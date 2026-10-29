@@ -1,0 +1,10 @@
+{
+  "name": "@scholar-club/pdf-viewer",
+  "version": "0.1.0",
+  "description": "零 LLM 依赖、可复用的 PDF 查看器组件（pdfjs-dist 6 直连）",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}
