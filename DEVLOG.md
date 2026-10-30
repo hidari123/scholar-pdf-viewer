@@ -259,5 +259,26 @@
 - yml 本身即交付物：推送到 GitHub 远端后自动生效
 
 **验证**
-- 本地：`pnpm verify` 全绿；react 矩阵可本地模拟（demo 换装 react@18 → typecheck + build → 换回 19，`git restore` 还原 lockfile/demo package.json）
+- 本地：`pnpm verify` 全绿；react 矩阵本地模拟通过（demo 换装 react@18 → typecheck + build 绿 → 换回 19，`git restore pnpm-lock.yaml demo/package.json` + `pnpm install` 还原基线）
 - GitHub 侧：推送到远端后首跑确认两个 job 全绿
+
+---
+
+## 第 10 步：README + 测试样张清单（Phase 0 收尾）（2026-10-30）
+
+**做了什么**
+- `README.md`：包的门面——定位 / 五条设计原则（硬约束）/ 三条消费契约 / 主题变量表 / StorageAdapter / 错误码表 / 坐标三空间 / 开发指引 / roadmap
+- `TEST-SAMPLES.md`：10 个 PDF 测试样张（S1–S10），每个标注用途 / 验证点 / 获取方式；实际文件放 `test-fixtures/`（gitignore，不进库）
+- `.gitignore` 加 `test-fixtures/`
+
+**为什么这么实现**
+- README = 面试第一张幻灯片：**"设计原则"放在"功能"前面**——零 LLM / 零 antd / 零业务 API / SSR 安全 / wire 兼容这五条硬约束是包的差异化，先讲原则再讲用法
+- 只写已存在的东西：组件阶段 2 才来，README 只呈现当前契约（类型 / 三入口 / 主题 / 适配器）+ roadmap，不虚构功能——0.x 的诚实比 1.0 的包装可信
+- 测试样张是"清单"不是"文件"：PDF 大，直接进库仓库会胖（git-lfs 是另一个决策）；清单固定的是"该测什么、从哪来、每个文件验证什么"——阶段 2+ 回归的验收基准
+- 10 个样张与方案 §9 边界矩阵一一对应：9 个 E_* 错误码全部有样张覆盖，另有旋转 / 大文件 / CJK / 无文本层四个渲染边界
+- biome 2.6 的 markdown 格式化验证过（prose 保持原样、表格不重排），.md 进 lint gate 无副作用
+
+**验证**
+- README 代码块自测：安装/导入示例可直接复制运行；变量表与 `src/styles/viewer.css` 逐条一致
+- TEST-SAMPLES.md 覆盖全部 9 个错误码 + 4 个渲染边界
+- `pnpm verify` 仍 5 gate 全绿（第 10 步纯文档，零代码改动）
