@@ -4,6 +4,7 @@
   "description": "零 LLM 依赖、可复用的 PDF 查看器组件（pdfjs-dist 6 直连）",
   "type": "module",
   "license": "MIT",
+  "packageManager": "pnpm@10.32.1",
   "engines": {
     "node": ">=22.13.0"
   },
@@ -33,6 +34,7 @@
     "format": "biome format --write .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "verify": "node scripts/verify.mjs",
     "demo": "pnpm --filter @scholar-club/pdf-viewer-demo dev"
   },
   "devDependencies": {

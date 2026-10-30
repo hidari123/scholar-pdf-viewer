@@ -206,6 +206,8 @@
 - `demo/`：Vite 8 + React 19 + @vitejs/plugin-react；原生元素 + 包 CSS 变量，**零 antd**
 - 根 package.json：`peerDependencies: react >=18 <20`；script `demo`（`pnpm --filter ... dev`）
 - demo 消费的是 **dist 构建产物**（先 `pnpm build` 再 `pnpm demo`）
+- `scripts/verify.mjs` + script `verify`：质量门禁总入口（lint → typecheck → test → build → demo:typecheck，顺序执行、任一红即停）
+- 根 package.json 加 `packageManager: "pnpm@10.32.1"`（pnpm 版本单一事实源，pnpm/action-setup 与 corepack 自动读取）
 
 **遇到的问题**
 1. 编辑器报 2 个错、当时只跑了根 typecheck——逐条区分真假：
@@ -231,8 +233,31 @@
   3. 代价 = 开发前先 `pnpm build`（~1s）——这个代价就是价值（保真税）；大包可以源码 alias 换 DX 速度，小包背离保真不划算
 - 零 antd 的 demo 本身就是验收标准：包 + demo + 集成层三处零 antd 是既定约束；demo 证明"不靠 UI 库也能搭出可用的消费端"
 - workspace 而不用 npm link：workspace 协议是 pnpm 原生语义、lockfile 可追溯；发布不受影响（`files: ["dist"]` 保证 demo 不进包）
+- 为什么 verify 脚本：门禁清单单一事实源——本地提交前与 CI（第 9 步）跑同一个脚本，"本地绿 = CI 绿"结构上成立；每个 gate 是单条 pnpm 命令（零 shell 拼接，第 7 步 && 教训的延续）；顺序有含义（build 先于 demo:typecheck——demo 消费 dist）
 
 **验证**
 - `pnpm build` → `pnpm demo` → http://localhost:5173：main 入口 VERSION / core 子路径空模块（运行时导出 []）/ styles.css 变量色块生效
-- demo 内 `tsc --noEmit` 干净（走的是 dist 的 d.ts，类型契约也被验证）
+- `pnpm verify` 5 个 gate 全绿（demo typecheck 首跑，走 dist 的 d.ts，类型契约也被验证）
 - 根 typecheck / test / lint 保持绿
+
+---
+
+## 第 9 步：CI — GitHub Actions（2026-10-30）
+
+**做了什么**
+- `.github/workflows/ci.yml`，两个 job：
+  - `verify`：主管线 = `pnpm verify`（与本地同一个脚本）
+  - `react-matrix`：demo 在 react 18 / 19 下都能 typecheck + vite build（持续验证 peer 范围 `>=18 <20`）
+- 触发：push main + PR；`concurrency` 同分支只留最新一次
+
+**为什么这么实现**
+- CI 跑 `pnpm verify` 而不是列步骤：门禁清单单一事实源（scripts/verify.mjs），加/改门禁 = 改一个文件，"本地绿 = CI 绿"结构上成立
+- `--frozen-lockfile`：CI 必须装 lockfile 记录的那棵树（deps 表达意图、lockfile 表达事实）；有分歧 = lockfile 过期或有人装完没提交
+- 为什么有 react 矩阵：peer 范围是写进 package.json 的对消费者承诺，"18 也能用"必须由机器持续证明。阶段 0 矩阵成本低（只有类型 + demo），阶段 2 组件（hooks）落地后同一矩阵自动覆盖 react 18/19 的类型与 hook 行为差异——提前铺好，到时候零成本
+- 矩阵 job 先跑根 build：demo 消费 dist（保真纪律），CI 全新 checkout 没有 dist
+- Node 24：最新 LTS 线，且在 `engines: node>=22.13` 声明的范围内
+- yml 本身即交付物：推送到 GitHub 远端后自动生效
+
+**验证**
+- 本地：`pnpm verify` 全绿；react 矩阵可本地模拟（demo 换装 react@18 → typecheck + build → 换回 19，`git restore` 还原 lockfile/demo package.json）
+- GitHub 侧：推送到远端后首跑确认两个 job 全绿

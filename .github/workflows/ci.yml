@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 主管线：与本地同一个 verify 脚本（lint / typecheck / test / build / demo typecheck）
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm 版本自动读 package.json 的 packageManager 字段
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify
+
+  # peer 兼容矩阵：消费者（demo）在 react 18 / 19 下都能 typecheck + build
+  react-matrix:
+    name: demo @ react ${{ matrix.react }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        react: ["18", "19"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # demo 消费 dist：先构建包（全新 checkout 没有 dist）
+      - run: pnpm build
+      # demo（宿主侧）换装目标 react 版本
+      - run: >-
+          pnpm --filter @scholar-club/pdf-viewer-demo add
+          react@^${{ matrix.react }} react-dom@^${{ matrix.react }}
+          @types/react@^${{ matrix.react }} @types/react-dom@^${{ matrix.react }}
+      - run: pnpm --filter @scholar-club/pdf-viewer-demo run typecheck
+      - run: pnpm --filter @scholar-club/pdf-viewer-demo run build
