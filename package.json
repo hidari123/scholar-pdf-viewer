@@ -17,13 +17,17 @@
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js",
       "require": "./dist/core.cjs"
-    }
+    },
+    "./styles.css": "./dist/styles.css"
   },
+  "sideEffects": [
+    "**/*.css"
+  ],
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome format --write .",

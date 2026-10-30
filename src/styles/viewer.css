@@ -1,0 +1,27 @@
+/* @scholar-club/pdf-viewer —— 基础样式（类名 scpdf- 前缀隔离，CSS 变量主题化） */
+
+:root {
+  --scpdf-color-surface: #ffffff;
+  --scpdf-color-surface-alt: #f5f6f8;
+  --scpdf-color-text: #1f2329;
+  --scpdf-color-border: #e5e6eb;
+  --scpdf-color-primary: #2f54eb;
+  --scpdf-highlight-my: #fff3bf; /* label-6 黄（现有默认高亮色） */
+  --scpdf-highlight-others: #d6e4ff;
+  --scpdf-highlight-active: #2f54eb;
+  --scpdf-bbox-color: #2f54eb;
+  --scpdf-shadow-page: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --scpdf-radius-page: 2px;
+  --scpdf-motion-fast: 120ms;
+  --scpdf-motion-base: 200ms;
+  --scpdf-motion-slow: 320ms;
+  --scpdf-font-reading:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei",
+    sans-serif;
+}
+
+.scpdf-root {
+  font-family: var(--scpdf-font-reading);
+  color: var(--scpdf-color-text);
+  background: var(--scpdf-color-surface-alt);
+}
