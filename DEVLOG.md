@@ -108,3 +108,24 @@
 - `pnpm test` → 1 passed
 - 红绿演练：加 window 引用 → 红（ReferenceError）；删除 → 绿
 - `pnpm typecheck` 通过
+
+---
+
+## 第 5 步：运行时依赖 — pdfjs-dist + idb（2026-10-30）
+
+**做了什么**
+- `pnpm add pdfjs-dist idb`（进 `dependencies`，不是 devDependencies）
+- tsup.config.ts 加 `external: ['pdfjs-dist', 'idb']`（与依赖同一提交变更）
+- `tests/ssr-smoke.test.ts` 增加 2 条依赖的 SSR import 测试（node 环境可直接 import、import 无副作用）
+- 版本：pdfjs-dist ^6.4.x（最新 6 线）、idb ^8.x
+
+**为什么这么实现**
+- 这两个是包**仅有的**运行时依赖（方案 §4.1 定死的决策）。提前装 = lockfile 锁住版本 + 依赖的 SSR 属性现在就在依赖层验证，而不是等几千行代码依赖它们之后才发现
+- 三类依赖字段的划分标准（面试必答）：
+  - `peerDependencies` = "必须全局唯一、宿主提供"（react —— 两份实例 = hooks 崩）
+  - `dependencies` = "我的实现细节、版本由我锁、消费者自动安装"（pdfjs-dist / idb —— 宿主不需要知道、也不应能干预；宿主乱装一个不匹配版本就是事故）
+  - `devDependencies` = "只在构建/测试本包时需要，消费者不可见"（typescript / tsup / vitest / biome…）
+- 为什么 external 和依赖**同一提交**变更：external 是"哪些是我的代码、哪些是我的依赖"的边界线。漏了 external，esbuild 会把依赖打进产物（打进 pdfjs = 包体积暴增数 MB，且宿主无法独立管理其版本）。规则：deps 与 external 一起变
+- 为什么给第三方依赖写 SSR 测试："包可 SSR import"的承诺包含整条依赖链——pdfjs 若不能在 Node import，承诺在依赖层就是假的。现在验证，不等渲染层写完
+- （选型记录）pdfjs-dist 6.4 **直连**、不用 react-pdf 封装：版本自主 / 不被封装层绑架 / peer 兼容 React 18+19（方案 §3）；退路 ^5.3 记录于方案 §16
+- （选型记录）idb：IndexedDB 的 Promise 封装。主项目现有手写 IDB 正是 B1 类 bug（Promise 提前 resolve、删除无人等待）的来源，idb 从 API 形态上消灭这类回调陷阱
