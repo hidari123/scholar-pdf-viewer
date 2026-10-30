@@ -130,6 +130,9 @@
 - （选型记录）pdfjs-dist 6.4 **直连**、不用 react-pdf 封装：版本自主 / 不被封装层绑架 / peer 兼容 React 18+19（方案 §3）；退路 ^5.3 记录于方案 §16
 - （选型记录）idb：IndexedDB 的 Promise 封装。主项目现有手写 IDB 正是 B1 类 bug（Promise 提前 resolve、删除无人等待）的来源，idb 从 API 形态上消灭这类回调陷阱
 
+**观察**
+- SSR 测试（pdfjs-dist 的 Node import 测试）中 pdfjs 打印 `Warning: Please use the 'legacy' build in Node.js environments`——阶段 0 只验证"import 不炸"，警告可接受；阶段 1 core 真正 import pdfjs 时决定构建策略（浏览器 = modern build；Node/SSR 需要碰 pdfjs API 时 = legacy build 或动态 import）
+
 ---
 
 ## 第 6 步：core 公共类型模型（API 契约）（2026-10-30）
@@ -203,6 +206,19 @@
 - `demo/`：Vite 8 + React 19 + @vitejs/plugin-react；原生元素 + 包 CSS 变量，**零 antd**
 - 根 package.json：`peerDependencies: react >=18 <20`；script `demo`（`pnpm --filter ... dev`）
 - demo 消费的是 **dist 构建产物**（先 `pnpm build` 再 `pnpm demo`）
+
+**遇到的问题**
+1. 编辑器报 2 个错、当时只跑了根 typecheck——逐条区分真假：
+   - `ts(2882) 找不到 styles.css 侧效导入的类型声明`：**真缺口**——`.css` 侧效导入的类型来自 Vite 的 `vite/client`（`declare module '*.css'` 通配声明，TS 5.6+ 开始检查侧效导入），Vite 模板标配的 `src/vite-env.d.ts` 被漏建
+     - 为什么只在编辑器看到：demo 有独立 tsconfig，它的 `tsc --noEmit` **还没跑过**（Vite 渲染页面不做类型检查，页面正常 ≠ 类型绿）。demo 的 typescript 实际解析到 5.9.3（与根一致，全工作区单一编译器版本）
+     - 修复：新建 `demo/src/vite-env.d.ts`（一行 `/// <reference types="vite/client" />`）
+   - `ts(2307) 找不到 './App'`：**假报错**——文件存在且 CLI 能解析，是编辑器 TS Server 在 App.tsx 创建前就检查过 main.tsx 的过期状态
+     - 修复：`TypeScript: Restart TS Server`（零代码改动）
+2. 全库 `biome check` 报 15 个 format 错误：CRLF 行尾（Windows 编辑器）+ 双引号（编辑器保存时自动格式化覆盖了 biome 单引号 house style）+ 1 处 import 顺序
+   - 根因：**编辑器和 biome 各持一套"格式权威"**；第 4 步起新增文件后没有再跑 `pnpm format`
+   - 修复：`biome check . --write` 一次清空（Biome 2.6 的 apply 叫 `--write`，`--apply` 是旧版本 flag，已不存在）+ `.gitattributes`（`* text=auto eol=lf`，LF 是跨平台/包生态标准）+ `.vscode/settings.json`（Biome 扩展为唯一格式化器 + files.eol LF + `js/ts.tsdk.path` 指向工作区 typescript；`typescript.tsdk` 在新版 VS Code 已废弃改名）
+   - 纪律：**格式权威只能有一个**——编辑器保存格式化必须与 CLI 同一工具，否则每次保存都是拉锯；编辑器与 CLI 还应共用同一 TS 版本（tsdk 指到 node_modules）
+3. `main.tsx` 的 `getElementById('root')!` 触发 `noNonNullAssertion`（biome recommended 警告）：`!` 是模板惯性，改为显式判空 + 快速失败（throw 明确错误），不关规则
 
 **为什么这么实现**
 - demo = 第一个"真实消费者"：它扮宿主 App 的角色——react 由它安装提供（宿主职责），包只声明 peer 范围

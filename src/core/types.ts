@@ -91,7 +91,7 @@ export interface HighlightRecord {
   selectedText: string;
   position: NormPosition;
   /** 现有 myNotes / othersNotes 的合并表达 */
-  source: "my" | "others";
+  source: 'my' | 'others';
   authorName?: string;
   /** 富文本 JSON 字符串：后端 wire 原样透传，包内不解析 */
   context?: string;
@@ -137,7 +137,7 @@ export interface PdfDocInfo {
 
 /** 缓存事件 */
 export interface CacheEvent {
-  type: "hit" | "miss" | "save" | "evict" | "error";
+  type: 'hit' | 'miss' | 'save' | 'evict' | 'error';
   url: string;
   size?: number;
   error?: unknown;
@@ -146,15 +146,15 @@ export interface CacheEvent {
 /** 查看器错误（code 表见方案 §8） */
 export interface PdfViewerError {
   code:
-    | "E_LOAD_HTTP"
-    | "E_LOAD_NETWORK"
-    | "E_PDF_INVALID"
-    | "E_EMPTY"
-    | "E_PDF_ENCRYPTED"
-    | "E_PDF_PASSWORD_WRONG"
-    | "E_RENDER_PAGE"
-    | "E_LINK_INVALID"
-    | "E_CACHE_QUOTA";
+    | 'E_LOAD_HTTP'
+    | 'E_LOAD_NETWORK'
+    | 'E_PDF_INVALID'
+    | 'E_EMPTY'
+    | 'E_PDF_ENCRYPTED'
+    | 'E_PDF_PASSWORD_WRONG'
+    | 'E_RENDER_PAGE'
+    | 'E_LINK_INVALID'
+    | 'E_CACHE_QUOTA';
   message: string;
   cause?: unknown;
   pageNumber?: PageNumber;

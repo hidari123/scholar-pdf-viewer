@@ -1,0 +1,6 @@
+{
+  "files.eol": "\n",
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "biomejs.biome",
+  "js/ts.tsdk.path": "node_modules/typescript/lib"
+}

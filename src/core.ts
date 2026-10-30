@@ -9,4 +9,4 @@
  * core 子路径入口：import ... from '@scholar-club/pdf-viewer/core'
  * 零 React 依赖，可在 Node / Worker 环境使用。
  */
-export * from "./core";
+export * from './core';

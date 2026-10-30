@@ -5,8 +5,8 @@
  * @LastEditTime: 2026-10-30 15:13:01
  * Copyright (c) 2026 by hidari, All Rights Reserved.
  */
-import { cpSync, mkdirSync } from "node:fs";
-import tsupModule from "tsup";
+import { cpSync, mkdirSync } from 'node:fs';
+import tsupModule from 'tsup';
 
 const { build } = tsupModule;
 
@@ -16,6 +16,6 @@ const { build } = tsupModule;
 // tsup 9 编程接口是 build(options)（v9 由 tsup() 改名且 options 必传）；tsup 是 CJS 模块，用 default import + 解构
 await build({});
 
-mkdirSync("dist", { recursive: true });
-cpSync("src/styles/viewer.css", "dist/styles.css");
-console.log("[build] ok: dist/ (js + dts + styles.css)");
+mkdirSync('dist', { recursive: true });
+cpSync('src/styles/viewer.css', 'dist/styles.css');
+console.log('[build] ok: dist/ (js + dts + styles.css)');

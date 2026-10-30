@@ -10,4 +10,4 @@
  * 阶段 0：公共类型模型定稿（API 契约）；
  * 阶段 1 起加入 geometry / selection / highlight / cache / document / search / store。
  */
-export type * from "./types";
+export type * from './types';
