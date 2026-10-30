@@ -6,4 +6,4 @@
  * Copyright (c) 2026 by hidari, All Rights Reserved.
  */
 // @scholar-club/pdf-viewer 主入口（占位，阶段 1 起由真实模块替换）
-export const VERSION = "0.1.0";
+export const VERSION = '0.1.0';

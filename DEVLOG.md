@@ -49,3 +49,33 @@
 - `pnpm typecheck` 通过
 - `pnpm build` 完整跑完，`dist/` 共 6 个文件：index.js / index.cjs / index.d.ts / index.d.cts + 2 个 .map
 - `node -e "import('./dist/index.js')"` → `esm ok: 0.1.0`（ESM 产物可被直接加载）
+
+---
+
+## 第 3 步：lint/format — biome（2026-10-30）
+
+**做了什么**
+- `pnpm add -D @biomejs/biome`（v2）
+- `biome.json`：recommended 规则集 + house style（单引号 / 分号必写 / trailing commas / 2 空格 / 100 列）
+- scripts 加 `lint`（biome check .）/ `format`（biome format --write .）
+- 运行 `biome migrate --write`：配置按 CLI 2.6.4 的 schema 迁移（见"遇到的问题"）
+
+**遇到的问题**
+1. `biome check` 报 2 条 info（非 error，lint 本身 0 错误）：
+   - `$schema` 写的 2.0.0，CLI 实际是 2.6.4 —— 配置 schema 版本与 CLI 版本不配套
+   - `rules.recommended` 已废弃，下个主版本移除，要求改用 `preset`
+   - 处理：`biome migrate --write` 官方一键迁移，配置自动改写到 2.6.4 schema（语义不变，diff 已人工确认）
+   - 教训：**配置文件也有版本**。装最新 CLI 就用官方 migrate 把配置迁到对应 schema；deprecation 噪音不处理 = 等移除那天直接炸 + 团队对警告脱敏
+
+**为什么这么实现**
+- 为什么需要 lint+format：公开包的源码会被消费者阅读，风格一致性是专业度的一部分；靠人工维持风格 = 漂移 + 扯皮，自动化 = 零成本
+- 为什么 biome 单工具而不是 ESLint + Prettier：
+  - 两工具职责重叠：ESLint 的风格规则与 Prettier 格式化互相冲突（eslint-config-prettier 这个包的存在本身就是尴尬的证据）
+  - Biome（Rust 单二进制）lint + format 一体，速度 5–10 倍 → 每次保存/PR 都跑，快才有人真的开
+  - **取舍（两头都要会说）**：Biome 规则生态/插件系统小于 ESLint（社区插件数千个）。决策规则：需要自定义规则/特定生态插件 → ESLint；标准 TS/React 组件包、内置 recommended 够用 → Biome。将来出现自定义规则需求再切回，biome.json 的配置思路可直接迁移
+- `vcs.useIgnoreFile: true`：lint 范围与 .gitignore 共享，"哪些文件不算数"单一事实源
+- 规则集用内置 recommended 原样、不写自定义规则——配置最小化，每条开着的规则都有默认理由
+
+**验证**
+- `pnpm format` 干净跑完（如有 diff = biome 统一风格，看过后随本提交一起进）
+- `pnpm lint` → 0 errors
