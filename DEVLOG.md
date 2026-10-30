@@ -78,4 +78,33 @@
 
 **验证**
 - `pnpm format` 干净跑完（如有 diff = biome 统一风格，看过后随本提交一起进）
-- `pnpm lint` → 0 errors
+- `pnpm lint` → 0 errors（migrate 后 0 infos）
+
+---
+
+## 第 4 步：测试框架 — vitest + SSR 冒烟测试（2026-10-30）
+
+**做了什么**
+- `pnpm add -D vitest`（v5）
+- `vitest.config.ts`：`environment: 'node'`，显式枚举测试位置（src + tests）
+- `tests/ssr-smoke.test.ts`：第一个测试——纯 Node 环境 import 包入口
+- scripts 加 `test`（vitest run）/ `test:watch`（vitest）
+- tsconfig `include` 扩为 src + tests + vitest.config.ts + tsup.config.ts（每个区域出现即纳入类型检查）
+
+**为什么这么实现**
+- 为什么先上测试框架（还没写业务逻辑）：测试框架和 tsup/biome 同级是工具——独立一步、验证可用、之后才依赖它。从下一步起，每步代码都带测试进场
+- 为什么 vitest 而不是 jest：与 Vite 同一套 transform 管线（第 8 步 demo 也用 Vite），TS/ESM/别名零配置；jest 要额外配 ts-jest/babel。全仓库一种配置语言（defineConfig）
+- 为什么 core 测试用 `environment: 'node'`（关键决策）：
+  - core 层承诺零 DOM；node 环境跑测试更快**且更诚实**——core 顶层误碰 window/document 会当场抛错，jsdom 会用假 window 把 bug 藏起来
+  - 环境即层契约：core = node（无 DOM）；将来组件测试 = 单文件 `// @vitest-environment jsdom` 显式声明
+- 为什么 SSR 冒烟测试只有一行却价值大：
+  - 经典失效模式：模块顶层 `navigator.userAgent`（主项目现有 PageCom 的 isSafari 判断正是此形状）→ 浏览器 SPA 正常，Next.js/SSR 一 import 就炸
+  - 这条测试 = 永久守卫：未来任何顶层 DOM 访问在 CI 红掉，而不是在消费者服务器炸掉
+  - 语义上声明了包的适用域：任何框架，而不只是浏览器 SPA
+- 为什么测试里用 `await import()` 动态导入：模块 import 期抛错时得到清晰的单条测试失败；静态 import 会炸掉整个测试文件的加载，报错更难读
+- "红-绿"验证：临时在 src/index.ts 加 `const w = window;`，测试必须红（ReferenceError: window is not defined），删掉回绿——不会变红的守卫没有价值
+
+**验证**
+- `pnpm test` → 1 passed
+- 红绿演练：加 window 引用 → 红（ReferenceError）；删除 → 绿
+- `pnpm typecheck` 通过
