@@ -129,3 +129,29 @@
 - 为什么给第三方依赖写 SSR 测试："包可 SSR import"的承诺包含整条依赖链——pdfjs 若不能在 Node import，承诺在依赖层就是假的。现在验证，不等渲染层写完
 - （选型记录）pdfjs-dist 6.4 **直连**、不用 react-pdf 封装：版本自主 / 不被封装层绑架 / peer 兼容 React 18+19（方案 §3）；退路 ^5.3 记录于方案 §16
 - （选型记录）idb：IndexedDB 的 Promise 封装。主项目现有手写 IDB 正是 B1 类 bug（Promise 提前 resolve、删除无人等待）的来源，idb 从 API 形态上消灭这类回调陷阱
+
+---
+
+## 第 6 步：core 公共类型模型（API 契约）（2026-10-30）
+
+**做了什么**
+- `src/core/types.ts`：全部公共类型（坐标三空间 / NormRect wire 格式 / BboxData / HighlightRecord / SelectionData / StorageAdapter / PopoverAction / 错误码等）
+- core 子路径入口落地：`src/core.ts`（子路径入口）+ `src/core/index.ts`（实现目录）；`src/index.ts` re-export 类型模型 + VERSION
+- tsup entry 扩为 index + core（2 入口 × esm/cjs × dts）
+- package.json 加 `exports`（`.` 与 `./core`，types 条件第一位）+ `files: ["dist"]`
+
+**为什么这么实现**
+- types 先行：类型文件是 API 的 single source of truth，实现/测试/文档都从它推导；评审 API = 评审这一百多行，而不是三千行实现
+- wire 兼容类型的注释即文档：NormRect / BboxData 的语义（哪个坐标系、原点在哪、页码 0-based 还是 1-based、比例的参考是什么）是全包最易错的部分，写进类型注释后维护者永不需要再问"这字段什么意思"
+- 坐标三空间（PDF 点 / 归一化 / 视口 px）一次定义，后续所有换算都是基于这些类型的纯函数——从结构上消灭主项目"换算散落 5+ 文件"的问题（A6）
+- core 子路径入口在这一步落地（而不是更早/更晚）：入口结构在这里定稿，exports map 描述的正是这个结构——**入口结构与 exports 同提交**
+- 为什么只有 `exports`、不写 main/module：exports 是 ESM 时代唯一标准入口声明，还能封死深路径导入（消费者 import 不到内部实现）；main/module 是 CJS 时代遗留，现代 bundler 消费方不需要——契约面最小化
+- `files: ["dist"]` 同提交：npm 包面 = 发布面；没有 files 白名单，demo/tests/DEVLOG 全会进包（安装成本 + 供应链攻击面）
+- `src/core.ts`（子路径入口）与 `src/core/`（实现目录）同名共存是标准模式，模块解析优先同名文件，不冲突
+- `dist/core.js` 当前是空模块属正常：契约暂全是类型（类型擦除后无运行时导出），阶段 1 第一个运行时函数（坐标换算）落地后它才有内容
+
+**验证**
+- `pnpm test` → 4 passed（含 core 子路径 import）
+- `pnpm build` → dist 12 个文件（2 入口 × 4 产物 + 4 maps）；`dist/core.js` 为空模块
+- node 直接 import `dist/index.js` 与 `dist/core.js` 均成功
+- `pnpm typecheck` 通过
