@@ -1,4 +1,10 @@
-/* @scholar-club/pdf-viewer —— 基础样式（类名 scpdf- 前缀隔离，CSS 变量主题化） */
+/* @scholar-club/pdf-viewer —— 样式
+ *
+ * 约定：
+ * - 所有类名 `scpdf-` 前缀（命名空间隔离，防撞宿主）
+ * - 所有颜色/尺寸走 CSS 变量（宿主覆盖变量即换肤）
+ * - 零构建依赖：任何 bundler 都能用，也能 CDN 直引
+ */
 
 :root {
   --scpdf-color-surface: #ffffff;
@@ -6,7 +12,7 @@
   --scpdf-color-text: #1f2329;
   --scpdf-color-border: #e5e6eb;
   --scpdf-color-primary: #2f54eb;
-  --scpdf-highlight-my: #fff3bf; /* label-6 黄（现有默认高亮色） */
+  --scpdf-highlight-my: #fff3bf;
   --scpdf-highlight-others: #d6e4ff;
   --scpdf-highlight-active: #2f54eb;
   --scpdf-bbox-color: #2f54eb;
@@ -20,8 +26,301 @@
     sans-serif;
 }
 
+/* 暗色主题（跟随系统或手动开启） */
+@media (prefers-color-scheme: dark) {
+  .scpdf-root--auto {
+    --scpdf-color-surface: #1f1f1f;
+    --scpdf-color-surface-alt: #141414;
+    --scpdf-color-text: #e6e6e6;
+    --scpdf-color-border: #333333;
+    --scpdf-highlight-my: #6b5a1f;
+    --scpdf-highlight-others: #26426b;
+  }
+}
+
+.scpdf-root--dark {
+  --scpdf-color-surface: #1f1f1f;
+  --scpdf-color-surface-alt: #141414;
+  --scpdf-color-text: #e6e6e6;
+  --scpdf-color-border: #333333;
+  --scpdf-highlight-my: #6b5a1f;
+  --scpdf-highlight-others: #26426b;
+}
+
 .scpdf-root {
   font-family: var(--scpdf-font-reading);
   color: var(--scpdf-color-text);
+  background: var(--scpdf-color-surface-alt);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+}
+
+/* ---------- 工具栏 ---------- */
+
+.scpdf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--scpdf-color-surface);
+  border-bottom: 1px solid var(--scpdf-color-border);
+  flex: 0 0 auto;
+}
+
+.scpdf-toolbar__left,
+.scpdf-toolbar__center,
+.scpdf-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scpdf-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    background var(--scpdf-motion-fast) ease,
+    border-color var(--scpdf-motion-fast) ease;
+}
+
+.scpdf-toolbar__btn:hover:not(:disabled) {
+  background: var(--scpdf-color-surface-alt);
+  border-color: var(--scpdf-color-border);
+}
+
+.scpdf-toolbar__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.scpdf-toolbar__btn:focus-visible {
+  outline: 2px solid var(--scpdf-color-primary);
+  outline-offset: 1px;
+}
+
+.scpdf-toolbar__pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.scpdf-toolbar__page-input {
+  width: 44px;
+  padding: 3px 6px;
+  border: 1px solid var(--scpdf-color-border);
+  border-radius: 4px;
+  background: var(--scpdf-color-surface);
+  color: inherit;
+  font: inherit;
+  text-align: center;
+}
+
+.scpdf-toolbar__page-total {
+  color: var(--scpdf-color-text);
+  opacity: 0.65;
+}
+
+.scpdf-toolbar__scale {
+  min-width: 44px;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+/* ---------- 滚动容器 ---------- */
+
+.scpdf-container {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: auto;
+  outline: none;
+  padding: 16px 0;
+}
+
+.scpdf-pages {
+  position: relative;
+  width: 100%;
+}
+
+/* ---------- 页面 ---------- */
+
+.scpdf-page {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  background: var(--scpdf-color-surface);
+  box-shadow: var(--scpdf-shadow-page);
+  border-radius: var(--scpdf-radius-page);
+  overflow: hidden;
+}
+
+.scpdf-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- 标注层（高亮 / 链接） ---------- */
+
+.scpdf-annotations {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.scpdf-annotation {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background var(--scpdf-motion-fast) ease;
+}
+
+.scpdf-annotation--mine {
+  background: var(--scpdf-highlight-my);
+}
+
+.scpdf-annotation--others {
+  background: var(--scpdf-highlight-others);
+}
+
+.scpdf-annotation--active {
+  outline: 2px solid var(--scpdf-highlight-active);
+  outline-offset: 0;
+}
+
+/* ---------- 状态区（加载 / 空 / 错误） ---------- */
+
+.scpdf-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  color: var(--scpdf-color-text);
+}
+
+.scpdf-state__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.scpdf-state__hint {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.65;
+}
+
+.scpdf-state--error .scpdf-state__title {
+  color: #d83931;
+}
+
+.scpdf-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--scpdf-color-border);
+  border-radius: 4px;
+  background: var(--scpdf-color-surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.scpdf-btn:hover {
+  border-color: var(--scpdf-color-primary);
+  color: var(--scpdf-color-primary);
+}
+
+/* ---------- 搜索面板 ---------- */
+
+.scpdf-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--scpdf-color-surface);
+  border-bottom: 1px solid var(--scpdf-color-border);
+  flex: 0 0 auto;
+}
+
+.scpdf-search__input {
+  flex: 1 1 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--scpdf-color-border);
+  border-radius: 4px;
+  background: var(--scpdf-color-surface);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+/* ---------- 面板（缩略图 / 目录） ---------- */
+
+.scpdf-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 220px;
+  padding: 12px;
+  background: var(--scpdf-color-surface);
+  border-right: 1px solid var(--scpdf-color-border);
+  overflow: auto;
+  z-index: 2;
+}
+
+.scpdf-panel__title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.scpdf-thumbnail {
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.scpdf-thumbnail--active {
+  border-color: var(--scpdf-color-primary);
+}
+
+.scpdf-outline__item {
+  display: block;
+  width: 100%;
+  padding: 3px 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.scpdf-outline__item:hover {
   background: var(--scpdf-color-surface-alt);
 }

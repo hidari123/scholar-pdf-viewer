@@ -4,11 +4,20 @@
  * 这里只做"跨环境都要准备"的事：
  * - jsdom 缺失的浏览器 API 补齐（IntersectionObserver / ResizeObserver / matchMedia）
  * - canvas 的 2d context 替身（jsdom 没有 canvas 实现，组件测试里 canvas 是空壳）
+ * - testing-library 的自动清理（每个用例之间清 DOM，否则元素会跨用例累积）
  *
  * 刻意**不**做的事：
  * - 不 mock pdf.js 全局（组件测试用注入的 fake document provider，见 tests/fixtures）
  * - 不改 React 的 act 环境（@testing-library/react 自带）
  */
+
+import { cleanup } from '@testing-library/react';
+import { afterEach } from 'vitest';
+
+// 每个用例后清理 DOM（testing-library 默认只在 globals 模式下自动清理，这里显式做）
+afterEach(() => {
+  cleanup();
+});
 
 /** 造一个极简 IntersectionObserver 替身（记录回调，可手动触发） */
 class FakeIntersectionObserver implements IntersectionObserver {

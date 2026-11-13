@@ -553,4 +553,47 @@
 
 ---
 
-## 阶段 2 · 第 2 步（下一步）：组件层 —— PdfViewer / PageCanvas / AnnotationLayer
+## 阶段 2 · 第 2 步：组件层 —— PdfViewer / Toolbar / PageCanvas / AnnotationLayer + i18n（2026-11-13）
+
+**做了什么**
+- `src/components/PdfViewer.tsx`：主组件（加载 → 页面流 → 虚拟化 → 缩放 → 当前页 → 选区 → 高亮层 → 键盘）
+- `src/components/Toolbar.tsx`：内置工具栏（零 UI 库；内联 SVG 图标；左右 slots 给宿主）
+- `src/components/PageCanvas.tsx`：单页 canvas（viewport 只读 / renderId 守卫 / DPR cap 2）
+- `src/components/AnnotationLayer.tsx`：高亮 DOM 层（可命中、可换肤、键盘可达）
+- `src/i18n/messages.ts`：zh/en 文案 + `{占位符}` 解析
+- `src/styles/viewer.css`：扩充为完整组件样式（工具栏/页面/标注层/状态区/面板 + 暗色主题）
+- `src/index.ts`：主入口导出组件 + hooks + 类型 + 错误码 + i18n
+- 测试：Toolbar 15 例 + AnnotationLayer 8 例（jsdom）
+
+**为什么这么实现**
+- **标注层用 DOM 不用 canvas**：DOM 天然可命中测试、可 hover、可被读屏器识别、可用 CSS 变量换肤；canvas 画的标注要自己实现命中与无障碍
+- **viewport 只读**：`page.getViewport({ scale })` 的结果绝不手工变异（主项目漂移 bug 的根因）
+- **renderId 守卫**：缩放/换文件后旧渲染回调直接丢弃；取消导致的错误不算失败（快速缩放会大量产生）
+- **DPR cap 2**：高分屏不糊（>2 收益递减）、低端机不爆（内存与填充率）
+- **工具栏内联 SVG 而非图标库**：保持零依赖 + 可换肤（`currentColor`）
+- **slots 而非业务 prop**：宿主的历史文档/分享按钮等业务入口，宿主自己塞进 `leftSlot`/`rightSlot`——包不提供业务入口（v2 边界）
+- **i18n 内置但可覆盖**：基础文案（加载中/空态/密码框）必须有，宿主可覆盖但不被迫提供
+
+**遇到的问题**
+1. **Toolbar 的 prop 名与实现不一致（真 bug）**：props 声明 `config`，但 `PdfViewer` 传的是 `toolbar` → 所有工具栏配置（showPageNav/showZoom/slots）**全部失效**
+   - 修复：统一为 `toolbar`（与方案 §5.1 公开 API 一致）
+   - 教训：**组件的 prop 名要有单一事实源**；类型系统没报错是因为两边都"合法"，只有测试能发现
+2. **页码输入框没法输入（真 UX 缺陷）**：受控 `value={page}` → 用户清空输入框时值立刻被外部覆盖回去
+   - 修复：改用**草稿值**（本地 state）+ 合法才提交 + 失焦非法值回落
+   - 教训：受控组件不等于"外部值直写"；凡是"用户要输入"的场景都要草稿值
+3. **测试之间 DOM 累积**：testing-library 的自动清理只在 `globals: true` 时生效 → 跨用例元素累积 → "Found multiple elements"
+   - 修复：`tests/setup.ts` 里显式 `afterEach(cleanup)`
+4. **biome 的 a11y 规则抓到 4 处问题**（都是真问题，不是误报）：高亮 div 带事件处理器（→ 改 `<button>`）、`role="status"`/`role="search"` 用 div（→ 换语义元素 `<output>`/`<search>`）、SVG 无 title、滚动容器 tabIndex
+   - 教训：**a11y 规则值得当真**——高亮块用 div 模拟按钮是常见偷懒，改成 button 后键盘可达是白送的
+5. **`biome-ignore` 注释位置**：JSX 里必须用 `//` 行注释写在**元素属性之间**才能生效（`{/* */}` 形式不被识别）
+   - 教训：抑制注释的语法随上下文变（JSX vs JS），别照抄
+6. **测试期望值算错**：输入 "99" 期望"无回调"，但中间态 "9" 是合法页码 → 合法跳页是对的
+   - 修复：改成输入单字符越界值，并补一例"中途合法立即跳页"（把正确行为也锁住）
+
+**验证**
+- `pnpm test`：142 passed（components 23 + hooks 17 + core 102）
+- `pnpm verify` 5 gate 全绿
+
+---
+
+## 阶段 2 · 第 3 步（下一步）：demo 改造 —— 真实 pdf.js 接入

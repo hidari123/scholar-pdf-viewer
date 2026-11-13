@@ -1,0 +1,147 @@
+// @vitest-environment jsdom
+
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import type { HighlightRecord } from '../core/types';
+import { AnnotationLayer } from './AnnotationLayer';
+
+/** 造一个高亮 */
+function highlight(overrides: Partial<HighlightRecord> = {}): HighlightRecord {
+  return {
+    id: 'h1',
+    color: 'label-6',
+    selectedText: '选中的文字',
+    position: {
+      boundingRect: {
+        x1: 10,
+        y1: 20,
+        x2: 110,
+        y2: 40,
+        width: 595,
+        height: 842,
+        pageNumber: 1,
+      },
+      rects: [
+        {
+          x1: 10,
+          y1: 20,
+          x2: 110,
+          y2: 40,
+          width: 595,
+          height: 842,
+          pageNumber: 1,
+        },
+      ],
+      pageNumber: 1,
+    },
+    source: 'my',
+    ...overrides,
+  };
+}
+
+describe('AnnotationLayer', () => {
+  /** 最小 props */
+  function setup(overrides: Partial<React.ComponentProps<typeof AnnotationLayer>> = {}) {
+    const props = {
+      pageNumber: 1,
+      highlights: [highlight()],
+      scale: 1,
+      viewport: { width: 595, height: 842 },
+      ...overrides,
+    };
+
+    const utils = render(<AnnotationLayer {...props} />);
+    return { props, ...utils };
+  }
+
+  it('无高亮时不渲染任何元素', () => {
+    setup({ highlights: [] });
+
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('渲染高亮块（我的高亮 class）', () => {
+    setup();
+
+    const element = screen.getByRole('button');
+    expect(element.className).toContain('scpdf-annotation--mine');
+  });
+
+  it('他人高亮用不同 class', () => {
+    setup({ highlights: [highlight({ source: 'others' })] });
+
+    expect(screen.getByRole('button').className).toContain('scpdf-annotation--others');
+  });
+
+  it('坐标按归一化比例换算成视口 px', () => {
+    // 参考 595×842，坐标 10,20 → 100,200 时比例 ×0.1
+    setup({
+      viewport: { width: 59.5, height: 84.2 },
+      highlights: [
+        highlight({
+          position: {
+            boundingRect: {
+              x1: 10,
+              y1: 20,
+              x2: 110,
+              y2: 40,
+              width: 595,
+              height: 842,
+              pageNumber: 1,
+            },
+            rects: [
+              {
+                x1: 10,
+                y1: 20,
+                x2: 110,
+                y2: 40,
+                width: 595,
+                height: 842,
+                pageNumber: 1,
+              },
+            ],
+            pageNumber: 1,
+          },
+        }),
+      ],
+    });
+
+    const element = screen.getByRole('button');
+    expect(element.style.left).toBe('1px');
+    expect(element.style.top).toBe('2px');
+    expect(element.style.width).toBe('10px');
+    expect(element.style.height).toBe('2px');
+  });
+
+  it('只渲染当前页的高亮', () => {
+    setup({
+      pageNumber: 2,
+      highlights: [highlight()],
+    });
+
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('点击高亮 → onHighlightClick', async () => {
+    const onHighlightClick = vi.fn();
+    setup({ onHighlightClick });
+
+    await userEvent.click(screen.getByRole('button'));
+
+    expect(onHighlightClick).toHaveBeenCalledTimes(1);
+    expect(onHighlightClick.mock.calls[0]?.[0]?.id).toBe('h1');
+  });
+
+  it('激活态加 active class', () => {
+    setup({ activeHighlightId: 'h1' });
+
+    expect(screen.getByRole('button').className).toContain('scpdf-annotation--active');
+  });
+
+  it('无障碍标签是选中的文本', () => {
+    setup();
+
+    expect(screen.getByRole('button').getAttribute('aria-label')).toBe('选中的文字');
+  });
+});
