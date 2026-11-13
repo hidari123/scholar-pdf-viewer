@@ -1,5 +1,4 @@
 # 本地测试样张（体积大，不入库）
 # 用法：把任意 PDF 放到 demo/public/samples/local.pdf，demo 会优先加载它
-demo/public/samples/local*.pdf
 demo/public/samples/*.pdf
 !demo/public/samples/.gitkeep
