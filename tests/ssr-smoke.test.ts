@@ -2,7 +2,7 @@
  * @Author: hidari
  * @Date: 2026-10-30 14:21:21
  * @LastEditors: hidari
- * @LastEditTime: 2026-10-30 14:38:57
+ * @LastEditTime: 2026-11-13 15:19:59
  * Copyright (c) 2026 by hidari, All Rights Reserved.
  */
 import { describe, expect, it } from 'vitest';
@@ -26,7 +26,7 @@ describe('SSR smoke', () => {
   });
 
   it('core 子路径入口可在 Node 环境直接 import', async () => {
-    const core = await import('../src/core');
+    const core = await import('../src/core/index');
     expect(core).toBeTypeOf('object');
   });
 });

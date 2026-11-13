@@ -153,6 +153,11 @@
 - `src/core.ts`（子路径入口）与 `src/core/`（实现目录）同名共存是标准模式，模块解析优先同名文件，不冲突
 - `dist/core.js` 当前是空模块属正常：契约暂全是类型（类型擦除后无运行时导出），阶段 1 第一个运行时函数（坐标换算）落地后它才有内容
 
+**【阶段 1 更正】以上两条判断均有误**
+
+- 上一条"同名共存是标准模式"不成立：同名文件与同名目录共存时，`src/core.ts` 里 `export * from './core'` 会**解析到它自己**（同名文件优先于同名目录）→ 自引用 → 类型模型与运行时导出**全部没进产物**（`dist/core.d.ts` = `export {}`，`dist/index.d.ts` 只剩 VERSION）。已在阶段 1 · 第 1 步修复：删 `src/core.ts`，tsup entry 指向 `src/core/index.ts`，引用改显式路径 `'./core/index'`
+- "空模块属正常"的真实原因不是"契约全是类型"，而是上面的自引用。修复后 `dist/core.js` 导出 6 个函数、`dist/core.d.ts` 6.03KB（含完整类型模型）
+
 **验证**
 - `pnpm test` → 4 passed（含 core 子路径 import）
 - `pnpm build` → dist 12 个文件（2 入口 × 4 产物 + 4 maps）；`dist/core.js` 为空模块
@@ -282,3 +287,36 @@
 - README 代码块自测：安装/导入示例可直接复制运行；变量表与 `src/styles/viewer.css` 逐条一致
 - TEST-SAMPLES.md 覆盖全部 9 个错误码 + 4 个渲染边界
 - `pnpm verify` 仍 5 gate 全绿（第 10 步纯文档，零代码改动）
+
+---
+
+## 阶段 1 · 第 1 步：core/geometry — 坐标换算纯函数 + golden 测试（2026-11-13）
+
+**做了什么**
+- `src/core/geometry/transform.ts`：三空间换算纯函数
+  - `viewToNorm(rect, ref)` / `normToView(norm, viewport)`：**语义逐字对齐**主项目 `viewportToScaled` / `scaledToViewport`
+  - `pdfToView(bbox, viewport, page, pageNumber)` / `viewToPdf(rect, viewport, page)`：优先用 pdf.js viewport API（正确处理 rotation/cropbox/userUnit），无 API 时仅 rotation=0 纯数学回退，rotation≠0 直接抛错
+  - `pdfToNorm` / `normToPdf`：组合路径
+  - bbox 输出统一规范化为 `[minX, minY, maxX, maxY]`
+- `src/core/geometry/transform.test.ts`：golden 测试（node 环境，零 pdf.js 依赖）
+- `src/core/geometry/index.ts` + `src/core/index.ts`：core 入口**第一次有运行时导出**
+- **修复阶段 0 的自引用 bug**：删 `src/core.ts`（`export * from './core'` 解析到自己 → 类型模型与全部运行时导出没进产物），tsup entry 改指 `src/core/index.ts`，`src/index.ts` 与测试改用显式路径 `'./core/index'`
+- 边界收窄辅助 `toQuad` / `toPair`（viewport API 返回 `number[]`，取出定长数字并校验）
+
+**为什么这么实现**
+- **里程碑断言抓出静默 bug**：`core exports:` 打印为空 + `dist/core.d.ts` = `export {}`——类型模型其实**一直没进产物**，而阶段 0 被我误判成"契约全是类型所以正常"。教训：**"看起来正常"不等于对**，产物级断言（导出名 / d.ts 体积 / 关键符号 grep）比"构建成功"更能暴露问题。已把这三条断言固化进本步的验证清单
+- 同名文件与同名目录是**陷阱**不是"标准模式"：模块解析里同名文件永远优先，`'./core'` 在 `src/core.ts` 里 = 自引用。消除方式是**显式路径**（`'./core/index'`）+ 让 entry 直指目录入口
+- 为什么换算必须是纯函数且放 core：数学路径零 DOM、零框架、零 pdf.js 依赖 → node 环境直接单测（layer 契约：core = 零 DOM）
+- **为什么语义必须逐字对齐主项目**（本步最重要的一条）：`NormRect` ≙ 后端 `ScaledPosition`，换算语义一改 = **存量高亮整体偏移**（数据没坏、只是渲染位置错 → 最难查的 bug）。已逐行核对主项目 `coordinates.ts` + `useTextSelection.ts` + `get-client-rects.ts` 的真实调用链
+- 核对出的 wire 真相（与直觉不同，必须写进注释）：存的不是"纯比例"，而是**坐标 + 采集时视口尺寸**的一对——读回时按 `当前视口尺寸 / 采集时视口尺寸` 线性映射，所以**同一份数据在任何缩放下落点相同**（缩放无关性）；主项目的 width/height 取的是**当前缩放下**的视口尺寸，不是 scale=1 的页面尺寸
+- 为什么优先 viewport API 而不是自己算：pdf.js 已处理 rotation/cropbox/userUnit，手算必错（修 A5：禁止手工变异 viewport）
+- 为什么不把 rotation≠0 的回退也补上：宁可抛错也不给不可信结果——静默算错比报错危险得多
+- **为什么不把 `PdfViewportLike` 的签名收紧成 tuple**（而是在边界收窄）：pdf.js 的 `PageViewport` 原生声明是 `Array<number>`，收紧后真实 PageViewport 无法直接赋值（要么 cast、要么加适配层）；**边界处收窄一次**比改动公共接口更划算。收窄时必须校验长度——NaN 坐标流到渲染层的表现是"全画在 0,0"，几乎无法排查
+- 为什么测试里不引入 pdf.js：单测只锁"我们的换算语义"，pdf.js 自身由它自己的测试保证；用最小 fake viewport（两种形态：有/无 API）覆盖两条代码路径
+- bbox 顺序规范化的原因：主项目 API 路径返回的 y 是上→下，与输入的 y 下→上相反 → 统一成 min/max 规范序，避免下游拿到方向不明的 bbox
+
+**验证**
+- `pnpm test`：14 passed（transform 10 例：wire 语义 / 缩放无关性 / API 与回退路径一致 / 旋转页抛错 / 组合往返 + SSR 4 例）
+- `pnpm typecheck`：0 error（`noUncheckedIndexedAccess` 下的边界收窄）
+- `pnpm build`：`dist/core.js` 导出 6 个函数（normToPdf, normToView, pdfToNorm, pdfToView, viewToNorm, viewToPdf）；`dist/core.d.ts` 6.03KB 含完整类型模型；`dist/index.d.ts` 504B 含类型 re-export
+- `pnpm verify` 5 gate 全绿

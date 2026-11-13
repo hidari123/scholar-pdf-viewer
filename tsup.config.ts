@@ -2,13 +2,13 @@
  * @Author: hidari
  * @Date: 2026-10-29 16:50:09
  * @LastEditors: hidari
- * @LastEditTime: 2026-10-30 14:38:18
+ * @LastEditTime: 2026-11-13 15:19:36
  * Copyright (c) 2026 by hidari, All Rights Reserved.
  */
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: { index: 'src/index.ts', core: 'src/core.ts' },
+  entry: { index: 'src/index.ts', core: 'src/core/index.ts' },
   format: ['esm', 'cjs'],
   dts: true,
   sourcemap: true,

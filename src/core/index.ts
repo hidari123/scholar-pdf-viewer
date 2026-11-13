@@ -2,7 +2,7 @@
  * @Author: hidari
  * @Date: 2026-10-30 14:37:13
  * @LastEditors: hidari
- * @LastEditTime: 2026-10-30 14:37:18
+ * @LastEditTime: 2026-11-13 15:38:32
  * Copyright (c) 2026 by hidari, All Rights Reserved.
  */
 /**
@@ -10,4 +10,5 @@
  * 阶段 0：公共类型模型定稿（API 契约）；
  * 阶段 1 起加入 geometry / selection / highlight / cache / document / search / store。
  */
-export type * from './types';
+export * from "./geometry";
+export type * from "./types";

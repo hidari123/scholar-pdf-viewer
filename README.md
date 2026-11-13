@@ -68,7 +68,7 @@ import '@scholar-club/pdf-viewer/styles.css';
 ## 宿主接入（数据注入，零业务）
 
 ```ts
-import type { StorageAdapter } from "@scholar-club/pdf-viewer/core";
+import type { StorageAdapter } from '@scholar-club/pdf-viewer/core';
 
 // 宿主实现该接口接自家后端（主项目实现见其 src/adapters/pdf-storage.ts）
 const storage: StorageAdapter = {
