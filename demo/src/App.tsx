@@ -150,6 +150,18 @@ export default function App() {
             })),
         };
       },
+      getAnnotations: async () => {
+        // 只取链接类注解（其它注解包用不上）
+        const list = await page.getAnnotations({ intent: 'display' });
+        return list
+          .filter((item) => item.subtype === 'Link')
+          .map((item) => ({
+            subtype: item.subtype,
+            rect: item.rect,
+            url: 'url' in item ? item.url : undefined,
+            dest: 'dest' in item ? (item.dest as string | unknown[] | null) : null,
+          }));
+      },
       render: (params: {
         canvas?: HTMLCanvasElement;
         canvasContext: CanvasRenderingContext2D;
@@ -355,30 +367,34 @@ export default function App() {
       return;
     }
 
-    void searchEngine.buildIndex(async (pageNumber) => {
-      try {
-        const page = await doc.getPage(pageNumber);
-        return {
-          pageNumber: page.pageNumber,
-          getTextContent: async () => {
-            const content = await page.getTextContent();
-            return {
-              items: content.items
-                .filter((item) => 'transform' in item)
-                .map((item) => ({
-                  str: 'str' in item ? item.str : '',
-                  transform: item.transform,
-                  width: item.width,
-                  height: item.height,
-                  hasEOL: 'hasEOL' in item ? item.hasEOL : false,
-                })),
-            };
-          },
-        };
-      } catch {
-        return undefined;
-      }
-    }, doc.numPages);
+    void searchEngine.buildIndex(
+      async (pageNumber) => {
+        try {
+          const page = await doc.getPage(pageNumber);
+          return {
+            pageNumber: page.pageNumber,
+            getTextContent: async () => {
+              const content = await page.getTextContent();
+              return {
+                items: content.items
+                  .filter((item) => 'transform' in item)
+                  .map((item) => ({
+                    str: 'str' in item ? item.str : '',
+                    transform: item.transform,
+                    width: item.width,
+                    height: item.height,
+                    hasEOL: 'hasEOL' in item ? item.hasEOL : false,
+                  })),
+              };
+            },
+          };
+        } catch {
+          return undefined;
+        }
+      },
+      numPages > 0 ? doc.numPages : 0,
+    );
+    // numPages 是"文档已就绪"的信号（getDocInfo 里设置）
   }, [searchEngine, numPages]);
 
   /** 文档信息（宿主注入给包） */
@@ -497,6 +513,11 @@ export default function App() {
           onSelectionChange={handleSelection}
           onHighlightCreate={handleHighlightCreate}
           onHighlightClick={(h) => setHint(`点击高亮：${h.selectedText.slice(0, 20)}`)}
+          onExternalLink={(url) => {
+            // 宿主决定怎么开外链（新窗口 / 应用内 WebView）
+            globalThis.open?.(url, '_blank', 'noopener,noreferrer');
+            setHint(`打开外链：${url}`);
+          }}
           onPageChange={(p) => setCurrentPage(p)}
           onZoomChange={(s) => setScale(s)}
         />

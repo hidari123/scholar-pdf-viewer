@@ -11,8 +11,10 @@
  */
 
 import { useEffect, useState } from 'react';
+import type { LinkAnnotationLike } from '../core/annotation/links';
 import type { HighlightRecord } from '../core/types';
 import { AnnotationLayer } from './AnnotationLayer';
+import { LinkLayer } from './LinkLayer';
 import type { PageProxyLike, TextContentLike } from './PageCanvas';
 import { PageCanvas } from './PageCanvas';
 import { TextLayer } from './TextLayer';
@@ -27,12 +29,20 @@ export interface PageProps {
   scale: number;
   /** 页面尺寸（当前缩放下的 px） */
   size: { width: number; height: number };
+  /** 页面尺寸（pt，归一化用） */
+  pageSizePt?: { width: number; height: number };
+  /** 链接注解（宿主注入） */
+  annotations?: LinkAnnotationLike[] | null;
   /** 高亮（受控） */
   highlights: HighlightRecord[];
   /** 激活的高亮 id */
   activeHighlightId?: string | null;
   /** 点击高亮 */
   onHighlightClick?: (highlight: HighlightRecord) => void;
+  /** 点击外部链接 */
+  onExternalLink?: (url: string) => void;
+  /** 点击内部链接 */
+  onInternalLink?: (dest: string | unknown[]) => void;
   /** 渲染失败 */
   onRenderError?: (error: unknown, pageNumber: number) => void;
   /** 无障碍标签 */
@@ -50,9 +60,13 @@ export function Page(props: PageProps) {
     page,
     scale,
     size,
+    pageSizePt,
+    annotations,
     highlights,
     activeHighlightId,
     onHighlightClick,
+    onExternalLink,
+    onInternalLink,
     onRenderError,
     ariaLabel,
   } = props;
@@ -137,6 +151,20 @@ export function Page(props: PageProps) {
       <PageCanvas page={page} scale={scale} ariaLabel={ariaLabel} onRenderError={onRenderError} />
 
       {textContent && viewport ? <TextLayer content={textContent} viewport={viewport} /> : null}
+
+      {/*
+        链接层在文本层之上：链接区域要能点（文本层的透明文字不能挡着）。
+        但在标注层之下：高亮优先。
+      */}
+      {annotations && pageSizePt ? (
+        <LinkLayer
+          annotations={annotations}
+          pageSize={pageSizePt}
+          viewport={{ width: size.width, height: size.height }}
+          onExternalLink={onExternalLink}
+          onInternalLink={onInternalLink}
+        />
+      ) : null}
 
       <AnnotationLayer
         pageNumber={pageNumber}

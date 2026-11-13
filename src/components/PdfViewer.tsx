@@ -16,6 +16,7 @@
 
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { LinkAnnotationLike } from '../core/annotation/links';
 import type { DocumentCache } from '../core/cache/store';
 import type { DocumentSource, LoadOptions } from '../core/document/loader';
 import type { PdfViewerError } from '../core/errors';
@@ -33,6 +34,7 @@ import { resolveMessage } from '../i18n/messages';
 import { OutlinePanel } from './OutlinePanel';
 import { Page } from './Page';
 import type { PageProxyLike } from './PageCanvas';
+import { PasswordDialog } from './PasswordDialog';
 import { SearchPanel } from './SearchPanel';
 import { ThumbnailPanel } from './ThumbnailPanel';
 import type { ToolbarConfig } from './Toolbar';
@@ -126,6 +128,17 @@ export interface PdfViewerProps {
   onZoomChange?: (scale: number) => void;
   /** 加密文档：宿主接管密码输入 */
   onRequestPassword?: (info: { retry: (password: string) => void; cancel: () => void }) => void;
+  /**
+   * 用包内置的密码框（宿主不接管时用）。
+   *
+   * 加密 PDF 是**通用场景**（不是业务）→ 包提供默认 UI；
+   * 但**弹不弹、怎么弹**宿主说了算 → 传了这个回调就以宿主为准。
+   */
+  showPasswordDialog?: boolean;
+  /** 外部链接点击（宿主决定怎么开） */
+  onExternalLink?: (url: string) => void;
+  /** 内部链接点击（宿主解析 dest → 页码） */
+  onInternalLink?: (dest: string | unknown[], pageNumber: number) => void;
   /** 自定义内容（渲染在工具栏下方，宿主可放自己的面板） */
   children?: ReactNode;
 }
@@ -165,6 +178,9 @@ export function PdfViewer(props: PdfViewerProps) {
     onPageChange,
     onZoomChange,
     onRequestPassword,
+    showPasswordDialog = false,
+    onExternalLink,
+    onInternalLink,
     children,
   } = props;
 
@@ -183,6 +199,15 @@ export function PdfViewer(props: PdfViewerProps) {
   /** 目录数据（宿主注入） */
   const [outline, setOutline] = useState<OutlineItemLike[] | null>(null);
 
+  /** 密码框是否打开 */
+  const [passwordOpen, setPasswordOpen] = useState(false);
+
+  /** 上次密码是否错误（用于提示） */
+  const [passwordWrong, setPasswordWrong] = useState(false);
+
+  /** 当前使用的密码（内置密码框提交后更新 → 触发重新加载） */
+  const [currentPassword, setCurrentPassword] = useState(password);
+
   const t = useCallback(
     (key: keyof Messages, vars?: Record<string, string | number>) =>
       resolveMessage(locale, key, messages, vars),
@@ -195,8 +220,23 @@ export function PdfViewer(props: PdfViewerProps) {
     documentId,
     cache,
     loadOptions,
-    password,
-    onRequestPassword,
+    password: currentPassword,
+    /**
+     * 密码请求：
+     * - 宿主接管（传了 onRequestPassword）→ 转发给宿主
+     * - 宿主没接管 + 开了内置密码框 → 打开内置对话框
+     * - 都没有 → 忽略（错误会走 onError）
+     */
+    onRequestPassword: (info) => {
+      if (onRequestPassword) {
+        onRequestPassword(info);
+        return;
+      }
+      if (showPasswordDialog) {
+        setPasswordWrong(false);
+        setPasswordOpen(true);
+      }
+    },
     getDocInfo,
     onDocumentLoad: (doc) => {
       setNumPages(doc.numPages);
@@ -207,6 +247,9 @@ export function PdfViewer(props: PdfViewerProps) {
 
   /** 页面代理缓存（pageNumber → page proxy） */
   const [pageProxies, setPageProxies] = useState<Map<number, PageProxyLike>>(new Map());
+
+  /** 链接注解缓存（pageNumber → 注解列表） */
+  const [annotations, setAnnotations] = useState<Map<number, LinkAnnotationLike[]>>(new Map());
 
   /**
    * 页面尺寸（pt，scale=1 时的物理尺寸）。
@@ -344,6 +387,52 @@ export function PdfViewer(props: PdfViewerProps) {
       cancelled = true;
     };
   }, [getPage, visiblePages, pageProxies, data]);
+
+  /**
+   * 取链接注解（可见页才取）。
+   *
+   * 注解是链接层的几何来源；没有它链接就点不了。
+   * 懒加载：跟页面一样，只取可见页。
+   */
+  useEffect(() => {
+    if (visiblePages.length === 0 || !data) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const load = async () => {
+      const next = new Map(annotations);
+
+      for (const pageNumber of visiblePages) {
+        if (next.has(pageNumber)) {
+          continue;
+        }
+        const proxy = pageProxies.get(pageNumber);
+        if (!proxy?.getAnnotations) {
+          continue;
+        }
+        try {
+          const list = await proxy.getAnnotations();
+          if (!cancelled) {
+            next.set(pageNumber, list);
+          }
+        } catch {
+          // 取不到注解不影响其它页
+        }
+      }
+
+      if (!cancelled && next.size !== annotations.size) {
+        setAnnotations(next);
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visiblePages, pageProxies, annotations, data]);
 
   // 4) 当前页
   const { scrollToPage } = useCurrentPage({
@@ -622,9 +711,13 @@ export function PdfViewer(props: PdfViewerProps) {
                       page={pageProxies.get(pageNumber) ?? null}
                       scale={scale}
                       size={size}
+                      pageSizePt={pageSizesPt[index]}
+                      annotations={annotations.get(pageNumber) ?? null}
                       highlights={highlights}
                       activeHighlightId={activeHighlightId}
                       onHighlightClick={handleHighlightClick}
+                      onExternalLink={onExternalLink}
+                      onInternalLink={(dest) => onInternalLink?.(dest, pageNumber)}
                       ariaLabel={t('a11y.page', { page: pageNumber })}
                       onRenderError={(renderError, failedPage) => {
                         onError?.(
@@ -642,6 +735,25 @@ export function PdfViewer(props: PdfViewerProps) {
           </div>
         </section>
       </div>
+
+      {/* 加密文档密码框（宿主没接管时） */}
+      {showPasswordDialog && !onRequestPassword ? (
+        <PasswordDialog
+          open={passwordOpen}
+          wrongPassword={passwordWrong}
+          onSubmit={(value) => {
+            setPasswordOpen(false);
+            // 用新密码重新加载
+            setCurrentPassword(value);
+            reload();
+          }}
+          onCancel={() => {
+            setPasswordOpen(false);
+          }}
+          locale={locale}
+          messages={messages}
+        />
+      ) : null}
     </div>
   );
 }

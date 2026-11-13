@@ -741,7 +741,7 @@
    - 排查过程：
      a. 先怀疑宿主映射没建好 → 加日志发现 `getPageIndex` 没被调用
      b. 再查 `dest` 结构 → **`dest` 是字符串（"section.1"），不是数组！**
-        → 这是**命名目标**（named destination），真实 PDF 常见
+     → 这是**命名目标**（named destination），真实 PDF 常见
      c. 包的 `resolveDestPage` 只认数组 → 字符串直接返回 null
    - 修复（两层）：
      - 宿主：命名目标先用 `doc.getDestination(name)` 解析成数组，再取页引用
@@ -776,4 +776,46 @@
 
 ---
 
-## 阶段 4 · 第 3 步（下一步）：链接/表单标注层 + 密码框 + 错误态 UI
+## 阶段 4 · 第 3 步：链接层 + 密码框 + 错误态（2026-11-13）
+
+**做了什么**
+- `src/core/annotation/links.ts`：链接归一化 + 安全过滤 + 命中测试 + 视口换算
+- `src/components/LinkLayer.tsx`：链接覆盖层（透明可点区域）
+- `src/components/PasswordDialog.tsx`：加密文档密码框（宿主不接管时的默认 UI）
+- `src/components/PageCanvas.tsx`：`PageProxyLike` 加可选 `getAnnotations`
+- `src/components/Page.tsx`：接入链接层（文本层之上、标注层之下）
+- `src/components/PdfViewer.tsx`：加 `showPasswordDialog` / `onExternalLink` / `onInternalLink` props + 注解懒加载
+- `src/styles/viewer.css`：链接层 + 对话框样式 + `.scpdf-visually-hidden`
+- `scripts/e2e-links.mjs`：链接层 E2E（5 项断言）
+- 测试：links 16 例
+
+**为什么这么实现**
+- **链接用透明 DOM 而不是 canvas 画**：要能点、要能被读屏器识别、要能 hover
+- **URL 必须过滤**（`javascript:` / `data:`）：PDF 是**不可信输入**，
+  渲染成可点击链接前必须按协议白名单过滤 → 这是安全底线，不是可选项
+- **链接层在文本层之上、标注层之下**：链接要能点（文本层不能挡），
+  但高亮优先（标注层在最上）
+- **密码框由宿主决定用不用**：加密 PDF 是通用场景 → 包提供默认 UI；
+  但"弹不弹"是宿主的事 → `showPasswordDialog` 开关
+- **密码不留在 state 里**：关闭对话框时清空（不留在内存）
+
+**遇到的问题**
+1. **`usePdfDocument` 的密码回调是"宿主接管"语义**：内置密码框要接管它，
+   但不能覆盖宿主的回调 → 改成"宿主优先，否则用内置"
+2. **密码提交后要重新加载**：`reload()` 不带新密码 → 需要把新密码存进 state
+   再触发加载（`currentPassword`）
+3. **`currentPassword` 声明在使用之后**：TS 报 "used before its declaration"
+   → 状态必须声明在 hook 调用之前
+4. **`<a>` 无内容 → biome a11y 报错**：链接是"透明可点区域"，
+   视觉上没内容 → 加 `.scpdf-visually-hidden` 的文本兜底（读屏器需要）
+5. **`noUncheckedIndexedAccess` 下解构 rect 得到 `number | undefined`**：
+   `const [x1, y1, x2, y2] = rect` → 逐个判空（不用 `!` 断言）
+
+**验证**
+- `pnpm test`：225 passed
+- `pnpm verify` 5 gate 全绿
+- E2E 链接：**5/5**（50 个链接区域 / 位置在页面内 / 无 javascript: / 点击触发宿主回调）
+
+---
+
+## 阶段 5 · 第 1 步（下一步）：发布基建（size-limit / publint / attw / changesets / CI）

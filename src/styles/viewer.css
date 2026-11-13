@@ -324,6 +324,102 @@
   font-size: 13px;
 }
 
+/* ---------- 链接层 ---------- */
+
+/* 视觉隐藏但读屏器可读（链接区域是"透明的可点区域"，需要文本兜底） */
+.scpdf-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.scpdf-links {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.scpdf-link {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  /* 透明但可点：视觉上是 PDF 自己画的链接 */
+  background: transparent;
+  border-radius: 2px;
+  transition: background var(--scpdf-motion-fast) ease;
+}
+
+.scpdf-link:hover {
+  background: rgba(47, 84, 235, 0.12);
+}
+
+/* ---------- 对话框（密码框） ---------- */
+
+.scpdf-dialog__mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 10;
+}
+
+.scpdf-dialog {
+  min-width: 280px;
+  padding: 20px;
+  background: var(--scpdf-color-surface);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.scpdf-dialog__title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.scpdf-dialog__error {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #d83931;
+}
+
+.scpdf-dialog__input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--scpdf-color-border);
+  border-radius: 4px;
+  background: var(--scpdf-color-surface);
+  color: inherit;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.scpdf-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.scpdf-btn--primary {
+  background: var(--scpdf-color-primary);
+  border-color: var(--scpdf-color-primary);
+  color: #ffffff;
+}
+
+.scpdf-btn--primary:hover {
+  color: #ffffff;
+  opacity: 0.9;
+}
+
 /* ---------- 面板（缩略图 / 目录） ---------- */
 
 /*

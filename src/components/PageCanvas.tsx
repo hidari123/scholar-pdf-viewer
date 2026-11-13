@@ -44,6 +44,15 @@ export interface PageProxyLike {
   };
   /** 取文本内容（用于文本层；没实现则不渲染文本层） */
   getTextContent?(): Promise<TextContentLike>;
+  /** 取注解（链接等；没实现则不渲染链接层） */
+  getAnnotations?(): Promise<
+    {
+      subtype?: string;
+      rect: number[];
+      url?: string;
+      dest?: string | unknown[] | null;
+    }[]
+  >;
   /**
    * 渲染到 canvas。
    *

@@ -6,6 +6,7 @@
  * 阶段 2+：selection / search / store / text-layer（文本排版）
  */
 
+export * from './annotation';
 export * from './cache';
 export * from './document';
 export * from './errors';
