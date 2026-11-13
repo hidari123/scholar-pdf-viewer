@@ -506,4 +506,51 @@
 
 ---
 
-## 阶段 1 · 第 7 步（下一步）：React 层 —— hooks + 组件
+## 阶段 2 · 第 1 步：React 层基础 —— hooks（状态桥 / 加载 / 缩放 / 虚拟化 / 选区）（2026-11-13）
+
+**做了什么**
+- `src/hooks/useStore.ts`：`useStore` / `useStoreSelector`（`useSyncExternalStore` 桥）+ `shallowEqual`
+- `src/hooks/usePdfDocument.ts`：文档加载（cache 接入 / loadId 竞态 / 密码流程 ≤3 次 / 进度）
+- `src/hooks/useZoom.ts`：缩放 + **锚点保持**（调 core 的纯函数）
+- `src/hooks/useVisiblePages.ts`：虚拟化可见页（IntersectionObserver + 缓冲）
+- `src/hooks/useCurrentPage.ts`：当前页跟踪（rAF 节流）+ 跳页
+- `src/hooks/useTextSelection.ts`：选区几何提取（DOM → SelectionData）
+- `tests/setup.ts`：jsdom 缺失 API 补齐（IntersectionObserver / ResizeObserver / matchMedia / canvas 2d 替身）
+- `vitest.config.ts`：加 setupFiles + tsx 测试纳入
+- 根包加 `@types/react` / `@types/react-dom`（devDep —— 类型是公开契约的一部分，但由宿主提供 React）
+
+**为什么这么实现**
+- **core 不依赖 pdf.js**：文档解析（`getDocInfo`）由调用方**注入** → core/hooks 都不 import pdf.js → 单测不需要 pdf.js、也不锁死渲染引擎的用法
+- **`useSyncExternalStore` 而非第三方状态库**：React 官方方案，零依赖；core 的 store 是纯 TS（可脱离 React 单测）
+- **缩放锚点保持放在 core 纯函数里**：`anchoredScrollTop(scrollTop, anchorY, scaleBefore, scaleAfter)` → 渲染层只负责读/写滚动位置，数学部分可单测
+- **虚拟化用 IntersectionObserver**：可见性在主线程之外计算，滚动时不掉帧；不需要自己维护"哪些元素在视口内"
+- **当前页用 rAF 节流 + 二分**：滚动事件触发频率远高于帧率；页顶边数组单调 → 二分 O(log n)
+- **选区只输出几何**：包不弹窗、不存库、不调模型（v2 边界）
+
+**遇到的问题**
+1. **jsdom 的 canvas.getContext 探测本身会抛**：`proto.getContext('2d') === null` 这个探测调用在 jsdom 里抛 "not implemented" → 整个测试文件加载失败
+   - 修复：不探测，直接覆盖 `getContext`（jsdom 本来就没有可用实现）
+   - 教训：**探测能力时可能本身就是触发点**；不确定就直接替换
+2. **`useStoreSelector` 的 `isEqual` 形同虚设**：`useSyncExternalStore` 内部用 `Object.is` 比较快照 → 选择器每次返回新对象 → React 判定"变了" → 无限重渲染
+   - 修复：缓存上次结果，`isEqual` 说相等就返回**同一引用**；且**缓存只在订阅回调里更新**，不能在 `getSnapshot` 里更新（React 渲染期间会多次调用 getSnapshot，在里面写缓存会让本次渲染读到新值 → 与上次不一致 → 无限重渲染）
+   - 教训：**useSyncExternalStore 的快照必须是纯读取**；写操作只能发生在订阅回调里
+3. **usePdfDocument 每次渲染都重新加载（严重 bug）**：依赖数组里有 `loadOptions` / `onError` 等**对象/函数** → 宿主传内联值 → 每次渲染新引用 → effect 每次重跑 → 无限重载
+   - 修复：这些 props 全部存进 `optionsRef`，effect 依赖只留 `[file, documentId, reloadSignal]`
+   - 教训：**hook 依赖数组里不能放对象/函数 props**（除非调用方保证稳定引用）——这是 React 最常见的性能坑
+4. **`reloadSignal` 被 biome 判为"多余依赖"**：它只出现在依赖数组、没出现在 effect 体里 → exhaustive-deps 报错
+   - 修复：把 `reloadSignal` **真正用进** loadId 计算（语义也更直观：不同 reload 轮次 id 绝不重复），而不是加 biome-ignore 注释
+   - 教训：**规则报"多余依赖"时，先想是不是设计没表达清楚**；用 ignore 注释压制前，先试着用它
+5. **loadId 判定失效**：把 `loadIdRef.current += 1` 放在捕获 loadId **之后** → 异步回调里 `loadIdRef.current === loadId` 永远不成立 → 加载结果全被丢弃
+   - 修复：改用 `latestLoadIdRef`（记录"当前最新"的那次 id）+ `isCurrent()` 辅助函数统一判定
+   - 教训：**竞态保护的判据必须只有一个来源**；"递增计数器"和"当前值"混用会自相矛盾
+6. **PowerShell 的 `Set-Content -Encoding UTF8` 破坏源文件**：用 `(Get-Content x) -replace ... | Set-Content` 做批量替换 → 中文注释全变乱码 + 一行被合并（`// 1) 查缓存` 后面的代码被吞进注释）
+   - 修复：整个文件重写（write 而非 replace）
+   - 教训：**不要用 PowerShell 做源码级批量替换**；用编辑工具的精确替换，UTF-8 中文源码尤其危险
+
+**验证**
+- `pnpm test`：119 passed（hooks 17 + core 102）
+- `pnpm verify` 5 gate 全绿
+
+---
+
+## 阶段 2 · 第 2 步（下一步）：组件层 —— PdfViewer / PageCanvas / AnnotationLayer

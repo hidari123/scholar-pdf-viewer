@@ -50,6 +50,8 @@ export interface LoadOptions {
   onProgress?: (loaded: number, total: number) => void;
   /** 取消信号 */
   signal?: AbortSignal;
+  /** 加密文档密码（由 pdf.js 解析层消费） */
+  password?: string;
 }
 
 /** 加载结果 */

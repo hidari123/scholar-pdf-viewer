@@ -153,7 +153,8 @@ export function findCurrentPage(pageTops: number[], scrollTop: number): number {
 
   while (low < high) {
     const mid = Math.ceil((low + high) / 2);
-    if (pageTops[mid] !== undefined && pageTops[mid]! <= scrollTop) {
+    const top = pageTops[mid];
+    if (top !== undefined && top <= scrollTop) {
       low = mid;
     } else {
       high = mid - 1;
