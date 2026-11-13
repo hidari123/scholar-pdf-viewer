@@ -1,0 +1,26 @@
+[
+  {
+    "name": "主入口（组件 + hooks）",
+    "path": "dist/index.js",
+    "limit": "25 kB",
+    "import": "{ PdfViewer }"
+  },
+  {
+    "name": "core 子路径（零 React）",
+    "path": "dist/core.js",
+    "limit": "6 kB",
+    "import": "{ findCurrentPage }"
+  },
+  {
+    "name": "core 子路径（选区几何按需导入）",
+    "path": "dist/core.js",
+    "limit": "6 kB",
+    "import": "{ optimizeClientRects, extractSelection }"
+  },
+  {
+    "name": "core 子路径（缩略图/目录策略）",
+    "path": "dist/core.js",
+    "limit": "6 kB",
+    "import": "{ planThumbnails, flattenOutline }"
+  }
+]

@@ -111,7 +111,17 @@ try {
   check('查看器已挂载', (await page.locator('[data-testid="pdf-viewer"]').count()) === 1);
   check('工具栏已渲染', (await page.locator('.scpdf-toolbar').count()) === 1);
 
-  // 2) 等文档加载（demo 启动时优先加载本地真实文档，没有则用内置样张）
+  // 2) 等文档加载
+  //    demo 启动时优先加载本地真实文档（samples/local.pdf，CI 里没有），
+  //    没有就点"载入内置样张"用内置的 3 页样张 → 两条路径都能测
+  await page.waitForTimeout(2500);
+  if ((await page.locator('.scpdf-page canvas.scpdf-canvas').count()) === 0) {
+    const sampleBtn = page.getByRole('button', { name: '载入内置样张' });
+    if ((await sampleBtn.count()) > 0) {
+      await sampleBtn.click();
+      await page.waitForTimeout(2500);
+    }
+  }
   await page.waitForSelector('.scpdf-page canvas.scpdf-canvas', { timeout: 60000 });
   await page.waitForTimeout(2000);
 

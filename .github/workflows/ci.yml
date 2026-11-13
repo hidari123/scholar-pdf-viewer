@@ -49,3 +49,58 @@ jobs:
           @types/react@^${{ matrix.react }} @types/react-dom@^${{ matrix.react }}
       - run: pnpm --filter @scholar-club/pdf-viewer-demo run typecheck
       - run: pnpm --filter @scholar-club/pdf-viewer-demo run build
+
+  # 发布门禁：包体积 / package.json 规范 / 类型解析
+  #
+  # 为什么单独一个 job：这些检查需要先 build 出 dist，
+  # 且失败原因与代码质量不同（是"发布配置"问题）→ 分开看更清楚。
+  publish-checks:
+    name: 发布门禁（体积 / publint / attw）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # 包体积上限（防止依赖悄悄变大）
+      - run: pnpm size
+      # package.json / exports 规范
+      - run: pnpm publint
+      # 类型在 node10 / node16(CJS/ESM) / bundler 下能否正确解析
+      - run: pnpm attw
+
+  # E2E：真浏览器验证（渲染 / 文本层 / 面板 / 链接）
+  e2e:
+    name: E2E（Chromium）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # 装 Chromium（Playwright）
+      - run: pnpm exec playwright install --with-deps chromium
+      # 起 demo（后台）
+      - run: pnpm --filter @scholar-club/pdf-viewer-demo dev --port 5180 &
+      - name: 等待 demo 就绪
+        run: >-
+          node -e "const t=Date.now();(async()=>{while(Date.now()-t<60000){try{const r=await fetch('http://localhost:5180');if(r.ok){console.log('ready');process.exit(0)}}catch{}await new Promise(r=>setTimeout(r,500))}console.error('timeout');process.exit(1)})()"
+      - run: node scripts/e2e-smoke.mjs
+      - run: node scripts/e2e-text-layer.mjs
+      - run: node scripts/e2e-panels.mjs
+      - run: node scripts/e2e-links.mjs
+      - name: 上传截图
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: e2e-shots/
+          if-no-files-found: ignore

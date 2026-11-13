@@ -8,18 +8,32 @@
   "engines": {
     "node": ">=22.13.0"
   },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./core": {
-      "types": "./dist/core.d.ts",
-      "import": "./dist/core.js",
-      "require": "./dist/core.cjs"
+      "import": {
+        "types": "./dist/core.d.ts",
+        "default": "./dist/core.js"
+      },
+      "require": {
+        "types": "./dist/core.d.cts",
+        "default": "./dist/core.cjs"
+      }
     },
-    "./styles.css": "./dist/styles.css"
+    "./styles.css": "./dist/styles.css",
+    "./package.json": "./package.json"
   },
   "sideEffects": [
     "**/*.css"
@@ -38,10 +52,22 @@
     "demo": "pnpm --filter @scholar-club/pdf-viewer-demo dev",
     "e2e": "node scripts/e2e-smoke.mjs",
     "e2e:text": "node scripts/e2e-text-layer.mjs",
-    "e2e:serve": "pnpm --filter @scholar-club/pdf-viewer-demo dev --port 5180"
+    "e2e:panels": "node scripts/e2e-panels.mjs",
+    "e2e:links": "node scripts/e2e-links.mjs",
+    "e2e:serve": "pnpm --filter @scholar-club/pdf-viewer-demo dev --port 5180",
+    "size": "size-limit",
+    "publint": "publint",
+    "attw": "attw --pack",
+    "release:check": "pnpm size && pnpm publint && pnpm attw",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "changeset publish"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@biomejs/biome": "^2.6.4",
+    "@changesets/cli": "^3.0.3",
+    "@size-limit/preset-small-lib": "^14.3.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.10",
@@ -49,6 +75,8 @@
     "@types/react-dom": "^19.3.0",
     "jsdom": "^31.0.1",
     "playwright": "^1.65.0",
+    "publint": "^0.3.25",
+    "size-limit": "^14.3.0",
     "tsup": "^9.0.0",
     "typescript": "^5.9.3",
     "vitest": "^5.0.5"

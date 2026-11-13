@@ -46,8 +46,16 @@ page.on('console', (m) => {
 
 try {
   await page.goto(BASE_URL, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(2500);
 
-  // 等本地真实文档加载完
+  // 没有本地真实文档 → 用内置样张
+  if ((await page.locator('.scpdf-page canvas.scpdf-canvas').count()) === 0) {
+    const sampleBtn = page.getByRole('button', { name: '载入内置样张' });
+    if ((await sampleBtn.count()) > 0) {
+      await sampleBtn.click();
+      await page.waitForTimeout(2500);
+    }
+  }
   await page.waitForSelector('.scpdf-page canvas.scpdf-canvas', { timeout: 60000 });
   await page.waitForTimeout(2500);
 

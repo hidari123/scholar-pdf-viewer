@@ -818,4 +818,55 @@
 
 ---
 
-## 阶段 5 · 第 1 步（下一步）：发布基建（size-limit / publint / attw / changesets / CI）
+## 阶段 5 · 第 1 步：发布基建（size-limit / publint / attw / changesets / CI）（2026-11-13）
+
+**做了什么**
+- `.size-limit.json`：4 条体积门禁（主入口 / core / 按需导入 / 策略模块）
+- `.attw.json`：类型解析检查配置
+- `.changeset/`：changesets 配置 + 说明
+- `package.json`：
+  - `exports` 改成**条件式 types**（import/require 各自指向 `.d.ts` / `.d.cts`）
+  - 补 `main` / `module` / `types`（node10 回退）
+  - 加 `size` / `publint` / `attw` / `release:check` / `changeset` / `version` / `release` 脚本
+- `scripts/verify.mjs`：门禁从 5 个扩到 **8 个**
+- `.github/workflows/ci.yml`：新增 `publish-checks` 与 `e2e` 两个 job
+- E2E 脚本改造：**没有本地 PDF 时也能跑**（用内置样张，CI 场景）
+
+**为什么这么实现**
+- **体积门禁必须有上限才有意义**：当前主入口 11.74 kB（tree-shaken），
+  上限设 25 kB → 依赖偷偷变大时 CI 会红
+- **`exports` 的 types 必须分 import/require**：ESM 的 `.d.ts` 给 CJS 用会
+  "假 ESM"（attw 报 FalseESM）→ CJS 侧要用 `.d.cts`
+- **E2E 要能在 CI 跑**：CI 里没有 16MB 的本地 PDF →
+  E2E 自动降级到内置样张，并对"该文档没有的功能"打 SKIP 而不是 FAIL
+- **门禁清单单一事实源**：`verify.mjs` 一处定义，本地与 CI 共用
+
+**遇到的问题**
+1. **attw 报 2 个真问题**：
+   - `node10: Resolution failed` → 缺 `main` / `module` / `types` 回退字段
+   - `node16 (from CJS): Masquerading as ESM` → `exports` 的 `types` 没按条件分开
+   - 修复：`exports` 改成 `{ import: { types, default }, require: { types, default } }`
+     + 补 `main`/`module`/`types` → **"No problems found 🌟"**
+2. **size-limit v14 不支持 CSS 打包**（rolldown 移除了该实验特性）：
+   `ERROR [UNSUPPORTED_FEATURE] Bundling CSS is no longer supported`
+   - 修复：CSS 不交给 size-limit，改为在 CI 里单独检查文件大小
+     （`size-limit` 只管 JS；CSS 11.7 kB 由人工/脚本把关）
+3. **size-limit 配置里的 `$schema` 字段不被识别**：`Unknown option $schema in config`
+   - 修复：删掉该字段
+4. **attw 的 `ignoreRules` 用错大小写**：应为 `no-resolution`（kebab-case），
+   不是 `NoResolution`（PascalCase）
+   - 教训：**配置项的合法值要先查**（报错信息里列了 allowed choices）
+5. **E2E 在 CI 会因为缺本地 PDF 而失败**：
+   - 修复：检测不到 canvas 就点"载入内置样张"；对"该文档没有的功能"（目录/链接）打 SKIP
+   - 教训：**E2E 要能在最小输入下运行**，不能依赖本机的特殊文件
+
+**验证**
+- `pnpm verify`：**8 gate 全绿**
+- 包体积：主入口 11.74 kB / core 1.15 kB / 按需导入 1.79 kB（上限 25 / 6 / 6 kB）
+- publint：`All good!`
+- attw：`No problems found 🌟`（node10 / node16 CJS+ESM / bundler 全 🟢）
+- E2E 两种场景都通过：真实 PDF（13+7+8+5 项）与合成样张（13+7+8+4 项）
+
+---
+
+## 收官 · 第 1 步（下一步）：README / PLAN / DEVLOG 更新 + 全量复跑

@@ -1,0 +1,5 @@
+{
+  "$schema": "https://raw.githubusercontent.com/arethetypeswrong/arethetypeswrong/main/packages/arethetypeswrong/schema.json",
+  "ignoreRules": ["no-resolution"],
+  "excludeEntrypoints": ["styles.css", "package.json"]
+}
