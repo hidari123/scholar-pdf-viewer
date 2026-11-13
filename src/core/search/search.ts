@@ -119,6 +119,22 @@ export class PdfSearch {
   }
 
   /**
+   * 取页函数（宿主提供）。
+   *
+   * 暴露出来是为了让 UI 层能"确保索引建好"：
+   * UI 拿到 PdfSearch 实例后，若索引还没建，需要自己调 buildIndex，
+   * 而 buildIndex 需要取页函数与总页数 → 通过这两个访问器拿。
+   */
+  getPageProvider(): ((pageNumber: number) => Promise<TextPageLike | undefined>) | null {
+    return this.getPage;
+  }
+
+  /** 总页数（宿主提供） */
+  getTotalPages(): number {
+    return this.totalPages;
+  }
+
+  /**
    * 建立索引。
    *
    * @param getPage 取页（1-based）

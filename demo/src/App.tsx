@@ -6,8 +6,13 @@
  * Copyright (c) 2026 by hidari, All Rights Reserved.
  */
 
-import type { HighlightRecord, NewHighlight, SelectionData } from '@scholar-club/pdf-viewer';
-import { PdfViewer } from '@scholar-club/pdf-viewer';
+import type {
+  HighlightRecord,
+  NewHighlight,
+  OutlineItemLike,
+  SelectionData,
+} from '@scholar-club/pdf-viewer';
+import { PdfSearch, PdfViewer } from '@scholar-club/pdf-viewer';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import * as pdfjs from 'pdfjs-dist';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -47,6 +52,12 @@ export default function App() {
 
   /** 当前页（宿主展示用） */
   const [currentPage, setCurrentPage] = useState(1);
+
+  /** 总页数（搜索索引要用） */
+  const [numPages, setNumPages] = useState(0);
+
+  /** 目录页码映射就绪标记（解析完 +1 → 包重新解析目录） */
+  const [outlineResolveToken, setOutlineResolveToken] = useState(0);
 
   /** 缩放（宿主展示用） */
   const [scale, setScale] = useState(1);
@@ -122,14 +133,21 @@ export default function App() {
       getTextContent: async () => {
         const content = await page.getTextContent();
         return {
-          items: content.items.map((item) => ({
-            str: 'str' in item ? item.str : '',
-            transform: item.transform,
-            width: item.width,
-            height: item.height,
-            fontName: item.fontName,
-            hasEOL: item.hasEOL,
-          })),
+          /**
+           * pdf.js 的 items 混合了 TextItem 与 TextMarkedContent：
+           * 后者没有 transform/width/height（是标记锚点，不是文字）。
+           * 只取真正的文字项（'transform' in item 是可靠的判别）。
+           */
+          items: content.items
+            .filter((item) => 'transform' in item)
+            .map((item) => ({
+              str: 'str' in item ? item.str : '',
+              transform: item.transform,
+              width: item.width,
+              height: item.height,
+              fontName: 'fontName' in item ? item.fontName : undefined,
+              hasEOL: 'hasEOL' in item ? item.hasEOL : false,
+            })),
         };
       },
       render: (params: {
@@ -162,13 +180,219 @@ export default function App() {
     return sizes;
   }, []);
 
+  /**
+   * 页引用 → 页码的映射。
+   *
+   * pdf.js 的 outline 目标里是**页对象的内部引用**，
+   * 包拿不到页码 → 必须由宿主提供映射。
+   *
+   * 实现要点：pdf.js v6 的 `doc.getPageIndex(ref)` 是**异步**的，
+   * 而包的 `pageRefToNumber` 是**同步**回调 →
+   * 所以这里在拿到目录时**一次性把所有引用的页码解析好**，存进 Map。
+   */
+  const pageRefMapRef = useRef(new Map<string, number>());
+
+  /**
+   * 解析目录里出现的所有目标 → 页码。
+   *
+   * **dest 有两种形态**（真实 PDF 两种都有）：
+   * 1. 数组：[pageRef, '/XYZ', left, top, zoom] → 直接有页引用
+   * 2. 字符串：命名目标（如 "section.1"）→ 要先用 `doc.getDestination(name)`
+   *    解析成数组才能拿到页引用
+   *
+   * 真实案例：本机的 A²E 论文用的就是命名目标（不处理的话目录全点不动）。
+   */
+  const resolveOutlinePages = useCallback(
+    async (doc: PDFDocumentProxy, outline: OutlineItemLike[] | null) => {
+      const map = new Map<string, number>();
+
+      /** 递归收集所有 dest（数组或命名） */
+      const collect = (items: OutlineItemLike[]): unknown[] => {
+        const dests: unknown[] = [];
+        for (const item of items) {
+          if (item.dest) {
+            dests.push(item.dest);
+          }
+          if (item.items?.length) {
+            dests.push(...collect(item.items));
+          }
+        }
+        return dests;
+      };
+
+      for (const dest of collect(outline ?? [])) {
+        try {
+          // 命名目标 → 先解析成数组
+          const resolved = typeof dest === 'string' ? await doc.getDestination(dest) : dest;
+          if (!resolved || !Array.isArray(resolved)) {
+            console.warn('[demo] 目标无法解析:', dest, resolved);
+            continue;
+          }
+
+          const ref = resolved[0];
+          if (!ref) {
+            continue;
+          }
+
+          const pageIndex = await doc.getPageIndex(ref as never);
+          if (pageIndex < 0) {
+            continue;
+          }
+
+          const target = ref as { num?: number; gen?: number };
+          if (typeof target.num === 'number') {
+            const pageNumber = pageIndex + 1;
+            // 两种键都存：页引用形态 + 命名目标形态
+            map.set(`${target.num}R${target.gen ?? 0}`, pageNumber);
+            if (typeof dest === 'string') {
+              map.set(dest, pageNumber);
+            }
+          }
+        } catch (error) {
+          // 解析不了的引用跳过（该项在 UI 上禁用）
+          console.warn('[demo] 目录目标解析失败:', error, dest);
+        }
+      }
+
+      console.log('[demo] 映射结果:', map.size, '条');
+
+      pageRefMapRef.current = map;
+
+      // 告诉包"映射好了，重新解析目录"
+      setOutlineResolveToken((token) => token + 1);
+    },
+    [],
+  );
+
+  /**
+   * 页引用 / 命名目标 → 页码。
+   *
+   * 两种键：
+   * - 页引用对象：`{num, gen}` → "330R0"
+   * - 命名目标字符串："section.1" → 原样
+   */
+  const pageRefToNumber = useCallback((ref: unknown): number | null => {
+    if (typeof ref === 'string') {
+      return pageRefMapRef.current.get(ref) ?? null;
+    }
+    if (!ref || typeof ref !== 'object') {
+      return null;
+    }
+    const target = ref as { num?: number; gen?: number };
+    if (typeof target.num !== 'number') {
+      return null;
+    }
+    return pageRefMapRef.current.get(`${target.num}R${target.gen ?? 0}`) ?? null;
+  }, []);
+
+  /**
+   * 取目录（宿主注入）。
+   *
+   * pdf.js 的 dest 里第一个元素是**页对象的内部引用**，
+   * 包拿不到页码 → 必须由宿主提供映射（pageRefToNumber）。
+   */
+  const getOutline = useCallback(async () => {
+    const doc = docRef.current;
+    if (!doc) {
+      return null;
+    }
+    const outline = await doc.getOutline();
+
+    // 解析目录目标 → 页码（包的 pageRefToNumber 回调是同步的，这里先备好）
+    void resolveOutlinePages(doc, outline);
+
+    return outline;
+  }, [resolveOutlinePages]);
+
+  /**
+   * 渲染缩略图（宿主注入）。
+   *
+   * 用离屏 canvas 渲染 → 转成 dataURL 给包。
+   * （真实项目里也可以用 worker + OffscreenCanvas 更快。）
+   */
+  const renderThumbnail = useCallback(
+    async (pageNumber: number, width: number): Promise<string | null> => {
+      const doc = docRef.current;
+      if (!doc) {
+        return null;
+      }
+
+      try {
+        const page = await doc.getPage(pageNumber);
+        const baseViewport = page.getViewport({ scale: 1 });
+        const scale = width / baseViewport.width;
+        const viewport = page.getViewport({ scale });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        const context = canvas.getContext('2d');
+        if (!context) {
+          return null;
+        }
+
+        await page.render({ canvas, canvasContext: context, viewport }).promise;
+        return canvas.toDataURL('image/jpeg', 0.7);
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+
+  /**
+   * 搜索引擎（宿主注入）。
+   *
+   * 关键：`buildIndex` 需要**取页函数**（宿主提供 pdf.js 的页）。
+   * 宿主持有文档 → 这里用 getPage 的逻辑提供取文本的页。
+   */
+  const searchEngine = useMemo(() => new PdfSearch(), []);
+
+  /** 文档就绪后给搜索引擎装上取页函数 */
+  useEffect(() => {
+    const doc = docRef.current;
+    if (!doc) {
+      return;
+    }
+
+    void searchEngine.buildIndex(async (pageNumber) => {
+      try {
+        const page = await doc.getPage(pageNumber);
+        return {
+          pageNumber: page.pageNumber,
+          getTextContent: async () => {
+            const content = await page.getTextContent();
+            return {
+              items: content.items
+                .filter((item) => 'transform' in item)
+                .map((item) => ({
+                  str: 'str' in item ? item.str : '',
+                  transform: item.transform,
+                  width: item.width,
+                  height: item.height,
+                  hasEOL: 'hasEOL' in item ? item.hasEOL : false,
+                })),
+            };
+          },
+        };
+      } catch {
+        return undefined;
+      }
+    }, doc.numPages);
+  }, [searchEngine, numPages]);
+
   /** 文档信息（宿主注入给包） */
   const getDocInfo = useCallback(async (data: Uint8Array) => {
     const doc = await pdfjs.getDocument({ data: data.slice() }).promise;
     docRef.current = doc;
+
     const info = (await doc.getMetadata().catch(() => null)) as {
       info?: { Title?: string };
     } | null;
+
+    // 记录页数（搜索索引要用）
+    setNumPages(doc.numPages);
+
     return {
       numPages: doc.numPages,
       title: info?.info?.Title,
@@ -264,6 +488,11 @@ export default function App() {
           getPage={getPage}
           getPageSizes={getPageSizes}
           getDocInfo={getDocInfo}
+          getOutline={getOutline}
+          pageRefToNumber={pageRefToNumber}
+          outlineResolveToken={outlineResolveToken}
+          renderThumbnail={renderThumbnail}
+          searchEngine={searchEngine}
           onDocumentLoad={handleDocumentLoad}
           onSelectionChange={handleSelection}
           onHighlightCreate={handleHighlightCreate}

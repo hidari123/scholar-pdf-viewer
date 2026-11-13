@@ -20,6 +20,8 @@ import type { DocumentCache } from '../core/cache/store';
 import type { DocumentSource, LoadOptions } from '../core/document/loader';
 import type { PdfViewerError } from '../core/errors';
 import { pdfViewerError } from '../core/errors';
+import type { OutlineItemLike } from '../core/outline/outline';
+import type { PdfSearch, SearchHit } from '../core/search/search';
 import type { HighlightRecord, NewHighlight, PdfDocInfo, SelectionData } from '../core/types';
 import { useCurrentPage } from '../hooks/useCurrentPage';
 import { usePdfDocument } from '../hooks/usePdfDocument';
@@ -28,8 +30,11 @@ import { useVisiblePages } from '../hooks/useVisiblePages';
 import { useZoom } from '../hooks/useZoom';
 import type { Locale, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
+import { OutlinePanel } from './OutlinePanel';
 import { Page } from './Page';
 import type { PageProxyLike } from './PageCanvas';
+import { SearchPanel } from './SearchPanel';
+import { ThumbnailPanel } from './ThumbnailPanel';
 import type { ToolbarConfig } from './Toolbar';
 import { Toolbar } from './Toolbar';
 
@@ -86,6 +91,21 @@ export interface PdfViewerProps {
   getPageSizes?: (numPages: number) => Promise<{ width: number; height: number }[]>;
   /** 取文档信息（页数/元数据） */
   getDocInfo?: (data: Uint8Array) => Promise<PdfDocInfo>;
+  /** 取目录（宿主注入 pdf.js 的 getOutline） */
+  getOutline?: () => Promise<OutlineItemLike[] | null>;
+  /** 页引用 → 页码的映射（解析目录目标用） */
+  pageRefToNumber?: (ref: unknown) => number | null;
+  /**
+   * 目录页码映射就绪标记（宿主解析完 +1）。
+   *
+   * 宿主解析页引用→页码通常是异步的（pdf.js 的 getPageIndex 是 async），
+   * 包拿不到"什么时候好了"的通知 → 宿主用这个标记告诉包"重新解析一次"。
+   */
+  outlineResolveToken?: number;
+  /** 渲染缩略图（宿主注入；返回图片 URL） */
+  renderThumbnail?: (pageNumber: number, width: number) => Promise<string | null>;
+  /** 搜索引擎（宿主注入 core 的 PdfSearch 实例） */
+  searchEngine?: PdfSearch | null;
   /** 加载成功 */
   onDocumentLoad?: (doc: PdfDocInfo) => void;
   /** 出错 */
@@ -133,6 +153,11 @@ export function PdfViewer(props: PdfViewerProps) {
     getPage,
     getPageSizes,
     getDocInfo,
+    getOutline,
+    pageRefToNumber,
+    outlineResolveToken,
+    renderThumbnail,
+    searchEngine,
     onDocumentLoad,
     onError,
     onSelectionChange,
@@ -151,6 +176,12 @@ export function PdfViewer(props: PdfViewerProps) {
   const [numPages, setNumPages] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
+
+  /** 侧栏：'none' | 'thumbnails' | 'outline' */
+  const [sidebar, setSidebar] = useState<'none' | 'thumbnails' | 'outline'>('none');
+
+  /** 目录数据（宿主注入） */
+  const [outline, setOutline] = useState<OutlineItemLike[] | null>(null);
 
   const t = useCallback(
     (key: keyof Messages, vars?: Record<string, string | number>) =>
@@ -223,6 +254,31 @@ export function PdfViewer(props: PdfViewerProps) {
     pageElements: pageElementsRef,
     totalPages: numPages,
   });
+
+  /** 取目录（宿主注入；懒加载 —— 打开目录面板时才取） */
+  useEffect(() => {
+    if (!getOutline || sidebar !== 'outline' || outline !== null) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void getOutline()
+      .then((items) => {
+        if (!cancelled) {
+          setOutline(items ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOutline([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getOutline, sidebar, outline]);
 
   /** 取各页尺寸（宿主注入；失败则用 A4 兜底） */
   useEffect(() => {
@@ -432,116 +488,160 @@ export function PdfViewer(props: PdfViewerProps) {
           )
         }
         onToggleSearch={features.search === false ? undefined : () => setSearchOpen((v) => !v)}
+        onToggleThumbnails={
+          features.thumbnails === false || !renderThumbnail
+            ? undefined
+            : () => setSidebar((v) => (v === 'thumbnails' ? 'none' : 'thumbnails'))
+        }
+        onToggleOutline={
+          features.outline === false || !getOutline
+            ? undefined
+            : () => setSidebar((v) => (v === 'outline' ? 'none' : 'outline'))
+        }
         onPrint={features.print === false ? undefined : () => globalThis.print?.()}
       />
 
       {children}
 
       {searchOpen ? (
-        <search className="scpdf-search">
-          <input
-            type="search"
-            className="scpdf-search__input"
-            placeholder={t('search.placeholder')}
-            aria-label={t('search.placeholder')}
-          />
-        </search>
+        <SearchPanel
+          search={searchEngine ?? null}
+          onClose={() => setSearchOpen(false)}
+          onNavigate={(hit: SearchHit) => {
+            // 跳到命中所在页（宿主可再根据 start 做精确定位与高亮）
+            scrollToPage(hit.pageNumber);
+          }}
+          locale={locale}
+          messages={messages}
+        />
       ) : null}
 
       {/*
-        滚动容器：section（自带 region 语义）+ tabIndex。
-        键盘用户要能聚焦进来用方向键/PageUp/PageDown 翻页（无障碍要求）。
-        biome 的 a11y 规则无法区分"可聚焦的滚动区域"与"普通 section"，
-        这里是有意的语义选择（可聚焦的滚动 landmark），故豁免该规则。
+        主体区：侧栏（缩略图 / 目录）与滚动容器**并列**（flex）。
+        并列而非绝对定位 → 侧栏不覆盖工具栏（工具栏按钮始终可点），
+        也不影响页面流的居中计算。
       */}
-      <section
-        className="scpdf-container"
-        ref={containerRef}
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: 可聚焦的滚动区域（键盘翻页需要）
-        tabIndex={0}
-        aria-label={t('a11y.canvas')}
-      >
-        {!file ? (
-          <div className="scpdf-state">
-            <p className="scpdf-state__title">{t('empty.title')}</p>
-            <p className="scpdf-state__hint">{t('empty.hint')}</p>
-          </div>
+      <div className="scpdf-body">
+        {sidebar === 'thumbnails' && renderThumbnail ? (
+          <ThumbnailPanel
+            totalPages={numPages}
+            currentPage={page}
+            visiblePages={visiblePages}
+            pageSizes={pageSizesPt}
+            renderThumbnail={renderThumbnail}
+            onPageSelect={(target) => scrollToPage(target)}
+            locale={locale}
+            messages={messages}
+          />
         ) : null}
 
-        {loading ? (
-          <output className="scpdf-state">
-            <p className="scpdf-state__title">{t('load.loading')}</p>
-            {progress > 0 ? (
-              <p className="scpdf-state__hint">
-                {t('load.progress', { percent: Math.round(progress * 100) })}
-              </p>
-            ) : null}
-          </output>
-        ) : null}
-
-        {error ? (
-          <div className="scpdf-state scpdf-state--error" role="alert">
-            <p className="scpdf-state__title">{t('load.failed')}</p>
-            <p className="scpdf-state__hint">{error.message}</p>
-            <button type="button" className="scpdf-btn" onClick={reload}>
-              {t('load.retry')}
-            </button>
-          </div>
+        {sidebar === 'outline' && getOutline ? (
+          <OutlinePanel
+            outline={outline}
+            pageRefToNumber={pageRefToNumber ?? (() => null)}
+            resolveToken={outlineResolveToken}
+            currentPage={page}
+            onPageSelect={(target) => scrollToPage(target)}
+            locale={locale}
+            messages={messages}
+          />
         ) : null}
 
         {/*
+          滚动容器：section（自带 region 语义）+ tabIndex。
+          键盘用户要能聚焦进来用方向键/PageUp/PageDown 翻页（无障碍要求）。
+          biome 的 a11y 规则无法区分"可聚焦的滚动区域"与"普通 section"，
+          这里是有意的语义选择（可聚焦的滚动 landmark），故豁免该规则。
+        */}
+        <section
+          className="scpdf-container"
+          ref={containerRef}
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: 可聚焦的滚动区域（键盘翻页需要）
+          tabIndex={0}
+          aria-label={t('a11y.canvas')}
+        >
+          {!file ? (
+            <div className="scpdf-state">
+              <p className="scpdf-state__title">{t('empty.title')}</p>
+              <p className="scpdf-state__hint">{t('empty.hint')}</p>
+            </div>
+          ) : null}
+
+          {loading ? (
+            <output className="scpdf-state">
+              <p className="scpdf-state__title">{t('load.loading')}</p>
+              {progress > 0 ? (
+                <p className="scpdf-state__hint">
+                  {t('load.progress', { percent: Math.round(progress * 100) })}
+                </p>
+              ) : null}
+            </output>
+          ) : null}
+
+          {error ? (
+            <div className="scpdf-state scpdf-state--error" role="alert">
+              <p className="scpdf-state__title">{t('load.failed')}</p>
+              <p className="scpdf-state__hint">{error.message}</p>
+              <button type="button" className="scpdf-btn" onClick={reload}>
+                {t('load.retry')}
+              </button>
+            </div>
+          ) : null}
+
+          {/*
           页面区高度 = 最后一项页顶边（即文档总高）。
           末项已含顶部留白 + 每页高度 + 间距 → 直接用作总高即可。
         */}
-        <div className="scpdf-pages" style={{ height: pageTops.at(-1) ?? 0 }}>
-          {pageSizes.map((size, index) => {
-            const pageNumber = index + 1;
-            const isVisible = visiblePages.includes(pageNumber);
+          <div className="scpdf-pages" style={{ height: pageTops.at(-1) ?? 0 }}>
+            {pageSizes.map((size, index) => {
+              const pageNumber = index + 1;
+              const isVisible = visiblePages.includes(pageNumber);
 
-            return (
-              <div
-                key={pageNumber}
-                data-page-number={pageNumber}
-                className="scpdf-page"
-                ref={(element) => {
-                  if (element) {
-                    pageElementsRef.current.set(pageNumber, element);
-                  } else {
-                    pageElementsRef.current.delete(pageNumber);
-                  }
-                }}
-                style={{
-                  width: size.width,
-                  height: size.height,
-                  // 绝对定位 + top：页面按页顶边数组摆放（滚动定位靠它）
-                  top: pageTops[index] ?? 0,
-                }}
-              >
-                {isVisible ? (
-                  <Page
-                    pageNumber={pageNumber}
-                    page={pageProxies.get(pageNumber) ?? null}
-                    scale={scale}
-                    size={size}
-                    highlights={highlights}
-                    activeHighlightId={activeHighlightId}
-                    onHighlightClick={handleHighlightClick}
-                    ariaLabel={t('a11y.page', { page: pageNumber })}
-                    onRenderError={(renderError, failedPage) => {
-                      onError?.(
-                        pdfViewerError('E_RENDER_PAGE', {
-                          cause: renderError,
-                          pageNumber: failedPage,
-                        }),
-                      );
-                    }}
-                  />
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      </section>
+              return (
+                <div
+                  key={pageNumber}
+                  data-page-number={pageNumber}
+                  className="scpdf-page"
+                  ref={(element) => {
+                    if (element) {
+                      pageElementsRef.current.set(pageNumber, element);
+                    } else {
+                      pageElementsRef.current.delete(pageNumber);
+                    }
+                  }}
+                  style={{
+                    width: size.width,
+                    height: size.height,
+                    // 绝对定位 + top：页面按页顶边数组摆放（滚动定位靠它）
+                    top: pageTops[index] ?? 0,
+                  }}
+                >
+                  {isVisible ? (
+                    <Page
+                      pageNumber={pageNumber}
+                      page={pageProxies.get(pageNumber) ?? null}
+                      scale={scale}
+                      size={size}
+                      highlights={highlights}
+                      activeHighlightId={activeHighlightId}
+                      onHighlightClick={handleHighlightClick}
+                      ariaLabel={t('a11y.page', { page: pageNumber })}
+                      onRenderError={(renderError, failedPage) => {
+                        onError?.(
+                          pdfViewerError('E_RENDER_PAGE', {
+                            cause: renderError,
+                            pageNumber: failedPage,
+                          }),
+                        );
+                      }}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

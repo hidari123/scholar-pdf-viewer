@@ -19,6 +19,13 @@
 export * from './components';
 export type { PdfViewerError, PdfViewerErrorCode } from './core/errors';
 export { isRetryable, pdfViewerError } from './core/errors';
+export type { OutlineItemLike } from './core/outline/outline';
+export type {
+  SearchHit,
+  SearchOptions,
+  TextPageLike,
+} from './core/search/search';
+export { PdfSearch } from './core/search/search';
 export type * from './core/types';
 export * from './hooks';
 export type { Locale, Messages } from './i18n/messages';

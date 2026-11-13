@@ -145,6 +145,7 @@
 .scpdf-container {
   position: relative;
   flex: 1 1 auto;
+  min-width: 0;
   overflow: auto;
   outline: none;
   /*
@@ -325,10 +326,27 @@
 
 /* ---------- 面板（缩略图 / 目录） ---------- */
 
+/*
+ * 侧栏用 flex 布局（与滚动容器并列），**不用 absolute**。
+ *
+ * 为什么：absolute + top:0 会盖住工具栏（.scpdf-root 是定位祖先），
+ * 导致工具栏上的"关闭面板"按钮点不到。
+ * flex 并列 → 侧栏有自己的位置，不影响工具栏，也不影响页面流的居中计算。
+ */
+.scpdf-root {
+  display: flex;
+  flex-direction: column;
+}
+
+.scpdf-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
 .scpdf-panel {
-  position: absolute;
-  top: 0;
-  bottom: 0;
+  flex: 0 0 auto;
   width: 220px;
   padding: 12px;
   background: var(--scpdf-color-surface);
@@ -344,10 +362,20 @@
   opacity: 0.8;
 }
 
+/* 缩略图 */
+
+.scpdf-thumbnails {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
 .scpdf-thumbnail {
-  display: block;
-  width: 100%;
-  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   padding: 0;
   border: 2px solid transparent;
   border-radius: 4px;
@@ -359,9 +387,47 @@
   border-color: var(--scpdf-color-primary);
 }
 
-.scpdf-outline__item {
+.scpdf-thumbnail__img,
+.scpdf-thumbnail__placeholder {
   display: block;
-  width: 100%;
+  background: var(--scpdf-color-surface-alt);
+  border: 1px solid var(--scpdf-color-border);
+  object-fit: contain;
+}
+
+.scpdf-thumbnail__number {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+/* 目录 */
+
+.scpdf-outline__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.scpdf-outline__toggle {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.scpdf-outline__toggle--empty {
+  cursor: default;
+}
+
+.scpdf-outline__item {
+  flex: 1 1 auto;
+  display: block;
   padding: 3px 4px;
   border: 0;
   background: transparent;
@@ -371,8 +437,21 @@
   text-align: left;
   cursor: pointer;
   border-radius: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.scpdf-outline__item:hover {
+.scpdf-outline__item:hover:not(:disabled) {
   background: var(--scpdf-color-surface-alt);
+}
+
+.scpdf-outline__item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.scpdf-outline__item--active {
+  color: var(--scpdf-color-primary);
+  font-weight: 600;
 }

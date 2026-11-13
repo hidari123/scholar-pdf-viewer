@@ -709,4 +709,71 @@
 
 ---
 
-## 阶段 4 · 第 2 步（下一步）：缩略图面板 / 目录面板 / 搜索面板
+## 阶段 4 · 第 2 步：面板 —— 缩略图 / 目录 / 搜索（2026-11-13）
+
+**做了什么**
+- `src/core/thumbnail/plan.ts`：缩略图策略（`thumbnailSpec` / `planThumbnails` / `ThumbnailCache` LRU）
+- `src/core/outline/outline.ts`：目录扁平化 + 折叠可见性计算 + 目标解析
+- `src/components/ThumbnailPanel.tsx`：缩略图面板（宿主注入渲染函数）
+- `src/components/OutlinePanel.tsx`：目录面板（层级 + 折叠 + 当前项高亮）
+- `src/components/SearchPanel.tsx`：搜索面板（接 core 的 PdfSearch）
+- `src/components/PdfViewer.tsx`：加 `getOutline` / `pageRefToNumber` / `renderThumbnail` / `searchEngine` / `outlineResolveToken` props + 侧栏布局
+- `src/core/search/search.ts`：加 `getPageProvider()` / `getTotalPages()`（UI 层要能确保索引已建）
+- `src/styles/viewer.css`：面板样式（缩略图/目录）+ 侧栏改为 flex 并列
+- `scripts/e2e-panels.mjs`：面板 E2E（12 项断言）
+- 测试：thumbnail 19 + outline 14 + OutlinePanel 6 + SearchPanel 7
+
+**为什么这么实现**
+- **缩略图由宿主渲染**：包不依赖 pdf.js → 宿主可用 canvas / worker / OffscreenCanvas，包只收 URL
+- **懒生成 + 窗口化 + 单次批量上限**：500 页文档一次性生成会吃光内存；
+  只生成可视页 ±2、单次最多 4 个 → 滚动流畅
+- **LRU + 条数上限**：缩略图每张 ~200KB，500 页 = 100MB+ → 必须限制
+- **目录扁平化**：React 渲染树要递归组件 + 展开状态管理；扁平后是一个 map，快得多
+- **目录页码由宿主解析**：pdf.js 的页引用是内部对象，包算不出页码 → 宿主注入映射
+- **搜索接 core 的 PdfSearch**：索引懒建 + 分片让出主线程（不在加载时建索引）
+
+**遇到的问题**
+1. **侧栏盖住工具栏（真 bug，E2E 抓到的）**：`.scpdf-panel` 用 `position:absolute; top:0`
+   → 定位祖先是 `.scpdf-root`（含工具栏）→ 面板把工具栏的"关闭"按钮盖住 → 点不到
+   - 修复：侧栏改为 **flex 并列**（`.scpdf-body` 容器），不再绝对定位
+   - 教训：**绝对定位的参照系要看清楚** —— 面板"从顶部开始"是相对谁？
+2. **目录项全部点不动（真 bug，真实 PDF 暴露的）**：20 个目录项全 disabled
+   - 排查过程：
+     a. 先怀疑宿主映射没建好 → 加日志发现 `getPageIndex` 没被调用
+     b. 再查 `dest` 结构 → **`dest` 是字符串（"section.1"），不是数组！**
+        → 这是**命名目标**（named destination），真实 PDF 常见
+     c. 包的 `resolveDestPage` 只认数组 → 字符串直接返回 null
+   - 修复（两层）：
+     - 宿主：命名目标先用 `doc.getDestination(name)` 解析成数组，再取页引用
+     - 包：`resolveDestPage` 支持字符串形态（查宿主映射里的命名键）
+   - 教训：**PDF 的同一概念在不同文件里有不同编码**；只按"标准示例"实现会漏掉真实场景
+3. **宿主页码映射是异步的，包拿不到"好了"的通知**：
+   `getPageIndex` 是 async → 目录首次渲染时映射还是空的
+   - 修复：加 `outlineResolveToken` prop —— 宿主解析完 +1 → 包重新解析目录
+   - 教训：**包与宿主之间的异步边界要显式设计**，不能靠"宿主刚好先准备好"
+4. **缩略图缓存放 ref 导致 biome 报"多余依赖"**：
+   缓存内容变了要重渲染，但 ref 变化不触发 → 只能手动把 `generated` 列进依赖
+   - 修复：缓存改用 **state**（不可变更新）→ 依赖天然正确
+   - 教训：**要触发渲染的数据就该放 state**，ref + 手动依赖是脆弱的组合
+5. **`ThumbnailCache` 类成员重名**：私有字段 `maxEntries` + getter `maxEntries` → biome 报重复成员
+   - 修复：字段改名 `limit`
+   - 教训：**私有字段与公开 getter 同名**在 TS 里合法，但 biome 不允许
+6. **`PdfSearch.search()` 是同步的**（我一开始按异步写）→ 类型直接报错
+   - 修复：面板改成"先确保索引建好（异步）→ 再同步搜"
+   - 教训：**先读实现再写调用方**
+7. **PowerShell 批量替换第三次毁掉源码 UTF-8**（E2E 脚本里的 ✓ 变乱码 → 语法错误）
+   - 修复：脚本用 write 工具重写
+   - 教训：**已经是第三次** —— 从此**一律用编辑工具改文件**，PowerShell 只用来跑命令
+8. **demo 的 pdf.js 文本项类型**：`TextItem | TextMarkedContent` 混合，后者没有 transform
+   - 修复：用 `'transform' in item` 做类型守卫
+   - 教训：**pdf.js 的联合类型要用 in 收窄**，不能直接当 TextItem 用
+
+**验证**
+- `pnpm test`：209 passed
+- `pnpm verify` 5 gate 全绿
+- E2E 面板：**12/12**（缩略图 18 项/懒生成 6-8 张/点击跳页 / 目录 20 项全可跳/点击跳页 / 搜索 107 个结果 / 无 JS 错误）
+- 截图：`e2e-shots/thumbnails.png`、`e2e-shots/outline.png`
+
+---
+
+## 阶段 4 · 第 3 步（下一步）：链接/表单标注层 + 密码框 + 错误态 UI
