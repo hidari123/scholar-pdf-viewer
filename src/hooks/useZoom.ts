@@ -33,10 +33,15 @@ export interface UseZoomResult {
   zoomIn: () => void;
   /** 缩小 */
   zoomOut: () => void;
-  /** 适配宽度 */
-  fitWidth: (containerWidth: number) => void;
-  /** 适配页面（整页可见） */
-  fitPage: (containerWidth: number, containerHeight: number, pageAspect: number) => void;
+  /** 适配宽度（传入容器宽度与页面宽度 pt） */
+  fitWidth: (containerWidth: number, pageWidth: number) => void;
+  /** 适配页面（传入容器宽高与页面尺寸 pt） */
+  fitPage: (
+    containerWidth: number,
+    containerHeight: number,
+    pageWidth: number,
+    pageHeight: number,
+  ) => void;
   /** 直接设置缩放（保持锚点） */
   setScale: (next: number) => void;
 }
@@ -99,35 +104,43 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
     setScale(scale - SCALE_STEP);
   }, [scale, setScale]);
 
-  /** 适配宽度：容器宽度 / 页面宽度（scale=1 时的页面宽度） */
+  /**
+   * 适配宽度：容器宽度 / 页面宽度（pt）。
+   *
+   * @param containerWidth 容器可用宽度（px）
+   * @param pageWidth 页面宽度（pt，scale=1 时的尺寸）
+   */
   const fitWidth = useCallback(
-    (containerWidth: number) => {
-      if (containerWidth <= 0) {
+    (containerWidth: number, pageWidth: number) => {
+      if (containerWidth <= 0 || pageWidth <= 0) {
         return;
       }
-      // 页面在 scale=1 时的宽度由调用方按页宽传入，这里用容器宽度作为基准
-      onScaleChange(clampedFit(containerWidth));
+      // 减掉容器内边距（左右各 16px）
+      const available = containerWidth - 32;
+      setScale(available / pageWidth);
     },
-    [onScaleChange],
+    [setScale],
   );
 
-  /** 适配页面：容器宽高都能容纳整页 */
+  /**
+   * 适配页面：整页完整可见（宽高都容纳）。
+   *
+   * @param containerWidth 容器可用宽度（px）
+   * @param containerHeight 容器可用高度（px）
+   * @param pageWidth 页面宽度（pt）
+   * @param pageHeight 页面高度（pt）
+   */
   const fitPage = useCallback(
-    (containerWidth: number, containerHeight: number, pageAspect: number) => {
-      if (containerWidth <= 0 || containerHeight <= 0 || pageAspect <= 0) {
+    (containerWidth: number, containerHeight: number, pageWidth: number, pageHeight: number) => {
+      if (containerWidth <= 0 || containerHeight <= 0 || pageWidth <= 0 || pageHeight <= 0) {
         return;
       }
-      const byWidth = containerWidth / (pageAspect * 100);
-      const byHeight = containerHeight / 100;
+      const byWidth = (containerWidth - 32) / pageWidth;
+      const byHeight = (containerHeight - 32) / pageHeight;
       setScale(Math.min(byWidth, byHeight));
     },
     [setScale],
   );
 
   return { zoomIn, zoomOut, fitWidth, fitPage, setScale };
-}
-
-/** 适配宽度：调用方传入的容器宽度即 scale=1 时的页宽基准 */
-function clampedFit(containerWidth: number): number {
-  return clampScale(containerWidth / 100);
 }

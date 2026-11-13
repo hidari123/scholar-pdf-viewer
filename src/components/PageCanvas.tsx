@@ -28,8 +28,15 @@ export interface PageProxyLike {
     height: number;
     scale: number;
   };
-  /** 渲染到 canvas */
+  /**
+   * 渲染到 canvas。
+   *
+   * 参数同时带 `canvas` 与 `canvasContext`：
+   * pdf.js v6 的 RenderParameters 要求 `canvas`（v5 只要 context），
+   * 两个都给 → 跨 pdf.js 版本都能用（宿主注入的实现直接转发即可）。
+   */
   render(params: {
+    canvas?: HTMLCanvasElement;
     canvasContext: CanvasRenderingContext2D;
     viewport: { width: number; height: number; scale: number };
   }): RenderTaskLike;
@@ -101,7 +108,8 @@ export function PageCanvas(props: PageCanvasProps) {
 
     let task: RenderTaskLike;
     try {
-      task = page.render({ canvasContext: context, viewport });
+      // 同时传 canvas 与 canvasContext：pdf.js v6 需要 canvas，v5 只看 context
+      task = page.render({ canvas, canvasContext: context, viewport });
     } catch (error) {
       onRenderError?.(error, page.pageNumber);
       return;

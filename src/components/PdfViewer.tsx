@@ -78,6 +78,13 @@ export interface PdfViewerProps {
   theme?: 'light' | 'dark' | 'auto';
   /** 取页（由宿主注入 pdf.js） */
   getPage?: (pageNumber: number) => Promise<PageProxyLike | undefined>;
+  /**
+   * 取各页尺寸（pt）。
+   *
+   * 不传则用 A4（595×842）——**滚动条长度会不准**（不同 PDF 尺寸不同）。
+   * 有真实尺寸时一定要传：它决定页顶边数组，进而决定"跳页"和"当前页"的准确性。
+   */
+  getPageSizes?: (numPages: number) => Promise<{ width: number; height: number }[]>;
   /** 取文档信息（页数/元数据） */
   getDocInfo?: (data: Uint8Array) => Promise<PdfDocInfo>;
   /** 加载成功 */
@@ -125,6 +132,7 @@ export function PdfViewer(props: PdfViewerProps) {
     messages,
     theme = 'auto',
     getPage,
+    getPageSizes,
     getDocInfo,
     onDocumentLoad,
     onError,
@@ -170,14 +178,23 @@ export function PdfViewer(props: PdfViewerProps) {
   /** 页面代理缓存（pageNumber → page proxy） */
   const [pageProxies, setPageProxies] = useState<Map<number, PageProxyLike>>(new Map());
 
-  // 2) 页面尺寸（简化实现按统一比例算；真实实现由宿主提供 pageSize）
+  /**
+   * 页面尺寸（pt，scale=1 时的物理尺寸）。
+   *
+   * 默认用 A4（595×842）；宿主可传 `getPageSizes` 覆盖（不同 PDF 尺寸不同，
+   * A4 假设会让滚动条长度不准）。
+   */
+  const [pageSizesPt, setPageSizesPt] = useState<{ width: number; height: number }[]>([]);
+
+  // 2) 页面尺寸（当前缩放下的像素尺寸）
   const pageSizes = useMemo(() => {
     const sizes: { width: number; height: number }[] = [];
     for (let i = 0; i < numPages; i += 1) {
-      sizes.push({ width: 595 * scale, height: 842 * scale });
+      const pt = pageSizesPt[i] ?? { width: PAGE_WIDTH_PT, height: PAGE_HEIGHT_PT };
+      sizes.push({ width: pt.width * scale, height: pt.height * scale });
     }
     return sizes;
-  }, [numPages, scale]);
+  }, [numPages, scale, pageSizesPt]);
 
   /** 页顶边数组（末项为文档总高哨兵） */
   const pageTops = useMemo(() => {
@@ -196,6 +213,29 @@ export function PdfViewer(props: PdfViewerProps) {
     pageElements: pageElementsRef,
     totalPages: numPages,
   });
+
+  /** 取各页尺寸（宿主注入；失败则用 A4 兜底） */
+  useEffect(() => {
+    if (!getPageSizes || numPages <= 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void getPageSizes(numPages)
+      .then((sizes) => {
+        if (!cancelled && Array.isArray(sizes)) {
+          setPageSizesPt(sizes);
+        }
+      })
+      .catch(() => {
+        // 取不到尺寸 → 保持 A4 兜底，不阻断渲染
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getPageSizes, numPages]);
 
   /**
    * 取页（可见页才取，懒加载）。
@@ -258,6 +298,27 @@ export function PdfViewer(props: PdfViewerProps) {
       onZoomChange?.(next);
     },
   });
+
+  /**
+   * 初始缩放 = 适配宽度。
+   *
+   * 必须在**容器有宽度**之后才能算准；只做一次（之后由用户控制）→ ref 记住是否已执行。
+   */
+  const initialScaleAppliedRef = useRef(false);
+  useEffect(() => {
+    // 只在 initialScale === 'width' 时做适配宽度；数字初始值直接用
+    if (initialScale !== 'width' || initialScaleAppliedRef.current) {
+      return;
+    }
+    const container = containerRef.current;
+    if (!container || container.clientWidth <= 0 || numPages <= 0) {
+      return;
+    }
+
+    initialScaleAppliedRef.current = true;
+    const pt = pageSizesPt[0] ?? { width: PAGE_WIDTH_PT, height: PAGE_HEIGHT_PT };
+    zoom.fitWidth(container.clientWidth, pt.width);
+  }, [initialScale, numPages, pageSizesPt, zoom]);
 
   // 6) 选区
   useTextSelection({
@@ -351,12 +412,13 @@ export function PdfViewer(props: PdfViewerProps) {
         onPageChange={(next) => scrollToPage(next)}
         onZoomIn={zoom.zoomIn}
         onZoomOut={zoom.zoomOut}
-        onFitWidth={() => zoom.fitWidth(containerRef.current?.clientWidth ?? 0)}
+        onFitWidth={() => zoom.fitWidth(containerRef.current?.clientWidth ?? 0, PAGE_WIDTH_PT)}
         onFitPage={() =>
           zoom.fitPage(
             containerRef.current?.clientWidth ?? 0,
             containerRef.current?.clientHeight ?? 0,
-            595 / 842,
+            PAGE_WIDTH_PT,
+            PAGE_HEIGHT_PT,
           )
         }
         onToggleSearch={features.search === false ? undefined : () => setSearchOpen((v) => !v)}
@@ -437,7 +499,8 @@ export function PdfViewer(props: PdfViewerProps) {
                 style={{
                   width: size.width,
                   height: size.height,
-                  transform: `translateY(${pageTops[index] ?? 0}px)`,
+                  // 绝对定位 + top：页面按页顶边数组摆放（滚动定位靠它）
+                  top: pageTops[index] ?? 0,
                 }}
               >
                 {isVisible ? (
@@ -476,3 +539,9 @@ export function PdfViewer(props: PdfViewerProps) {
 
 /** 页间距（px） */
 const PAGE_GAP = 16;
+
+/** 默认页宽（pt，A4） */
+const PAGE_WIDTH_PT = 595;
+
+/** 默认页高（pt，A4） */
+const PAGE_HEIGHT_PT = 842;

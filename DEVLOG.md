@@ -596,4 +596,55 @@
 
 ---
 
-## 阶段 2 · 第 3 步（下一步）：demo 改造 —— 真实 pdf.js 接入
+## 阶段 2 · 第 3 步：demo 真实接入 + E2E 冒烟（2026-11-13）
+
+**做了什么**
+- `demo/src/App.tsx`：真实 pdf.js 接线（标准宿主示例）
+  - pdf.js 全部在宿主侧：包不 import pdf.js（换引擎不用改包）
+  - 手写 3 页样张 PDF（仓库不放二进制，字节可控）
+  - 高亮**受控**（宿主存）、选区**只有几何**（宿主决定弹什么）
+  - 工具栏 slots 塞宿主自己的"添加高亮"按钮
+- `scripts/e2e-smoke.mjs`：真浏览器冒烟（12 项断言 + 截图）
+- `demo/index.html`：内联 SVG favicon（消掉 404）
+- `package.json`：加 `e2e` / `e2e:serve` 脚本
+- `src/components/PageCanvas.tsx`：`render()` 参数补 `canvas`（pdf.js v6 要求）
+- `src/hooks/useZoom.ts`：`fitWidth`/`fitPage` 改为**接收真实页宽页高**（原来硬编码 100）
+- `src/components/PdfViewer.tsx`：加 `getPageSizes` prop + `initialScale='width'` 真实实现
+
+**为什么这么实现**
+- **E2E 是唯一能验证"真的画出来了吗"的手段**：jsdom 没有 canvas 渲染能力，"PDF 渲染/缩放/定位"这三件核心事单测覆盖不到
+- **复用本机已装的 Chromium**（chromium-1234）而不是让 Playwright 下载 1254：省时间、不污染环境；脚本里自动探测版本
+- **样张 PDF 手写字节**：不放二进制进仓库（体积 + 审查成本），且能精确控制每页文字（便于测选中）
+- **页尺寸由宿主注入**（`getPageSizes`）：不同 PDF 尺寸不同，用 A4 假设会让页顶边数组不准 → "跳页"和"当前页"都偏
+
+**遇到的问题**
+1. **Playwright 版本与本机浏览器不匹配**：`browserType.launch` 报 "Executable doesn't exist at chromium_headless_shell-1254"
+   - 修复：脚本自动探测 `%LOCALAPPDATA%\ms-playwright` 下已装 chromium（取版本号最大），用 `executablePath` 启动
+   - 教训：**环境差异要在脚本里兜住**，不能假设"装依赖 = 装齐浏览器"
+2. **ESM 里用 `require` 报错**："Cannot determine intended module format because both 'require' and top-level await are present"
+   - 修复：改用顶层 `import { readdirSync } from 'node:fs'`
+   - 教训：`.mjs` + 顶层 await → 纯 ESM，不能混 `require`
+3. **E2E 脚本自己写错（缩放到底后继续点禁用按钮）**：`locator.click` 超时 30s
+   - 修复：循环里先 `isDisabled()` 判断，禁用就 break
+   - 教训：**E2E 失败先分清是"产品 bug"还是"脚本 bug"** —— 这次是脚本假设错了
+4. **favicon 404 被当成运行期错误**：浏览器自动请求 /favicon.ico
+   - 修复：① demo 加内联 SVG favicon；② E2E 过滤 favicon 相关错误（浏览器行为不是包的问题）
+5. **`fitWidth` 数学硬编码页宽 100**：`containerWidth / 100` → 适配宽度完全算错（页面小到离谱）
+   - 修复：改为接收真实页宽（pt）；`fitPage` 同理
+   - 教训：**凡是"魔法数字"都要问"它代表什么"** —— 100 显然不代表任何真实页宽
+6. **`initialScale` 判断写反（真 bug）**：`if (initialScale === 'width') return;` → 永远不执行适配宽度
+   - 修复：改成 `!== 'width'` 才执行
+   - 教训：**条件写反了，测试和类型都发现不了**（逻辑上"合法但没效果"）；E2E 的"页宽接近容器宽"断言直接抓到了
+7. **demo 消费的是 `dist/`（构建产物），改 `src/` 不生效**：调试时一度以为是逻辑问题
+   - 修复：改完 `src/` 先 `pnpm build` 再测
+   - 教训：**workspace 包消费的是构建产物**，不是源码；调试前先确认"改的代码真的被加载了"
+
+**验证**
+- `pnpm test`：142 passed
+- `pnpm verify` 5 gate 全绿
+- E2E（真 Chromium）：**12/12 通过** —— 3 页真实渲染 / 595×842 初始 / 适配宽度 207% / 缩放 207%→217% / canvas 1232→1292px / 跳页 / 无 JS 错误
+- 截图：`e2e-shots/viewer-fit-width.png`（适配宽度）、`e2e-shots/viewer.png`（缩放后）
+
+---
+
+## 阶段 4 · 第 1 步（下一步）：TextLayer —— 文本层（让文字真的能选中）

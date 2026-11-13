@@ -160,7 +160,11 @@
 .scpdf-page {
   position: absolute;
   top: 0;
-  left: 50%;
+  /* 水平居中：用 margin auto（不用 transform —— transform 要留给别处，
+     且页宽是动态的，margin-left 负值写法容易算错） */
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   background: var(--scpdf-color-surface);
   box-shadow: var(--scpdf-shadow-page);
   border-radius: var(--scpdf-radius-page);
