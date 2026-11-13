@@ -10,5 +10,7 @@ export * from './cache';
 export * from './document';
 export * from './errors';
 export * from './geometry';
+export * from './search';
 export * from './selection';
+export * from './store';
 export type * from './types';

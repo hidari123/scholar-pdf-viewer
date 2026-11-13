@@ -449,4 +449,61 @@
 
 ---
 
-## 阶段 1 · 第 5 步（下一步）：core/search —— 文本索引与搜索
+## 阶段 1 · 第 5 步：core/search —— 文本索引与搜索（2026-11-13）
+
+**做了什么**
+- `src/core/search/search.ts`：`PdfSearch` 类（懒建索引 / 分片构建 / 大小写与全角归一化 / 命中上限 / 全文提取）
+- `src/core/search/search.test.ts`：14 例
+- 目录结构：`search/search.ts` + `search/index.ts`（桶文件）——实现与桶分开，避免"同名文件既是实现又是出口"
+
+**为什么这么实现**
+- **懒建索引**：只在第一次搜索时建，不在加载时建——加载时建会让首屏变慢（用户可能根本不搜索）
+- **分片构建 + 让出主线程**：每 10 页 `await yieldToHost()` 一次，否则 500 页文档建索引会卡住 UI 好几秒（长任务 > 50ms = 掉帧）
+- **大小写 + 全角归一化**：搜 "pdf" 要能命中 "PDF"、搜 "abc" 要能命中 "ａｂｃ"（全角）——搜索体验的细节，也是中文文档的常见需求
+- **命中按页码顺序**：结果顺序可预期 > 性能（用户会按顺序跳）
+- **单页/总命中上限**：防止在超大文档里搜一个高频词返回上万条把 UI 拖垮
+- **单页失败不中断整体建索引**：某页是纯图片（无文本层）→ 记为空页继续；取页本身失败（页已销毁）同样要兜住
+
+**遇到的问题**
+1. **类型签名写错导致 9 个类型错误**：`getPage: (n) => Promise<TextPageLike> | undefined` —— 这个写法的 `| undefined` 绑定的是 **`Promise` 本身**（"可能返回一个 undefined 的 Promise"），而不是"Promise 可能 resolve 成 undefined"
+   - 修复：改成 `(n) => Promise<TextPageLike | undefined>`
+   - 教训：**联合类型的绑定位置**是 TS 里最容易看错的地方之一；写完签名要用真实调用方校验一次
+2. **测试期望值算错**：以为失败页会让命中数少 1，实际第 1、3 页都有 'good text' → 2 个命中才对
+   - 修复：改断言为"第 2 页为空 + 命中 2 个"，顺带把 `indexedPages === 3` 也断言上（更能表达"失败页不影响整体"）
+
+**验证**
+- `pnpm test`：101 passed（search 14 + store 17 + selection 23 + cache 16 + loader 17 + geometry 10 + SSR 4）
+- `pnpm verify` 5 gate 全绿
+
+---
+
+## 阶段 1 · 第 6 步：core/store —— 每实例状态容器（2026-11-13）
+
+**做了什么**
+- `src/core/store/instance.ts`：`createStore()`（纯 TS 容器）+ `createViewerStore()` + `ViewerState` + `anchoredScrollTop()` + `findCurrentPage()`
+- `src/core/store/instance.test.ts`：17 例
+- `src/core/index.ts`：出口接线
+
+**为什么这么实现**
+- **自己写而不用 valtio/zustand**：包不该给宿主强加运行时依赖（一个 PDF 查看器不值得拖一个状态库）；`useSyncExternalStore` 是 React 官方方案，够用
+- **每实例一份 state**：多个查看器互不干扰（主项目有"主视图 + 缩略图预览"的需求）
+- **`setState` 无变化不通知**：避免无谓重渲染（React 的重渲染代价不低）
+- **通知时遍历快照**：监听器可能在回调里取消订阅 → 遍历活着的 Set 会出问题
+- **`anchoredScrollTop` 抽成纯函数**：缩放锚点保持是"缩放不跳动"的核心，纯函数可单测（渲染层只负责读滚动位置）
+- **`findCurrentPage` 用二分**：主项目原实现每次滚动全量遍历所有页 → 长文档卡顿；页顶边数组是单调的 → 二分 O(log n)
+
+**遇到的问题**
+1. **`findCurrentPage` 会返回"不存在的第 N 页"**：页顶边数组的最后一项是**文档总高的哨兵**，二分命中它 → 返回 `页数+1`
+   - 修复：用 `Math.min(..., pageTops.length - 1)` 夹到真实页数
+   - 教训：**哨兵值要显式处理**，否则它会漏进业务结果
+2. **`anchoredScrollTop` 的测试期望值算错**（期望 150 / 0，实际 250 / 25）
+   - 重新推导：内容坐标 c = (scrollTop + anchorY) / scaleBefore；新 scrollTop = c × scaleAfter − anchorY = 250 / 25 —— **实现是对的，测试的算术错了**
+   - 教训：断言写错和实现写错要分清；这里先推导公式再对答案，而不是"看着不对就改实现"
+
+**验证**
+- `pnpm test`：101 passed
+- `pnpm verify` 5 gate 全绿
+
+---
+
+## 阶段 1 · 第 7 步（下一步）：React 层 —— hooks + 组件
