@@ -91,7 +91,12 @@ page.on('requestfailed', (request) => {
   if (request.url().includes('favicon')) {
     return;
   }
-  pageErrors.push(`请求失败：${request.url()}`);
+  // 被主动取消的请求（React StrictMode 双挂载会取消第一次 effect）不是错误
+  const failure = request.failure();
+  if (failure?.errorText === 'net::ERR_ABORTED') {
+    return;
+  }
+  pageErrors.push(`请求失败：${request.url()}（${failure?.errorText ?? '未知'}）`);
 });
 page.on('response', (response) => {
   if (response.status() >= 400 && !response.url().includes('favicon')) {
@@ -106,9 +111,9 @@ try {
   check('查看器已挂载', (await page.locator('[data-testid="pdf-viewer"]').count()) === 1);
   check('工具栏已渲染', (await page.locator('.scpdf-toolbar').count()) === 1);
 
-  // 2) 生成样张 PDF
-  await page.getByRole('button', { name: '生成样张 PDF' }).click();
-  await page.waitForTimeout(1500);
+  // 2) 等文档加载（demo 启动时优先加载本地真实文档，没有则用内置样张）
+  await page.waitForSelector('.scpdf-page canvas.scpdf-canvas', { timeout: 60000 });
+  await page.waitForTimeout(2000);
 
   // 3) 页面已渲染（canvas 存在且有尺寸）
   const canvasCount = await page.locator('.scpdf-page canvas.scpdf-canvas').count();
@@ -144,9 +149,10 @@ try {
   const pagerValue = await page.locator('.scpdf-toolbar__page-input').inputValue();
   check('页码输入框显示第 1 页', pagerValue === '1', `值 = ${pagerValue}`);
 
-  // 5) 总页数 = 3
+  // 5) 总页数（真实文档页数不固定 → 只校验"有数字且与页数一致"）
   const totalText = await page.locator('.scpdf-toolbar__page-total').textContent();
-  check('总页数为 3', totalText?.trim() === '/ 3', `文本 = ${totalText?.trim()}`);
+  const totalPages = Number.parseInt((totalText ?? '').replace('/', '').trim(), 10);
+  check('总页数有效', Number.isFinite(totalPages) && totalPages > 0, `总页数 = ${totalPages}`);
 
   // 6) 缩放
   const scaleBefore = await page.locator('.scpdf-toolbar__scale').textContent();
@@ -180,11 +186,46 @@ try {
   const disabled = await zoomOut.isDisabled();
   check('缩到下限后缩小按钮禁用', disabled);
 
-  // 9) 跳页
-  await page.locator('.scpdf-toolbar__page-input').fill('3');
-  await page.waitForTimeout(800);
+  // 8.5) 恢复缩放（回到适宽），再测跳页 —— 最小缩放下文档很短，跳页边界容易出问题
+  await page.getByLabel('适应宽度').click();
+  await page.waitForTimeout(600);
+
+  // 9) 跳页（跳到倒数第二页）
+  const targetPage = Math.max(1, totalPages - 1);
+  await page.locator('.scpdf-toolbar__page-input').fill(String(targetPage));
+
+  // 等滚动稳定（不用固定 sleep —— 平滑滚动的时长随距离变化）
+  await page
+    .waitForFunction(
+      (target) => document.querySelector('.scpdf-toolbar__page-input')?.value === String(target),
+      targetPage,
+      { timeout: 8000 },
+    )
+    .catch(() => {
+      /* 下面的断言会报告失败 */
+    });
+
   const pagerAfter = await page.locator('.scpdf-toolbar__page-input').inputValue();
-  check('跳到第 3 页', pagerAfter === '3', `值 = ${pagerAfter}`);
+  check(`跳到第 ${targetPage} 页`, pagerAfter === String(targetPage), `值 = ${pagerAfter}`);
+
+  // 9.5) 跳页后滚动位置确实落在目标页
+  const jumpCheck = await page.evaluate((target) => {
+    const container = document.querySelector('.scpdf-container');
+    const pages = [...document.querySelectorAll('.scpdf-page')];
+    const targetEl = pages[target - 1];
+    if (!container || !targetEl) return null;
+    const c = container.getBoundingClientRect();
+    const t = targetEl.getBoundingClientRect();
+    return {
+      offset: Math.round(t.top - c.top),
+      scrollTop: Math.round(container.scrollTop),
+    };
+  }, targetPage);
+  check(
+    '跳页后目标页在视口顶部',
+    jumpCheck !== null && Math.abs(jumpCheck.offset) < 4,
+    jumpCheck ? `偏移 ${jumpCheck.offset}px（scrollTop ${jumpCheck.scrollTop}）` : '无',
+  );
 
   // 10) 无页面错误
   check('运行期无 JS 错误', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));

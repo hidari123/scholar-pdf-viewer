@@ -129,4 +129,17 @@ describe('findCurrentPage（当前页二分查找）', () => {
   it('空数组 → 第 1 页', () => {
     expect(findCurrentPage([], 100)).toBe(1);
   });
+
+  it('页顶边取整后 → 精确命中（浏览器 scrollTop 是整数）', () => {
+    /**
+     * 真实场景：页顶边累加得到小数（29050.24），
+     * 组件层把 pageTops 取整（浏览器 scrollTop 本身也是整数），
+     * 于是滚到 tops[16]=29050 → 判定为第 17 页（边界包含）。
+     */
+    const rounded = [0, 1816, 3631, 5447, 7263];
+    expect(findCurrentPage(rounded, 3631)).toBe(3);
+    expect(findCurrentPage(rounded, 5447)).toBe(4);
+    // 边界前 1px 仍是上一页
+    expect(findCurrentPage(rounded, 5446)).toBe(3);
+  });
 });

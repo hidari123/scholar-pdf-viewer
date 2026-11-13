@@ -37,6 +37,7 @@
     "verify": "node scripts/verify.mjs",
     "demo": "pnpm --filter @scholar-club/pdf-viewer-demo dev",
     "e2e": "node scripts/e2e-smoke.mjs",
+    "e2e:text": "node scripts/e2e-text-layer.mjs",
     "e2e:serve": "pnpm --filter @scholar-club/pdf-viewer-demo dev --port 5180"
   },
   "devDependencies": {

@@ -18,6 +18,19 @@ export interface RenderTaskLike {
   promise: Promise<void>;
 }
 
+/** 文本内容（pdf.js getTextContent 的最小形状） */
+export interface TextContentLike {
+  /** 文本项 */
+  items: {
+    str: string;
+    transform: number[];
+    width: number;
+    height: number;
+    fontName?: string;
+    hasEOL?: boolean;
+  }[];
+}
+
 /** 页面代理（pdf.js PDFPageProxy 的最小形状） */
 export interface PageProxyLike {
   /** 页码（1-based） */
@@ -27,7 +40,10 @@ export interface PageProxyLike {
     width: number;
     height: number;
     scale: number;
+    transform?: number[];
   };
+  /** 取文本内容（用于文本层；没实现则不渲染文本层） */
+  getTextContent?(): Promise<TextContentLike>;
   /**
    * 渲染到 canvas。
    *

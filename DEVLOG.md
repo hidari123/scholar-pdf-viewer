@@ -647,4 +647,66 @@
 
 ---
 
-## 阶段 4 · 第 1 步（下一步）：TextLayer —— 文本层（让文字真的能选中）
+## 阶段 4 · 第 1 步：TextLayer —— 文本层（让文字真的能选中）+ 真实 PDF 联调（2026-11-13）
+
+**做了什么**
+- `src/core/text-layer/layout.ts`：文本项 → CSS 定位的纯函数（`positionTextItem` / `layoutTextContent`）
+- `src/components/TextLayer.tsx`：透明文字层组件（让浏览器原生可选中）
+- `src/components/Page.tsx`：单页组合（canvas + 文本层 + 标注层）
+- `src/components/PageCanvas.tsx`：`PageProxyLike` 加可选的 `getTextContent`
+- `src/components/PdfViewer.tsx`：`getPageSizes` prop + `pageTops` 取整 + 顶部留白纳入基准
+- `src/styles/viewer.css`：文本层样式（透明 + 可选中 + 选区高亮）
+- `scripts/e2e-text-layer.mjs`：文本层 E2E（7 项断言）
+- demo：优先加载**本地真实 PDF**（`demo/public/samples/local.pdf`，体积大不入库）
+
+**为什么这么实现**
+- **文本层是整个包最关键的一块**：canvas 渲染出的是像素 → 用户选不中、复制不了、搜不了。
+  叠一层透明 DOM 后，浏览器原生就能选中 → 我们只在 mouseup 时读几何
+- **按 `hasEOL` 分行而不是每个 item 一个 span**：一页上千个 item → DOM 爆炸；
+  按行合并后每页几十个节点，选中体验也更自然（整行可选）
+- **字体大小 = |d| × 视口缩放**：视口矩阵的 vb 是**负的**（y 轴翻转）→ 必须用 hypot 取模长，
+  直接乘会得到负字号
+- **文本层透明**：用户看到的是 canvas 的真实渲染，文本层只是"给浏览器的可选中替身"
+- **页面尺寸由宿主注入**：不同 PDF 尺寸不同（A4 / Letter / 混合），
+  用 A4 假设会让页顶边数组不准 → 跳页与当前页都偏
+
+**遇到的问题**
+1. **fontSize 算错（真 bug）**：用了 `hypot(a, d) * hypot(va, vb)` —— 把文本矩阵的**水平**缩放
+   和视口缩放混在一起 → 字号偏大 40%
+   - 修复：字号 = |d| × hypot(va, vb)（视口矩阵的 2D 缩放）
+   - 教训：**矩阵分解要想清楚每个分量代表什么**，别把两个不同空间的量相乘
+2. **`TextItemLike` 名字冲突**：`search` 模块已有同名导出 → core 桶导出报 TS2308
+   - 修复：文本层的改名为 `TextLayerItemLike`
+   - 教训：**core 桶是公共 API 面**，导出名必须全局唯一
+3. **跳页差 16px + 当前页偏一页（真 bug，E2E 抓到的）**：
+   - 现象：跳到第 17 页 → 页码显示 16；目标页顶部偏移 16px
+   - 根因 1：`.scpdf-container` 有 `padding: 16px 0` → 页面元素实际位置比 `pageTops` 大 16px
+   - 根因 2：`.scpdf-pages` 又有 `margin: 16px 0` → 又差 16px（实测元素在 32px 处）
+   - 根因 3：`pageTops` 是小数（29050.24），浏览器 `scrollTop` 取整 → 边界判定差 1px
+   - 修复：
+     - 容器**去掉 padding**，页面区**去掉 margin**（滚动基准必须是内容原点）
+     - `pageTops` 首项 = 顶部留白（16px），全部取整
+   - 教训：**滚动定位的坐标系必须端到端一致** —— 任何 CSS 偏移都会打破 scrollTop ↔ 元素位置的对应
+4. **调试时反复读到旧数据**：`dist` 没重建 + demo dev server 缓存 → 改了三轮代码都在看旧行为
+   - 修复：每次改 `src/` 先 `pnpm build`；必要时重启 dev server
+   - 教训：**消费 workspace 包时，跑的是构建产物**；调试前先确认改动真的生效
+5. **PowerShell 批量替换又毁了一次中文注释**（`Set-Content -Encoding UTF8`）
+   - 修复：调试脚本用 write 工具重写；源码修改一律用编辑工具
+   - 教训：**已两次踩同一个坑** —— PowerShell 只用来跑命令，不用来改源码
+6. **E2E 误报"请求失败"**：React StrictMode 双挂载会取消第一次 effect 的 fetch
+   - 修复：E2E 忽略 `net::ERR_ABORTED`（主动取消不是错误）
+   - 教训：**开发模式下的双挂载是正常行为**，不能当成缺陷
+7. **E2E 断言时机不稳**：固定 sleep 等待平滑滚动 → 距离越长越容易误判
+   - 修复：改用 `waitForFunction` 等待状态达成
+   - 教训：**E2E 要等"状态"而不是等"时间"**
+
+**验证**
+- `pnpm test`：161 passed（新增 text-layer 16 + store 回归 2）
+- `pnpm verify` 5 gate 全绿
+- E2E 冒烟：**13/13**（真实 PDF 18 页 / 适配宽度 / 缩放 / **跳页精确到 0px** / 无 JS 错误）
+- E2E 文本层：**7/7**（195 个文本片段 / 可选中 / 对齐正确）
+- 截图：`e2e-shots/text-layer.png`（真实 PDF 渲染效果）
+
+---
+
+## 阶段 4 · 第 2 步（下一步）：缩略图面板 / 目录面板 / 搜索面板

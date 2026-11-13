@@ -1,7 +1,8 @@
 /** 调试：初始 fit-width 是否生效 */
-import { chromium } from 'playwright';
+
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
 
 function resolveChromium() {
   const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');

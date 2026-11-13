@@ -28,9 +28,8 @@ import { useVisiblePages } from '../hooks/useVisiblePages';
 import { useZoom } from '../hooks/useZoom';
 import type { Locale, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
-import { AnnotationLayer } from './AnnotationLayer';
+import { Page } from './Page';
 import type { PageProxyLike } from './PageCanvas';
-import { PageCanvas } from './PageCanvas';
 import type { ToolbarConfig } from './Toolbar';
 import { Toolbar } from './Toolbar';
 
@@ -196,13 +195,24 @@ export function PdfViewer(props: PdfViewerProps) {
     return sizes;
   }, [numPages, scale, pageSizesPt]);
 
-  /** 页顶边数组（末项为文档总高哨兵） */
+  /**
+   * 页顶边数组（末项为文档总高哨兵）。
+   *
+   * **必须取整**：浏览器的 scrollTop 是整数（Device Pixel 会对齐），
+   * 而页顶边是小数（1390.63 × 16 累加 → 29050.24）。
+   * 不取整的话：滚到 tops[16]=29050.24 → 浏览器实际停在 29050
+   * → `tops[i] <= scrollTop` 判 false → 明明在第 17 页却报第 16 页（差一页）。
+   *
+   * **必须含顶部留白**：`.scpdf-pages` 有 margin-top（16px），
+   * 页元素相对容器内容原点的实际位置 = margin + 累加高度。
+   * 漏掉 margin → 跳页差 16px、当前页判定偏一页。
+   */
   const pageTops = useMemo(() => {
-    const tops: number[] = [0];
-    let acc = 0;
+    const tops: number[] = [PAGES_MARGIN];
+    let acc = PAGES_MARGIN;
     for (const size of pageSizes) {
       acc += size.height + PAGE_GAP;
-      tops.push(acc);
+      tops.push(Math.round(acc));
     }
     return tops;
   }, [pageSizes]);
@@ -479,6 +489,10 @@ export function PdfViewer(props: PdfViewerProps) {
           </div>
         ) : null}
 
+        {/*
+          页面区高度 = 最后一项页顶边（即文档总高）。
+          末项已含顶部留白 + 每页高度 + 间距 → 直接用作总高即可。
+        */}
         <div className="scpdf-pages" style={{ height: pageTops.at(-1) ?? 0 }}>
           {pageSizes.map((size, index) => {
             const pageNumber = index + 1;
@@ -504,29 +518,24 @@ export function PdfViewer(props: PdfViewerProps) {
                 }}
               >
                 {isVisible ? (
-                  <>
-                    <PageCanvas
-                      page={pageProxies.get(pageNumber) ?? null}
-                      scale={scale}
-                      ariaLabel={t('a11y.page', { page: pageNumber })}
-                      onRenderError={(renderError, failedPage) => {
-                        onError?.(
-                          pdfViewerError('E_RENDER_PAGE', {
-                            cause: renderError,
-                            pageNumber: failedPage,
-                          }),
-                        );
-                      }}
-                    />
-                    <AnnotationLayer
-                      pageNumber={pageNumber}
-                      highlights={highlights}
-                      scale={scale}
-                      viewport={{ width: size.width, height: size.height }}
-                      activeHighlightId={activeHighlightId}
-                      onHighlightClick={handleHighlightClick}
-                    />
-                  </>
+                  <Page
+                    pageNumber={pageNumber}
+                    page={pageProxies.get(pageNumber) ?? null}
+                    scale={scale}
+                    size={size}
+                    highlights={highlights}
+                    activeHighlightId={activeHighlightId}
+                    onHighlightClick={handleHighlightClick}
+                    ariaLabel={t('a11y.page', { page: pageNumber })}
+                    onRenderError={(renderError, failedPage) => {
+                      onError?.(
+                        pdfViewerError('E_RENDER_PAGE', {
+                          cause: renderError,
+                          pageNumber: failedPage,
+                        }),
+                      );
+                    }}
+                  />
                 ) : null}
               </div>
             );
@@ -539,6 +548,9 @@ export function PdfViewer(props: PdfViewerProps) {
 
 /** 页间距（px） */
 const PAGE_GAP = 16;
+
+/** 页面区上下留白（px）—— 必须与 CSS 的 .scpdf-pages margin 一致 */
+const PAGES_MARGIN = 16;
 
 /** 默认页宽（pt，A4） */
 const PAGE_WIDTH_PT = 595;

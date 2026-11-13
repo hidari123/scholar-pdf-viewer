@@ -147,12 +147,31 @@
   flex: 1 1 auto;
   overflow: auto;
   outline: none;
-  padding: 16px 0;
+  /*
+   * 注意：**不要**在这里加 padding。
+   *
+   * 原因：页顶边数组（pageTops）是以"容器内容原点"为基准算的，
+   * 而 scrollTop 也是相对内容原点。若容器有 padding-top，
+   * 页面元素的实际位置会比 pageTops 大一个 padding 值
+   * → 跳页总是差 padding 像素、当前页判定也会偏一页（实测 16px）。
+   *
+   * 上下留白由 .scpdf-pages 的 margin 承担（不影响滚动定位基准）。
+   */
 }
 
 .scpdf-pages {
   position: relative;
   width: 100%;
+  /*
+   * 不要加 margin/padding！
+   *
+   * 页顶边数组（pageTops）是以**本容器的内容原点**为基准的，
+   * 而 scrollTop 也相对该原点 → 两者必须 1:1 对应。
+   * 若这里加 margin，页面元素的实际位置会整体下移一个 margin 值
+   * → 跳页差 margin 像素、当前页判定偏一页。
+   *
+   * 上下留白由 pageTops 的首项（= 16px）承担。
+   */
 }
 
 /* ---------- 页面 ---------- */
@@ -175,6 +194,35 @@
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* ---------- 文本层（透明文字，供选中/复制） ---------- */
+
+.scpdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0.25;
+  line-height: 1;
+  /* 允许选中（这是文本层存在的全部意义） */
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.scpdf-text-layer__item {
+  position: absolute;
+  /* 透明：用户看到的是 canvas 的真实渲染，这里只是"可选中的替身" */
+  color: transparent;
+  white-space: pre;
+  transform-origin: left top;
+  /* 选区高亮要能看见 → 用 currentColor 的透明化版本 */
+  caret-color: var(--scpdf-color-primary);
+}
+
+/* 选区颜色跟随主题 */
+.scpdf-text-layer ::selection {
+  background: rgba(47, 84, 235, 0.28);
 }
 
 /* ---------- 标注层（高亮 / 链接） ---------- */

@@ -39,6 +39,9 @@ export function useCurrentPage(options: UseCurrentPageOptions): UseCurrentPageRe
   /** 上一次上报的页（避免重复回调） */
   const lastPageRef = useRef(0);
 
+  /** 当前页（供 jump 判定"远距离"用；用 ref 避免闭包过期） */
+  const currentPageRef = useRef(1);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) {
@@ -51,6 +54,7 @@ export function useCurrentPage(options: UseCurrentPageOptions): UseCurrentPageRe
       const page = findCurrentPage(pageTops, container.scrollTop);
       if (page !== lastPageRef.current) {
         lastPageRef.current = page;
+        currentPageRef.current = page;
         onPageChange?.(page);
       }
     };
@@ -87,10 +91,24 @@ export function useCurrentPage(options: UseCurrentPageOptions): UseCurrentPageRe
         return;
       }
 
-      container.scrollTo({
-        top,
-        behavior: options.smooth === false ? 'auto' : 'smooth',
-      });
+      /**
+       * 平滑 vs 立即：
+       * - 相邻几页 → 平滑（能看清滚动过程）
+       * - 远距离（> 3 页 或 > 2 屏）→ 立即跳转
+       *
+       * 为什么远距离不用平滑：
+       * 1) 平滑滚动 30000px 要好几秒，中途用户/断言看到的都是中间页
+       * 2) 浏览器对超长距离的平滑滚动是**匀速**的（不是按距离自适应）→ 很慢
+       * 3) 大文档里跳到第 500 页，用户要的是"立刻到"，不是"看它滚过去"
+       */
+      const distance = Math.abs(top - container.scrollTop);
+      const viewportHeight = container.clientHeight || 1;
+      const isFar = Math.abs(page - currentPageRef.current) > 3;
+      const isLongDistance = distance > viewportHeight * 2;
+
+      const behavior = options.smooth === false || isFar || isLongDistance ? 'auto' : 'smooth';
+
+      container.scrollTo({ top, behavior });
     },
     [containerRef, pageTops],
   );

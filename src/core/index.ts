@@ -3,7 +3,7 @@
  *
  * 阶段 0：公共类型模型（API 契约）
  * 阶段 1：geometry（坐标换算）/ errors（错误码）/ document（加载）/ cache（字节缓存）
- * 阶段 2+：selection / search / store
+ * 阶段 2+：selection / search / store / text-layer（文本排版）
  */
 
 export * from './cache';
@@ -13,4 +13,5 @@ export * from './geometry';
 export * from './search';
 export * from './selection';
 export * from './store';
+export * from './text-layer';
 export type * from './types';

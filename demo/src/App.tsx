@@ -10,7 +10,7 @@ import type { HighlightRecord, NewHighlight, SelectionData } from '@scholar-club
 import { PdfViewer } from '@scholar-club/pdf-viewer';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import * as pdfjs from 'pdfjs-dist';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '@scholar-club/pdf-viewer/styles.css';
 
 /**
@@ -54,8 +54,29 @@ export default function App() {
   /** 选区提示（模拟宿主自己的业务：弹窗/AI 入口） */
   const [hint, setHint] = useState('');
 
-  /** 样张 PDF（用 pdf.js 自己生成一份，避免仓库里放二进制） */
+  /**
+   * 样张 PDF。
+   *
+   * 优先用本地真实文档（`/samples/local.pdf`，体积大不入库），
+   * 没有时用内置的手写样张（3 页，可测选中）。
+   */
   const [sampleUrl, setSampleUrl] = useState<string | null>(null);
+  const [sampleLabel, setSampleLabel] = useState('');
+
+  /** 加载本地真实文档（若存在） */
+  const loadLocal = useCallback(async () => {
+    try {
+      const response = await fetch('/samples/local.pdf', { method: 'HEAD' });
+      if (!response.ok) {
+        return false;
+      }
+      setSampleUrl('/samples/local.pdf');
+      setSampleLabel('本地真实文档');
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
 
   /** 生成样张 PDF（3 页，带文字，便于测试选中/搜索） */
   const createSample = useCallback(async () => {
@@ -66,7 +87,13 @@ export default function App() {
       bytes.byteOffset + bytes.byteLength,
     ) as ArrayBuffer;
     setSampleUrl(URL.createObjectURL(new Blob([buffer], { type: 'application/pdf' })));
+    setSampleLabel('内置样张（3 页）');
   }, []);
+
+  // 启动时优先加载本地真实文档
+  useEffect(() => {
+    void loadLocal();
+  }, [loadLocal]);
 
   /** 文档加载完成 → 重置高亮计数 */
   const handleDocumentLoad = useCallback(() => {
@@ -88,6 +115,21 @@ export default function App() {
           width: viewport.width,
           height: viewport.height,
           scale: viewport.scale,
+          // 文本层定位需要视口变换矩阵（y 轴翻转在这里）
+          transform: viewport.transform as number[],
+        };
+      },
+      getTextContent: async () => {
+        const content = await page.getTextContent();
+        return {
+          items: content.items.map((item) => ({
+            str: 'str' in item ? item.str : '',
+            transform: item.transform,
+            width: item.width,
+            height: item.height,
+            fontName: item.fontName,
+            hasEOL: item.hasEOL,
+          })),
         };
       },
       render: (params: {
@@ -202,14 +244,14 @@ export default function App() {
       >
         <strong>@scholar-club/pdf-viewer</strong>
         <button type="button" className="scpdf-btn" onClick={createSample}>
-          生成样张 PDF
+          载入内置样张
         </button>
         {sampleUrl ? (
           <span>
-            当前：样张（3 页）· 第 {currentPage} 页 · {Math.round(scale * 100)}%
+            当前：{sampleLabel || '文档'} · 第 {currentPage} 页 · {Math.round(scale * 100)}%
           </span>
         ) : (
-          <span style={{ opacity: 0.6 }}>先点「生成样张 PDF」</span>
+          <span style={{ opacity: 0.6 }}>加载中…</span>
         )}
         {hint ? <span style={{ color: 'var(--scpdf-color-primary)' }}>{hint}</span> : null}
       </div>
