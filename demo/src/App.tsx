@@ -5,8 +5,8 @@
  * @LastEditTime: 2026-11-13 15:31:55
  * Copyright (c) 2026 by hidari, All Rights Reserved.
  */
-import { VERSION } from "@scholar-club/pdf-viewer";
-import * as core from "@scholar-club/pdf-viewer/core";
+import { VERSION } from '@scholar-club/pdf-viewer';
+import * as core from '@scholar-club/pdf-viewer/core';
 
 /**
  * core subpath import OK, runtime exports = {Object.keys(core).length} items
@@ -18,25 +18,25 @@ import * as core from "@scholar-club/pdf-viewer/core";
  */
 export default function App() {
   return (
-    <div className="scpdf-root" style={{ minHeight: "100vh", padding: 24 }}>
+    <div className="scpdf-root" style={{ minHeight: '100vh', padding: 24 }}>
       <h1 style={{ fontSize: 18 }}>@scholar-club/pdf-viewer demo</h1>
       <ul style={{ fontSize: 14, lineHeight: 2 }}>
         <li>main 入口 import OK，VERSION = {VERSION}</li>
         <li>
-          core 子路径 import OK，运行时导出 = [{Object.keys(core).join(", ")}]
+          core 子路径 import OK，运行时导出 = [{Object.keys(core).join(', ')}]
           （当前全类型，空模块属预期）
         </li>
         <li>
-          styles.css 生效，primary 色 ={" "}
+          styles.css 生效，primary 色 ={' '}
           <span
             style={{
-              display: "inline-block",
+              display: 'inline-block',
               width: 12,
               height: 12,
-              background: "var(--scpdf-color-primary)",
-              verticalAlign: "middle",
+              background: 'var(--scpdf-color-primary)',
+              verticalAlign: 'middle',
             }}
-          />{" "}
+          />{' '}
           <code>var(--scpdf-color-primary)</code>
         </li>
         <li>零 antd：本页面全部为原生元素 + 包 CSS 变量</li>

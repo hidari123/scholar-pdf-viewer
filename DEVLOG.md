@@ -320,3 +320,67 @@
 - `pnpm typecheck`：0 error（`noUncheckedIndexedAccess` 下的边界收窄）
 - `pnpm build`：`dist/core.js` 导出 6 个函数（normToPdf, normToView, pdfToNorm, pdfToView, viewToNorm, viewToPdf）；`dist/core.d.ts` 6.03KB 含完整类型模型；`dist/index.d.ts` 504B 含类型 re-export
 - `pnpm verify` 5 gate 全绿
+
+---
+
+## 阶段 1 · 第 1.5 步：范围收窄 —— 确立"只做 PDF"的边界（2026-11-13）
+
+**发生了什么**
+- 原计划第 2 步做 `core/wire.ts`（后端 `ScaledPosition`/`HighlightType` → `HighlightRecord` 映射），写到一半被自己叫停并删除
+- 重新确立包的定位：**只做 PDF 本身——加载快、定位准、缩放稳；业务交互全在宿主**
+- 新方案文档：`PdfViewerPackagePlan-v2.md`（包本体方案，v1 保留作历史）
+
+**为什么这么实现**
+- **最初的越界**：把 `noteuuid` / `contentType` / `isPrivate` / `likeNum` 这些**后端业务字段**写进包 → 包就只能给这一家后端用，与"换个后端也能用"直接冲突
+- **判据（一句话）**：这个能力是"PDF 自身的"还是"PDF 之外的"？前者进包，后者留宿主
+  - 进包：滚动/翻页/缩放/当前页/选择几何/高亮绘制/内部链接/搜索/缩略图/目录/打印/键盘
+  - 留宿主：选区弹层（解释/提问/翻译）、AI 追问与流式回填、证据框 bbox、笔记增删改查、点赞评论、持久化
+- **连带取消的两个 v1 设计**：
+  - `StorageAdapter`（宿主注入持久化）→ 改为**受控 props**（`highlights` 进、`onHighlightCreate/Update/Remove` 出），持久化归宿主
+  - `PopoverAction`（宿主注册弹层动作）→ 删除；包只输出选区几何 `onSelectionChange`，弹什么由宿主自己决定
+- **bbox 也不进包**：它是业务数据（AI 证据），不是 PDF 能力
+- 结果：包的公共 API 变成**纯受控 + 中立模型**，且 §2.4 写明"包内禁止出现的字段清单"（noteuuid/contentType/isPrivate/API 路径/登录态…），CI 可加 lint 规则卡住
+- **推论（这条最值钱）**：包内**根本没有后端的位置**，所以"换个后端也能用"不是靠适配，是**结构上就成立**
+
+**验证**
+- `src/core/wire.ts` 已删除（`git status` 仅剩 DEVLOG 修改）
+- 方案 v2 §2 边界表 + §6.1 props 表 + §6.5 错误码表已按新边界重写
+
+---
+
+## 阶段 1 · 第 2 步：core/document —— 文档加载管线 + 错误码体系（2026-11-13）
+
+**做了什么**
+- `src/core/errors.ts`：12 个错误码（加载 7 / 渲染 2 / 缓存 2 / 交互 1）+ 统一构造器 `pdfViewerError()` + `isRetryable()`
+- `src/core/document/loader.ts`：加载管线（URL / Blob / ArrayBuffer / Uint8Array 四种来源）
+- `src/core/document/loader.test.ts`：17 个用例（node 环境，注入 fake fetch，**零真实网络**）
+- `src/core/index.ts`：core 出口接上 `errors` 与 `document`
+- `src/core/types.ts`：**按 v2 新边界重写**——删除 `StorageAdapter` / `PopoverAction` / `ActionContext`（业务注入面已取消）、`PdfViewerError`（迁到 errors.ts 单一来源）、`BboxData`（业务数据）；`HighlightRecord` 瘦身为中立模型
+
+**为什么这么实现**
+- **错误码先行**：12 个错误码里 7 个属于加载层 → 加载是错误最集中的一层。先把错误**分类清楚**（宿主才能区分"重试 / 提示 / 降级"），而不是抛一个 catch 不住的 Error。每个错误必带 `cause` → 排障可追根
+- **fetch 注入**：core 层不碰 `globalThis.fetch` → node 环境可单测（不碰真实网络、不被网络波动影响）。这也让"同一份加载逻辑"在浏览器/Node/Worker 里行为一致
+- **magic bytes 在进 pdf.js 之前校验**：pdf.js 对非 PDF 的报错不可控（`InvalidPDFException` 之外还有各种解析异常），我们给宿主一个明确的 `E_PDF_INVALID`
+- **Range 只信状态码不信 `Accept-Ranges` 头**：很多服务端回 `Accept-Ranges: bytes` 却对 Range 请求返回 200 全量。实测路径：**206 = 分段、405/501 = 降级全量重试、其余非 2xx = E_LOAD_HTTP**（头不可信，状态码可信）
+- **206 但无 `content-range` 也视为全量**：部分服务端行为不一致，宁可多下一次也不能拿到错乱的分段数据
+- **超时与"宿主主动取消"要分开**：`AbortController` 同时用于两者，靠"宿主 signal 是否已 abort"区分 → 宿主取消不该被报成超时错误
+- **loadId 由调用方持有**：换文件竞态用"比 URL 是否相等"不可靠（同一 URL 换内容也必须重载），只有单调递增的 loadId 可靠
+
+**遇到的问题**
+1. `src/core/index.ts` 同时 `export * from './errors'` 与 `export * from './types'` → TS2308 `PdfViewerError` 重复导出歧义
+   - 修复：错误类型**单一来源**（只留在 `errors.ts`），`types.ts` 不再声明
+2. `types.ts` 里残留 v1 的业务类型（`StorageAdapter`/`PopoverAction`/`ActionContext`）与新边界冲突，且 `BboxData` 是业务数据
+   - 修复：按 v2 §2.4 重写 types.ts，业务类型**从包里删除**（不是加开关关掉，是彻底移除）
+3. `loader.ts` 里的 `supportsRange()` 成了死代码（头不可信，改用状态码判断）→ TS6133 未使用告警
+   - 修复：删除该函数。教训：**辅助函数要留有明确用途**，凭"也许有用"写下的代码会在下一个决策改变时变成噪音
+4. 测试里 fake fetch 的 `init` 类型写窄了（漏 `signal`）→ TS2339
+   - 修复：补全类型。教训：测试替身的类型要**跟着真实签名走**，否则测试写的是"想象中的 API"
+
+**验证**
+- `pnpm test`：31 passed（geometry 10 + loader 17 + SSR 4）
+- `pnpm build`：`dist/core.js` 导出 12 个函数；`dist/core.d.ts` 10.7KB
+- `pnpm verify` 5 gate 全绿
+
+---
+
+## 阶段 1 · 第 3 步（下一步）：core/cache —— 文档字节缓存
