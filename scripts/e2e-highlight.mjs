@@ -6,7 +6,7 @@
  * 2. 高亮**不遮挡**文字（multiply 混合 → 字仍是深色）
  * 3. 选区背景**每处只涂一次**（没有阶梯状深浅不一）
  * 4. 高亮块可点击
- * 5. 色板生效（宿主传自定义颜色）
+ * 5. 选区不叠涂（同行不同字号不产生多个行盒）
  */
 
 import { existsSync, readdirSync } from 'node:fs';
@@ -108,13 +108,12 @@ try {
 
     const paintCounts = groups.map((g) => sample((g.left + g.right) / 2, (g.top + g.bottom) / 2));
 
+    const span = document.querySelector('.scpdf-text-layer__item');
+
     return {
       lines: groups.length,
       maxPaint: paintCounts.length > 0 ? Math.max(...paintCounts) : 0,
-      lineHeight: (() => {
-        const span = document.querySelector('.scpdf-text-layer__item');
-        return span ? getComputedStyle(span).lineHeight : '';
-      })(),
+      lineHeight: span ? getComputedStyle(span).lineHeight : '',
     };
   });
 
@@ -140,7 +139,7 @@ try {
 
     const sel = window.getSelection();
     const selRects =
-      sel && sel.rangeCount
+      sel?.rangeCount > 0
         ? [...sel.getRangeAt(0).getClientRects()].map((r) => ({
             top: r.top,
             left: r.left,
@@ -165,7 +164,7 @@ try {
     return { hlRects, selRects };
   });
 
-  check('高亮已创建', hl !== null && hl.hlRects.length > 0, hl ? `${hl.hlRects.length} 个块` : '');
+  check('高亮已创建', hl?.hlRects.length > 0, hl ? `${hl.hlRects.length} 个块` : '');
 
   // ---- 断言 1：逐行对齐 ----
   if (hl && hl.hlRects.length > 0 && hl.selRects.length > 0) {
@@ -205,20 +204,21 @@ try {
   // ---- 断言 2：不遮挡（multiply 混合）----
   check(
     '高亮用 mix-blend-mode: multiply（文字仍清晰）',
-    hl !== null && hl.hlRects.every((h) => h.blend === 'multiply'),
+    hl?.hlRects.every((h) => h.blend === 'multiply') === true,
     hl ? `blend = ${hl.hlRects[0]?.blend}` : '',
   );
 
   check(
     '高亮圆角 4px（对齐 pdf.js）',
-    hl !== null && hl.hlRects.every((h) => h.radius === '4px'),
+    hl?.hlRects.every((h) => h.radius === '4px') === true,
     hl ? `radius = ${hl.hlRects[0]?.radius}` : '',
   );
 
   check(
-    '高亮**没有** transform: scale（避免双重缩放）',
-    hl !== null &&
-      hl.hlRects.every((h) => h.transform === 'none' || h.transform === 'matrix(1, 0, 0, 1, 0, 0)'),
+    '高亮没有 transform: scale（避免双重缩放）',
+    hl?.hlRects.every(
+      (h) => h.transform === 'none' || h.transform === 'matrix(1, 0, 0, 1, 0, 0)',
+    ) === true,
     hl ? `transform = ${hl.hlRects[0]?.transform}` : '',
   );
 
