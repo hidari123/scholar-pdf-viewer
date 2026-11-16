@@ -292,7 +292,7 @@ export function PdfViewer(props: PdfViewerProps) {
   }, [pageSizes]);
 
   // 3) 虚拟化
-  const { visiblePages, refresh: refreshVisiblePages } = useVisiblePages({
+  const { visiblePages } = useVisiblePages({
     containerRef,
     pageElements: pageElementsRef,
     totalPages: numPages,

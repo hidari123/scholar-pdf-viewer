@@ -55,6 +55,9 @@ export function useVisiblePages(options: UseVisiblePagesOptions): UseVisiblePage
   /** rAF 句柄（scroll 节流） */
   const rafRef = useRef<number | null>(null);
 
+  /** 上次重算时的缩放（调试用） */
+  const lastScaleRef = useRef<number>(scale);
+
   /**
    * 收集页的占位信息。
    *
@@ -90,48 +93,60 @@ export function useVisiblePages(options: UseVisiblePagesOptions): UseVisiblePage
 
   /**
    * 重算可见页。
+   *
+   * @param scaleHint 当前缩放（缩放后重算时传入；仅用于日志/调试，不影响计算）
    */
-  const recompute = useCallback(() => {
-    const container = containerRef.current;
-    if (!container || totalPages <= 0) {
-      setVisiblePages([]);
-      setViewportPages([]);
-      return;
-    }
+  const recompute = useCallback(
+    (scaleHint?: number) => {
+      const container = containerRef.current;
+      if (!container || totalPages <= 0) {
+        setVisiblePages([]);
+        setViewportPages([]);
+        return;
+      }
 
-    const boxes = collectPageBoxes();
-    if (boxes.length === 0) {
-      return;
-    }
+      const boxes = collectPageBoxes();
+      if (boxes.length === 0) {
+        return;
+      }
 
-    const next = computeVisiblePages({
-      scrollTop: container.scrollTop,
-      viewportHeight: container.clientHeight,
-      pages: boxes,
-      bufferPages,
-    });
+      const next = computeVisiblePages({
+        scrollTop: container.scrollTop,
+        viewportHeight: container.clientHeight,
+        pages: boxes,
+        bufferPages,
+      });
 
-    // 只在真的变了时才 setState（避免无谓重渲染）
-    const changed =
-      next.length !== lastRef.current.length ||
-      next.some((page, index) => page !== lastRef.current[index]);
+      // 只在真的变了时才 setState（避免无谓重渲染）
+      const changed =
+        next.length !== lastRef.current.length ||
+        next.some((page, index) => page !== lastRef.current[index]);
 
-    if (changed) {
-      lastRef.current = next;
-      setVisiblePages(next);
-    }
+      if (changed) {
+        lastRef.current = next;
+        setVisiblePages(next);
+      }
 
-    // 视口页（不含缓冲）
-    const viewport = computeVisiblePages({
-      scrollTop: container.scrollTop,
-      viewportHeight: container.clientHeight,
-      pages: boxes,
-      bufferPages: 0,
-    });
-    setViewportPages((prev) =>
-      prev.length === viewport.length && prev.every((p, i) => p === viewport[i]) ? prev : viewport,
-    );
-  }, [containerRef, totalPages, bufferPages, collectPageBoxes]);
+      // 视口页（不含缓冲）
+      const viewport = computeVisiblePages({
+        scrollTop: container.scrollTop,
+        viewportHeight: container.clientHeight,
+        pages: boxes,
+        bufferPages: 0,
+      });
+      setViewportPages((prev) =>
+        prev.length === viewport.length && prev.every((p, i) => p === viewport[i])
+          ? prev
+          : viewport,
+      );
+
+      // 缩放提示（供调试用）
+      if (scaleHint !== undefined) {
+        lastScaleRef.current = scaleHint;
+      }
+    },
+    [containerRef, totalPages, bufferPages, collectPageBoxes],
+  );
 
   /** 手动触发重算 */
   const refresh = useCallback(() => {
@@ -175,7 +190,7 @@ export function useVisiblePages(options: UseVisiblePagesOptions): UseVisiblePage
   useEffect(() => {
     // 缩放后 DOM 还没重排 → 等一帧再算
     const raf = requestAnimationFrame(() => {
-      recompute();
+      recompute(scale);
     });
 
     return () => cancelAnimationFrame(raf);
@@ -196,7 +211,7 @@ export function useVisiblePages(options: UseVisiblePagesOptions): UseVisiblePage
     observer.observe(container);
 
     return () => observer.disconnect();
-  }, [recompute]);
+  }, [recompute, containerRef]);
 
   return { visiblePages, viewportPages, refresh };
 }
