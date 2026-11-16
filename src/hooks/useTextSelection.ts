@@ -159,12 +159,33 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         return;
       }
 
-      // 容器坐标 → 页框坐标（页框是容器坐标系）
+      /**
+       * 坐标系统一（⚠️ 这里曾经有个双重扣减的 bug）：
+       *
+       * - `getClientRects()` 返回的是**视口坐标**（相对浏览器窗口）
+       * - `pageFrames` 的 `top` 是**滚动内容坐标**（相对容器内容的原点）
+       *
+       * 两者要相减，必须先换算到**同一个坐标系**。
+       * 这里统一换算到「**容器内容坐标**」（滚动内容坐标系）：
+       *
+       * ```
+       * 容器内容坐标 = 视口坐标 - 容器视口原点 + scrollTop
+       * ```
+       *
+       * ❌ 之前的写法：rect 减了 containerRect.top，frames 也减了 containerRect.top
+       *    → containerRect.top 被减了两次 → 页内坐标偏了 containerRect.top
+       *    → 实测高亮偏 97px（正好是容器的视口 top）
+       */
       const containerRect = container.getBoundingClientRect();
+
+      const toContentCoords = (value: number): number =>
+        value - containerRect.top + container.scrollTop;
+
       const frames: PageFrame[] = pageFrames.map((frame) => ({
         pageNumber: frame.pageNumber,
-        top: frame.top - containerRect.top,
-        left: frame.left - containerRect.left,
+        // pageFrames 已经是滚动内容坐标，**不用再减 containerRect.top**
+        top: frame.top,
+        left: frame.left,
         width: frame.width,
         height: frame.height,
       }));
@@ -172,8 +193,8 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
       const result = extractSelection({
         text,
         rects: rects.map((rect) => ({
-          top: rect.top - containerRect.top,
-          left: rect.left - containerRect.left,
+          top: toContentCoords(rect.top),
+          left: rect.left - containerRect.left + container.scrollLeft,
           width: rect.width,
           height: rect.height,
         })),

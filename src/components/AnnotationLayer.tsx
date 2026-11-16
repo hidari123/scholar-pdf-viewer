@@ -11,6 +11,8 @@
  */
 
 import { useMemo } from 'react';
+import type { HighlightPalette } from '../core/highlight/palette';
+import { paletteToCssVars, resolveHighlightColor } from '../core/highlight/palette';
 import type { SearchHitRect } from '../core/search/highlight';
 import type { HighlightRecord, ViewRect } from '../core/types';
 
@@ -20,8 +22,6 @@ export interface AnnotationLayerProps {
   pageNumber: number;
   /** 高亮（受控） */
   highlights: HighlightRecord[];
-  /** 缩放（用于把归一化坐标换算成视口 px） */
-  scale: number;
   /** 当前视口尺寸（归一化坐标的参考） */
   viewport: { width: number; height: number };
   /** 点击高亮 */
@@ -37,6 +37,13 @@ export interface AnnotationLayerProps {
   searchRects?: SearchHitRect[];
   /** 当前激活的搜索命中（更高亮） */
   activeSearchRectIndex?: number | null;
+  /**
+   * 高亮色板：语义 key → CSS 颜色值。
+   *
+   * **包的边界**：包只负责"把颜色渲染出来"（纯视觉）；
+   * 取色器 UI、语义含义（"我的"/"他人"）、持久化 → 全部归宿主。
+   */
+  palette?: HighlightPalette;
 }
 
 /**
@@ -48,12 +55,12 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
   const {
     pageNumber,
     highlights,
-    scale,
     viewport,
     onHighlightClick,
     activeHighlightId,
     searchRects = [],
     activeSearchRectIndex = null,
+    palette,
   } = props;
 
   /** 当前页的高亮（按归一化坐标 → 视口 px 换算） */
@@ -108,12 +115,28 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
     });
   }, [searchRects, viewport.width, viewport.height, activeSearchRectIndex, pageNumber]);
 
+  /**
+   * 色板 → CSS 变量。
+   *
+   * 为什么要走 CSS 变量而不是直接把颜色写进 style：
+   * - 宿主可以在自己的 CSS 里用 `var(--scpdf-hl-yellow)` 派生别的样式
+   * - 换肤只改变量，不用重渲染
+   */
+  const paletteVars = useMemo(() => paletteToCssVars(palette), [palette]);
+
+  /** 某个高亮的实际颜色（语义 key → CSS 颜色） */
+  const colorOf = (highlight: HighlightRecord): string => {
+    const color = resolveHighlightColor(palette, highlight.color, 'var(--scpdf-highlight-my)');
+    // 命中色板 → 用 CSS 变量（宿主可再派生）；未命中 → 保留 var() 兜底
+    return palette?.[highlight.color] ? `var(--scpdf-hl-${highlight.color})` : color;
+  };
+
   if (rects.length === 0 && searchViewRects.length === 0) {
     return null;
   }
 
   return (
-    <div className="scpdf-annotations" aria-hidden="false">
+    <div className="scpdf-annotations" aria-hidden="false" style={paletteVars}>
       {/* 搜索命中（在用户高亮之下） */}
       {searchViewRects.map(({ index, isActive, rect }) => (
         <div
@@ -130,8 +153,11 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
             top: `${rect.top}px`,
             width: `${rect.width}px`,
             height: `${rect.height}px`,
-            transform: `scale(${scale})`,
-            transformOrigin: 'top left',
+            /*
+             * ⚠️ **不要加 transform: scale()**：
+             * rect 已经是"当前缩放下的视口 px"（由 norm × viewport 换算而来）
+             * → 再乘一次 scale 就是**双重缩放** → 高亮偏移（实测偏 278px）。
+             */
           }}
         />
       ))}
@@ -156,9 +182,13 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
               top: `${rect.top}px`,
               width: `${rect.width}px`,
               height: `${rect.height}px`,
-              // 缩放时同步（高亮块是纯色，不缩放字体）
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left',
+              /*
+               * ⚠️ **不要加 transform: scale()**：
+               * rect 已经是"当前缩放下的视口 px"（由 norm × viewport 换算而来）
+               * → 再乘一次 scale 就是**双重缩放** → 高亮偏移（实测偏 278px）。
+               */
+              // 颜色：语义 key → CSS 变量（宿主可自定义色板）
+              background: colorOf(highlight),
             }}
             onClick={
               onHighlightClick

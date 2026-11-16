@@ -1113,3 +1113,188 @@ src/hooks/useZoom.ts                     量化 + 左上角锚点
 - 印刷级分页（print CSS）：未实现（`onPrint` 走浏览器原生打印）
 - `endOfContent` 的 Chrome 专属 `selectionchange` 重定位已实现，
   但 Firefox 的 `-moz-user-select: none` 路径未特判（Firefox 行为已正常）
+
+---
+
+## 高亮效果重做（2026-11-16 下午）
+
+用户报了两个问题：**高亮错位严重** + **高亮挡住文字**，
+另外截图显示**选区有阶梯状深浅不一**。这一轮全部修掉。
+
+### 问题 1：高亮错位 —— 双重缩放
+
+**实测**（真实 PDF，230%）：
+
+```
+选区实际在:   top=58px
+高亮渲染在:   146.104 × 2.3 = 336px     ← 偏了 278px
+```
+
+`AnnotationLayer.tsx:160` 的 `transform: scale(${scale})` ——
+而 `rect.left/top/width/height` **已经是从归一化坐标换算出来的视口 px**
+（`norm.x1 * viewport.width / norm.width`）→ **不需要再乘一次 scale**。
+
+> **为什么会写成这样**：早期 `rect` 是"参考尺寸下的 px"，需要 `scale()` 拉伸；
+> 后来改成"直接乘比例"，`transform` 忘了删 → 两套缩放机制并存。
+> 搜索高亮（`AnnotationLayer.tsx:133`）有同款 bug。
+
+**修复**：删掉两处 `transform: scale()`。
+
+### 问题 2：选区坐标双重扣减（新发现）
+
+修完双重缩放后，高亮**水平对齐了**（Δ 0.3px），但**垂直还差 97px**。
+
+**排查过程**：
+
+1. 选区 rect 是**视口坐标**（`getClientRects()`）
+2. `pageFrames` 的 `top` 是**滚动内容坐标**（`pageTops[]`）
+3. 代码把两者都减了 `containerRect.top` → **减了两次**
+
+```ts
+// ❌ 改前
+const frames = pageFrames.map(f => ({ ...f, top: f.top - containerRect.top, ... }));
+const rects  = clientRects.map(r => ({ top: r.top - containerRect.top, ... }));
+//    ↑ containerRect.top 被减了两次 → 正好差 97px（容器的视口 top）
+
+// ✅ 改后：统一换算到"容器内容坐标"
+const toContentCoords = (v: number) => v - containerRect.top + container.scrollTop;
+```
+
+**修复后实测**：6 个高亮块与选区 rect **逐行 Δ = 0.0px**。
+
+### 问题 3：阶梯状深浅不一（选区叠涂）
+
+**实测**（选 10 行）：
+
+```
+浏览器返回 26 个 rect，实际只有 10 个视觉行
+每行 rect 数: {1个: 2行, 2个: 4行, 4个: 4行}
+中心被涂次数: {涂1次: 2行, 涂2次: 8行}   ← 8/10 行被叠涂!
+```
+
+**根因**：一行里有两个**不同字号**的 span（正文 22.9px + 上标 17.4px），
+它们**各自形成一个行盒** → `getClientRects()` 返回多个**垂直重叠 27px** 的 rect
+→ `::selection` 背景被**逐个 rect 绘制** → 重叠区涂两次
+→ `28%` 的蓝叠两次 ≈ `48%` → **阶梯状深浅不一**。
+
+**排除 scaleX**：单独测一个 span（只有 scaleX）→ `getClientRects()` 只返回 **1 个** rect。
+
+**修复（一行 CSS，已实测验证）**：
+
+```css
+.scpdf-text-layer__item {
+  line-height: 0;
+}
+```
+
+|      | 中心被涂次数                    |
+| ---- | ------------------------------- |
+| 改前 | {涂1次: 2行, **涂2次: 8行**} ❌ |
+| 改后 | **{涂1次: 10行}** ✅            |
+
+**为什么有效**：行盒高度 = `font-size × line-height` → 归零 → 同行不同字号不再产生独立行盒。
+**为什么不影响位置**：span 是 `position: absolute`，`top` 定位**不依赖行盒**。
+
+**试过但没用的方案**：
+
+| 方案                                   | 结果                                |
+| -------------------------------------- | ----------------------------------- |
+| `line-height: normal` / `1`            | maxPaint = 2 ❌（问题回来了）       |
+| `line-height: 0` + `padding-top: 20px` | maxPaint = 2 ❌（padding 又撑出盒） |
+| `line-height: 0.001`                   | maxPaint = 1 ✅ 但高度只有 0.016px  |
+
+> **pdf.js v6 自己也有这个问题** —— 它靠 `.selectionRendering` 模式绕开
+> （关掉原生 `::selection`，改用 SVG clipPath 画 `rgb(0 90 255 / 0.22)` 覆盖层）。
+> 我们用 `line-height: 0` 更简单，代价是 span 盒子高度为 0
+> → Playwright 的 `waitForSelector`（要求"可见"）会超时 → E2E 改用 `waitForFunction`。
+
+### 问题 4：高亮遮挡文字 → `mix-blend-mode: multiply`
+
+高亮层在 DOM 里排在 `<canvas>` **之后**，而背景 `#fff3bf` **不透明** → 完全遮住字。
+
+**解法**（原 scholar-club 也是这么做的，`PageCom/style.ts:21`）：
+
+```css
+.scpdf-annotation {
+  mix-blend-mode: multiply;
+}
+```
+
+**原理**：正片叠底 = 颜色相乘
+
+- 底下的**黑字** × 高亮色 = **黑** → 字完全清晰
+- 底下的**白纸** × 高亮色 = 高亮色 → 荧光笔效果
+
+**为什么不动 DOM 顺序**：高亮要能点（`onHighlightClick`）→ 放 canvas 下面会被挡住。
+`multiply` 不改顺序 → **不影响点击**。
+
+`::selection` 同理：
+
+```css
+.scpdf-text-layer ::selection {
+  background: var(--scpdf-selection-color, rgba(13, 104, 189, 0.24));
+  mix-blend-mode: multiply;
+}
+```
+
+（不含 multiply 时：半透明蓝直接盖在 canvas 的黑字上 → 蓝 + 黑 = 灰蓝 → 字发虚）
+
+### 问题 5：颜色可配置（用户需求）
+
+**包的边界**：包**只负责把颜色渲染出来**（纯视觉）；
+取色器 UI、语义含义、持久化 → **全部归宿主**。
+
+**两条通道**：
+
+1. **`::selection` 颜色** → CSS 变量（伪元素里 CSS 变量可用）
+
+   ```css
+   --scpdf-selection-color: rgba(13, 104, 189, 0.24);
+   ```
+
+2. **高亮颜色** → `highlightPalette` prop（语义 key → CSS 颜色）
+
+   ```tsx
+   <PdfViewer highlightPalette={{ yellow: '#ffd54a', 'h-123': '#ff6b6b' }} />
+   ```
+
+   → 高亮记录存 `color: 'h-123'`（**语义 key，不是颜色值**）→ 换色板不用改数据
+
+**新增** `src/core/highlight/palette.ts`：
+
+- `HighlightPalette` 类型
+- `DEFAULT_HIGHLIGHT_PALETTE`（内置 6 色）
+- `resolveHighlightColor` / `paletteToCssVars`
+
+**demo 侧**（`demo/src/HighlightPicker.tsx`，**宿主 UI，不在包里**）：
+6 个预设色 + 原生取色器 + "用此色"保存自定义色 → 全部走 `highlightPalette` 通道。
+
+### 附带修的
+
+- `reference` 硬编码 `595 * scale`（A4）→ 改用该页**真实视口尺寸**
+  （真实 PDF 是 Letter 612×792 → 参考尺寸错 → 读回时换算比例错）
+- 高亮圆角 `2px` → `4px`（对齐 pdf.js 的 `.textLayer .highlight`）
+
+### 验证
+
+- `pnpm verify`：**8 门禁全绿**
+- `pnpm test`：**303 passed**（24 个测试文件）
+  - 新增 `palette.test.ts`（11 例）
+  - `AnnotationLayer.test.tsx` 新增 5 例（**无 transform: scale** / 色板生效 / CSS 变量）
+- E2E：**9 套 73 项断言全通过**（新增 `e2e-highlight.mjs` 9/9）
+  - **高亮与被选文字逐行对齐：最大偏差 0.0px**
+  - **选区每处只涂一次：最大叠涂次数 = 1**
+  - 高亮用 `multiply` / 圆角 4px / 无 `transform: scale`
+  - 高亮块可点击（`elementFromPoint` 命中高亮本身）
+  - 回归：选区精准度 9/9（**Δ = 0.00px** 不回归）
+
+### 关键文件
+
+```
+src/core/highlight/palette.ts       色板类型 + 默认色 + 工具函数
+src/hooks/useTextSelection.ts       修坐标双重扣减
+src/components/AnnotationLayer.tsx  删 transform: scale + 应用色板
+src/styles/viewer.css               multiply / line-height:0 / CSS 变量
+demo/src/HighlightPicker.tsx        宿主的取色器 UI（不在包里）
+scripts/e2e-highlight.mjs           高亮效果 E2E（9 项）
+```

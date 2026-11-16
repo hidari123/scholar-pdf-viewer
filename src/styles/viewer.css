@@ -15,6 +15,13 @@
   --scpdf-highlight-my: #fff3bf;
   --scpdf-highlight-others: #d6e4ff;
   --scpdf-highlight-active: #2f54eb;
+  /*
+   * 选区颜色（::selection）—— 宿主可覆盖。
+   *
+   * ⚠️ 保持**半透明**：正片叠底（multiply）下，透明度决定"染色"的浓淡。
+   * 24% 是原项目（scholar-club）在用的值。
+   */
+  --scpdf-selection-color: rgba(13, 104, 189, 0.24);
   --scpdf-bbox-color: #2f54eb;
   --scpdf-shadow-page: 0 2px 8px rgba(0, 0, 0, 0.12);
   --scpdf-radius-page: 2px;
@@ -236,11 +243,37 @@
   caret-color: var(--scpdf-color-primary);
   /* 不参与布局（绝对定位已足够），避免撑开容器影响滚动 */
   display: block;
+  /*
+   * ⚠️ **line-height: 0 —— 修"选区阶梯状深浅不一"的关键**：
+   *
+   * 一行里常有两个**不同字号**的 span（正文 22.9px + 上标 17.4px）。
+   * 它们各自形成**独立的行盒** → 浏览器的 `getClientRects()` 返回
+   * **多个垂直重叠的矩形** → `::selection` 背景被**叠涂两次**
+   * → 半透明色叠两次 → 颜色明显更深 → 出现阶梯状深浅不一。
+   *
+   * 实测（真实 PDF，230%，选 10 行）：
+   *   改前：{涂1次: 2行, 涂2次: 8行}   ← 8/10 行被叠涂
+   *   改后：{涂1次: 10行}              ← 全部只涂一次
+   *
+   * 为什么不影响位置：span 是 `position: absolute`，
+   * `top` 定位**不依赖行盒** → 位置完全不受影响。
+   */
+  line-height: 0;
 }
 
-/* 选区颜色跟随主题 */
+/*
+ * 选区颜色（WPS / Word 风格）。
+ *
+ * `mix-blend-mode: multiply`（正片叠底）是关键：
+ * 浏览器的 ::selection 背景画在**文本层**上，而真正的黑字在 **canvas** 上
+ * → 半透明蓝 + 黑字 = 灰蓝，字发虚
+ * → 正片叠底后：黑字 × 蓝 = **黑**，字完全清晰，只有背景被染色
+ *
+ * 颜色可配：宿主覆盖 `--scpdf-selection-color` 即可（伪元素里 CSS 变量可用）。
+ */
 .scpdf-text-layer ::selection {
-  background: rgba(47, 84, 235, 0.28);
+  background: var(--scpdf-selection-color, rgba(13, 104, 189, 0.24));
+  mix-blend-mode: multiply;
 }
 
 /*
@@ -273,8 +306,25 @@
   position: absolute;
   pointer-events: auto;
   cursor: pointer;
-  border-radius: 2px;
+  /* 圆角 4px（对齐 pdf.js 的 .textLayer .highlight） */
+  border-radius: 4px;
   transition: background var(--scpdf-motion-fast) ease;
+  /*
+   * ⚠️ **mix-blend-mode: multiply 是"高亮不挡字"的关键**：
+   *
+   * 高亮层在 DOM 里排在 <canvas> **之后**（在文字上面），
+   * 如果背景不透明 → 完全遮住文字。
+   *
+   * 正片叠底（multiply）= 颜色相乘：
+   * - 底下的**黑字** × 高亮色 = **黑** → 字完全清晰
+   * - 底下的**白纸** × 高亮色 = 高亮色 → 有荧光笔效果
+   *
+   * 这就是 WPS / Word 高亮笔的实现原理（正片叠底）。
+   *
+   * ⚠️ 混合需要高亮与 canvas 在**同一个层叠上下文**里合成，
+   *    所以不能给祖先加 `isolation: isolate`。
+   */
+  mix-blend-mode: multiply;
 }
 
 .scpdf-annotation--mine {
@@ -295,7 +345,7 @@
   background: rgba(255, 173, 0, 0.42);
   /* 搜索高亮不可点（避免挡住选区与链接） */
   pointer-events: none;
-  border-radius: 2px;
+  border-radius: 4px;
 }
 
 .scpdf-annotation--search-active {

@@ -11,6 +11,7 @@ export * from './cache';
 export * from './document';
 export * from './errors';
 export * from './geometry';
+export * from './highlight';
 export * from './outline';
 export * from './search';
 export * from './selection';

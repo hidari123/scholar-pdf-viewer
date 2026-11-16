@@ -7,9 +7,10 @@
  * 假设: range.getClientRects() 返回的每行矩形**高度 > 行间距**,
  *       所以相邻行的矩形在垂直方向重叠 -> ::selection 叠加 -> 变深。
  */
-import { chromium } from 'playwright';
+
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
 
 function resolveChromium() {
   const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
@@ -90,7 +91,11 @@ const data = await page.evaluate(() => {
   const spanInfo = spans
     .map((s) => {
       const r = s.getBoundingClientRect();
-      return { text: (s.textContent ?? '').slice(0, 20), top: Math.round(r.top), h: Math.round(r.height) };
+      return {
+        text: (s.textContent ?? '').slice(0, 20),
+        top: Math.round(r.top),
+        h: Math.round(r.height),
+      };
     })
     .filter((s) => s.top > 250 && s.top < 700)
     .slice(0, 8);
@@ -111,7 +116,12 @@ const clip = await page.evaluate(() => {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return null;
   const r = sel.getRangeAt(0).getBoundingClientRect();
-  return { x: Math.max(0, r.left - 20), y: Math.max(0, r.top - 20), width: Math.min(650, r.width + 40), height: Math.min(300, r.height + 40) };
+  return {
+    x: Math.max(0, r.left - 20),
+    y: Math.max(0, r.top - 20),
+    width: Math.min(650, r.width + 40),
+    height: Math.min(300, r.height + 40),
+  };
 });
 if (clip) {
   await page.screenshot({ path: 'e2e-shots/overlap-zoom.png', clip });

@@ -46,7 +46,6 @@ describe('AnnotationLayer', () => {
     const props = {
       pageNumber: 1,
       highlights: [highlight()],
-      scale: 1,
       viewport: { width: 595, height: 842 },
       ...overrides,
     };
@@ -143,5 +142,47 @@ describe('AnnotationLayer', () => {
     setup();
 
     expect(screen.getByRole('button').getAttribute('aria-label')).toBe('选中的文字');
+  });
+
+  /**
+   * 回归：曾经给高亮块加了 `transform: scale(scale)`，
+   * 而 rect 已经是视口 px → **双重缩放** → 高亮偏移（实测偏 278px）。
+   */
+  it('**不加** transform: scale（避免双重缩放）', () => {
+    setup();
+
+    const element = screen.getByRole('button');
+    expect(element.style.transform).toBe('');
+  });
+
+  it('搜索命中也不加 transform: scale', () => {
+    setup({
+      highlights: [],
+      searchRects: [{ x: 0.1, y: 0.2, width: 0.3, height: 0.04 }],
+    });
+
+    const element = document.querySelector('.scpdf-annotation--search') as HTMLElement;
+    expect(element).toBeTruthy();
+    expect(element.style.transform).toBe('');
+  });
+
+  it('色板命中时用 CSS 变量', () => {
+    setup({ palette: { yellow: '#ffd54a' }, highlights: [highlight({ color: 'yellow' })] });
+
+    expect(screen.getByRole('button').style.background).toBe('var(--scpdf-hl-yellow)');
+  });
+
+  it('色板未命中时用兜底变量', () => {
+    setup({ palette: { yellow: '#ffd54a' }, highlights: [highlight({ color: 'unknown' })] });
+
+    expect(screen.getByRole('button').style.background).toBe('var(--scpdf-highlight-my)');
+  });
+
+  it('色板转成 CSS 变量挂在容器上', () => {
+    setup({ palette: { yellow: '#ffd54a', 'my-1': '#ff6b6b' } });
+
+    const container = document.querySelector('.scpdf-annotations') as HTMLElement;
+    expect(container.style.getPropertyValue('--scpdf-hl-yellow')).toBe('#ffd54a');
+    expect(container.style.getPropertyValue('--scpdf-hl-my-1')).toBe('#ff6b6b');
   });
 });

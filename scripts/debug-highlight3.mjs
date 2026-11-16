@@ -1,29 +1,50 @@
-﻿import { chromium } from 'playwright';
-import { existsSync, readdirSync } from 'node:fs';
+﻿import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
+
 const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
-const dirs = readdirSync(cacheRoot).filter(n=>n.startsWith('chromium-')).map(n=>({n,v:parseInt(n.replace('chromium-',''))||0})).sort((a,b)=>b.v-a.v);
-let exe; for (const d of dirs) { const e = join(cacheRoot, d.n, 'chrome-win64', 'chrome.exe'); if (existsSync(e)) { exe = e; break; } }
+const dirs = readdirSync(cacheRoot)
+  .filter((n) => n.startsWith('chromium-'))
+  .map((n) => ({ n, v: parseInt(n.replace('chromium-', '')) || 0 }))
+  .sort((a, b) => b.v - a.v);
+let exe;
+for (const d of dirs) {
+  const e = join(cacheRoot, d.n, 'chrome-win64', 'chrome.exe');
+  if (existsSync(e)) {
+    exe = e;
+    break;
+  }
+}
 const browser = await chromium.launch(exe ? { executablePath: exe } : {});
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
-await page.goto('http://localhost:5193', { waitUntil: 'networkidle' });
+await page.goto('http://localhost:5194', { waitUntil: 'networkidle' });
 await page.waitForTimeout(3000);
 await page.waitForSelector('.scpdf-text-layer__item', { timeout: 30000 });
 await page.waitForTimeout(1500);
 
 const t = await page.evaluate(() => {
   const spans = [...document.querySelectorAll('.scpdf-text-layer__item')];
-  const el = spans.find(x => (x.textContent ?? '').trim().length > 20);
+  const el = spans.find((x) => (x.textContent ?? '').trim().length > 20);
   const r = el.getBoundingClientRect();
   const c = document.querySelector('.scpdf-container');
   const cr = c.getBoundingClientRect();
   const pageEl = el.closest('.scpdf-page');
   const pr = pageEl.getBoundingClientRect();
   return {
-    drag: { x: r.left + 5, y: r.top + r.height/2 },
-    spanRect: { left: Math.round(r.left), top: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) },
+    drag: { x: r.left + 5, y: r.top + r.height / 2 },
+    spanRect: {
+      left: Math.round(r.left),
+      top: Math.round(r.top),
+      w: Math.round(r.width),
+      h: Math.round(r.height),
+    },
     containerRect: { left: Math.round(cr.left), top: Math.round(cr.top) },
-    pageRect: { left: Math.round(pr.left), top: Math.round(pr.top), w: Math.round(pr.width), h: Math.round(pr.height) },
+    pageRect: {
+      left: Math.round(pr.left),
+      top: Math.round(pr.top),
+      w: Math.round(pr.width),
+      h: Math.round(pr.height),
+    },
     scrollTop: Math.round(c.scrollTop),
   };
 });
@@ -47,11 +68,16 @@ const style = await page.evaluate(() => {
   const pr = pageEl.getBoundingClientRect();
   return {
     inlineStyle: h.getAttribute('style'),
-    computed: { left: getComputedStyle(h).left, top: getComputedStyle(h).top, width: getComputedStyle(h).width, height: getComputedStyle(h).height, transform: getComputedStyle(h).transform },
+    computed: {
+      left: getComputedStyle(h).left,
+      top: getComputedStyle(h).top,
+      width: getComputedStyle(h).width,
+      height: getComputedStyle(h).height,
+      transform: getComputedStyle(h).transform,
+    },
     pageRect: { left: Math.round(pr.left), top: Math.round(pr.top) },
     scaleText: document.querySelector('.scpdf-toolbar__scale')?.textContent,
   };
 });
 console.log('\n高亮 style:', JSON.stringify(style, null, 2));
 await browser.close();
-

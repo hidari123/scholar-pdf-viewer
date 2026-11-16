@@ -42,7 +42,17 @@ const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 try {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.waitForTimeout(3000);
-  await page.waitForSelector('.scpdf-text-layer__item', { timeout: 30000 });
+  /*
+   * ⚠️ 用 `waitForFunction` 而不是 `waitForSelector`：
+   * 文本层 span 的 `line-height: 0`（修"选区阶梯状深浅不一"）→
+   * span 的盒子高度为 0 → Playwright 的 "visible" 检查（要求非零尺寸）永远不通过。
+   *
+   * 选区功能本身不受影响（浏览器仍能命中并选中这些 span）。
+   */
+  await page.waitForFunction(
+    () => document.querySelectorAll('.scpdf-text-layer__item').length > 50,
+    { timeout: 30000 },
+  );
   await page.waitForTimeout(1500);
 
   // ---- 1. 文本层结构 ----

@@ -22,10 +22,10 @@
 
 实测同一行（"Haoning Wang" + 上标的 "*"）：
 
-| rect | top | bottom | height | 覆盖的 span |
-|---|---|---|---|---|
-| 1 | 498 | 521 | 23 | "Haoning Wang" (fs=22.9) + "*" (fs=17.4) |
-| 2 | 494 | 524 | **30** | "Haoning Wang" (fs=22.9) + "*" (fs=17.4) |
+| rect | top | bottom | height | 覆盖的 span                              |
+| ---- | --- | ------ | ------ | ---------------------------------------- |
+| 1    | 498 | 521    | 23     | "Haoning Wang" (fs=22.9) + "*" (fs=17.4) |
+| 2    | 494 | 524    | **30** | "Haoning Wang" (fs=22.9) + "*" (fs=17.4) |
 
 **机制**：
 1. 我的 span 是 `position: absolute; display: block` + `font-size: Npx`
@@ -54,28 +54,32 @@
 
 **但 pdf.js 也有同样的问题** —— 它靠 `.selectionRendering` 模式绕开：
 ```css
-.textLayer.selectionRendering ::selection { background: transparent; }  /* 关掉原生选区 */
-.pdfViewer .page .selection { background: rgb(0 90 255 / 0.22); }        /* SVG clipPath 覆盖层 */
+.textLayer.selectionRendering ::selection {
+  background: transparent;
+} /* 关掉原生选区 */
+.pdfViewer .page .selection {
+  background: rgb(0 90 255 / 0.22);
+} /* SVG clipPath 覆盖层 */
 ```
 
 → **SVG 覆盖层每个像素只画一次** → 不可能有阶梯。
 
 ### 三个可选修法
 
-| 方案 | 做法 | 优点 | 缺点 |
-|---|---|---|---|
+| 方案                                        | 做法                                                                                                           | 优点                                                 | 缺点                                                                               |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | **A. `line-height: 0`**（推荐，已实测验证） | 给文本层 span 加 `line-height: 0` → **行盒高度归零** → 同行不同字号的 span 不再产生独立行盒 → 选区每处只涂一次 | **一行 CSS**；根治；保留浏览器原生选区；不动布局逻辑 | 行盒高度为 0 → 需要确认 `top` 定位仍准确（`position:absolute` + `top` 不依赖行盒） |
-| **B. SVG 覆盖层** | 关掉 `::selection`，用 `getClientRects()` 画 SVG clipPath | 与 pdf.js v6 完全一致；形状贴合字形 | 工作量大；需要 `selectionchange` 监听 + React 重渲染 |
-| **C. 降低不透明度** | 把 `::selection` 改成 14%（涂两次 ≈ 26%） | 一行代码 | **治标不治本**；单涂的地方会太淡 |
+| **B. SVG 覆盖层**                           | 关掉 `::selection`，用 `getClientRects()` 画 SVG clipPath                                                      | 与 pdf.js v6 完全一致；形状贴合字形                  | 工作量大；需要 `selectionchange` 监听 + React 重渲染                               |
+| **C. 降低不透明度**                         | 把 `::selection` 改成 14%（涂两次 ≈ 26%）                                                                      | 一行代码                                             | **治标不治本**；单涂的地方会太淡                                                   |
 
 ### ✅ 方案 A 已实测验证（真实 PDF，230%，选 10 行）
 
 在页面上临时注入 `.scpdf-text-layer__item { line-height: 0 }` 后实测：
 
-| | rect 总数 | 视觉行数 | 每行 rect 数 | **中心被涂次数** |
-|---|---|---|---|---|
-| **改前** | 26 | 10 | {1个:2行, 2个:4行, 4个:4行} | **{涂1次: 2行, 涂2次: 8行}** ❌ |
-| **改后** | 26 | 10 | {1个:2行, 2个:4行, 4个:4行} | **{涂1次: 10行}** ✅ |
+|          | rect 总数 | 视觉行数 | 每行 rect 数                | **中心被涂次数**                |
+| -------- | --------- | -------- | --------------------------- | ------------------------------- |
+| **改前** | 26        | 10       | {1个:2行, 2个:4行, 4个:4行} | **{涂1次: 2行, 涂2次: 8行}** ❌ |
+| **改后** | 26        | 10       | {1个:2行, 2个:4行, 4个:4行} | **{涂1次: 10行}** ✅            |
 
 **结论**：`line-height: 0` 让所有行的选区背景**只涂一次** → 阶梯状深浅彻底消失。
 （rect 数不变，因为浏览器仍然返回它们，但它们的行盒高度归零 → 叠涂消失）
@@ -103,7 +107,9 @@
 ### 根因
 
 ```css
-.scpdf-annotation--mine { background: var(--scpdf-highlight-my); }  /* #fff3bf 不透明 */
+.scpdf-annotation--mine {
+  background: var(--scpdf-highlight-my);
+} /* #fff3bf 不透明 */
 ```
 
 高亮层在 DOM 里排在 `<canvas>` **之后**（`Page.tsx:206`）→ 盖在文字上。
@@ -175,20 +181,20 @@ style={{
 
 ### 阶段 1：修错位与遮挡（低风险）
 
-| 步骤 | 内容 | 文件 |
-|---|---|---|
-| **S1.1** | 删掉 `transform: scale()`（高亮 + 搜索高亮） | `AnnotationLayer.tsx:133,160` |
-| **S1.2** | `reference` 改用该页**真实视口尺寸** | `PdfViewer.tsx:614` |
-| **S1.3** | 高亮块加 `mix-blend-mode: multiply` | `viewer.css` |
-| **S1.4** | `::selection` 加 `mix-blend-mode: multiply` + 降到 14% | `viewer.css:242` |
+| 步骤     | 内容                                                   | 文件                          |
+| -------- | ------------------------------------------------------ | ----------------------------- |
+| **S1.1** | 删掉 `transform: scale()`（高亮 + 搜索高亮）           | `AnnotationLayer.tsx:133,160` |
+| **S1.2** | `reference` 改用该页**真实视口尺寸**                   | `PdfViewer.tsx:614`           |
+| **S1.3** | 高亮块加 `mix-blend-mode: multiply`                    | `viewer.css`                  |
+| **S1.4** | `::selection` 加 `mix-blend-mode: multiply` + 降到 14% | `viewer.css:242`              |
 
 **S1.3 的效果**：不透明黄 + multiply → 黑字仍是黑 → **字清晰可见**，且**不用改 DOM 顺序**（不影响点击）。
 
 ### 阶段 2：修阶梯重叠
 
-| 步骤 | 内容 |
-|---|---|
-| **S2.1** | 文本层 span 加 `line-height: 0`（**已实测验证** → 每处只涂一次） |
+| 步骤     | 内容                                                                    |
+| -------- | ----------------------------------------------------------------------- |
+| **S2.1** | 文本层 span 加 `line-height: 0`（**已实测验证** → 每处只涂一次）        |
 | **S2.2** | `::selection` 不透明度降到 **14%** + `mix-blend-mode: multiply`（兜底） |
 
 ### 阶段 3：颜色可配置（你的需求）
@@ -285,9 +291,9 @@ highlightPalette?: Record<string, string>;
 对齐 pdf.js：
 ```css
 .scpdf-annotation {
-  border-radius: 4px;        /* pdf.js 用 4px, 现在是 2px */
+  border-radius: 4px; /* pdf.js 用 4px, 现在是 2px */
   /* 1px 外扩, 让"笔触"更饱满 */
-  outline: 2px solid transparent;  /* 或用伪元素 */
+  outline: 2px solid transparent; /* 或用伪元素 */
 }
 ```
 
@@ -295,14 +301,14 @@ highlightPalette?: Record<string, string>;
 
 ## 五、最终效果对比
 
-| | 现在 | 改后 |
-|---|---|---|
-| 高亮位置 | **偏 278px** | 精确对齐 |
-| 高亮遮挡 | **完全不透明, 字看不见** | multiply 混合, **字清晰可见** |
-| 选区颜色 | 阶梯状深浅不一 | **均匀**（每处只涂一次） |
-| 选区颜色可配 | ❌ 硬编码 | ✅ props 传入 |
-| 高亮颜色可配 | ❌ 只有语义名 | ✅ `highlightPalette` prop |
-| 高亮可点 | ✅ | ✅（不动 DOM 顺序） |
+|              | 现在                     | 改后                          |
+| ------------ | ------------------------ | ----------------------------- |
+| 高亮位置     | **偏 278px**             | 精确对齐                      |
+| 高亮遮挡     | **完全不透明, 字看不见** | multiply 混合, **字清晰可见** |
+| 选区颜色     | 阶梯状深浅不一           | **均匀**（每处只涂一次）      |
+| 选区颜色可配 | ❌ 硬编码                | ✅ props 传入                 |
+| 高亮颜色可配 | ❌ 只有语义名            | ✅ `highlightPalette` prop    |
+| 高亮可点     | ✅                       | ✅（不动 DOM 顺序）           |
 
 ---
 
@@ -336,14 +342,14 @@ pnpm --filter @scholar-club/pdf-viewer-demo dev --port 5199
 
 ## 八、实施顺序与验证（确认后执行）
 
-| 步骤 | 内容 | 验证 |
-|---|---|---|
-| **S1.1** | 删 `transform: scale()` | E2E：高亮矩形与文字偏差 < 3px |
-| **S1.2** | `reference` 用真实页面尺寸 | 单测 + E2E |
-| **S1.3** | 高亮块 `mix-blend-mode: multiply` | E2E：高亮区中心像素仍是深色（字没被遮） |
-| **S1.4** | `::selection` 加 multiply + 14% | E2E：computed style 检查 |
-| **S2.1** | span 加 `line-height: 0` | E2E：**每行选区只涂一次**（新增断言） |
-| **S3** | 颜色可配置（`selectionColor` + `highlightPalette`） | 单测 + demo 取色器 UI |
-| **S4** | 圆角 4px + 1px 外扩（对齐 pdf.js） | 截图对比 |
+| 步骤     | 内容                                                | 验证                                    |
+| -------- | --------------------------------------------------- | --------------------------------------- |
+| **S1.1** | 删 `transform: scale()`                             | E2E：高亮矩形与文字偏差 < 3px           |
+| **S1.2** | `reference` 用真实页面尺寸                          | 单测 + E2E                              |
+| **S1.3** | 高亮块 `mix-blend-mode: multiply`                   | E2E：高亮区中心像素仍是深色（字没被遮） |
+| **S1.4** | `::selection` 加 multiply + 14%                     | E2E：computed style 检查                |
+| **S2.1** | span 加 `line-height: 0`                            | E2E：**每行选区只涂一次**（新增断言）   |
+| **S3**   | 颜色可配置（`selectionColor` + `highlightPalette`） | 单测 + demo 取色器 UI                   |
+| **S4**   | 圆角 4px + 1px 外扩（对齐 pdf.js）                  | 截图对比                                |
 
 **回归**：现有 8 套 E2E（64 项断言）必须全绿。

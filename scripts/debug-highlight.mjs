@@ -6,9 +6,10 @@
  * 2) 高亮的 CSS（不透明度 / z-index / 层叠顺序）
  * 3) 文本层的 color/opacity（双层叠加变深）
  */
-import { chromium } from 'playwright';
+
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
 
 function resolveChromium() {
   const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');

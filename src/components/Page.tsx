@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react';
 import type { LinkAnnotationLike } from '../core/annotation/links';
+import type { HighlightPalette } from '../core/highlight/palette';
 import type { SearchHitRect } from '../core/search/highlight';
 import type { PositionedTextItem } from '../core/text-layer/layout';
 import { layoutTextItems } from '../core/text-layer/layout';
@@ -44,6 +45,8 @@ export interface PageProps {
   highlights: HighlightRecord[];
   /** 激活的高亮 id */
   activeHighlightId?: string | null;
+  /** 高亮色板（语义 key → CSS 颜色） */
+  palette?: HighlightPalette;
   /** 点击高亮 */
   onHighlightClick?: (highlight: HighlightRecord) => void;
   /** 点击外部链接 */
@@ -80,6 +83,7 @@ export function Page(props: PageProps) {
     activeSearchRectIndex,
     highlights,
     activeHighlightId,
+    palette,
     onHighlightClick,
     onExternalLink,
     onInternalLink,
@@ -206,12 +210,12 @@ export function Page(props: PageProps) {
       <AnnotationLayer
         pageNumber={pageNumber}
         highlights={highlights}
-        scale={scale}
         viewport={{ width: size.width, height: size.height }}
         activeHighlightId={activeHighlightId}
         onHighlightClick={onHighlightClick}
         searchRects={searchRects}
         activeSearchRectIndex={activeSearchRectIndex}
+        palette={palette}
       />
     </>
   );

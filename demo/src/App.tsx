@@ -16,6 +16,7 @@ import { PdfSearch, PdfViewer } from '@scholar-club/pdf-viewer';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import * as pdfjs from 'pdfjs-dist';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { HighlightPicker, PRESET_COLORS } from './HighlightPicker';
 import '@scholar-club/pdf-viewer/styles.css';
 
 /**
@@ -46,6 +47,26 @@ export default function App() {
 
   /** 高亮（受控状态 —— 宿主的数据） */
   const [highlights, setHighlights] = useState<HighlightRecord[]>([]);
+
+  /** 当前选中的高亮颜色 key（宿主的 UI 状态） */
+  const [highlightColor, setHighlightColor] = useState('yellow');
+
+  /** 用户自定义的颜色（key → 颜色）；持久化也是宿主的事 */
+  const [customColors, setCustomColors] = useState<Record<string, string>>({});
+
+  /**
+   * 传给包的高亮色板（语义 key → CSS 颜色）。
+   *
+   * ⚠️ **宿主负责组装**：预设色 + 用户自定义色 → 传给包的 `highlightPalette`。
+   * 包只认 key，不关心 key 的含义。
+   */
+  const highlightPalette = useMemo(() => {
+    const palette: Record<string, string> = {};
+    for (const item of PRESET_COLORS) {
+      palette[item.key] = item.color;
+    }
+    return { ...palette, ...customColors };
+  }, [customColors]);
 
   /** 选区（宿主拿到的几何） */
   const [selection, setSelection] = useState<SelectionData | null>(null);
@@ -466,7 +487,7 @@ export default function App() {
             return;
           }
           handleHighlightCreate({
-            color: 'label-2',
+            color: highlightColor,
             selectedText: selection.text,
             position: selection.norm,
           });
@@ -478,7 +499,7 @@ export default function App() {
         +
       </button>
     ),
-    [selection, handleHighlightCreate],
+    [selection, handleHighlightCreate, highlightColor],
   );
 
   return (
@@ -506,12 +527,28 @@ export default function App() {
           <span style={{ opacity: 0.6 }}>加载中…</span>
         )}
         {hint ? <span style={{ color: 'var(--scpdf-color-primary)' }}>{hint}</span> : null}
+
+        {/*
+          高亮颜色选择器 —— **宿主侧的 UI**。
+          包只提供 `highlightPalette`（key → 颜色）这条通道，
+          取色器/预设/持久化全在宿主。
+        */}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ opacity: 0.7 }}>高亮色：</span>
+          <HighlightPicker
+            value={highlightColor}
+            customColors={customColors}
+            onChange={(key) => setHighlightColor(key)}
+            onSaveCustom={(key, color) => setCustomColors((prev) => ({ ...prev, [key]: color }))}
+          />
+        </span>
       </div>
 
       <div style={{ flex: 1, minHeight: 0 }}>
         <PdfViewer
           file={sampleUrl}
           highlights={highlights}
+          highlightPalette={highlightPalette}
           toolbar={{ rightSlot: toolbarSlot }}
           getPage={getPage}
           getPageSizes={getPageSizes}

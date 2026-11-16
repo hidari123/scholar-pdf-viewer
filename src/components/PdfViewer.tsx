@@ -21,6 +21,7 @@ import type { DocumentCache } from '../core/cache/store';
 import type { DocumentSource, LoadOptions } from '../core/document/loader';
 import type { PdfViewerError } from '../core/errors';
 import { pdfViewerError } from '../core/errors';
+import type { HighlightPalette } from '../core/highlight/palette';
 import type { OutlineItemLike } from '../core/outline/outline';
 import type { SearchHitRect } from '../core/search/highlight';
 import { hitsToRects } from '../core/search/highlight';
@@ -65,6 +66,16 @@ export interface PdfViewerProps {
   documentId?: string;
   /** 受控高亮 */
   highlights?: HighlightRecord[];
+  /**
+   * 高亮色板：语义 key → CSS 颜色值。
+   *
+   * **包的边界**：包只负责"把颜色渲染出来"（纯视觉）。
+   * 取色器 UI、语义含义、持久化 → 归宿主。
+   *
+   * 例：`{ yellow: '#ffd54a', 'my-1': '#ff6b6b' }`
+   * → 高亮记录的 `color: 'my-1'` 会渲染成 `#ff6b6b`。
+   */
+  highlightPalette?: HighlightPalette;
   /** 缓存实例 */
   cache?: DocumentCache | null;
   /** 加载选项 */
@@ -156,6 +167,7 @@ export function PdfViewer(props: PdfViewerProps) {
     file,
     documentId,
     highlights = [],
+    highlightPalette,
     cache,
     loadOptions,
     password,
@@ -611,7 +623,19 @@ export function PdfViewer(props: PdfViewerProps) {
       height: size.height,
     })),
     scale,
-    reference: { width: 595 * scale, height: 842 * scale },
+    /*
+     * 参考尺寸 = **采集时的真实视口尺寸**。
+     *
+     * ⚠️ 之前这里硬编码 `595 * scale`（A4 宽度）→ 真实 PDF 可能是
+     * Letter(612) / 其他尺寸 → NormRect 里的参考尺寸与实际不符
+     * → 读回时 `viewport / norm.width` 的换算比例是错的 → 高亮位置飘。
+     *
+     * 用真实的页面尺寸（pageSizes 存的就是视口 px）。
+     */
+    reference: {
+      width: pageSizes[0]?.width ?? 595 * scale,
+      height: pageSizes[0]?.height ?? 842 * scale,
+    },
     onSelectionChange,
   });
 
@@ -975,6 +999,7 @@ export function PdfViewer(props: PdfViewerProps) {
                       activeSearchRectIndex={activeSearchIndexOnPage(pageNumber)}
                       highlights={highlights}
                       activeHighlightId={activeHighlightId}
+                      palette={highlightPalette}
                       onHighlightClick={handleHighlightClick}
                       onExternalLink={onExternalLink}
                       onInternalLink={(dest) => onInternalLink?.(dest, pageNumber)}
