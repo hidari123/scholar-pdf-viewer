@@ -147,7 +147,12 @@ export function ThumbnailPanel(props: ThumbnailPanelProps) {
 
   /** 缩略图列表（页码 + 缓存的图片） */
   const items = useMemo(() => {
-    const list: { pageNumber: number; url: string | undefined; height: number }[] = [];
+    const list: {
+      pageNumber: number;
+      url: string | undefined;
+      width: number;
+      height: number;
+    }[] = [];
 
     for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
       const size = pageSizes[pageNumber - 1];
@@ -158,13 +163,13 @@ export function ThumbnailPanel(props: ThumbnailPanelProps) {
       list.push({
         pageNumber,
         url: cache.get(pageNumber),
+        width: spec.width,
         height: spec.height,
       });
     }
 
     return list;
   }, [totalPages, pageSizes, thumbnailWidth, cache]);
-
   return (
     <aside className="scpdf-panel scpdf-panel--thumbnails" aria-label={t('thumbnails.title')}>
       <h2 className="scpdf-panel__title">{t('thumbnails.title')}</h2>
@@ -189,13 +194,17 @@ export function ThumbnailPanel(props: ThumbnailPanelProps) {
                 className="scpdf-thumbnail__img"
                 src={item.url}
                 alt=""
-                style={{ width: `${thumbnailWidth}px`, height: `${item.height}px` }}
+                /*
+                 * 尺寸 = thumbnailSpec 给的（宿主渲染用的画布尺寸）
+                 * → CSS 尺寸与图片原始尺寸**完全一致** → 无白边、无变形
+                 */
+                style={{ width: `${item.width}px`, height: `${item.height}px` }}
                 loading="lazy"
               />
             ) : (
               <span
                 className="scpdf-thumbnail__placeholder"
-                style={{ width: `${thumbnailWidth}px`, height: `${item.height}px` }}
+                style={{ width: `${item.width}px`, height: `${item.height}px` }}
               />
             )}
             <span className="scpdf-thumbnail__number">{item.pageNumber}</span>

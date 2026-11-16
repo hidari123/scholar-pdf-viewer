@@ -9,10 +9,21 @@ describe('thumbnailSpec', () => {
     expect(spec.scale).toBeCloseTo(120 / 595);
   });
 
-  it('高度按页面比例算', () => {
+  it('高度按页面比例算（**ceil**，与宿主渲染一致）', () => {
     const spec = thumbnailSpec(595, 842, 120);
 
-    expect(spec.height).toBe(Math.round((842 * 120) / 595));
+    // 用 ceil 而不是 round —— 画布尺寸必须向上取整，否则裁掉内容
+    expect(spec.height).toBe(Math.ceil((842 * 120) / 595));
+  });
+
+  it('尺寸与宿主渲染的画布尺寸一致（零错位）', () => {
+    // 宿主渲染时用 Math.ceil(viewport.width/height)
+    const spec = thumbnailSpec(612, 792, 120);
+    const scale = spec.width / 612;
+    const viewport = { width: 612 * scale, height: 792 * scale };
+
+    expect(spec.width).toBe(Math.ceil(viewport.width));
+    expect(spec.height).toBe(Math.ceil(viewport.height));
   });
 
   it('非法输入返回空规格', () => {

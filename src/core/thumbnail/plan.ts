@@ -9,9 +9,9 @@
 
 /** 缩略图规格 */
 export interface ThumbnailSpec {
-  /** 缩略图宽度（px） */
+  /** 缩略图宽度（px）——**宿主应直接用作 canvas.width** */
   width: number;
-  /** 缩略图高度（px） */
+  /** 缩略图高度（px）——**宿主应直接用作 canvas.height** */
   height: number;
   /** 渲染用的缩放比（= width / 页面宽度 pt） */
   scale: number;
@@ -20,10 +20,18 @@ export interface ThumbnailSpec {
 /**
  * 计算缩略图规格。
  *
+ * ⚠️ **必须用 ceil（向上取整）**：
+ * - 画布尺寸必须**向上**取整，否则会裁掉内容（差 1px 的边缘）
+ * - 之前这里用 `round`、宿主用 `ceil` → **两边不一致** →
+ *   `<img>` 的 CSS 尺寸（155）与图片原始尺寸（156）差 1px
+ *   → 配合 `object-fit: contain` 出现白边 → "缩略图跟原文不一样"
+ *
+ * 现在包给出的 width/height 就是宿主该用的画布尺寸 → 零错位。
+ *
  * @param pageWidth 页面宽度（pt）
  * @param pageHeight 页面高度（pt）
  * @param targetWidth 目标宽度（px）
- * @returns 规格（scale 用于 pdf.js 渲染）
+ * @returns 规格（scale 用于 pdf.js 渲染；width/height 用于 canvas 尺寸）
  */
 export function thumbnailSpec(
   pageWidth: number,
@@ -37,8 +45,9 @@ export function thumbnailSpec(
   const scale = targetWidth / pageWidth;
 
   return {
-    width: Math.round(targetWidth),
-    height: Math.round(pageHeight * scale),
+    // ceil：画布尺寸向上取整（与宿主渲染时的 Math.ceil 一致）
+    width: Math.ceil(targetWidth),
+    height: Math.ceil(pageHeight * scale),
     scale,
   };
 }

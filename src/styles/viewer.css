@@ -536,8 +536,14 @@
 .scpdf-thumbnail__placeholder {
   display: block;
   background: var(--scpdf-color-surface-alt);
-  border: 1px solid var(--scpdf-color-border);
-  object-fit: contain;
+  /*
+   * ⚠️ **不要用 object-fit: contain**：
+   * 包的 thumbnailSpec 与宿主渲染用的画布尺寸已经**完全一致**（都用 ceil）
+   * → contain 只会因为舍入产生几像素的白边 → "缩略图跟原文不一样"。
+   *
+   * 描边用 box-shadow 画在**外侧**，不占内容区（border 会占）。
+   */
+  box-shadow: 0 0 0 1px var(--scpdf-color-border);
 }
 
 .scpdf-thumbnail__number {

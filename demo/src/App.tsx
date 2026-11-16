@@ -321,6 +321,11 @@ export default function App() {
    *
    * 用离屏 canvas 渲染 → 转成 dataURL 给包。
    * （真实项目里也可以用 worker + OffscreenCanvas 更快。）
+   *
+   * ⚠️ **必须用包给的尺寸 + DPR**：
+   * - 画布尺寸用 `Math.ceil(viewport.width/height)` → 与包的 thumbnailSpec 一致（零错位）
+   * - 画布物理尺寸乘 DPR → 高 DPI 屏清晰
+   * - context 要 `setTransform(ratio,...)` 缩放 → pdf.js 按 viewport 尺寸绘制
    */
   const renderThumbnail = useCallback(
     async (pageNumber: number, width: number): Promise<string | null> => {
@@ -335,16 +340,23 @@ export default function App() {
         const scale = width / baseViewport.width;
         const viewport = page.getViewport({ scale });
 
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+
         const canvas = document.createElement('canvas');
-        canvas.width = Math.ceil(viewport.width);
-        canvas.height = Math.ceil(viewport.height);
+        // 物理像素尺寸（DPR 感知 → 高 DPI 屏清晰）
+        canvas.width = Math.ceil(viewport.width * ratio);
+        canvas.height = Math.ceil(viewport.height * ratio);
         const context = canvas.getContext('2d');
         if (!context) {
           return null;
         }
 
+        // pdf.js 按 viewport 尺寸绘制 → 先按 DPR 缩放 context
+        context.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+        // pdf.js v6 需要 canvas + viewport
         await page.render({ canvas, canvasContext: context, viewport }).promise;
-        return canvas.toDataURL('image/jpeg', 0.7);
+        return canvas.toDataURL('image/jpeg', 0.85);
       } catch {
         return null;
       }
