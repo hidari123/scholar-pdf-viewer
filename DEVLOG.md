@@ -1298,3 +1298,152 @@ src/styles/viewer.css               multiply / line-height:0 / CSS 变量
 demo/src/HighlightPicker.tsx        宿主的取色器 UI（不在包里）
 scripts/e2e-highlight.mjs           高亮效果 E2E（9 项）
 ```
+
+---
+
+## 第四轮：高亮黑框 / 选区叠涂换方案 / 缩放崩溃 / 选区浮层（2026-11-16 下午）
+
+用户报了 4 个问题。排查后发现**其中两个是上一轮"修复"引入的**。
+
+### 问题 1：高亮有黑框 + 缩放下定位不对
+
+**实测：几何完全是对的**
+
+```
+选区: { l: 457.7, t: 328.9, w: 252,  h: 44 }
+高亮: { l: 457.7, t: 328.9, w: 252,  h: 44 }
+Δleft = Δtop = Δw = Δh = 0.0
+```
+
+缩放后也正确（230% → 250%，高亮宽 252 → 273.9 = ×1.088）。
+
+**错的是渲染** —— 高亮是 `<button>`，但 **CSS 从来没 reset 浏览器默认样式**：
+
+```js
+{ tagName: "BUTTON",
+  border: "2px outset rgb(0, 0, 0)",   // ← 黑框
+  padding: "1px 6px",
+  boxSizing: "border-box" }            // ← 内容区被 border 吃掉
+```
+
+- `border: 2px outset` → **可见黑框**
+- `box-sizing: border-box` → 可见区域比几何框小 2px → **看起来没对齐**
+
+**修**：reset button 样式 + **`box-sizing: content-box`**（让 width/height 就是全部可见区域）。
+
+### 问题 2：选区叠涂仍在 + 框选多选一点 —— **上一轮的修法是治标**
+
+**关键实测**（发现 `line-height: 0` 是一对问题的其中一半）：
+
+| line-height       | 选区 top 相对 span top     | 选区高度 | 叠涂次数 |
+| ----------------- | -------------------------- | -------- | -------- |
+| **`0`（上一轮）** | **−21.9px**（上偏 22px）❌ | 44px     | **1** ✅ |
+| **`normal`**      | **+0.1px**（完美）✅       | 44px     | **2** ❌ |
+| `1`               | −5.9px                     | 44px     | 2 ❌     |
+| `1.15`            | −3.9px                     | 44px     | 2 ❌     |
+
+选区框高 **44px** 而字号只有 **16.1px** → 框粗 2.7 倍 → 就是"上下多框选一点"。
+
+**原因**：`line-height: 0` 让行盒归零 → 浏览器 fallback 到**默认行盒**画选区矩形
+→ 叠涂"少"了，但框歪了。**它只是把行盒压扁，没真正解决。**
+
+**正解：pdf.js v6 的 `selectionRendering` 模式**
+
+1. 关掉原生 `::selection` 的背景
+2. `getClientRects()` 拿原始形状 → 合并同行重叠矩形
+3. 画成 SVG `<clipPath>` → **每个像素只画一次**
+
+**已实测验证**：手工注入后选区均匀、贴合文字、无阶梯 ✅
+
+**新增** `src/core/selection/shape.ts`（`buildSelectionShapes` + `mergeOverlappingRects`）
+**新增** `src/components/SelectionLayer.tsx`（SVG clipPath 覆盖层）
+
+**踩到的坑**：SVG **绝对不能设 viewBox**！
+`viewBox="0 0 100 100"` + `preserveAspectRatio="none"` 会把用户坐标从 100×100
+拉伸到页面真实像素 → clipPath（`userSpaceOnUse`）的 `x=449` 被放大成 `449×(1408/100)=6324`
+→ 形状跑到页面外 → **选区完全看不见**（截图确认）。
+→ 修：**不设 viewBox** → SVG 用户坐标 = CSS 像素。
+
+### 问题 3：缩放时页面消失（NotFoundError）
+
+**复现了完全一样的报错**：
+
+```
+NotFoundError: Failed to execute 'insertBefore' on 'Node':
+The node before which the new node is to be inserted is not a child of this node.
+```
+
+**两个根因**（实测定位）：
+
+1. `insertBefore(newNode, referenceNode)` 要求 `referenceNode` 是 `newNode.parentElement` 的子节点。
+   缩放时 React 重建所有 span（key 含位置 → 全变）→ `endContainer.nextSibling` 可能属**别的 parent** → 抛错。
+2. **跨页选择时哨兵被搬到另一页**（实测 `endStillInL1: false`）
+   → 第 1 页哨兵丢失、第 2 页多一个 → 哨兵失去意义。
+
+**异常在 `selectionchange` 里未捕获** → React 错误边界 unmount 整棵树 → **页面消失**。
+
+**修**：
+- `contains()` 校验引用节点同父（不满足 → 降级 `appendChild`）
+- 跨页时**不动**哨兵（每页各有自己的）
+- 哨兵加**固定 key**（React 重渲染不再错位）
+
+**新增** `scripts/e2e-selection-stability.mjs`：6/6
+
+### 问题 4：选区浮层（scholar-club 那种）
+
+**调研了原项目**（`TextSelectionPopover` + `useTextSelection`），确认它的毛病：
+
+| 它的问题                         | 实测                                                        |
+| -------------------------------- | ----------------------------------------------------------- |
+| 坐标系错                         | `getClientRects()`（视口）+ `window.scrollY` → 当文档坐标用 |
+| 不跟随内部滚动                   | 项目**自己的缺陷 B2** 就记着这事                            |
+| 假翻转                           | 永远在下方，"翻转"只是 `popoverY -= 50`                     |
+| 魔法数字                         | 宽度猜 `200`（实际 350-400）、高度猜 `50`                   |
+| 位置不更新                       | 只在 mouseup 算一次，缩放/滚动都不重算                      |
+| 无 Esc / 无 selectionchange 关闭 | —                                                           |
+| 死代码                           | `document.createElement('div')` 后直接丢弃                  |
+| 动作硬编码                       | 每个按钮一个闭包，没有配置数组                              |
+
+**我们的实现**：
+
+- **定位**：`position: fixed` + 视口坐标 → **不需要 scroll 换算** → 天然不漂移
+  - **实测弹层尺寸**（不猜）+ **真翻转**（先下方再上方）+ clamp 到容器
+- **动作注册表**（可注入）：宿主传 `selectionActions` 覆盖/追加
+  内置：🖍高亮(带色板) · 📋复制 · 🌐翻译 · 💬提问 · 📝笔记 · 🗑删除
+  **宿主不传 `onTranslate` → 按钮不显示** ✅
+- **内置图标 7 个**（纯 SVG，零依赖）
+- **统一色板下拉**：6 预设色（原项目新高亮/编辑高亮用了**两套 UI**）
+- **关闭**：mousedown 外部 · Esc · 选区清空 · 滚动/缩放（隐藏）
+
+**踩到的坑**：
+
+1. **`react-dom` 不是依赖**：包只 peer-dep `react` → 不能用 `createPortal`
+   → 改用 `position: fixed` 内联渲染（祖先链无 transform/filter/contain → 等价于挂 body）
+2. **鸡生蛋死锁**：位置没算出来 → 返回 `null` → 元素没渲染 → 量不到尺寸 → 永远算不出位置
+   → 修：**第一帧先渲染**（`visibility: hidden`），量到后再算位置
+3. **biome `noSvgWithoutTitle`**：要求每个 svg 有**字面量**的 `<title>`（变量不认）
+
+**新增** `src/core/selection/popover-position.ts`（纯函数定位，可单测）
+**新增** `src/core/selection/actions.ts`（动作类型 + 合并逻辑）
+**新增** `src/components/SelectionPopover.tsx` + `SelectionActionIcons.tsx`
+
+### 验证
+
+- `pnpm verify`：**8 门禁全绿**
+- `pnpm test`：**333 passed**（27 个测试文件）
+  - 新增 `popover-position.test.ts`（10）+ `actions.test.ts`（5）
+- E2E：**11 套 96 项断言全通过**
+  - `e2e-selection-popover.mjs` **15/15**（定位/居中/clamp/真翻转/Esc/点外部/滚动隐藏/色板/选色触发高亮）
+  - `e2e-selection-stability.mjs` **6/6**
+  - `e2e-highlight.mjs` **11/11**（改写断言：原生背景已关 + 自绘层生效）
+
+### 关键文件
+
+```
+src/core/selection/shape.ts            选区形状（归页 + 合并重叠）
+src/core/selection/popover-position.ts  浮层定位（纯函数）
+src/core/selection/actions.ts          动作注册表
+src/components/SelectionLayer.tsx      SVG clipPath 自绘选区
+src/components/SelectionPopover.tsx    选区浮层
+src/components/SelectionActionIcons.tsx 内置图标
+```

@@ -130,6 +130,13 @@ export function Reader({ url }: { url: string }) {
 | `file`                | `string \| Blob \| ArrayBuffer \| null`    | 文档来源（唯一必填）            |
 | `highlights`          | `HighlightRecord[]`                        | 受控高亮                        |
 | `highlightPalette`    | `Record<string, string>`                   | 高亮色板（语义 key → CSS 颜色） |
+| `selectionActions`    | `SelectionAction[]`                        | 选区浮层动作（覆盖/追加内置）   |
+| `onHighlight`         | `(ctx) => void`                            | 浮层"高亮"被点（带颜色 key）    |
+| `onCopy`              | `(ctx) => void`                            | 浮层"复制"（不传则用剪贴板）    |
+| `onTranslate`         | `(ctx) => void`                            | 浮层"翻译"（不传**不显示**）    |
+| `onAsk`               | `(ctx) => void`                            | 浮层"提问"（不传**不显示**）    |
+| `onNote`              | `(ctx) => void`                            | 浮层"笔记"（不传**不显示**）    |
+| `onExplain`           | `(ctx) => void`                            | 浮层"解释"（不传**不显示**）    |
 | `getPage`             | `(n) => Promise<PageProxyLike>`            | 取页（宿主注入 pdf.js）         |
 | `getPageSizes`        | `(n) => Promise<{width,height}[]>`         | 各页尺寸（pt）——影响跳页准确性  |
 | `getDocInfo`          | `(data) => Promise<PdfDocInfo>`            | 文档信息（页数/元数据）         |
@@ -214,6 +221,40 @@ export function Reader({ url }: { url: string }) {
 
 包内置 6 色（`DEFAULT_HIGHLIGHT_PALETTE`），宿主可完全覆盖或扩展。
 
+## 选区浮层
+
+选中文字后出现的操作条（🖍 高亮 · 📋 复制 · 🌐 翻译 · 💬 提问 · 📝 笔记）。
+
+### 定位（自研，不用 UI 库的 Popover）
+
+- **`position: fixed` + 视口坐标** → 不需要 scroll 换算 → **天然不漂移**
+  （对比：原 scholar-club 用 `getClientRects() + window.scrollY` 当文档坐标，
+  而 PDF 在内部容器滚动 → 弹层不跟随、页面滚动时漂移）
+- **实测弹层尺寸**（不猜宽度 200 / 高度 50）
+- **真翻转**：先试下方 → 放不下再试上方
+- **clamp** 到 PDF 容器的可视区
+- **滚动时隐藏**（位置已失效）
+
+### 动作可注入
+
+```tsx
+<PdfViewer
+  // 内置动作：宿主传了回调才显示
+  onTranslate={({ text }) => openTranslate(text)}
+  onAsk={({ text }) => ask(text)}
+  // 自定义动作（覆盖同名内置项 / 追加新项）
+  selectionActions={[
+    { key: 'summary', icon: 'explain', label: '总结', onSelect: ({ text }) => summarize(text) },
+  ]}
+/>;
+```
+
+**规则**：宿主不传 `onTranslate` → "翻译"按钮**不显示**。
+
+### 关闭条件
+
+`mousedown` 落浮层外 · `Esc` · 选区被清空 · 滚动 / 缩放 / 翻页。
+
 ## 错误码
 
 12 个，统一 `PdfViewerError`（带 `code` / `message` / `cause` / `retryable`）：
@@ -253,7 +294,7 @@ pnpm demo          # 启动 demo（消费 dist 产物，真实消费者路径）
 pnpm e2e           # E2E（需先 pnpm e2e:serve）
 ```
 
-E2E 脚本（9 套，73 项断言）：
+E2E 脚本（11 套，96 项断言）：
 
 | 脚本            | 验证内容                                          |
 | --------------- | ------------------------------------------------- |
@@ -262,7 +303,9 @@ E2E 脚本（9 套，73 项断言）：
 | `e2e:panels`    | 缩略图 / 目录 / 搜索三个面板                      |
 | `e2e:links`     | 链接层（XSS 过滤 / 位置 / 点击）                  |
 | `e2e:selection` | **选区精准度**（scaleX 生效 / 起点 Δ / 整页不丢） |
-| `e2e:highlight` | **高亮效果**（逐行对齐 Δ=0 / 不叠涂 / 不遮字）    |
+| `e2e:selection` | **选区稳定性**（跨页 + 缩放不崩 / 哨兵不搬家）    |
+| `e2e:selection` | **选区浮层**（定位 / 翻转 / clamp / 关闭 / 色板） |
+| `e2e:highlight` | **高亮效果**（逐行对齐 Δ=0 / 不遮挡 / 样式）      |
 | `e2e:zoom`      | **缩放**（整十比例 / 左上角锚点 / 无白屏）        |
 | `e2e:search`    | **搜索高亮**（命中矩形 / 落在文字上 / 跳转）      |
 | `e2e:thumbnail` | **缩略图**（零错位 / DPR / 无变形）               |
