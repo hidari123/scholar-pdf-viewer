@@ -7,9 +7,10 @@
  * 验证：分别用不同的 canvas 尺寸渲染同一页，
  *      看输出图片的内容边界是否一致。
  */
-import { chromium } from 'playwright';
+
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
 
 function resolveChromium() {
   const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
@@ -36,8 +37,7 @@ await page.waitForSelector('.scpdf-page canvas.scpdf-canvas', { timeout: 30000 }
 
 const result = await page.evaluate(async () => {
   const pdfjs = await import('/node_modules/.vite/deps/pdfjs-dist.js');
-  pdfjs.GlobalWorkerOptions.workerSrc =
-    '/node_modules/pdfjs-dist/build/pdf.worker.min.mjs';
+  pdfjs.GlobalWorkerOptions.workerSrc = '/node_modules/pdfjs-dist/build/pdf.worker.min.mjs';
 
   const response = await fetch('/samples/local.pdf');
   const data = new Uint8Array(await response.arrayBuffer());
@@ -89,10 +89,8 @@ const result = await page.evaluate(async () => {
         maxX < 0
           ? '空白'
           : `${minX},${minY} → ${maxX},${maxY} (${maxX - minX + 1}x${maxY - minY + 1})`,
-      contentBottomPct:
-        maxX < 0 ? 0 : Math.round(((maxY + 1) / canvas.height) * 1000) / 10,
-      contentRightPct:
-        maxX < 0 ? 0 : Math.round(((maxX + 1) / canvas.width) * 1000) / 10,
+      contentBottomPct: maxX < 0 ? 0 : Math.round(((maxY + 1) / canvas.height) * 1000) / 10,
+      contentRightPct: maxX < 0 ? 0 : Math.round(((maxX + 1) / canvas.width) * 1000) / 10,
     };
   }
 

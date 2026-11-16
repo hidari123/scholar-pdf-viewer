@@ -150,7 +150,9 @@ export function Page(props: PageProps) {
     <>
       <PageCanvas page={page} scale={scale} ariaLabel={ariaLabel} onRenderError={onRenderError} />
 
-      {textContent && viewport ? <TextLayer content={textContent} viewport={viewport} /> : null}
+      {textContent && viewport ? (
+        <TextLayer content={textContent} viewport={viewport} pageNumber={pageNumber} />
+      ) : null}
 
       {/*
         链接层在文本层之上：链接区域要能点（文本层的透明文字不能挡着）。

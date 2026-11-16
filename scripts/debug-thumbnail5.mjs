@@ -4,9 +4,10 @@
  * 关键：如果主页面渲染的内容占满整页，而缩略图不满，
  *       说明是缩略图渲染路径的问题。
  */
-import { chromium } from 'playwright';
+
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
 
 function resolveChromium() {
   const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
@@ -33,8 +34,7 @@ await page.waitForSelector('.scpdf-page canvas.scpdf-canvas', { timeout: 30000 }
 
 const result = await page.evaluate(async () => {
   const pdfjs = await import('/node_modules/.vite/deps/pdfjs-dist.js');
-  pdfjs.GlobalWorkerOptions.workerSrc =
-    '/node_modules/pdfjs-dist/build/pdf.worker.min.mjs';
+  pdfjs.GlobalWorkerOptions.workerSrc = '/node_modules/pdfjs-dist/build/pdf.worker.min.mjs';
 
   const response = await fetch('/samples/local.pdf');
   const data = new Uint8Array(await response.arrayBuffer());
@@ -71,7 +71,8 @@ const result = await page.evaluate(async () => {
       canvas: `${canvas.width}x${canvas.height}`,
       box: maxX < 0 ? '空白' : `${minX},${minY}→${maxX},${maxY}`,
       leftMarginPct: maxX < 0 ? 0 : Math.round((minX / canvas.width) * 1000) / 10,
-      bottomMarginPct: maxX < 0 ? 0 : Math.round(((canvas.height - maxY - 1) / canvas.height) * 1000) / 10,
+      bottomMarginPct:
+        maxX < 0 ? 0 : Math.round(((canvas.height - maxY - 1) / canvas.height) * 1000) / 10,
     };
   }
 

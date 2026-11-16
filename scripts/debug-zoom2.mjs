@@ -1,9 +1,10 @@
 /**
  * 调试：确认滚动容器 + 缩放后 canvas 消失的时序。
  */
-import { chromium } from 'playwright';
+
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
 
 function resolveChromium() {
   const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
@@ -45,7 +46,9 @@ const containers = await page.evaluate(() => {
 
 console.log('--- 可滚动的元素 ---');
 for (const c of containers) {
-  console.log(`  ${c.tag}.${c.cls} | ${c.scrollHeight}/${c.clientHeight} overflowY=${c.overflowY} scrollTop=${c.scrollTop}`);
+  console.log(
+    `  ${c.tag}.${c.cls} | ${c.scrollHeight}/${c.clientHeight} overflowY=${c.overflowY} scrollTop=${c.scrollTop}`,
+  );
 }
 
 // 缩放，并记录每一步的 canvas 状态（观察"消失 → 恢复"的时序）
@@ -62,7 +65,9 @@ for (let i = 0; i < 4; i++) {
       text: t?.querySelectorAll('.scpdf-text-layer__item').length ?? 0,
     };
   });
-  console.log(`  第${i + 1}次点击后(立即): zoom=${immediate.zoomLabel} canvas=${immediate.canvas} text=${immediate.text}项`);
+  console.log(
+    `  第${i + 1}次点击后(立即): zoom=${immediate.zoomLabel} canvas=${immediate.canvas} text=${immediate.text}项`,
+  );
 
   await page.waitForTimeout(1500);
   const after = await page.evaluate(() => {
@@ -74,7 +79,9 @@ for (let i = 0; i < 4; i++) {
       text: t?.querySelectorAll('.scpdf-text-layer__item').length ?? 0,
     };
   });
-  console.log(`  第${i + 1}次点击后(1.5s): zoom=${after.zoomLabel} canvas=${after.canvas} text=${after.text}项`);
+  console.log(
+    `  第${i + 1}次点击后(1.5s): zoom=${after.zoomLabel} canvas=${after.canvas} text=${after.text}项`,
+  );
 }
 
 await browser.close();

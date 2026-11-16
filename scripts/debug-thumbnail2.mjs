@@ -4,9 +4,10 @@
  * 截取缩略图面板的截图 + 主页面截图，肉眼对比。
  * 同时把缩略图放大，看是否内容被裁切/错位。
  */
-import { chromium } from 'playwright';
+
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
 
 function resolveChromium() {
   const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
@@ -25,7 +26,10 @@ function resolveChromium() {
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:5186';
 const exe = resolveChromium();
 const browser = await chromium.launch(exe ? { executablePath: exe } : {});
-const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, deviceScaleFactor: 2 });
+const page = await browser.newPage({
+  viewport: { width: 1400, height: 900 },
+  deviceScaleFactor: 2,
+});
 
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.waitForTimeout(3000);
@@ -50,7 +54,10 @@ if ((await first.count()) > 0) {
   const buf = Buffer.from(src.split(',')[1], 'base64');
   const { writeFileSync } = await import('node:fs');
   writeFileSync('e2e-shots/thumb-raw.jpg', buf);
-  console.log('缩略图原始尺寸:', await first.evaluate((el) => `${el.naturalWidth}x${el.naturalHeight}`));
+  console.log(
+    '缩略图原始尺寸:',
+    await first.evaluate((el) => `${el.naturalWidth}x${el.naturalHeight}`),
+  );
 }
 
 // 3) 主页面第 1 页截图（同样大小以便对比）

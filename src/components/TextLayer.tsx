@@ -5,18 +5,20 @@
  * - 浏览器原生选中/复制 → 不用自己实现选区
  * - 文字透明 → 用户看到的是 canvas 上的真实渲染
  *
- * 关键设计（决定了选区准不准）：
+ * **关键设计（决定了选区准不准）—— 完全对齐 pdf.js 官方 `TextLayer`**：
  * - **一个 pdf.js text item 一个 span**：PDF 里一行由多个 item 组成，
  *   每个 item 有自己的 x 位置和字号。合并成一行一个 span 会导致
- *   "选中的框"与"看到的字"错位（用户报的核心 bug）
- * - **显式设 width**：用 PDF 的真实字宽，不用浏览器按系统字体估算
- *   （浏览器算的宽度与 PDF 内嵌字体不同 → 选区框偏移）
- * - **字号用 item.height**：不用 transform[3]（那是渲染矩阵，不是字号）
+ *   "选中的框"与"看到的字"错位
+ * - **scaleX 横向拉伸**：PDF 内嵌字体与浏览器系统字体度量不同，
+ *   不拉伸的话文字总宽度对不上 → 越往右偏得越多 → 选区框偏移。
+ *   `scaleX = PDF 真实宽度 / 浏览器实测宽度` → 每个字的位置都对得上
+ * - **top = 基线 − ascent**：浏览器的行盒是从基线到 ascent 决定的，
+ *   用字号会让整行文字偏低 15~20%
  * - **white-space: pre**：保留 PDF 里的连续空格（否则被折叠 → 文字挤压）
  */
 
 import { useMemo } from 'react';
-import type { TextContentLike, TextViewportLike } from '../core/text-layer/layout';
+import type { FontInfo, TextContentLike, TextViewportLike } from '../core/text-layer/layout';
 import { layoutTextItems } from '../core/text-layer/layout';
 
 /** TextLayer 参数 */
@@ -25,6 +27,12 @@ export interface TextLayerProps {
   content: TextContentLike | null;
   /** 视口 */
   viewport: TextViewportLike | null;
+  /** 字体表（fontName → 字体信息）；宿主可选注入 */
+  fontMap?: Record<string, FontInfo>;
+  /** 默认字体族（没有 fontMap 时用它） */
+  defaultFontFamily?: string;
+  /** 页码（选区归页用；span 上带 data-page-number） */
+  pageNumber?: number;
 }
 
 /**
@@ -32,14 +40,20 @@ export interface TextLayerProps {
  *
  * @param props 参数
  */
-export function TextLayer({ content, viewport }: TextLayerProps) {
+export function TextLayer({
+  content,
+  viewport,
+  fontMap,
+  defaultFontFamily,
+  pageNumber,
+}: TextLayerProps) {
   /** 排版后的文本项（一个 item 一个） */
   const items = useMemo(() => {
     if (!content || !viewport) {
       return [];
     }
-    return layoutTextItems(content, viewport);
-  }, [content, viewport]);
+    return layoutTextItems(content, viewport, { fontMap, defaultFontFamily });
+  }, [content, viewport, fontMap, defaultFontFamily]);
 
   if (items.length === 0) {
     return null;
@@ -55,17 +69,43 @@ export function TextLayer({ content, viewport }: TextLayerProps) {
            */
           key={`${item.left}-${item.top}-${item.text.slice(0, 12)}-${index}`}
           className="scpdf-text-layer__item"
+          // 选区归页用（useTextSelection 靠它判断选中的是哪一页）
+          data-page-number={pageNumber}
           style={{
             left: `${item.left}px`,
             top: `${item.top}px`,
             fontSize: `${item.fontSize}px`,
-            // 显式宽度：用 PDF 的真实字宽 → 选区框与文字严格对齐
-            width: item.width > 0 ? `${item.width}px` : undefined,
+            fontFamily: item.fontFamily,
+            /*
+             * scaleX：把浏览器排出来的宽度拉伸到 PDF 的宽度。
+             * 这是选区精准的关键 —— 不做的话选中的框和看到的字会逐渐错开。
+             *
+             * ⚠️ **不要设 width**（pdf.js 也不设）：
+             * 浏览器会在固定宽度盒子里排字，scaleX 的补偿就会被二次缩放抵消。
+             * 宽度完全由 scaleX 控制。
+             */
+            transform:
+              item.scaleX !== 1
+                ? `scaleX(${item.scaleX})${item.angle !== 0 ? ` rotate(${(item.angle * 180) / Math.PI}deg)` : ''}`
+                : undefined,
+            transformOrigin: 'left top',
           }}
         >
           {item.text}
         </span>
       ))}
+
+      {/*
+        endOfContent 哨兵（pdf.js 有，我们也要）。
+
+        为什么需要：在 Chrome/Safari 里，用户在**空白处**点击/拖动时，
+        选区会一路扩到文本层的末尾（选一大片空白）。
+        pdf.js 的做法是监听 `selectionchange`，把这个哨兵元素
+        **移动到当前选区边界旁边** → 选区就不会越过它。
+
+        详见 `useTextSelection` 里的 `selectionchange` 处理。
+      */}
+      <div className="scpdf-text-layer__end" />
     </div>
   );
 }

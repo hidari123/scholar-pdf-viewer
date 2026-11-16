@@ -17,7 +17,7 @@
 
 ```ts
 const available = containerWidth - 32;
-setScale(available / pageWidth);      // ← 任意小数
+setScale(available / pageWidth); // ← 任意小数
 ```
 
 容器宽 1391px、页面宽 612pt → `1359/612 = 2.2205...` → 工具栏显示 **222%**。
@@ -33,7 +33,7 @@ setScale(available / pageWidth);      // ← 任意小数
 `src/hooks/useZoom.ts:81`：
 
 ```ts
-const anchorY = container.clientHeight / 2;   // ← 锚点在视口正中
+const anchorY = container.clientHeight / 2; // ← 锚点在视口正中
 const nextScrollTop = anchoredScrollTop(scrollTop, anchorY, prevScale, clamped);
 ```
 
@@ -52,7 +52,7 @@ const nextScrollTop = anchoredScrollTop(scrollTop, anchorY, prevScale, clamped);
 // 改前
 const anchorY = container.clientHeight / 2;
 // 改后
-const anchorY = 0;   // 视口左上角
+const anchorY = 0; // 视口左上角
 ```
 
 同时 `core/store/instance.ts` 的 `anchoredScrollTop` 公式需要复核
@@ -71,9 +71,9 @@ const anchorY = 0;   // 视口左上角
 
 **方案：引入「显示比例」与「实际比例」分离**
 
-| 概念 | 值 | 用途 |
-|---|---|---|
-| `scale` | 实际渲染比例（任意小数） | 渲染几何 |
+| 概念          | 值                        | 用途                  |
+| ------------- | ------------------------- | --------------------- |
+| `scale`       | 实际渲染比例（任意小数）  | 渲染几何              |
 | `zoomPercent` | **整十数**（10/20/…/250） | 工具栏显示 + 步进基准 |
 
 但这样「适配宽度」算出的 222% 就无法精确显示。
@@ -95,7 +95,7 @@ step 量化：scale = round(scale / 0.1) * 0.1     → 220%
 
 ```ts
 // useZoom.ts 新增
-const SCALE_QUANTUM = 0.1;   // 10%
+const SCALE_QUANTUM = 0.1; // 10%
 
 function quantizeScale(scale: number): number {
   return Math.round(scale / SCALE_QUANTUM) * SCALE_QUANTUM;
@@ -204,7 +204,7 @@ export function computeVisiblePages(
   pageElements: Map<number, HTMLElement>,
   totalPages: number,
   bufferPages: number,
-): number[]
+): number[];
 ```
 
 计算方式：**直接用 `getBoundingClientRect()` 判断**，不依赖 IO。
@@ -299,7 +299,7 @@ onNavigate={(hit: SearchHit) => {
 export interface SearchHit {
   pageNumber: number;
   text: string;
-  start: number;     // 在该页文本中的字符起始位置
+  start: number; // 在该页文本中的字符起始位置
   length: number;
 }
 ```
@@ -317,9 +317,9 @@ export interface SearchHit {
 /** 把命中转成归一化矩形 */
 export function hitToRects(
   hit: SearchHit,
-  pageItems: PositionedTextItem[],   // 该页已排版的文本项
+  pageItems: PositionedTextItem[], // 该页已排版的文本项
   viewport: TextViewportLike,
-): NormRect[]
+): NormRect[];
 ```
 
 **算法**（逐 item 累加字符数，找到覆盖命中的那些 item）：
@@ -406,12 +406,12 @@ const targetScrollTop = pageTop[hit.pageNumber] + rect.y * pageHeightPx - 100;
 
 用同一页、同一相对尺寸，在两种 scale 下测内容边界：
 
-| 渲染 | 内容边界 | 左边距 | 下边距 |
-|---|---|---|---|
-| 页1 @227%（主页面） | `54,39→1281,1643` | 3.9% | 8.6% |
-| 页1 @缩略图 scale | `4,3→111,142` | 3.3% | 8.3% |
-| 页2 @227% | `163,38→1225,1701` | 11.7% | 5.3% |
-| 页2 @缩略图 scale | `13,3→106,146` | 10.8% | 5.8% |
+| 渲染                | 内容边界           | 左边距 | 下边距 |
+| ------------------- | ------------------ | ------ | ------ |
+| 页1 @227%（主页面） | `54,39→1281,1643`  | 3.9%   | 8.6%   |
+| 页1 @缩略图 scale   | `4,3→111,142`      | 3.3%   | 8.3%   |
+| 页2 @227%           | `163,38→1225,1701` | 11.7%  | 5.3%   |
+| 页2 @缩略图 scale   | `13,3→106,146`     | 10.8%  | 5.8%   |
 
 **比例完全一致** → 缩略图**没有裁切、没有拉伸变形**。
 页 2 左边距大是因为 PDF 本身有旋转的 arXiv 侧栏（占 11% 宽度）——
@@ -474,7 +474,7 @@ const ratio = Math.min(window.devicePixelRatio, 2);
 canvas.width = Math.ceil(viewport.width * ratio);
 canvas.height = Math.ceil(viewport.height * ratio);
 const context = canvas.getContext('2d');
-context.setTransform(ratio, 0, 0, ratio, 0, 0);   // ← 关键
+context.setTransform(ratio, 0, 0, ratio, 0, 0); // ← 关键
 await page.render({ canvas, canvasContext: context, viewport }).promise;
 ```
 
@@ -508,12 +508,12 @@ await page.render({ canvas, canvasContext: context, viewport }).promise;
 
 ## 实施顺序建议
 
-| 顺序 | 内容 | 理由 |
-|---|---|---|
-| 1 | **Bug 3**（白屏） | 最影响可用性，且改动会牵动 `useVisiblePages` 的架构 |
-| 2 | **Bug 2**（缩放） | 与 Bug 3 耦合（都要动缩放流程） |
-| 3 | **Bug 4**（搜索高亮） | 独立功能，但工作量最大（要新增几何计算 + 渲染） |
-| 4 | **Bug 1**（缩略图） | 影响最小，改动最简单 |
+| 顺序 | 内容                  | 理由                                                |
+| ---- | --------------------- | --------------------------------------------------- |
+| 1    | **Bug 3**（白屏）     | 最影响可用性，且改动会牵动 `useVisiblePages` 的架构 |
+| 2    | **Bug 2**（缩放）     | 与 Bug 3 耦合（都要动缩放流程）                     |
+| 3    | **Bug 4**（搜索高亮） | 独立功能，但工作量最大（要新增几何计算 + 渲染）     |
+| 4    | **Bug 1**（缩略图）   | 影响最小，改动最简单                                |
 
 ---
 

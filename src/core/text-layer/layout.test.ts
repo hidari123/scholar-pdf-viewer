@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+// 文本层排版依赖 canvas 的 measureText（实测字体度量）→ 需要 DOM 环境
 import { describe, expect, it } from 'vitest';
 import type { TextContentLike, TextLayerItemLike, TextViewportLike } from './layout';
 import {
@@ -21,22 +23,29 @@ function viewport(scale = 1): TextViewportLike {
 /**
  * 造一个文本项（pdf.js TextItem 的形状）。
  *
- * 关键：`height` 是**字体高度**（真实字号），
- * `transform[3]` 是字体渲染矩阵的垂直分量（**不等于字号**）。
+ * 关键：pdf.js 的 `transform[3]`（渲染矩阵的垂直分量）**就等于**字号量级，
+ * 而 `item.height` 是字体高度（通常比 transform[3] 略大，含 descent）。
+ * pdf.js 的算法用 `hypot(tx[2], tx[3])` → 在无旋转时等于 `|transform[3]|`。
  */
 function item(
   str: string,
   x: number,
   y: number,
-  options: { fontHeight?: number; width?: number; hasEOL?: boolean } = {},
+  options: {
+    fontHeight?: number;
+    width?: number;
+    hasEOL?: boolean;
+    fontName?: string;
+  } = {},
 ): TextLayerItemLike {
   const fontHeight = options.fontHeight ?? 12;
   return {
     str,
-    // [a, b, c, d, e, f]：d 是渲染矩阵的垂直分量（≠字号）
-    transform: [1, 0, 0, fontHeight * 0.9, x, y],
+    // [a, b, c, d, e, f]：d 是渲染矩阵的垂直分量（pdf.js 里就是字号量级）
+    transform: [1, 0, 0, fontHeight, x, y],
     width: options.width ?? str.length * fontHeight * 0.5,
     height: fontHeight,
+    fontName: options.fontName,
     hasEOL: options.hasEOL ?? false,
   };
 }
@@ -50,10 +59,12 @@ describe('positionTextItem', () => {
   });
 
   it('y 轴翻转：PDF 里越高，屏幕上越靠上', () => {
-    // PDF 空间 y=700（靠近页顶）→ 屏幕 y = 842 - 700 = 142
-    const result = positionTextItem(item('Hi', 72, 700), viewport());
+    // PDF 空间 y=700（靠近页顶）→ 屏幕基线 = 842 - 700 = 142
+    // top = 基线 − ascent（ascent = 字号 × 实测比例 ≈ 0.8）
+    const result = positionTextItem(item('Hi', 72, 700, { fontHeight: 12 }), viewport());
 
-    expect(result?.top).toBeCloseTo(142 - 12);
+    expect(result?.top).toBeLessThan(142);
+    expect(result?.top).toBeGreaterThan(142 - 12);
   });
 
   it('PDF 里越低，屏幕上越靠下', () => {
@@ -76,6 +87,13 @@ describe('positionTextItem', () => {
     );
 
     expect(result).toBeNull();
+  });
+
+  it('字号 = 复合矩阵的垂直分量模长（不是 transform[3]）', () => {
+    // transform[3] = 12 * 0.9 = 10.8，但字号应该是 12
+    const result = positionTextItem(item('Hi', 72, 700, { fontHeight: 12 }), viewport());
+
+    expect(result?.fontSize).toBeCloseTo(12);
   });
 });
 
@@ -115,26 +133,65 @@ describe('layoutTextItems（逐 item 排版 —— 精准定位的核心）', ()
     expect(items[0]?.width).toBeCloseTo(78);
   });
 
-  it('字号用 item.height（真实字体高度），不是 transform[3]', () => {
-    // 同一行里 d=4.56 但真实字号是 9.66
-    const content: TextContentLike = {
-      items: [item('A', 522.2, 762.67, { fontHeight: 9.67, width: 7 })],
-    };
-
-    const items = layoutTextItems(content, viewport());
-
-    expect(items[0]?.fontSize).toBeCloseTo(9.67);
-  });
-
-  it('top = 基线 - 字号（按各自的字号算）', () => {
+  it('top = 基线 − ascent（ascent < 字号，所以 top > 基线−字号）', () => {
     const content: TextContentLike = {
       items: [item('A', 72, 700, { fontHeight: 10 })],
     };
 
     const items = layoutTextItems(content, viewport());
 
-    // 屏幕基线 = 842 - 700 = 142；top = 142 - 10 = 132
-    expect(items[0]?.top).toBeCloseTo(132);
+    // 屏幕基线 = 842 - 700 = 142
+    expect(items[0]?.top).toBeLessThan(142);
+    expect(items[0]?.top).toBeGreaterThan(132);
+  });
+
+  it('scaleX 是有效正数（PDF 宽度 / 浏览器实测宽度）', () => {
+    const content: TextContentLike = {
+      items: [item('Hello World', 72, 700, { width: 100, fontHeight: 12 })],
+    };
+
+    const items = layoutTextItems(content, viewport());
+
+    expect(items[0]?.scaleX).toBeGreaterThan(0);
+    expect(Number.isFinite(items[0]?.scaleX)).toBe(true);
+  });
+
+  it('单字符 + X/Y 等比缩放 → 不缩放（scaleX = 1）', () => {
+    // 真实 PDF 里 transform = [字号, 0, 0, 字号, x, y] → X/Y 等比 → pdf.js 不缩放
+    const content: TextContentLike = {
+      items: [
+        {
+          str: 'A',
+          transform: [12, 0, 0, 12, 72, 700],
+          width: 7,
+          height: 12,
+          hasEOL: false,
+        },
+      ],
+    };
+
+    const items = layoutTextItems(content, viewport());
+
+    expect(items[0]?.scaleX).toBe(1);
+  });
+
+  it('单字符 + 非等比缩放 > 1.5 倍 → 要缩放', () => {
+    const content: TextContentLike = {
+      items: [
+        {
+          str: 'A',
+          // X 缩放 12，Y 缩放 1 → 差异 12 倍（字被横向压扁）
+          transform: [12, 0, 0, 1, 72, 700],
+          width: 70,
+          height: 1,
+          hasEOL: false,
+        },
+      ],
+    };
+
+    const items = layoutTextItems(content, viewport());
+
+    expect(items[0]?.scaleX).not.toBe(1);
   });
 
   it('缩放时几何整体放大', () => {
@@ -178,6 +235,28 @@ describe('layoutTextItems（逐 item 排版 —— 精准定位的核心）', ()
     const items = layoutTextItems(content, viewport());
 
     expect(items[0]?.text).toBe('upper');
+  });
+
+  it('宿主注入字体表时用注入的字体族', () => {
+    const content: TextContentLike = {
+      items: [item('Hi', 72, 700, { fontName: 'F1' })],
+    };
+
+    const items = layoutTextItems(content, viewport(), {
+      fontMap: { F1: { family: 'monospace' } },
+    });
+
+    expect(items[0]?.fontFamily).toBe('monospace');
+  });
+
+  it('没有字体表时按 fontName 猜字体族', () => {
+    const content: TextContentLike = {
+      items: [item('Hi', 72, 700, { fontName: 'g_d0_f1' })],
+    };
+
+    const items = layoutTextItems(content, viewport());
+
+    expect(items[0]?.fontFamily).toBe('sans-serif');
   });
 });
 

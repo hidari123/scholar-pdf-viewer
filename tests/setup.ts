@@ -99,9 +99,27 @@ function polyfill(): void {
       if (kind !== '2d') {
         return null;
       }
+      // 记录 font（文本层要用 measureText 实测宽度 → 必须随字号变化）
+      const state = { font: '10px sans-serif', textBaseline: 'alphabetic' };
+
       return {
         canvas: this,
-        fillStyle: '#000000',
+        get fillStyle(): string {
+          return '#000000';
+        },
+        set fillStyle(_value: string) {},
+        get font(): string {
+          return state.font;
+        },
+        set font(value: string) {
+          state.font = value;
+        },
+        get textBaseline(): string {
+          return state.textBaseline;
+        },
+        set textBaseline(value: string) {
+          state.textBaseline = value;
+        },
         fillRect: () => {},
         clearRect: () => {},
         drawImage: () => {},
@@ -113,7 +131,20 @@ function polyfill(): void {
         translate: () => {},
         setTransform: () => {},
         transform: () => {},
-        measureText: (text: string) => ({ width: text.length * 6 }),
+        /**
+         * 宽度必须随字号变化 —— 文本层的 scaleX 依赖它
+         * （`scaleX = PDF 宽度 / 浏览器实测宽度`）。
+         * 固定返回 `text.length * 6` 会让所有字号测出同一个宽度 → 缩放比失真。
+         */
+        measureText: (text: string) => {
+          const match = /(\d+(?:\.\d+)?)px/.exec(state.font);
+          const fontSize = match?.[1] ? Number.parseFloat(match[1]) : 10;
+          return {
+            width: text.length * fontSize * 0.5,
+            fontBoundingBoxAscent: fontSize * 0.8,
+            fontBoundingBoxDescent: fontSize * 0.2,
+          };
+        },
       };
     };
   }

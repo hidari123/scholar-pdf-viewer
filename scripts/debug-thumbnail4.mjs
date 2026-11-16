@@ -6,9 +6,10 @@
  *
  * 验证：打印 viewport 的所有属性，并测试"手动应用 offsetCanvas"的效果。
  */
-import { chromium } from 'playwright';
+
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
 
 function resolveChromium() {
   const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
@@ -34,8 +35,7 @@ await page.waitForTimeout(3000);
 
 const result = await page.evaluate(async () => {
   const pdfjs = await import('/node_modules/.vite/deps/pdfjs-dist.js');
-  pdfjs.GlobalWorkerOptions.workerSrc =
-    '/node_modules/pdfjs-dist/build/pdf.worker.min.mjs';
+  pdfjs.GlobalWorkerOptions.workerSrc = '/node_modules/pdfjs-dist/build/pdf.worker.min.mjs';
 
   const response = await fetch('/samples/local.pdf');
   const data = new Uint8Array(await response.arrayBuffer());
@@ -103,15 +103,21 @@ const result = await page.evaluate(async () => {
 
   const results = [];
   results.push(await measure('基线(120x156)', 120, 156, false, null));
-  results.push(await measure('canvas 精确=ceil(viewport)', Math.ceil(viewport.width), Math.ceil(viewport.height), false, null));
+  results.push(
+    await measure(
+      'canvas 精确=ceil(viewport)',
+      Math.ceil(viewport.width),
+      Math.ceil(viewport.height),
+      false,
+      null,
+    ),
+  );
 
   // 关键：viewport.transform 是 [scale,0,0,-scale,0,height]
   // 若 canvas 尺寸 != viewport 尺寸，需要按比例缩放 context
   const sx = 120 / viewport.width;
   const sy = 156 / viewport.height;
-  results.push(
-    await measure('按比例 setTransform', 120, 156, false, [sx, 0, 0, sy, 0, 0]),
-  );
+  results.push(await measure('按比例 setTransform', 120, 156, false, [sx, 0, 0, sy, 0, 0]));
 
   // 检查 viewport.transform 与 offsetCanvas
   return {

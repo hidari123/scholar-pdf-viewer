@@ -11,7 +11,17 @@
  * - 我们把每个 item 算成 CSS transform（矩阵 → 平移+缩放），铺成绝对定位的 span
  * - **坐标系**：pdf.js 的文本矩阵是 PDF 用户空间（y 轴向上），CSS 是 y 轴向下
  *   → 必须用 viewport 翻转，否则文字会上下颠倒（这是最容易踩的坑）
+ *
+ * **算法对齐 pdf.js 官方 `TextLayer`**（见 `font-metrics.ts` 的说明）：
+ * - 一个 text item 一个 span
+ * - 字号 = 复合矩阵的垂直分量模长
+ * - top = 基线 − 实测 ascent
+ * - scaleX = PDF 宽度 / 浏览器实测宽度（**选区精准的关键**）
  */
+
+import { guessFontFamily, measureAscentRatio, measureTextWidth } from './font-metrics';
+
+export * from './font-metrics';
 
 /** 文本项（pdf.js TextItem 的最小形状） */
 export interface TextLayerItemLike {
@@ -52,8 +62,8 @@ export interface TextViewportLike {
 /**
  * 排好版的**单个文本项**（一个 span）。
  *
- * 关键：每个片段都带着**自己的** left / top / width / fontSize
- * —— 这些值全部来自 PDF 的原始几何，不是浏览器估算的。
+ * 关键：每个片段都带着**自己的** left / top / fontSize / scaleX
+ * —— 这些值全部来自 PDF 的原始几何 + 浏览器实测的字体度量。
  */
 export interface PositionedTextItem {
   /** 文本内容 */
@@ -62,12 +72,40 @@ export interface PositionedTextItem {
   left: number;
   /** 上边界（px，相对页面） */
   top: number;
-  /** 宽度（px，来自 PDF 的 item.width） */
-  width: number;
-  /** 字号（px，来自 PDF 的 item.height） */
+  /** 字号（px） */
   fontSize: number;
+  /** 字体族（CSS font-family） */
+  fontFamily: string;
+  /**
+   * 横向缩放比（浏览器排版宽度 → PDF 真实宽度）。
+   *
+   * 1 = 无需缩放；≠1 时用 `transform: scaleX()` 把字形拉伸到 PDF 的宽度。
+   * **这是选区精准的关键**：PDF 内嵌字体与浏览器系统字体度量不同，
+   * 不补偿的话文字会逐渐偏移，选区框就与看到的字对不上。
+   */
+  scaleX: number;
+  /** PDF 里的真实宽度（px） */
+  width: number;
+  /** 旋转角度（rad，0 = 水平） */
+  angle: number;
   /** 是否为段末 */
   hasEOL: boolean;
+}
+
+/** 字体信息（宿主可选注入；不注入则按 fontName 猜） */
+export interface FontInfo {
+  /** CSS font-family */
+  family: string;
+  /** 是否垂直书写 */
+  vertical?: boolean;
+}
+
+/** 排版选项 */
+export interface LayoutOptions {
+  /** 字体表（fontName → 字体信息）；宿主注入 */
+  fontMap?: Record<string, FontInfo>;
+  /** 默认字体族（没有 fontMap 时用它） */
+  defaultFontFamily?: string;
 }
 
 /** 排好版的文本片段（按行合并的旧形态，仅用于不需要精确位置的场景） */
@@ -87,83 +125,153 @@ export interface PositionedText {
 }
 
 /**
- * 把文本矩阵换算成 CSS 的 left/top/fontSize/width。
+ * 把文本矩阵换算成 CSS 的 left/top/fontSize/scaleX。
  *
- * 推导（PDF 用户空间 y 向上 → CSS y 向下）：
- *   文本矩阵 [a, b, c, d, e, f]：
- *     - (e, f) = 文本基线起点（PDF 空间）
+ * **算法完全对齐 pdf.js 的 `TextLayer.#appendText()` + `#layout()`**
+ * （`pdfjs-dist` v6 `build/pdf.mjs:15193-15230` 与 `:15836-15852`）。
  *
- *   视口矩阵把 PDF 点映射到屏幕 px：
- *     x' = a*x + c*y + e；y' = b*x + d*y + f（PDF.js 的矩阵乘法约定）
- *     视口矩阵的 vb 为**负**（y 轴翻转）
- *
- *   **字号用 item.height（pdf.js 提供的字体高度），不用 transform[3]**：
- *   transform[3] 是字体**渲染矩阵**的垂直分量，包含了字体的 ascent/descent 缩放，
- *   **不等于字号**。实测同一段正文里，transform[3] 会是 4.56，而真实字号是 9.66。
- *
- *   **宽度用 item.width（PDF 里的真实字宽），不让浏览器估算**：
- *   浏览器按系统字体算宽度，与 PDF 内嵌字体不同 → 选区框就会与看到的字错位。
+ * 推导：
+ *   1. **复合矩阵** tx = viewport.transform ∘ item.transform
+ *      （pdf.js: `Util.transform(this.#transform, geom.transform)`）
+ *   2. **字号** fontHeight = hypot(tx[2], tx[3])（复合矩阵的垂直分量模长）
+ *   3. **ascent** fontAscent = fontHeight × 实测的 ascent 比例
+ *   4. **位置** left = tx[4]；top = tx[5] − fontAscent
+ *      （用 ascent 不用 fontHeight：浏览器的行盒是从基线到 ascent 决定的）
+ *   5. **scaleX** = (PDF 真实宽度 × 视口缩放) / 浏览器实测宽度
+ *      → 用 `transform: scaleX()` 把字形拉伸到 PDF 的宽度
+ *      → **这是选区精准的关键**（PDF 内嵌字体 ≠ 浏览器系统字体）
  *
  * @param item 文本项
  * @param viewport 视口
+ * @param options 排版选项（字体表）
  * @returns 排版后的片段（无法定位时返回 null）
  */
 export function positionTextItem(
   item: TextLayerItemLike,
   viewport: TextViewportLike,
+  options: LayoutOptions = {},
 ): PositionedTextItem | null {
   const transform = item.transform;
   if (!transform || transform.length < 6) {
     return null;
   }
 
-  // 只取需要的分量：(e, f) = 基线起点
-  const [, , , , e, f] = transform as [number, number, number, number, number, number];
+  const itemTransform = transform as [number, number, number, number, number, number];
+  const viewportTransform = viewport.transform as [number, number, number, number, number, number];
 
-  // 视口变换：把 PDF 点变成屏幕 px
-  const [va, vb, vc, vd, ve, vf] = viewport.transform as [
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
+  /**
+   * 复合矩阵：tx = viewport ∘ item
+   *
+   * PDF.js 的 `Util.transform(m1, m2)` 约定：
+   *   tx[0] = m1[0]*m2[0] + m1[2]*m2[1]
+   *   tx[1] = m1[1]*m2[0] + m1[3]*m2[1]
+   *   tx[2] = m1[0]*m2[2] + m1[2]*m2[3]
+   *   tx[3] = m1[1]*m2[2] + m1[3]*m2[3]
+   *   tx[4] = m1[0]*m2[4] + m1[2]*m2[5] + m1[4]
+   *   tx[5] = m1[1]*m2[4] + m1[3]*m2[5] + m1[5]
+   */
+  const [ia, ib, ic, id_, ie, if_] = itemTransform;
+  const [va, vb, vc, vd, ve, vf] = viewportTransform;
+
+  const tx: [number, number, number, number, number, number] = [
+    va * ia + vc * ib,
+    vb * ia + vd * ib,
+    va * ic + vc * id_,
+    vb * ic + vd * id_,
+    va * ie + vc * if_ + ve,
+    vb * ie + vd * if_ + vf,
   ];
 
-  /**
-   * 用视口矩阵变换基线点 (e, f)。
-   * x' = a*x + c*y + e；y' = b*x + d*y + f（PDF.js 的矩阵乘法约定）
-   */
-  const originX = va * e + vc * f + ve;
-  const originY = vb * e + vd * f + vf;
+  /** 旋转角（rad） */
+  const angle = Math.atan2(tx[1], tx[0]);
 
-  /**
-   * 视口缩放（2D 模长）。
-   *
-   * 注意：视口矩阵的 vb 是**负的**（y 轴翻转），所以必须用 hypot 取模长，
-   * 直接乘 vb 会得到负值。
-   */
+  /** 字体族 */
+  const fontInfo = item.fontName ? options.fontMap?.[item.fontName] : undefined;
+  const fontFamily =
+    fontInfo?.family ?? options.defaultFontFamily ?? guessFontFamily(item.fontName);
+
+  /** 字号：复合矩阵的垂直分量模长（pdf.js: hypot(tx[2], tx[3])） */
+  const fontHeight = Math.hypot(tx[2], tx[3]);
+
+  if (!Number.isFinite(fontHeight) || fontHeight <= 0) {
+    return null;
+  }
+
+  /** ascent（浏览器实测的比例） */
+  const fontAscent = fontHeight * measureAscentRatio(fontFamily);
+
+  /** 位置 */
+  const left = tx[4];
+  const top = tx[5] - fontAscent;
+
+  /** 视口缩放（2D 模长） */
   const viewportScale = Math.hypot(va, vb) || Math.hypot(vc, vd) || 1;
 
-  /** 字号：PDF 的字体高度 × 视口缩放 */
-  const fontSize = item.height * viewportScale;
+  /** PDF 里的真实宽度（px） */
+  const pdfWidth = item.width * viewportScale;
 
-  /** 宽度：PDF 的真实字宽 × 视口缩放 */
-  const width = item.width * viewportScale;
+  /**
+   * scaleX：把浏览器排出来的宽度拉伸到 PDF 的宽度。
+   *
+   * 与 pdf.js 一致：
+   * - pdf.js: `transform = scaleX(canvasWidth * scale / width)`
+   * - 这里 canvasWidth 用 item.width（PDF 里的字宽），scale 是视口缩放
+   *
+   * **单字符且无变形时不缩放**（pdf.js 的 `shouldScaleText` 判断）：
+   * scaleX=1 时没必要；单字符做 scaleX 反而会引入舍入误差。
+   */
+  let scaleX = 1;
+  const shouldScale = item.str.length > 1 || needsScaleForSingleChar(item);
 
-  if (!Number.isFinite(fontSize) || fontSize <= 0) {
-    return null;
+  if (shouldScale && pdfWidth > 0) {
+    const browserWidth = measureTextWidth(item.str, fontFamily, fontHeight);
+    if (browserWidth > 0) {
+      scaleX = pdfWidth / browserWidth;
+    }
   }
 
   return {
     text: item.str,
-    left: originX,
-    // 文本基线在 top + fontSize 处 → top = originY - fontSize
-    top: originY - fontSize,
-    width: Number.isFinite(width) && width > 0 ? width : 0,
-    fontSize,
+    left,
+    top,
+    fontSize: fontHeight,
+    fontFamily,
+    scaleX,
+    width: pdfWidth,
+    angle,
     hasEOL: item.hasEOL === true,
   };
+}
+
+/**
+ * 单字符是否需要 scaleX（对齐 pdf.js 的 `shouldScaleText` 判断）。
+ *
+ * pdf.js 的规则：
+ * - 多字符 → 要缩放
+ * - 单字符 + 非空格 + X/Y 缩放不等且差异 > 1.5 倍 → 要缩放
+ *
+ * @param item 文本项
+ * @returns 是否需要缩放
+ */
+function needsScaleForSingleChar(item: TextLayerItemLike): boolean {
+  if (item.str.length > 1 || item.str === ' ') {
+    return false;
+  }
+
+  const transform = item.transform;
+  if (!transform || transform.length < 4) {
+    return false;
+  }
+
+  const absScaleX = Math.abs(transform[0] ?? 0);
+  const absScaleY = Math.abs(transform[3] ?? 0);
+  if (absScaleX === absScaleY) {
+    return false;
+  }
+
+  const max = Math.max(absScaleX, absScaleY);
+  const min = Math.min(absScaleX, absScaleY);
+  return min > 0 && max / min > 1.5;
 }
 
 /**
@@ -181,11 +289,13 @@ export function positionTextItem(
  *
  * @param content 文本内容
  * @param viewport 视口
+ * @param options 排版选项
  * @returns 排版后的片段列表（一个 item 一个）
  */
 export function layoutTextItems(
   content: TextContentLike,
   viewport: TextViewportLike,
+  options: LayoutOptions = {},
 ): PositionedTextItem[] {
   const positioned: PositionedTextItem[] = [];
 
@@ -194,7 +304,7 @@ export function layoutTextItems(
       continue;
     }
 
-    const result = positionTextItem(item, viewport);
+    const result = positionTextItem(item, viewport, options);
     if (!result) {
       continue;
     }
@@ -228,8 +338,9 @@ export function layoutTextItems(
 export function layoutTextContent(
   content: TextContentLike,
   viewport: TextViewportLike,
+  options: LayoutOptions = {},
 ): PositionedText[] {
-  return groupByLine(content, viewport);
+  return groupByLine(content, viewport, options);
 }
 
 /**
@@ -241,9 +352,14 @@ export function layoutTextContent(
  *
  * @param content 文本内容
  * @param viewport 视口
+ * @param options 排版选项
  * @returns 行片段列表
  */
-function groupByLine(content: TextContentLike, viewport: TextViewportLike): PositionedText[] {
+function groupByLine(
+  content: TextContentLike,
+  viewport: TextViewportLike,
+  options: LayoutOptions = {},
+): PositionedText[] {
   const lines: PositionedText[] = [];
   let current: PositionedText | null = null;
 
@@ -252,7 +368,7 @@ function groupByLine(content: TextContentLike, viewport: TextViewportLike): Posi
       continue;
     }
 
-    const positioned = positionTextItem(item, viewport);
+    const positioned = positionTextItem(item, viewport, options);
     if (!positioned) {
       continue;
     }

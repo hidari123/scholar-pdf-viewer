@@ -198,18 +198,24 @@
 }
 
 /* ---------- 文本层（透明文字，供选中/复制） ---------- */
+/*
+ * 规则对齐 pdf.js 官方 TextLayer.css（react-pdf 也直接用它）：
+ * - text-align: initial —— 防止继承宿主的 text-align 导致绝对定位的 span 偏移
+ * - text-size-adjust: none —— 防止移动端字体自动放大
+ * - forced-color-adjust: none —— 强制颜色模式（高对比度）下不改文字颜色
+ * - transform-origin: 0 0 —— scaleX 从左边界拉伸
+ */
 
 .scpdf-text-layer {
   position: absolute;
   inset: 0;
   /* 不能 overflow:hidden —— 会裁掉超出页面的 item（页眉/页脚边缘） */
   overflow: visible;
-  /*
-   * opacity 不用（会让选中高亮也变淡）：
-   * 文字本身已经是 transparent，够"看不见"了；
-   * 选中高亮由 ::selection 单独给色。
-   */
   line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
   /* 允许选中（这是文本层存在的全部意义） */
   user-select: text;
   -webkit-user-select: text;
@@ -224,7 +230,8 @@
    * pre：保留 PDF 里的连续空格与换行（否则被折叠 → 文字挤压 → 选区偏移）
    */
   white-space: pre;
-  transform-origin: left top;
+  margin: 0;
+  transform-origin: 0 0;
   /* 选区高亮要能看见 → 用主题色 */
   caret-color: var(--scpdf-color-primary);
   /* 不参与布局（绝对定位已足够），避免撑开容器影响滚动 */
@@ -234,6 +241,24 @@
 /* 选区颜色跟随主题 */
 .scpdf-text-layer ::selection {
   background: rgba(47, 84, 235, 0.28);
+}
+
+/*
+ * endOfContent 哨兵（对齐 pdf.js 的 .endOfContent）。
+ *
+ * 它是一个"不可选中的空白区"，用来限制选区的扩张范围：
+ * 在 Chrome/Safari 里，用户在页面空白处拖动时，选区会一路扩到
+ * 文本层末尾。pdf.js 监听 selectionchange，把这个哨兵挪到
+ * 选区边界旁边 → 选区就不会越过它。
+ */
+.scpdf-text-layer__end {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: -1;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* ---------- 标注层（高亮 / 链接） ---------- */

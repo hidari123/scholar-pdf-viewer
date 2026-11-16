@@ -6,9 +6,10 @@
  * 2) 页占位元素的 top 是否与 pageTops 一致
  * 3) canvas 是否已渲染（有内容）
  */
-import { chromium } from 'playwright';
+
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
 
 function resolveChromium() {
   const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
@@ -38,7 +39,9 @@ await page.waitForSelector('.scpdf-page canvas.scpdf-canvas', { timeout: 30000 }
 
 async function snapshot(label) {
   const data = await page.evaluate(() => {
-    const scroller = document.querySelector('.scpdf-scroll') ?? document.querySelector('[data-testid="pdf-viewer"]');
+    const scroller =
+      document.querySelector('.scpdf-scroll') ??
+      document.querySelector('[data-testid="pdf-viewer"]');
     const pages = [...document.querySelectorAll('.scpdf-page')];
     const container = scroller;
 
@@ -80,19 +83,15 @@ async function snapshot(label) {
   const blank = data.pageStates.filter(
     (p) => data.inViewport.includes(p.n) && (!p.hasCanvas || p.canvasW === 0),
   );
-  const noText = data.pageStates.filter(
-    (p) => data.inViewport.includes(p.n) && p.textItems === 0,
-  );
+  const noText = data.pageStates.filter((p) => data.inViewport.includes(p.n) && p.textItems === 0);
 
   console.log(`\n=== ${label} ===`);
-  console.log(`scrollTop=${data.scrollTop} scrollHeight=${data.scrollHeight} clientH=${data.clientHeight}`);
+  console.log(
+    `scrollTop=${data.scrollTop} scrollHeight=${data.scrollHeight} clientH=${data.clientHeight}`,
+  );
   console.log(`视口内页: [${data.inViewport.join(',')}]`);
-  console.log(
-    `视口内无 canvas 的页: ${blank.length ? blank.map((b) => b.n).join(',') : '无'}`,
-  );
-  console.log(
-    `视口内无文本层的页: ${noText.length ? noText.map((b) => b.n).join(',') : '无'}`,
-  );
+  console.log(`视口内无 canvas 的页: ${blank.length ? blank.map((b) => b.n).join(',') : '无'}`);
+  console.log(`视口内无文本层的页: ${noText.length ? noText.map((b) => b.n).join(',') : '无'}`);
   console.log('视口内各页详情:');
   for (const p of data.pageStates.filter((s) => data.inViewport.includes(s.n))) {
     console.log(

@@ -1,18 +1,18 @@
 /**
- * E2E：选区精准性验证。
+ * E2E：选区精准性验证（对齐 pdf.js 的做法）。
  *
- * 核心断言：**选中的框必须落在 canvas 真实文字上**。
- *
- * 验证方法（不依赖肉眼）：
- * 1) 在 canvas 上按 PDF 的文字位置画标记（从 pdf.js 的 text item 拿坐标）
- * 2) 拖选文字，拿到选区的 client rect
- * 3) 检查选区 rect 与 canvas 上该文字的**理论位置**是否一致
- *
- * 更稳的做法：比较"选区 rect 的相对位置"与"该 text item 的 PDF 坐标 × scale"
+ * 核心断言：
+ * 1. 文本层按 item 逐个定位（不是按行合并）
+ * 2. scaleX 已应用（横向拉伸到 PDF 宽度）
+ * 3. **span 的渲染宽度 ≈ PDF 真实宽度**（scaleX 生效的证明）
+ * 4. 选区起点与文字起点吻合
+ * 5. **选区不能超出被选文字的范围**（scaleX 后仍然成立）
+ * 6. 选整页不被丢弃（老 scholar-club 用 width<pageWidth 过滤会丢）
  */
-import { chromium } from 'playwright';
+
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
 
 function resolveChromium() {
   const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
@@ -28,7 +28,7 @@ function resolveChromium() {
   return undefined;
 }
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:5186';
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:5187';
 const results = [];
 function check(name, ok, detail = '') {
   results.push({ name, ok });
@@ -45,58 +45,77 @@ try {
   await page.waitForSelector('.scpdf-text-layer__item', { timeout: 30000 });
   await page.waitForTimeout(1500);
 
-  // ---- 1. 每个 span 的位置必须与 PDF 原始坐标一致 ----
-  const align = await page.evaluate(() => {
-    const layer = document.querySelector('.scpdf-text-layer');
-    const spans = [...layer.querySelectorAll('.scpdf-text-layer__item')];
-
-    // 找一个正文里的 span（宽度合理、非页眉）
-    const candidates = spans.filter((s) => {
-      const r = s.getBoundingClientRect();
-      return r.width > 100 && r.width < 400 && r.height > 5;
+  // ---- 1. 文本层结构 ----
+  const structure = await page.evaluate(() => {
+    const spans = [...document.querySelectorAll('.scpdf-text-layer__item')];
+    const withScale = spans.filter((s) => {
+      const t = s.style.transform ?? '';
+      return t.includes('scaleX');
     });
-
-    if (candidates.length === 0) return { error: 'no candidate' };
-
-    const el = candidates[0];
-    const r = el.getBoundingClientRect();
-    const pageEl = el.closest('.scpdf-page');
-    const pr = pageEl.getBoundingClientRect();
-
     return {
-      text: (el.textContent ?? '').slice(0, 30),
-      // 相对页面的坐标（= PDF 坐标 × scale）
-      relLeft: Math.round((r.left - pr.left) * 10) / 10,
-      relTop: Math.round((r.top - pr.top) * 10) / 10,
-      width: Math.round(r.width * 10) / 10,
-      // 关键：span 的显式宽度是否等于其渲染宽度（PDF 宽度被强制生效）
-      styleWidth: el.style.width,
-      renderWidth: Math.round(r.width * 10) / 10,
-      // 是否所有 span 都有独立位置（没有重叠成一行）
-      totalSpans: spans.length,
+      total: spans.length,
+      withScale: withScale.length,
+      hasEnd: document.querySelectorAll('.scpdf-text-layer__end').length,
+      // 不同位置的 span（有各自的 left）→ 证明是逐 item 定位
+      distinctLefts: new Set(spans.map((s) => s.style.left)).size,
     };
   });
 
-  check('文本层按 item 逐个定位', !align.error, align.error ?? `${align.totalSpans} 个 span`);
   check(
-    'span 显式宽度已设置（PDF 真实字宽）',
-    Boolean(align.styleWidth) && align.styleWidth !== '',
-    `style.width=${align.styleWidth} 实际=${align.renderWidth}`,
+    '文本层按 item 逐个定位',
+    structure.distinctLefts > structure.total * 0.5,
+    `${structure.total} 个 span, ${structure.distinctLefts} 个不同 left`,
   );
   check(
-    '渲染宽度 ≈ PDF 宽度（误差 < 15%）',
-    align.styleWidth
-      ? Math.abs(align.renderWidth - parseFloat(align.styleWidth)) /
-          Math.max(1, parseFloat(align.styleWidth)) <
-        0.15
-      : false,
-    `PDF 宽 ${align.styleWidth} vs 渲染宽 ${align.renderWidth}`,
+    'scaleX 已应用（横向拉伸到 PDF 宽度）',
+    structure.withScale > 0,
+    `${structure.withScale}/${structure.total} 个 span 有 scaleX`,
+  );
+  check('endOfContent 哨兵存在', structure.hasEnd >= 1, `${structure.hasEnd} 个`);
+
+  // ---- 2. scaleX 生效的证明：渲染宽度 ≈ PDF 宽度 ----
+  // 做法：把 span 的 scaleX 去掉 → 得到浏览器原始排版宽度；
+  //       保留 transform → 得到拉伸后的宽度。
+  //       两者之比应该等于 scaleX。
+  const scaleCheck = await page.evaluate(() => {
+    const spans = [...document.querySelectorAll('.scpdf-text-layer__item')];
+    const target = spans.find((s) => {
+      const t = s.style.transform ?? '';
+      return t.includes('scaleX') && (s.textContent ?? '').trim().length > 8;
+    });
+    if (!target) return { error: 'no target' };
+
+    const transform = target.style.transform;
+    const scaledWidth = target.getBoundingClientRect().width;
+
+    // 去掉 scaleX → 浏览器原始排版宽度
+    target.style.transform = transform.replace(/scaleX\([^)]*\)\s*/, '');
+    const rawWidth = target.getBoundingClientRect().width;
+    target.style.transform = transform;
+
+    const scaleMatch = /scaleX\(([\d.]+)\)/.exec(transform);
+
+    return {
+      text: (target.textContent ?? '').slice(0, 30),
+      scaleX: scaleMatch?.[1] ? Number.parseFloat(scaleMatch[1]) : 0,
+      scaledWidth: Math.round(scaledWidth * 100) / 100,
+      rawWidth: Math.round(rawWidth * 100) / 100,
+    };
+  });
+
+  check(
+    'scaleX 与实测宽度比一致（拉伸真的生效了）',
+    !scaleCheck.error &&
+      scaleCheck.rawWidth > 0 &&
+      Math.abs(scaleCheck.scaledWidth / scaleCheck.rawWidth - scaleCheck.scaleX) < 0.02,
+    scaleCheck.error
+      ? scaleCheck.error
+      : `scaleX=${scaleCheck.scaleX} 实测 ${scaleCheck.rawWidth}→${scaleCheck.scaledWidth}px`,
   );
 
-  // ---- 2. 选区 rect 必须与被选 span 的位置吻合 ----
+  // ---- 3. 选区几何 ----
   const selection = await page.evaluate(() => {
     const spans = [...document.querySelectorAll('.scpdf-text-layer__item')];
-    // 找一个足够长的 span
     const target = spans.find((el) => (el.textContent ?? '').trim().length > 15);
     if (!target) return { error: 'no target' };
 
@@ -112,46 +131,62 @@ try {
     sel.addRange(range);
 
     const rects = [...range.getClientRects()].map((r) => ({
-      left: Math.round(r.left * 10) / 10,
-      top: Math.round(r.top * 10) / 10,
-      width: Math.round(r.width * 10) / 10,
-      height: Math.round(r.height * 10) / 10,
+      left: Math.round(r.left * 100) / 100,
+      top: Math.round(r.top * 100) / 100,
+      width: Math.round(r.width * 100) / 100,
+      height: Math.round(r.height * 100) / 100,
     }));
 
     const targetRect = target.getBoundingClientRect();
 
     return {
       selectedText: sel.toString(),
-      targetText: (target.textContent ?? '').slice(0, 30),
       targetRect: {
-        left: Math.round(targetRect.left * 10) / 10,
-        top: Math.round(targetRect.top * 10) / 10,
-        width: Math.round(targetRect.width * 10) / 10,
-        height: Math.round(targetRect.height * 10) / 10,
+        left: Math.round(targetRect.left * 100) / 100,
+        top: Math.round(targetRect.top * 100) / 100,
+        width: Math.round(targetRect.width * 100) / 100,
+        height: Math.round(targetRect.height * 100) / 100,
       },
       rects,
     };
   });
 
-  check('能选中文本', !selection.error && Boolean(selection.selectedText), selection.error ?? selection.selectedText);
+  check(
+    '能选中文本',
+    !selection.error && Boolean(selection.selectedText),
+    selection.error ?? selection.selectedText,
+  );
 
   if (selection.rects && selection.rects.length > 0) {
     const rect = selection.rects[0];
-    // 选区应在 span 的范围内（left 起点接近，宽度不超过）
     const leftDelta = Math.abs(rect.left - selection.targetRect.left);
     const widthRatio = rect.width / Math.max(1, selection.targetRect.width);
 
-    check(
-      '选区起点与被选文字起点吻合（< 3px）',
-      leftDelta < 3,
-      `Δ=${leftDelta.toFixed(1)}px`,
-    );
+    check('选区起点与被选文字起点吻合（< 1px）', leftDelta < 1, `Δ=${leftDelta.toFixed(2)}px`);
     check(
       '选区宽度不超过被选文字宽度',
       widthRatio <= 1.02,
       `选区 ${rect.width} vs 文字 ${selection.targetRect.width}`,
     );
   }
+
+  // ---- 4. 整页选中不被丢弃（老 scholar-club 的 bug）----
+  const fullPage = await page.evaluate(() => {
+    const layer = document.querySelector('.scpdf-text-layer');
+    if (!layer) return { error: 'no layer' };
+
+    const range = document.createRange();
+    range.selectNodeContents(layer);
+
+    const rects = [...range.getClientRects()].filter((r) => r.width > 0 && r.height > 0);
+    return { count: rects.length, textLength: range.toString().length };
+  });
+
+  check(
+    '选整页不被丢弃（老 scholar-club 用 width<pageWidth 过滤会丢）',
+    !fullPage.error && fullPage.count > 0,
+    fullPage.error ?? `${fullPage.count} 个 rect, ${fullPage.textLength} 字符`,
+  );
 
   await page.screenshot({ path: 'e2e-shots/selection.png' });
 

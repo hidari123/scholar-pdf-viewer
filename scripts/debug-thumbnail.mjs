@@ -6,9 +6,10 @@
  * 2) 缩略图渲染的 scale vs 主页面渲染的 scale
  * 3) 缩略图 canvas 的像素尺寸 vs CSS 尺寸（DPR 问题）
  */
-import { chromium } from 'playwright';
+
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
 
 function resolveChromium() {
   const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
