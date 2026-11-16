@@ -527,6 +527,10 @@ export function PdfViewer(props: PdfViewerProps) {
    * 必须在**容器有宽度**之后才能算准；只做一次（之后由用户控制）→ ref 记住是否已执行。
    */
   const initialScaleAppliedRef = useRef(false);
+
+  /** 初始适配宽度算出的比例（用来区分"用户手动缩放"） */
+  const initialFitScaleRef = useRef<number | null>(null);
+
   useEffect(() => {
     // 只在 initialScale === 'width' 时做适配宽度；数字初始值直接用
     if (initialScale !== 'width' || initialScaleAppliedRef.current) {
@@ -540,7 +544,9 @@ export function PdfViewer(props: PdfViewerProps) {
     initialScaleAppliedRef.current = true;
     const pt = pageSizesPt[0] ?? { width: PAGE_WIDTH_PT, height: PAGE_HEIGHT_PT };
     zoom.fitWidth(container.clientWidth, pt.width);
-  }, [initialScale, numPages, pageSizesPt, zoom]);
+    // 记下适配出的比例（后面用来判断用户是否手动缩放过）
+    initialFitScaleRef.current = scale;
+  }, [initialScale, numPages, pageSizesPt, zoom, scale]);
 
   /**
    * 容器宽度变化时重新适配宽度（仅当用户没有手动缩放过）。
@@ -555,7 +561,8 @@ export function PdfViewer(props: PdfViewerProps) {
 
   useEffect(() => {
     // 用户手动缩放 → 标记，之后不再自动适配
-    if (initialScaleAppliedRef.current) {
+    // （scale 变化说明用户动过缩放；但初始适配也会触发一次 → 用标记区分）
+    if (scale !== initialFitScaleRef.current) {
       userZoomedRef.current = true;
     }
   }, [scale]);
