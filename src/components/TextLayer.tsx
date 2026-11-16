@@ -5,16 +5,19 @@
  * - 浏览器原生选中/复制 → 不用自己实现选区
  * - 文字透明 → 用户看到的是 canvas 上的真实渲染
  *
- * 关键细节：
- * - 字体大小用 `transform: scaleX()` 精确拉伸到 PDF 的宽度（而不是靠 letter-spacing）
- *   → 选中高亮的框能精确贴合字形
- * - `user-select: text` + `pointer-events: none`？
- *   → **不能**加 pointer-events:none，否则选不中；但要保证不影响标注层点击
+ * 关键设计（决定了选区准不准）：
+ * - **一个 pdf.js text item 一个 span**：PDF 里一行由多个 item 组成，
+ *   每个 item 有自己的 x 位置和字号。合并成一行一个 span 会导致
+ *   "选中的框"与"看到的字"错位（用户报的核心 bug）
+ * - **显式设 width**：用 PDF 的真实字宽，不用浏览器按系统字体估算
+ *   （浏览器算的宽度与 PDF 内嵌字体不同 → 选区框偏移）
+ * - **字号用 item.height**：不用 transform[3]（那是渲染矩阵，不是字号）
+ * - **white-space: pre**：保留 PDF 里的连续空格（否则被折叠 → 文字挤压）
  */
 
 import { useMemo } from 'react';
 import type { TextContentLike, TextViewportLike } from '../core/text-layer/layout';
-import { layoutTextContent } from '../core/text-layer/layout';
+import { layoutTextItems } from '../core/text-layer/layout';
 
 /** TextLayer 参数 */
 export interface TextLayerProps {
@@ -22,8 +25,6 @@ export interface TextLayerProps {
   content: TextContentLike | null;
   /** 视口 */
   viewport: TextViewportLike | null;
-  /** 字号缩放（字符宽度压缩比，用于精确对齐） */
-  charScale?: number;
 }
 
 /**
@@ -31,40 +32,38 @@ export interface TextLayerProps {
  *
  * @param props 参数
  */
-export function TextLayer({ content, viewport, charScale = 1 }: TextLayerProps) {
-  /** 排版后的行片段 */
-  const lines = useMemo(() => {
+export function TextLayer({ content, viewport }: TextLayerProps) {
+  /** 排版后的文本项（一个 item 一个） */
+  const items = useMemo(() => {
     if (!content || !viewport) {
       return [];
     }
-    return layoutTextContent(content, viewport);
+    return layoutTextItems(content, viewport);
   }, [content, viewport]);
 
-  if (lines.length === 0) {
+  if (items.length === 0) {
     return null;
   }
 
   return (
     <div className="scpdf-text-layer" aria-hidden="true">
-      {lines.map((line) => (
+      {items.map((item, index) => (
         <span
           /*
            * key 用"位置 + 文本"而不是数组下标：
-           * 下标在重新排版后会指向不同的行 → React 复用错节点 → 文字错位。
-           * 位置（left/top）在一页内唯一且稳定。
+           * 下标在重新排版后会指向不同的 item → React 复用错节点 → 文字错位。
            */
-          key={`${line.left}-${line.top}-${line.text.slice(0, 12)}`}
+          key={`${item.left}-${item.top}-${item.text.slice(0, 12)}-${index}`}
           className="scpdf-text-layer__item"
           style={{
-            left: `${line.left}px`,
-            top: `${line.top}px`,
-            fontSize: `${line.fontSize}px`,
-            // 横向拉伸到 PDF 的真实宽度（等宽近似 + 缩放最稳）
-            transform: `scaleX(${charScale})`,
-            transformOrigin: 'left top',
+            left: `${item.left}px`,
+            top: `${item.top}px`,
+            fontSize: `${item.fontSize}px`,
+            // 显式宽度：用 PDF 的真实字宽 → 选区框与文字严格对齐
+            width: item.width > 0 ? `${item.width}px` : undefined,
           }}
         >
-          {line.text}
+          {item.text}
         </span>
       ))}
     </div>

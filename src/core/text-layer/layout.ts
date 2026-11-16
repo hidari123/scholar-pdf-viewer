@@ -49,7 +49,28 @@ export interface TextViewportLike {
   transform: number[];
 }
 
-/** 排好版的文本片段 */
+/**
+ * 排好版的**单个文本项**（一个 span）。
+ *
+ * 关键：每个片段都带着**自己的** left / top / width / fontSize
+ * —— 这些值全部来自 PDF 的原始几何，不是浏览器估算的。
+ */
+export interface PositionedTextItem {
+  /** 文本内容 */
+  text: string;
+  /** 左边界（px，相对页面） */
+  left: number;
+  /** 上边界（px，相对页面） */
+  top: number;
+  /** 宽度（px，来自 PDF 的 item.width） */
+  width: number;
+  /** 字号（px，来自 PDF 的 item.height） */
+  fontSize: number;
+  /** 是否为段末 */
+  hasEOL: boolean;
+}
+
+/** 排好版的文本片段（按行合并的旧形态，仅用于不需要精确位置的场景） */
 export interface PositionedText {
   /** 文本 */
   text: string;
@@ -66,20 +87,22 @@ export interface PositionedText {
 }
 
 /**
- * 把文本矩阵换算成 CSS 的 left/top/fontSize。
+ * 把文本矩阵换算成 CSS 的 left/top/fontSize/width。
  *
  * 推导（PDF 用户空间 y 向上 → CSS y 向下）：
  *   文本矩阵 [a, b, c, d, e, f]：
- *     - 水平缩放 = a
- *     - 垂直缩放 = d（通常为 0）
- *     - 水平倾斜 = b
- *     - 垂直倾斜 = c
  *     - (e, f) = 文本基线起点（PDF 空间）
  *
  *   视口矩阵把 PDF 点映射到屏幕 px：
- *     x' = e_pdf + a_pdf * scale   （y 翻转：y' = height - f_pdf * scale）
+ *     x' = a*x + c*y + e；y' = b*x + d*y + f（PDF.js 的矩阵乘法约定）
+ *     视口矩阵的 vb 为**负**（y 轴翻转）
  *
- *   字体大小 = |d| * scale（基线到顶部的距离）
+ *   **字号用 item.height（pdf.js 提供的字体高度），不用 transform[3]**：
+ *   transform[3] 是字体**渲染矩阵**的垂直分量，包含了字体的 ascent/descent 缩放，
+ *   **不等于字号**。实测同一段正文里，transform[3] 会是 4.56，而真实字号是 9.66。
+ *
+ *   **宽度用 item.width（PDF 里的真实字宽），不让浏览器估算**：
+ *   浏览器按系统字体算宽度，与 PDF 内嵌字体不同 → 选区框就会与看到的字错位。
  *
  * @param item 文本项
  * @param viewport 视口
@@ -88,14 +111,14 @@ export interface PositionedText {
 export function positionTextItem(
   item: TextLayerItemLike,
   viewport: TextViewportLike,
-): PositionedText | null {
+): PositionedTextItem | null {
   const transform = item.transform;
   if (!transform || transform.length < 6) {
     return null;
   }
 
-  // 只取需要的分量：d = 字号，(e, f) = 基线起点
-  const [, , , d, e, f] = transform as [number, number, number, number, number, number];
+  // 只取需要的分量：(e, f) = 基线起点
+  const [, , , , e, f] = transform as [number, number, number, number, number, number];
 
   // 视口变换：把 PDF 点变成屏幕 px
   const [va, vb, vc, vd, ve, vf] = viewport.transform as [
@@ -115,18 +138,18 @@ export function positionTextItem(
   const originY = vb * e + vd * f + vf;
 
   /**
-   * 字体大小（屏幕 px）。
-   *
-   * 推导：
-   * - 文本矩阵的垂直分量 d = 字体的字号（PDF 用户空间）
-   * - 视口矩阵把它放大 `viewportScale` 倍（= hypot(va, vb)，视口矩阵的 2D 缩放）
-   * → 屏幕字号 = |d| × viewportScale
+   * 视口缩放（2D 模长）。
    *
    * 注意：视口矩阵的 vb 是**负的**（y 轴翻转），所以必须用 hypot 取模长，
-   * 直接乘 vb 会得到负字号。
+   * 直接乘 vb 会得到负值。
    */
   const viewportScale = Math.hypot(va, vb) || Math.hypot(vc, vd) || 1;
-  const fontSize = Math.abs(d) * viewportScale;
+
+  /** 字号：PDF 的字体高度 × 视口缩放 */
+  const fontSize = item.height * viewportScale;
+
+  /** 宽度：PDF 的真实字宽 × 视口缩放 */
+  const width = item.width * viewportScale;
 
   if (!Number.isFinite(fontSize) || fontSize <= 0) {
     return null;
@@ -137,9 +160,58 @@ export function positionTextItem(
     left: originX,
     // 文本基线在 top + fontSize 处 → top = originY - fontSize
     top: originY - fontSize,
+    width: Number.isFinite(width) && width > 0 ? width : 0,
     fontSize,
     hasEOL: item.hasEOL === true,
   };
+}
+
+/**
+ * 逐 item 排版（**精准定位的核心**）。
+ *
+ * 为什么不能"按行合并成一个 span"：
+ * - PDF 里一行由**多个 item** 组成，每个 item 有**自己的 x 位置和字号**
+ *   （实测同一行有 x=72.78 / 96.62 / 112.38，字号 6.78 / 6.78 / 4.56）
+ * - 合并成一个 span 后，span 的 left 是第一个 item 的位置，
+ *   而浏览器会把它当一串连续的等宽文字渲染 → **选中的框和看到的字对不上**
+ * - 所以：**一个 item 一个 span**，每个 span 用自己的几何数据
+ *
+ * 排序：按屏幕坐标 (top, left) —— 同一行内按 x 递增，行间从上到下。
+ * PDF 的 item 顺序不保证按视觉顺序（如页眉、图表标签会乱序）。
+ *
+ * @param content 文本内容
+ * @param viewport 视口
+ * @returns 排版后的片段列表（一个 item 一个）
+ */
+export function layoutTextItems(
+  content: TextContentLike,
+  viewport: TextViewportLike,
+): PositionedTextItem[] {
+  const positioned: PositionedTextItem[] = [];
+
+  for (const item of content.items) {
+    if (item.str.length === 0) {
+      continue;
+    }
+
+    const result = positionTextItem(item, viewport);
+    if (!result) {
+      continue;
+    }
+
+    positioned.push(result);
+  }
+
+  // 按屏幕坐标排序（同一行的 item 靠 top 分组，组内按 left）
+  positioned.sort((a, b) => {
+    // 同一行判定：top 差值小于半个字号
+    if (Math.abs(a.top - b.top) < Math.max(a.fontSize, b.fontSize) * 0.5) {
+      return a.left - b.left;
+    }
+    return a.top - b.top;
+  });
+
+  return positioned;
 }
 
 /**
@@ -163,6 +235,10 @@ export function layoutTextContent(
 /**
  * 按 `hasEOL` 分组：每行一个片段。
  *
+ * 注意：这个形态**不适合做精准定位**（一行内各 item 的 x/字号不同），
+ * 保留它只是为了"文本概览"这类不需要精确位置的场景。
+ * 文本层渲染请用 `layoutTextItems`。
+ *
  * @param content 文本内容
  * @param viewport 视口
  * @returns 行片段列表
@@ -182,7 +258,13 @@ function groupByLine(content: TextContentLike, viewport: TextViewportLike): Posi
     }
 
     if (!current) {
-      current = positioned;
+      current = {
+        text: positioned.text,
+        left: positioned.left,
+        top: positioned.top,
+        fontSize: positioned.fontSize,
+        hasEOL: positioned.hasEOL,
+      };
     } else {
       // 同一行：横向拼接
       current.text += positioned.text;

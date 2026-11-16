@@ -202,8 +202,13 @@
 .scpdf-text-layer {
   position: absolute;
   inset: 0;
-  overflow: hidden;
-  opacity: 0.25;
+  /* 不能 overflow:hidden —— 会裁掉超出页面的 item（页眉/页脚边缘） */
+  overflow: visible;
+  /*
+   * opacity 不用（会让选中高亮也变淡）：
+   * 文字本身已经是 transparent，够"看不见"了；
+   * 选中高亮由 ::selection 单独给色。
+   */
   line-height: 1;
   /* 允许选中（这是文本层存在的全部意义） */
   user-select: text;
@@ -215,10 +220,15 @@
   position: absolute;
   /* 透明：用户看到的是 canvas 的真实渲染，这里只是"可选中的替身" */
   color: transparent;
+  /*
+   * pre：保留 PDF 里的连续空格与换行（否则被折叠 → 文字挤压 → 选区偏移）
+   */
   white-space: pre;
   transform-origin: left top;
-  /* 选区高亮要能看见 → 用 currentColor 的透明化版本 */
+  /* 选区高亮要能看见 → 用主题色 */
   caret-color: var(--scpdf-color-primary);
+  /* 不参与布局（绝对定位已足够），避免撑开容器影响滚动 */
+  display: block;
 }
 
 /* 选区颜色跟随主题 */
