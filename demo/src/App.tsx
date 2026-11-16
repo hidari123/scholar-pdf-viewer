@@ -562,6 +562,22 @@ export default function App() {
           onSelectionChange={handleSelection}
           onHighlightCreate={handleHighlightCreate}
           onHighlightClick={(h) => setHint(`点击高亮：${h.selectedText.slice(0, 20)}`)}
+          /*
+           * 选区浮层的动作 —— **宿主注入**（证明包不需要业务入口）。
+           *
+           * 翻译/提问/笔记由宿主实现；不传就不会显示对应按钮。
+           */
+          onTranslate={({ text }) => setHint(`【翻译】${text.slice(0, 20)}…（宿主实现）`)}
+          onAsk={({ text }) => setHint(`【提问】${text.slice(0, 20)}…（宿主实现）`)}
+          onNote={({ text }) => setHint(`【笔记】${text.slice(0, 20)}…（宿主实现）`)}
+          onHighlight={({ text, color }) => {
+            handleHighlightCreate({
+              color: color ?? highlightColor,
+              selectedText: text,
+              position: selection?.norm as never,
+            });
+            setHint(`已高亮（${color ?? highlightColor}）`);
+          }}
           onExternalLink={(url) => {
             // 宿主决定怎么开外链（新窗口 / 应用内 WebView）
             globalThis.open?.(url, '_blank', 'noopener,noreferrer');

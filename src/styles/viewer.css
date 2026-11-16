@@ -399,6 +399,161 @@
   outline-offset: 0;
 }
 
+/* ---------- 选区浮层（选中文字后的操作条） ---------- */
+
+/*
+ * ⚠️ 用 `position: fixed`：
+ * 选区矩形本来就是**视口坐标**（getClientRects）→ 直接用，
+ * 不需要任何 scroll 换算 → 天然不会漂移。
+ *
+ * （对比原 scholar-club：视口坐标 + window.scrollY → 当文档坐标用，
+ *   而 PDF 在内部容器滚动 → 弹层不跟随、页面滚动时漂移。）
+ */
+.scpdf-selection-popover {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--scpdf-color-surface);
+  border: 1px solid var(--scpdf-color-border);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.06);
+  /* 深色主题下要用浅色阴影 */
+  user-select: none;
+  animation: scpdf-popover-in 120ms ease-out;
+}
+
+@keyframes scpdf-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scpdf-selection-popover__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.scpdf-selection-popover__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 组之间的分隔线 */
+.scpdf-selection-popover__divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: var(--scpdf-color-border);
+}
+
+.scpdf-selection-popover__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--scpdf-color-text);
+  cursor: pointer;
+  transition:
+    background var(--scpdf-motion-fast) ease,
+    color var(--scpdf-motion-fast) ease;
+}
+
+.scpdf-selection-popover__btn:hover {
+  background: var(--scpdf-color-surface-alt);
+  color: var(--scpdf-color-primary);
+}
+
+.scpdf-selection-popover__btn:focus-visible {
+  outline: 2px solid var(--scpdf-color-primary);
+  outline-offset: -2px;
+}
+
+/*
+ * 箭头（指向选区中心）。
+ *
+ * 用 CSS 三角形（border 技巧），零图片依赖。
+ * `data-placement` 决定朝上还是朝下。
+ */
+.scpdf-selection-popover__arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  /* 水平位置由 JS 计算（对准选区中心） */
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.scpdf-selection-popover__arrow[data-placement="bottom"] {
+  /* 浮层在下方 → 箭头朝上 */
+  top: -5px;
+  border-bottom: 5px solid var(--scpdf-color-border);
+}
+
+.scpdf-selection-popover__arrow[data-placement="top"] {
+  /* 浮层在上方 → 箭头朝下 */
+  bottom: -5px;
+  border-top: 5px solid var(--scpdf-color-border);
+}
+
+/* 分裂按钮的小箭头（展开颜色下拉） */
+.scpdf-selection-popover__btn--split {
+  width: 16px;
+  height: 28px;
+  margin-left: -4px;
+  border-radius: 0 6px 6px 0;
+}
+
+/* 颜色下拉 */
+.scpdf-selection-popover__palette {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--scpdf-color-surface);
+  border: 1px solid var(--scpdf-color-border);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.06);
+  z-index: 1;
+}
+
+.scpdf-selection-popover__swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform var(--scpdf-motion-fast) ease;
+}
+
+.scpdf-selection-popover__swatch:hover {
+  transform: scale(1.15);
+}
+
 /* ---------- 状态区（加载 / 空 / 错误） ---------- */
 
 .scpdf-state {

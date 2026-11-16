@@ -26,6 +26,8 @@ import type { OutlineItemLike } from '../core/outline/outline';
 import type { SearchHitRect } from '../core/search/highlight';
 import { hitsToRects } from '../core/search/highlight';
 import type { PdfSearch, SearchHit } from '../core/search/search';
+import type { SelectionAction, SelectionActionContext } from '../core/selection/actions';
+import { BUILTIN_ACTION_KEYS, mergeSelectionActions } from '../core/selection/actions';
 import type { PageSelectionShape } from '../core/selection/shape';
 import { buildSelectionShapes } from '../core/selection/shape';
 import type { PositionedTextItem } from '../core/text-layer/layout';
@@ -42,6 +44,7 @@ import { Page } from './Page';
 import type { PageProxyLike } from './PageCanvas';
 import { PasswordDialog } from './PasswordDialog';
 import { SearchPanel } from './SearchPanel';
+import { SelectionPopover } from './SelectionPopover';
 import { ThumbnailPanel } from './ThumbnailPanel';
 import type { ToolbarConfig } from './Toolbar';
 import { Toolbar } from './Toolbar';
@@ -130,6 +133,29 @@ export interface PdfViewerProps {
   onError?: (error: PdfViewerError) => void;
   /** 选区变化（**纯几何**） */
   onSelectionChange?: (selection: SelectionData | null) => void;
+  /**
+   * 选区浮层的动作（宿主注入）。
+   *
+   * - **覆盖**同名内置动作
+   * - **追加**新动作
+   * - 传 `undefined` → 只显示内置的"高亮 + 复制"
+   *
+   * ⚠️ **包的边界**：包只提供 UI + 事件，
+   * 翻译/提问/笔记的**业务实现全在宿主**。
+   */
+  selectionActions?: SelectionAction[];
+  /** 宿主实现了"翻译"→ 显示翻译按钮（等价于在 selectionActions 里配一个 translate） */
+  onTranslate?: (ctx: SelectionActionContext) => void;
+  /** 宿主实现了"提问" */
+  onAsk?: (ctx: SelectionActionContext) => void;
+  /** 宿主实现了"笔记" */
+  onNote?: (ctx: SelectionActionContext) => void;
+  /** 宿主实现了"解释" */
+  onExplain?: (ctx: SelectionActionContext) => void;
+  /** 宿主实现了"复制"（不传则用内置的剪贴板实现） */
+  onCopy?: (ctx: SelectionActionContext) => void;
+  /** 浮层里"高亮"按钮点击（宿主决定颜色与是否保存） */
+  onHighlight?: (ctx: SelectionActionContext) => void;
   /** 新建高亮（宿主决定是否保存） */
   onHighlightCreate?: (highlight: NewHighlight) => void;
   /** 更新高亮 */
@@ -191,6 +217,13 @@ export function PdfViewer(props: PdfViewerProps) {
     onDocumentLoad,
     onError,
     onSelectionChange,
+    selectionActions,
+    onTranslate,
+    onAsk,
+    onNote,
+    onExplain,
+    onCopy,
+    onHighlight,
     onHighlightClick,
     onPageChange,
     onZoomChange,
@@ -243,6 +276,27 @@ export function PdfViewer(props: PdfViewerProps) {
   const [selectionShapes, setSelectionShapes] = useState<Map<number, PageSelectionShape>>(
     new Map(),
   );
+
+  /** 选区浮层是否打开 */
+  const [popoverOpen, setPopoverOpen] = useState(false);
+
+  /** 选区浮层的锚点（选区矩形，视口坐标） */
+  const [popoverAnchor, setPopoverAnchor] = useState<{
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  } | null>(null);
+
+  /** 当前选区（浮层动作的上下文） */
+  const [currentSelection, setCurrentSelection] = useState<SelectionData | null>(null);
+
+  /**
+   * 浮层里"高亮"当前用的颜色 key。
+   *
+   * 颜色下拉选完会记到这里 → 点 🖍 主按钮时用它。
+   */
+  const [pickedColor, setPickedColor] = useState<string | null>(null);
 
   /** 密码框是否打开 */
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -666,6 +720,42 @@ export function PdfViewer(props: PdfViewerProps) {
     [pageSizes, pageTops],
   );
 
+  /**
+   * 选区变化 → 更新浮层状态 + 通知宿主。
+   *
+   * 浮层的锚点用**浏览器给的选区矩形**（视口坐标）→ 直接配 `position: fixed`。
+   */
+  const handleSelectionChange = useCallback(
+    (selection: SelectionData | null) => {
+      setCurrentSelection(selection);
+
+      if (!selection || selection.text.trim().length === 0) {
+        setPopoverOpen(false);
+        setPopoverAnchor(null);
+        onSelectionChange?.(selection);
+        return;
+      }
+
+      // 用当前选区的 DOM 矩形做锚点
+      const domSelection = window.getSelection();
+      if (domSelection && domSelection.rangeCount > 0) {
+        const rect = domSelection.getRangeAt(0).getBoundingClientRect();
+        if (rect.width > 0 || rect.height > 0) {
+          setPopoverAnchor({
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+          });
+          setPopoverOpen(true);
+        }
+      }
+
+      onSelectionChange?.(selection);
+    },
+    [onSelectionChange],
+  );
+
   // 6) 选区
   useTextSelection({
     containerRef,
@@ -690,7 +780,7 @@ export function PdfViewer(props: PdfViewerProps) {
       width: pageSizes[0]?.width ?? 595 * scale,
       height: pageSizes[0]?.height ?? 842 * scale,
     },
-    onSelectionChange,
+    onSelectionChange: handleSelectionChange,
     onClientRects: handleSelectionClientRects,
   });
 
@@ -749,6 +839,212 @@ export function PdfViewer(props: PdfViewerProps) {
       onHighlightClick?.(highlight);
     },
     [onHighlightClick],
+  );
+
+  /**
+   * 选区浮层的**内置动作**。
+   *
+   * ⚠️ **"翻译/提问/笔记/解释"默认是隐藏的**：
+   * 只有宿主传了对应的回调才显示（`when` 返回 false → 不渲染）。
+   * 这就是"宿主没配就不展示"的实现。
+   */
+  const builtinActions = useMemo<SelectionAction[]>(() => {
+    const actions: SelectionAction[] = [
+      {
+        key: BUILTIN_ACTION_KEYS.highlight,
+        icon: 'highlight',
+        label: '高亮',
+        group: 'primary',
+        order: 10,
+        onSelect: (ctx) => {
+          onHighlight?.({ ...ctx, color: pickedColor ?? undefined });
+        },
+      },
+      {
+        key: BUILTIN_ACTION_KEYS.copy,
+        icon: 'copy',
+        label: '复制',
+        group: 'primary',
+        order: 20,
+        onSelect: (ctx) => {
+          if (onCopy) {
+            onCopy(ctx);
+            return;
+          }
+          // 内置实现：写剪贴板（失败不打扰用户）
+          void navigator.clipboard?.writeText(ctx.text).catch(() => undefined);
+        },
+      },
+    ];
+
+    // 宿主实现了才显示
+    if (onTranslate) {
+      actions.push({
+        key: BUILTIN_ACTION_KEYS.translate,
+        icon: 'translate',
+        label: '翻译',
+        group: 'ai',
+        order: 30,
+        onSelect: onTranslate,
+      });
+    }
+
+    if (onAsk) {
+      actions.push({
+        key: BUILTIN_ACTION_KEYS.ask,
+        icon: 'ask',
+        label: '提问',
+        group: 'ai',
+        order: 40,
+        onSelect: onAsk,
+      });
+    }
+
+    if (onExplain) {
+      actions.push({
+        key: BUILTIN_ACTION_KEYS.explain,
+        icon: 'explain',
+        label: '解释',
+        group: 'ai',
+        order: 50,
+        onSelect: onExplain,
+      });
+    }
+
+    if (onNote) {
+      actions.push({
+        key: BUILTIN_ACTION_KEYS.note,
+        icon: 'note',
+        label: '笔记',
+        group: 'ai',
+        order: 60,
+        onSelect: onNote,
+      });
+    }
+
+    return actions;
+  }, [onHighlight, onCopy, onTranslate, onAsk, onExplain, onNote, pickedColor]);
+
+  /** 合并后的动作列表（宿主覆盖 + 追加） */
+  const popoverActions = useMemo(
+    () => mergeSelectionActions(builtinActions, selectionActions),
+    [builtinActions, selectionActions],
+  );
+
+  /**
+   * 内置动作的"高亮"要带颜色 → 用一个 state 记录当前选的颜色。
+   * 颜色下拉选完 → 直接触发高亮。
+   */
+
+  /** 关闭浮层 */
+  const handlePopoverClose = useCallback(() => {
+    setPopoverOpen(false);
+    setPopoverAnchor(null);
+  }, []);
+
+  /** 选颜色 → 立刻用该颜色高亮 */
+  const handlePickHighlightColor = useCallback(
+    (key: string) => {
+      setPickedColor(key);
+
+      if (!currentSelection) {
+        return;
+      }
+
+      // 触发宿主的高亮回调（带颜色 key）
+      onHighlight?.({
+        text: currentSelection.text,
+        position: currentSelection.norm,
+        event: undefined as never,
+        color: key,
+      });
+
+      handlePopoverClose();
+    },
+    [currentSelection, onHighlight, handlePopoverClose],
+  );
+
+  /**
+   * 浮层的容器矩形（视口坐标）—— PDF 的可视区。
+   *
+   * 用 state 而不是 ref：容器位置会随滚动/缩放变化，
+   * 浮层要跟着 clamp → 需要重渲染。
+   */
+  const [popoverContainerRect, setPopoverContainerRect] = useState<{
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  } | null>(null);
+
+  // 滚动 / 缩放 / 尺寸变化时更新容器矩形；并**隐藏浮层**（位置已失效）
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    // 依赖 scale：缩放会改变容器可视区 → 重新量
+    void scale;
+
+    const update = () => {
+      const rect = container.getBoundingClientRect();
+      setPopoverContainerRect({
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+      });
+    };
+
+    update();
+
+    /*
+     * ⚠️ **滚动时隐藏浮层**（而不是跟随滚动）：
+     * - 选区浮层是 `position: fixed` → 不跟随内部滚动
+     * - 跟随的话每帧都要重算位置（且内部容器滚动时 fixed 的锚点语义很别扭）
+     * - pdf.js 的做法也是滚动时隐藏
+     */
+    const hide = () => {
+      setPopoverOpen(false);
+      setPopoverAnchor(null);
+    };
+
+    container.addEventListener('scroll', hide, { passive: true });
+
+    if (typeof ResizeObserver === 'undefined') {
+      return () => container.removeEventListener('scroll', update);
+    }
+
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+
+    return () => {
+      container.removeEventListener('scroll', update);
+      container.removeEventListener('scroll', hide);
+      observer.disconnect();
+    };
+  }, [scale]);
+
+  /** 浮层动作被点击 */
+  const handlePopoverAction = useCallback(
+    (action: SelectionAction) => {
+      if (!currentSelection) {
+        return;
+      }
+
+      action.onSelect?.({
+        text: currentSelection.text,
+        position: currentSelection.norm,
+        event: undefined as never,
+      });
+
+      // 高亮后关闭；其他动作保留浮层（宿主可能要连续操作）
+      if (action.key === BUILTIN_ACTION_KEYS.highlight) {
+        handlePopoverClose();
+      }
+    },
+    [currentSelection, handlePopoverClose],
   );
 
   /**
@@ -1077,6 +1373,23 @@ export function PdfViewer(props: PdfViewerProps) {
           </div>
         </section>
       </div>
+
+      {/*
+        选区浮层（选中文字后出现的小工具条）。
+
+        ⚠️ 用 `createPortal` 挂到 `document.body`：
+        浮层是 `position: fixed` → 不受任何祖先的 transform/overflow 影响。
+      */}
+      <SelectionPopover
+        open={popoverOpen}
+        selectionRect={popoverAnchor}
+        containerRect={popoverContainerRect}
+        actions={popoverActions}
+        onAction={handlePopoverAction}
+        onClose={handlePopoverClose}
+        highlightPalette={highlightPalette}
+        onPickColor={handlePickHighlightColor}
+      />
 
       {/* 加密文档密码框（宿主没接管时） */}
       {showPasswordDialog && !onRequestPassword ? (
