@@ -306,6 +306,29 @@
   position: absolute;
   pointer-events: auto;
   cursor: pointer;
+  /*
+   * ⚠️ **必须 reset 浏览器对 <button> 的默认样式**：
+   *
+   * 高亮渲染成 <button>（为了能点、能被 a11y 识别），
+   * 但浏览器默认给它 `border: 2px outset` + `padding: 1px 6px` +
+   * `box-sizing: border-box`。
+   *
+   * 后果（实测）：
+   * - `border: 2px outset` → **可见的黑框**（每条高亮都一圈深色边）
+   * - `box-sizing: border-box` → width/height 变成"内容 + border"，
+   *   **可见的高亮区域比几何框小 2px** → 看起来"没对齐"
+   * - `outset` 还有 3D 立体感 → 视觉上更脏
+   *
+   * `content-box` 让 width/height 就是**全部可见区域** → 精确贴合。
+   */
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: none;
+  font: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: content-box;
   /* 圆角 4px（对齐 pdf.js 的 .textLayer .highlight） */
   border-radius: 4px;
   transition: background var(--scpdf-motion-fast) ease;

@@ -7,12 +7,12 @@
 
 ## 摘要
 
-| # | 问题 | 根因 | 修复方向 |
-|---|---|---|---|
-| 1 | 高亮有黑框 / 缩放下定位不对 | **`<button>` 的浏览器默认样式**（`border: 2px outset` + `padding: 1px 6px`） | CSS reset |
-| 2 | 选区叠涂仍在 / 框选多选一点 | `line-height: 0` 让选区 rect **上偏 22px**，且**每处仍涂 2 次**（浏览器 fallback 行盒） | 改用 pdf.js v6 的 **SVG clipPath 覆盖层** |
-| 3 | 缩放时页面消失 | `insertBefore` 的**引用节点**可能不属于目标父节点 → `NotFoundError` | 加 `contains()` 校验 + 兜底 |
-| 4 | 要 scholar-club 那样的选区浮层 | —— | 自研定位 + **可注入的动作注册表** |
+| #   | 问题                           | 根因                                                                                    | 修复方向                                  |
+| --- | ------------------------------ | --------------------------------------------------------------------------------------- | ----------------------------------------- |
+| 1   | 高亮有黑框 / 缩放下定位不对    | **`<button>` 的浏览器默认样式**（`border: 2px outset` + `padding: 1px 6px`）            | CSS reset                                 |
+| 2   | 选区叠涂仍在 / 框选多选一点    | `line-height: 0` 让选区 rect **上偏 22px**，且**每处仍涂 2 次**（浏览器 fallback 行盒） | 改用 pdf.js v6 的 **SVG clipPath 覆盖层** |
+| 3   | 缩放时页面消失                 | `insertBefore` 的**引用节点**可能不属于目标父节点 → `NotFoundError`                     | 加 `contains()` 校验 + 兜底               |
+| 4   | 要 scholar-club 那样的选区浮层 | ——                                                                                      | 自研定位 + **可注入的动作注册表**         |
 
 **注意**：问题 1 和 2 的根因**都是上一轮的"修复"引入的**（`<button>` 默认样式从未被 reset；`line-height: 0` 是我为了修叠涂加的）。这轮要**换方案**，不是打补丁。
 
@@ -92,12 +92,12 @@
 
 **上一轮我用 `line-height: 0` 修叠涂，实测数据：**
 
-| line-height | 选区 top 相对 span top | 选区高度 | 叠涂次数 |
-|---|---|---|---|
-| **`0`（上一轮的做法）** | **−21.9px**（向上偏 22px）❌ | 44px | **1** ✅ |
-| **`normal`** | **+0.1px**（完美）✅ | 44px | **2** ❌ |
-| `1` | −5.9px | 44px | 2 ❌ |
-| `1.15` | −3.9px | 44px | 2 ❌ |
+| line-height             | 选区 top 相对 span top       | 选区高度 | 叠涂次数 |
+| ----------------------- | ---------------------------- | -------- | -------- |
+| **`0`（上一轮的做法）** | **−21.9px**（向上偏 22px）❌ | 44px     | **1** ✅ |
+| **`normal`**            | **+0.1px**（完美）✅         | 44px     | **2** ❌ |
+| `1`                     | −5.9px                       | 44px     | 2 ❌     |
+| `1.15`                  | −3.9px                       | 44px     | 2 ❌     |
 
 **两个问题是一对**：
 - `line-height: 0` → 行盒归零 → 叠涂次数 = 1 ✅，但浏览器 fallback 到默认行盒 → **选区框上偏 22px** ❌（这就是"上下多框选一点"）
@@ -122,8 +122,10 @@ pdf.js v6 就是这么解决的（`pdf_viewer.css:765` + `:6341`）：
 /* 用 SVG clipPath 画覆盖层 —— 每个像素只画一次 */
 .pdfViewer .page .selection {
   position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   background: rgb(0 90 255 / 0.22);
 }
@@ -160,7 +162,7 @@ pdf.js v6 就是这么解决的（`pdf_viewer.css:765` + `:6341`）：
   <g clipPath={`url(#scpdf-clip-${pageNumber})`}>
     <rect x="0" y="0" width="100%" height="100%" className="scpdf-selection-layer__fill" />
   </g>
-</svg>
+</svg>;
 ```
 
 **坐标**：clipPath 用**页内坐标**（相对页面元素），所以要减去页面的 offset。
@@ -171,11 +173,11 @@ pdf.js v6 就是这么解决的（`pdf_viewer.css:765` + `:6341`）：
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 2;          /* 在 canvas 之上, 在 annotation 之下 */
+  z-index: 2; /* 在 canvas 之上, 在 annotation 之下 */
 }
 .scpdf-selection-layer__fill {
   fill: var(--scpdf-selection-color, rgba(0, 90, 255, 0.22));
-  mix-blend-mode: multiply;   /* 文字仍然清晰 */
+  mix-blend-mode: multiply; /* 文字仍然清晰 */
 }
 ```
 
@@ -193,13 +195,13 @@ pdf.js v6 就是这么解决的（`pdf_viewer.css:765` + `:6341`）：
 
 ### 2.5 代价与取舍
 
-| | `line-height: 0` | SVG clipPath |
-|---|---|---|
-| 叠涂 | ✅ 1 次 | ✅ 1 次 |
-| 选区框贴合 | ❌ 上偏 22px | ✅ 精确 |
-| 实现复杂度 | 一行 CSS | 需要 SVG 层 + 坐标换算 |
-| 浏览器原生选区 | 保留 | 保留（只是不画背景） |
-| 复制文本 | ✅ | ✅（不影响） |
+|                | `line-height: 0` | SVG clipPath           |
+| -------------- | ---------------- | ---------------------- |
+| 叠涂           | ✅ 1 次          | ✅ 1 次                |
+| 选区框贴合     | ❌ 上偏 22px     | ✅ 精确                |
+| 实现复杂度     | 一行 CSS         | 需要 SVG 层 + 坐标换算 |
+| 浏览器原生选区 | 保留             | 保留（只是不画背景）   |
+| 复制文本       | ✅               | ✅（不影响）           |
 
 **决策：改用 SVG clipPath**。理由：
 1. `line-height: 0` 的"叠涂修复"是**假象** —— 它用"框上移"换来了"只涂一次"，代价是选区框不准（用户明确抱怨了）
@@ -242,9 +244,7 @@ layer.insertBefore(end, other);   // other 属于**别的** parent
 
 ```ts
 const endContainer =
-  range.endContainer instanceof Element
-    ? range.endContainer
-    : range.endContainer.parentElement;
+  range.endContainer instanceof Element ? range.endContainer : range.endContainer.parentElement;
 
 endContainer.parentElement?.insertBefore(end, endContainer.nextSibling);
 ```
@@ -275,9 +275,7 @@ const onSelectionChangeEvent = () => {
   // ... 取 range / textLayer / end 不变
 
   const endContainer =
-    range.endContainer instanceof Element
-      ? range.endContainer
-      : range.endContainer.parentElement;
+    range.endContainer instanceof Element ? range.endContainer : range.endContainer.parentElement;
   if (!endContainer) return;
 
   const parent = endContainer.parentElement;
@@ -286,13 +284,13 @@ const onSelectionChangeEvent = () => {
   // ⚠️ **必须校验引用节点属于同一父节点**（否则 insertBefore 抛 NotFoundError）
   const reference = endContainer.nextSibling;
   if (reference && reference.parentElement !== parent) {
-    parent.appendChild(end);       // 降级：直接放到末尾
+    parent.appendChild(end); // 降级：直接放到末尾
     return;
   }
 
   // ⚠️ **哨兵只能在选区所在的 text layer 内移动**
   if (!textLayer.contains(endContainer)) {
-    return;                          // 跨页 → 不动（每页各有自己的哨兵）
+    return; // 跨页 → 不动（每页各有自己的哨兵）
   }
 
   parent.insertBefore(end, reference ?? null);
@@ -322,23 +320,23 @@ const onSelectionChangeEvent = () => {
 
 ```ts
 // useTextSelection.ts:75-129
-let popoverY = lastRect.bottom + window.scrollY;      // ← 视口坐标 + window.scrollY
+let popoverY = lastRect.bottom + window.scrollY; // ← 视口坐标 + window.scrollY
 if (popoverY + 50 > windowHeight) {
-  popoverY -= 50;                                       // ← 假"翻转"
+  popoverY -= 50; // ← 假"翻转"
 }
 popoverPosition.current = { top: popoverY, left: popoverX };
 ```
 
-| 问题 | 说明 |
-|---|---|
-| **坐标系错** | `getClientRects()` 是**视口**坐标，却加 `window.scrollY` 当**文档**坐标用 → 弹层漂移 |
-| **不跟随内部滚动** | PDF 在**内部容器**里滚，`window.scrollY` 根本不是那个滚动量 → 弹层不动 |
-| **没有真翻转** | 永远在下方；"翻转"只是 `popoverY -= 50` 这个魔法数字 |
-| **魔法数字** | `popoverWidth = 200`（实际 350-400）、`50`（弹层高度，从来没量过） |
-| **位置不更新** | 只在 mouseup 算一次；缩放/滚动/resize 都不重算 |
-| **没有 Esc** | 只有 `mousedown` 关闭 |
-| **死代码** | `document.createElement('div')` 创建后直接丢弃 |
-| **绕过 antd** | 用 `overlayStyle` 覆盖了 antd 的定位引擎，连箭头都对不齐 |
+| 问题               | 说明                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------ |
+| **坐标系错**       | `getClientRects()` 是**视口**坐标，却加 `window.scrollY` 当**文档**坐标用 → 弹层漂移 |
+| **不跟随内部滚动** | PDF 在**内部容器**里滚，`window.scrollY` 根本不是那个滚动量 → 弹层不动               |
+| **没有真翻转**     | 永远在下方；"翻转"只是 `popoverY -= 50` 这个魔法数字                                 |
+| **魔法数字**       | `popoverWidth = 200`（实际 350-400）、`50`（弹层高度，从来没量过）                   |
+| **位置不更新**     | 只在 mouseup 算一次；缩放/滚动/resize 都不重算                                       |
+| **没有 Esc**       | 只有 `mousedown` 关闭                                                                |
+| **死代码**         | `document.createElement('div')` 创建后直接丢弃                                       |
+| **绕过 antd**      | 用 `overlayStyle` 覆盖了 antd 的定位引擎，连箭头都对不齐                             |
 
 **它自己的计划文档已经写了正确做法**（`PdfNpmPackagePlan.md` §6.5）：
 
@@ -359,7 +357,7 @@ popoverPosition.current = { top: popoverY, left: popoverX };
 ```ts
 // 选区矩形本来就是**视口坐标**（getClientRects）
 // → fixed 定位直接用，不需要任何 scroll 换算！
-const rect = selectionRect;   // 视口坐标
+const rect = selectionRect; // 视口坐标
 
 // 理想位置：选区下方，水平居中
 let top = rect.bottom + GAP;
@@ -368,15 +366,22 @@ let left = rect.left + rect.width / 2 - toolbarWidth / 2;
 // 翻转：上方空间不够 → 放到上方
 if (top + toolbarHeight > containerRect.bottom) {
   const above = rect.top - GAP - toolbarHeight;
-  if (above >= containerRect.top) top = above;   // 上方也放得下 → 真的翻转
-  else top = Math.max(containerRect.top, rect.bottom + GAP);  // 都放不下 → 放下方 + clamp
+  if (above >= containerRect.top)
+    top = above; // 上方也放得下 → 真的翻转
+  else top = Math.max(containerRect.top, rect.bottom + GAP); // 都放不下 → 放下方 + clamp
 }
 
 // 水平 clamp（用**实测**的弹层宽度，不猜）
-left = Math.max(containerRect.left + MARGIN, Math.min(left, containerRect.right - toolbarWidth - MARGIN));
+left = Math.max(
+  containerRect.left + MARGIN,
+  Math.min(left, containerRect.right - toolbarWidth - MARGIN),
+);
 
 // 垂直 clamp
-top = Math.max(containerRect.top + MARGIN, Math.min(top, containerRect.bottom - toolbarHeight - MARGIN));
+top = Math.max(
+  containerRect.top + MARGIN,
+  Math.min(top, containerRect.bottom - toolbarHeight - MARGIN),
+);
 ```
 
 **关键改进**：
@@ -391,13 +396,13 @@ top = Math.max(containerRect.top + MARGIN, Math.min(top, containerRect.bottom - 
 
 #### (b) 关闭条件（比它全）
 
-| 触发 | 说明 |
-|---|---|
-| `mousedown` 在弹层外 | 标准做法 |
-| `Esc` | 它**没有**，我们加 |
-| 选区被清空（`selectionchange` → collapsed） | 它**没有**，我们加 |
-| 滚动 / 缩放 / 翻页 / 换文档 | 它**没有**，我们加（位置失效了） |
-| 点击已有高亮 | → 切换到"编辑高亮"模式 |
+| 触发                                        | 说明                             |
+| ------------------------------------------- | -------------------------------- |
+| `mousedown` 在弹层外                        | 标准做法                         |
+| `Esc`                                       | 它**没有**，我们加               |
+| 选区被清空（`selectionchange` → collapsed） | 它**没有**，我们加               |
+| 滚动 / 缩放 / 翻页 / 换文档                 | 它**没有**，我们加（位置失效了） |
+| 点击已有高亮                                | → 切换到"编辑高亮"模式           |
 
 #### (c) 内容：可注入的**动作注册表**
 
@@ -427,26 +432,26 @@ export interface SelectionAction {
 
 ```ts
 export type SelectionActionIcon =
-  | 'highlight'    // 高亮笔
-  | 'copy'         // 复制
-  | 'translate'    // 翻译
-  | 'note'         // 笔记
-  | 'ask'          // 提问
-  | 'explain'      // 解释
-  | 'delete';      // 删除
+  | 'highlight' // 高亮笔
+  | 'copy' // 复制
+  | 'translate' // 翻译
+  | 'note' // 笔记
+  | 'ask' // 提问
+  | 'explain' // 解释
+  | 'delete'; // 删除
 ```
 
 **内置动作**（包提供默认实现，宿主可覆盖/追加）：
 
-| key | 图标 | 行为 |
-|---|---|---|
+| key         | 图标   | 行为                                                       |
+| ----------- | ------ | ---------------------------------------------------------- |
 | `highlight` | 荧光笔 | **打开颜色下拉**（内置 6 色 + 自定义）→ 触发 `onHighlight` |
-| `copy` | 复制 | `navigator.clipboard.writeText(text)` |
-| `translate` | 翻译 | 触发 `onTranslate`（默认无操作 → 不显示） |
-| `note` | 笔记 | 触发 `onNote` |
-| `ask` | 提问 | 触发 `onAsk` |
-| `explain` | 解释 | 触发 `onExplain` |
-| `delete` | 删除 | 触发 `onDeleteHighlight`（仅选中已有高亮时显示） |
+| `copy`      | 复制   | `navigator.clipboard.writeText(text)`                      |
+| `translate` | 翻译   | 触发 `onTranslate`（默认无操作 → 不显示）                  |
+| `note`      | 笔记   | 触发 `onNote`                                              |
+| `ask`       | 提问   | 触发 `onAsk`                                               |
+| `explain`   | 解释   | 触发 `onExplain`                                           |
+| `delete`    | 删除   | 触发 `onDeleteHighlight`（仅选中已有高亮时显示）           |
 
 > **边界（很重要）**：包**只提供 UI + 事件**，**不做**翻译/提问/笔记的业务。
 > 宿主不传 `onTranslate` → 这个按钮**不显示**（符合用户要求："如果宿主没配，就不展示"）。
@@ -513,7 +518,7 @@ export type SelectionActionIcon =
   onNote={({ text }) => addNote(text)}
   onAsk={({ text }) => ask(text)}
   onExplain={({ text }) => explain(text)}
-/>
+/>;
 ```
 
 **规则**：
@@ -537,12 +542,12 @@ src/hooks/useSelectionPopover.test.ts
 
 ## 实施顺序与验证
 
-| 步骤 | 内容 | 风险 | 验证 |
-|---|---|---|---|
-| **S1** | reset button 默认样式（去黑框） | 低 | E2E：computed `border-width = 0px`；截图 |
-| **S2** | 修 `insertBefore` 崩溃 + 哨兵加 key + 按页隔离 | 低 | E2E：跨页选择 + 缩放，无 JS 错误 |
-| **S3** | 改用 SVG clipPath 选区层 | **中** | E2E：叠涂 = 1；选区起点 Δ；复制正常 |
-| **S4** | 选区浮层（定位 + 动作注册表 + 色板） | 中 | 新 E2E：定位/翻转/clamp/关闭 |
+| 步骤   | 内容                                           | 风险   | 验证                                     |
+| ------ | ---------------------------------------------- | ------ | ---------------------------------------- |
+| **S1** | reset button 默认样式（去黑框）                | 低     | E2E：computed `border-width = 0px`；截图 |
+| **S2** | 修 `insertBefore` 崩溃 + 哨兵加 key + 按页隔离 | 低     | E2E：跨页选择 + 缩放，无 JS 错误         |
+| **S3** | 改用 SVG clipPath 选区层                       | **中** | E2E：叠涂 = 1；选区起点 Δ；复制正常      |
+| **S4** | 选区浮层（定位 + 动作注册表 + 色板）           | 中     | 新 E2E：定位/翻转/clamp/关闭             |
 
 **回归**：现有 9 套 E2E（73 项断言）必须全绿。
 

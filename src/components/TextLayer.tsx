@@ -105,8 +105,15 @@ export function TextLayer({
         **移动到当前选区边界旁边** → 选区就不会越过它。
 
         详见 `useTextSelection` 里的 `selectionchange` 处理。
+
+        ⚠️ **必须有 key**：哨兵会被 `useTextSelection` 手动移动到别的位置
+        （不再是 React 渲染时的最后一个子节点）。
+        没有 key 时 React 重渲染（缩放 → 所有 span 的 key 变了 → 全部重建）
+        会按"位置索引"去协调它 → 可能把它塞回错误的位置，
+        或者与 `useTextSelection` 的手动移动互相打架。
+        固定 key 让 React 认得出"这是同一个哨兵"。
       */}
-      <div className="scpdf-text-layer__end" />
+      <div key="scpdf-end-of-content" className="scpdf-text-layer__end" />
     </div>
   );
 }

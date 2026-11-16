@@ -219,6 +219,15 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
      * 在 Chrome/Safari 里，用户在**页面空白处**点击或拖动时，
      * 选区会一路扩到文本层的末尾（选出一大片空白）。
      * 把哨兵挪到选区边界旁 → 选区不会越过它。
+     *
+     * ⚠️ **这里曾经抛 `NotFoundError` 导致整页消失**：
+     * `insertBefore(newNode, referenceNode)` 要求 `referenceNode` 是
+     * `newNode.parentElement` 的子节点，否则浏览器抛
+     * "The node before which the new node is to be inserted is not a child of this node"。
+     *
+     * 缩放时 React 会重建所有 span（key 含位置 → 全变），
+     * `endContainer.nextSibling` 可能指向**另一个 parent** 的节点 → 抛错。
+     * 异常在事件处理器里未捕获 → React 错误边界 unmount 整棵树 → **页面消失**。
      */
     const onSelectionChangeEvent = () => {
       const selection = window.getSelection();
@@ -249,7 +258,35 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         return;
       }
 
-      endContainer.parentElement?.insertBefore(end, endContainer.nextSibling);
+      const parent = endContainer.parentElement;
+      if (!parent) {
+        return;
+      }
+
+      /*
+       * ⚠️ **跨页选择时不能搬哨兵**：
+       * 选区可能从第 1 页跨到第 2 页 → `endContainer` 在**另一页**的文本层里。
+       * 之前会把哨兵搬到那一页 → 第 1 页的哨兵丢失、第 2 页多一个
+       * （实测 `endStillInL1: false`）→ 哨兵彻底失去意义。
+       *
+       * 每页各有自己的哨兵 → 只在**选区所在的那一页**内移动。
+       */
+      if (!textLayer.contains(endContainer)) {
+        return;
+      }
+
+      const reference = endContainer.nextSibling;
+
+      /*
+       * ⚠️ **必须校验引用节点属于同一父节点**（否则 insertBefore 抛 NotFoundError）。
+       * 降级策略：直接放到父节点末尾（语义上等价 —— 哨兵就在选区边界之后）。
+       */
+      if (reference && reference.parentElement !== parent) {
+        parent.appendChild(end);
+        return;
+      }
+
+      parent.insertBefore(end, reference ?? null);
     };
 
     container.addEventListener('mouseup', onMouseUp);
