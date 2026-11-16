@@ -61,13 +61,14 @@ export function TextLayer({
 
   return (
     <div className="scpdf-text-layer" aria-hidden="true">
-      {items.map((item, index) => (
+      {items.map((item) => (
         <span
           /*
            * key 用"位置 + 文本"而不是数组下标：
            * 下标在重新排版后会指向不同的 item → React 复用错节点 → 文字错位。
+           * 位置在一页内唯一且稳定（同一位置不会有两条不同的文字）。
            */
-          key={`${item.left}-${item.top}-${item.text.slice(0, 12)}-${index}`}
+          key={`${item.left}-${item.top}-${item.text.slice(0, 12)}`}
           className="scpdf-text-layer__item"
           // 选区归页用（useTextSelection 靠它判断选中的是哪一页）
           data-page-number={pageNumber}
