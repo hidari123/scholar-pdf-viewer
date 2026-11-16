@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 import type { LinkAnnotationLike } from '../core/annotation/links';
 import type { HighlightPalette } from '../core/highlight/palette';
 import type { SearchHitRect } from '../core/search/highlight';
+import type { PageSelectionShape } from '../core/selection/shape';
 import type { PositionedTextItem } from '../core/text-layer/layout';
 import { layoutTextItems } from '../core/text-layer/layout';
 import type { HighlightRecord } from '../core/types';
@@ -21,6 +22,7 @@ import { AnnotationLayer } from './AnnotationLayer';
 import { LinkLayer } from './LinkLayer';
 import type { PageProxyLike, TextContentLike } from './PageCanvas';
 import { PageCanvas } from './PageCanvas';
+import { SelectionLayer } from './SelectionLayer';
 import { TextLayer } from './TextLayer';
 
 /** Page 参数 */
@@ -47,6 +49,8 @@ export interface PageProps {
   activeHighlightId?: string | null;
   /** 高亮色板（语义 key → CSS 颜色） */
   palette?: HighlightPalette;
+  /** 选区形状（自绘选区层用；页内坐标） */
+  selectionShape?: PageSelectionShape;
   /** 点击高亮 */
   onHighlightClick?: (highlight: HighlightRecord) => void;
   /** 点击外部链接 */
@@ -84,6 +88,7 @@ export function Page(props: PageProps) {
     highlights,
     activeHighlightId,
     palette,
+    selectionShape,
     onHighlightClick,
     onExternalLink,
     onInternalLink,
@@ -192,6 +197,16 @@ export function Page(props: PageProps) {
       {textContent && viewport ? (
         <TextLayer content={textContent} viewport={viewport} pageNumber={pageNumber} />
       ) : null}
+
+      {/*
+        自绘选区（在 canvas 之上、标注层之下）。
+
+        ⚠️ 为什么不用原生 `::selection`：
+        浏览器逐个 client rect 画背景 → 同行不同字号的 span 产生重叠矩形
+        → 叠涂两次 → 阶梯状深浅不一。
+        自绘（SVG clipPath）每个像素只画一次 → 均匀。
+      */}
+      <SelectionLayer pageNumber={pageNumber} shape={selectionShape} />
 
       {/*
         链接层在文本层之上：链接区域要能点（文本层的透明文字不能挡着）。

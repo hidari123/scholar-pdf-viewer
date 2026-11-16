@@ -19,6 +19,7 @@ const suites = [
   { name: '面板（缩略图/目录/搜索）', file: 'e2e-panels.mjs' },
   { name: '链接层', file: 'e2e-links.mjs' },
   { name: '选区精准度', file: 'e2e-selection-align.mjs' },
+  { name: '选区稳定性', file: 'e2e-selection-stability.mjs' },
   { name: '高亮效果', file: 'e2e-highlight.mjs' },
   { name: '缩放行为', file: 'e2e-zoom.mjs' },
   { name: '搜索高亮', file: 'e2e-search-highlight.mjs' },

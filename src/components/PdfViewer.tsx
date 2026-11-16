@@ -26,6 +26,8 @@ import type { OutlineItemLike } from '../core/outline/outline';
 import type { SearchHitRect } from '../core/search/highlight';
 import { hitsToRects } from '../core/search/highlight';
 import type { PdfSearch, SearchHit } from '../core/search/search';
+import type { PageSelectionShape } from '../core/selection/shape';
+import { buildSelectionShapes } from '../core/selection/shape';
 import type { PositionedTextItem } from '../core/text-layer/layout';
 import type { HighlightRecord, NewHighlight, PdfDocInfo, SelectionData } from '../core/types';
 import { useCurrentPage } from '../hooks/useCurrentPage';
@@ -228,6 +230,17 @@ export function PdfViewer(props: PdfViewerProps) {
    * 这里从 `Page` 渲染时用的 textContent 来（宿主注入的 getTextContent）。
    */
   const [textItemsByPage, setTextItemsByPage] = useState<Map<number, PositionedTextItem[]>>(
+    new Map(),
+  );
+
+  /**
+   * 选区的**形状**（每页一组矩形，页内坐标）—— 自绘选区层用。
+   *
+   * ⚠️ 为什么单独存一份：
+   * - `SelectionData.rects` 是**合并同行后**的矩形 → 形状细节丢失
+   * - 自绘层需要**原始 client rects** → 精确贴合文字
+   */
+  const [selectionShapes, setSelectionShapes] = useState<Map<number, PageSelectionShape>>(
     new Map(),
   );
 
@@ -612,6 +625,47 @@ export function PdfViewer(props: PdfViewerProps) {
     return () => observer.disconnect();
   }, [initialScale, numPages, pageSizesPt, zoom]);
 
+  /**
+   * 收到选区的原始 client rects → 转成"每页的形状"（自绘选区用）。
+   *
+   * ⚠️ 坐标系：
+   * - client rects 是**视口坐标**
+   * - `pageFrames` 的 top/left 是**滚动内容坐标**
+   * - `buildSelectionShapes` 内部统一换算到页内坐标
+   */
+  const handleSelectionClientRects = useCallback(
+    (rects: { top: number; left: number; width: number; height: number }[]) => {
+      const container = containerRef.current;
+      if (!container) {
+        return;
+      }
+
+      const containerRect = container.getBoundingClientRect();
+
+      const shapes = buildSelectionShapes(
+        rects,
+        pageSizes.map((size, index) => ({
+          pageNumber: index + 1,
+          top: pageTops[index] ?? 0,
+          left: 0,
+          width: size.width,
+          height: size.height,
+        })),
+        { top: containerRect.top, left: containerRect.left },
+        container.scrollTop,
+      );
+
+      setSelectionShapes(() => {
+        const next = new Map<number, PageSelectionShape>();
+        for (const shape of shapes) {
+          next.set(shape.pageNumber, shape);
+        }
+        return next;
+      });
+    },
+    [pageSizes, pageTops],
+  );
+
   // 6) 选区
   useTextSelection({
     containerRef,
@@ -637,6 +691,7 @@ export function PdfViewer(props: PdfViewerProps) {
       height: pageSizes[0]?.height ?? 842 * scale,
     },
     onSelectionChange,
+    onClientRects: handleSelectionClientRects,
   });
 
   // 7) 键盘快捷键
@@ -1000,6 +1055,7 @@ export function PdfViewer(props: PdfViewerProps) {
                       highlights={highlights}
                       activeHighlightId={activeHighlightId}
                       palette={highlightPalette}
+                      selectionShape={selectionShapes.get(pageNumber)}
                       onHighlightClick={handleHighlightClick}
                       onExternalLink={onExternalLink}
                       onInternalLink={(dest) => onInternalLink?.(dest, pageNumber)}

@@ -45,6 +45,18 @@ export interface UseTextSelectionOptions {
   reference: { width: number; height: number };
   /** 选区变化 */
   onSelectionChange?: (selection: SelectionData | null) => void;
+  /**
+   * 选区的**原始** client rects（视口坐标）。
+   *
+   * ⚠️ **为什么要单独回调**：
+   * `SelectionData.rects` 是**合并同行后**的矩形（用于持久化高亮），
+   * 而自绘选区层需要**原始形状**（每个 client rect 一个）→ 合并会丢失形状细节。
+   *
+   * 两条管线各司其职（与 pdf.js 一致）：
+   * - 原始 rects → 自绘选区（形状精确）
+   * - 合并 rects → 持久化几何（干净、少数据）
+   */
+  onClientRects?: (rects: { top: number; left: number; width: number; height: number }[]) => void;
 }
 
 /** useTextSelection 返回值 */
@@ -59,7 +71,14 @@ export interface UseTextSelectionResult {
  * @param options 参数
  */
 export function useTextSelection(options: UseTextSelectionOptions): UseTextSelectionResult {
-  const { containerRef, pageFrames, scale = 1, reference, onSelectionChange } = options;
+  const {
+    containerRef,
+    pageFrames,
+    scale = 1,
+    reference,
+    onSelectionChange,
+    onClientRects,
+  } = options;
 
   /** 当前选区 */
   const selectionRef = useRef<SelectionData | null>(null);
@@ -158,6 +177,9 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         clearSelection();
         return;
       }
+
+      // 原始形状给自绘选区层（保留每个 client rect 的细节）
+      onClientRects?.(rects);
 
       /**
        * 坐标系统一（⚠️ 这里曾经有个双重扣减的 bug）：
@@ -296,7 +318,15 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
       container.removeEventListener('mouseup', onMouseUp);
       document.removeEventListener('selectionchange', onSelectionChangeEvent);
     };
-  }, [containerRef, pageFrames, scale, reference, onSelectionChange, clearSelection]);
+  }, [
+    containerRef,
+    pageFrames,
+    scale,
+    reference,
+    onSelectionChange,
+    onClientRects,
+    clearSelection,
+  ]);
 
   return { clearSelection };
 }

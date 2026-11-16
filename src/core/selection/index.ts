@@ -3,3 +3,4 @@
  */
 export * from './extract';
 export * from './optimize-rects';
+export * from './shape';

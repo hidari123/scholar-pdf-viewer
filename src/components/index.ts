@@ -9,6 +9,7 @@ export * from './PageCanvas';
 export * from './PasswordDialog';
 export * from './PdfViewer';
 export * from './SearchPanel';
+export * from './SelectionLayer';
 export * from './TextLayer';
 export * from './ThumbnailPanel';
 export * from './Toolbar';

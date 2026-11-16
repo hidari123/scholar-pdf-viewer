@@ -97,36 +97,55 @@ try {
       }
     }
 
-    // 每个视觉行中心被涂了几次
-    const sample = (x, y) => {
-      let c = 0;
-      for (const r of rects) {
-        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) c += 1;
-      }
-      return c;
-    };
-
-    const paintCounts = groups.map((g) => sample((g.left + g.right) / 2, (g.top + g.bottom) / 2));
-
     const span = document.querySelector('.scpdf-text-layer__item');
+    const layer = document.querySelector('.scpdf-selection-layer');
 
     return {
       lines: groups.length,
-      maxPaint: paintCounts.length > 0 ? Math.max(...paintCounts) : 0,
+      /** 原生选区的叠涂次数（浏览器仍返回多个重叠 rect，但背景已关掉 → 不影响观感） */
+      nativeMaxPaint: Math.max(
+        ...groups.map((g) => {
+          const cx = (g.left + g.right) / 2;
+          const cy = (g.top + g.bottom) / 2;
+          return rects.filter((r) => cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom)
+            .length;
+        }),
+      ),
+      /** 原生选区背景必须是透明（否则会与自绘层叠加） */
+      nativeBg: span ? getComputedStyle(span, '::selection').backgroundColor : '',
+      /** 自绘层必须有 clipPath 矩形 */
+      layerRects: layer ? layer.querySelectorAll('clipPath rect').length : 0,
+      /** 自绘层的填充色 */
+      layerFill: layer
+        ? getComputedStyle(layer.querySelector('.scpdf-selection-layer__fill')).fill
+        : '',
+      /** line-height 必须是正常值（0 会让选区框上偏 22px） */
       lineHeight: span ? getComputedStyle(span).lineHeight : '',
     };
   });
 
   check(
-    '选区每处只涂一次（无阶梯状深浅不一）',
-    paint !== null && paint.maxPaint === 1,
-    paint ? `最大叠涂次数 = ${paint.maxPaint}（${paint.lines} 行）` : '',
+    '原生 ::selection 背景已关闭（改由自绘层接管）',
+    paint !== null && paint.nativeBg === 'rgba(0, 0, 0, 0)',
+    paint ? `native ::selection background = ${paint.nativeBg}` : '',
   );
 
   check(
-    '文本层 span 的 line-height: 0（消除多余行盒）',
-    paint !== null && paint.lineHeight === '0px',
+    '自绘选区层已渲染（clipPath 有矩形）',
+    paint !== null && paint.layerRects > 0,
+    paint ? `${paint.layerRects} 个 clip rect` : '',
+  );
+
+  check(
+    '文本层 line-height 正常（0 会让选区框上偏 22px）',
+    paint !== null && paint.lineHeight !== '0px',
     paint ? `line-height = ${paint.lineHeight}` : '',
+  );
+
+  check(
+    '自绘层填充色可读（半透明 + multiply）',
+    paint !== null && paint.layerFill !== 'none',
+    paint ? `fill = ${paint.layerFill}` : '',
   );
 
   // ---- 添加高亮 ----

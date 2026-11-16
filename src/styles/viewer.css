@@ -244,35 +244,57 @@
   /* 不参与布局（绝对定位已足够），避免撑开容器影响滚动 */
   display: block;
   /*
-   * ⚠️ **line-height: 0 —— 修"选区阶梯状深浅不一"的关键**：
+   * ⚠️ **不要设 line-height: 0**：
    *
-   * 一行里常有两个**不同字号**的 span（正文 22.9px + 上标 17.4px）。
-   * 它们各自形成**独立的行盒** → 浏览器的 `getClientRects()` 返回
-   * **多个垂直重叠的矩形** → `::selection` 背景被**叠涂两次**
-   * → 半透明色叠两次 → 颜色明显更深 → 出现阶梯状深浅不一。
+   * 上一轮为了修"选区叠涂"设了 `line-height: 0`，实测发现：
+   * - 叠涂次数确实降到 1 ✅
+   * - 但浏览器的**选区矩形** fallback 到默认行盒 → 选区框**上偏 22px** ❌
+   *   （选区框高 44px 而字号只有 16.1px → 肉眼"框粗了、上下多选一点"）
    *
-   * 实测（真实 PDF，230%，选 10 行）：
-   *   改前：{涂1次: 2行, 涂2次: 8行}   ← 8/10 行被叠涂
-   *   改后：{涂1次: 10行}              ← 全部只涂一次
-   *
-   * 为什么不影响位置：span 是 `position: absolute`，
-   * `top` 定位**不依赖行盒** → 位置完全不受影响。
+   * 现在改用 **自绘选区层**（SVG clipPath）→ 不依赖行盒 → line-height 保持正常。
    */
-  line-height: 0;
 }
 
 /*
- * 选区颜色（WPS / Word 风格）。
+ * 选区（自绘层接管，原生背景关闭）。
  *
- * `mix-blend-mode: multiply`（正片叠底）是关键：
- * 浏览器的 ::selection 背景画在**文本层**上，而真正的黑字在 **canvas** 上
- * → 半透明蓝 + 黑字 = 灰蓝，字发虚
- * → 正片叠底后：黑字 × 蓝 = **黑**，字完全清晰，只有背景被染色
+ * ⚠️ **为什么要关掉原生背景**：
+ * 浏览器会**逐个 client rect** 画选区背景。同一行里不同字号的 span
+ * （正文 + 上标）各自形成行盒 → `getClientRects()` 返回多个**垂直重叠**的矩形
+ * → 重叠区被**叠涂两次** → 半透明色叠两次 → **阶梯状深浅不一**。
+ *
+ * → 关掉原生背景，改由 `.scpdf-selection-layer`（SVG clipPath）自绘
+ * → 每个像素只画一次 → 均匀。
+ *
+ * ⚠️ **颜色不透明度要配合自绘层**：
+ * 原生 `::selection` 叠涂两次 ≈ 28%×2 ≈ 48%（太深）；
+ * 自绘只画一次 → 需要**更淡**的颜色才接近原来的观感。
  *
  * 颜色可配：宿主覆盖 `--scpdf-selection-color` 即可（伪元素里 CSS 变量可用）。
  */
 .scpdf-text-layer ::selection {
-  background: var(--scpdf-selection-color, rgba(13, 104, 189, 0.24));
+  background: transparent;
+  mix-blend-mode: multiply;
+}
+
+/*
+ * 自绘选区层（SVG）。
+ *
+ * - `z-index: 2` → 在 canvas(1) 之上、annotation(3) 之下
+ *   （选区应该盖住文字，但用户高亮优先）
+ * - `pointer-events: none` → 不挡选区与链接点击
+ * - `mix-blend-mode: multiply` → 正片叠底，文字仍清晰可读
+ */
+.scpdf-selection-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  overflow: visible;
+}
+
+.scpdf-selection-layer__fill {
+  fill: var(--scpdf-selection-color, rgba(0, 90, 255, 0.22));
   mix-blend-mode: multiply;
 }
 
