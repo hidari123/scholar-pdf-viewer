@@ -125,27 +125,28 @@ export function Reader({ url }: { url: string }) {
 
 ## `<PdfViewer>` 主要 props
 
-| prop                  | 类型                                       | 说明                           |
-| --------------------- | ------------------------------------------ | ------------------------------ |
-| `file`                | `string \| Blob \| ArrayBuffer \| null`    | 文档来源（唯一必填）           |
-| `highlights`          | `HighlightRecord[]`                        | 受控高亮                       |
-| `getPage`             | `(n) => Promise<PageProxyLike>`            | 取页（宿主注入 pdf.js）        |
-| `getPageSizes`        | `(n) => Promise<{width,height}[]>`         | 各页尺寸（pt）——影响跳页准确性 |
-| `getDocInfo`          | `(data) => Promise<PdfDocInfo>`            | 文档信息（页数/元数据）        |
-| `getOutline`          | `() => Promise<OutlineItemLike[] \| null>` | 目录                           |
-| `pageRefToNumber`     | `(ref) => number \| null`                  | 页引用 → 页码（解析目录目标）  |
-| `renderThumbnail`     | `(n, width) => Promise<string \| null>`    | 渲染缩略图（返回图片 URL）     |
-| `searchEngine`        | `PdfSearch \| null`                        | 搜索引擎（core 实例）          |
-| `onSelectionChange`   | `(s: SelectionData \| null) => void`       | 选区变化（**纯几何**）         |
-| `onHighlightCreate`   | `(h: NewHighlight) => void`                | 新建高亮（宿主决定是否保存）   |
-| `onPageChange`        | `(page, total) => void`                    | 当前页变化                     |
-| `onZoomChange`        | `(scale) => void`                          | 缩放变化                       |
-| `onExternalLink`      | `(url) => void`                            | 外部链接点击（宿主决定怎么开） |
-| `showPasswordDialog`  | `boolean`                                  | 用包内置密码框（加密文档）     |
-| `initialScale`        | `'width' \| number`                        | 初始缩放（默认适配宽度）       |
-| `locale` / `messages` | `'zh' \| 'en'` / `Partial<Messages>`       | 语言 / 文案覆盖                |
-| `theme`               | `'light' \| 'dark' \| 'auto'`              | 主题                           |
-| `toolbar`             | `ToolbarConfig`                            | 工具栏开关 + 左右 slots        |
+| prop                  | 类型                                       | 说明                            |
+| --------------------- | ------------------------------------------ | ------------------------------- |
+| `file`                | `string \| Blob \| ArrayBuffer \| null`    | 文档来源（唯一必填）            |
+| `highlights`          | `HighlightRecord[]`                        | 受控高亮                        |
+| `highlightPalette`    | `Record<string, string>`                   | 高亮色板（语义 key → CSS 颜色） |
+| `getPage`             | `(n) => Promise<PageProxyLike>`            | 取页（宿主注入 pdf.js）         |
+| `getPageSizes`        | `(n) => Promise<{width,height}[]>`         | 各页尺寸（pt）——影响跳页准确性  |
+| `getDocInfo`          | `(data) => Promise<PdfDocInfo>`            | 文档信息（页数/元数据）         |
+| `getOutline`          | `() => Promise<OutlineItemLike[] \| null>` | 目录                            |
+| `pageRefToNumber`     | `(ref) => number \| null`                  | 页引用 → 页码（解析目录目标）   |
+| `renderThumbnail`     | `(n, width) => Promise<string \| null>`    | 渲染缩略图（返回图片 URL）      |
+| `searchEngine`        | `PdfSearch \| null`                        | 搜索引擎（core 实例）           |
+| `onSelectionChange`   | `(s: SelectionData \| null) => void`       | 选区变化（**纯几何**）          |
+| `onHighlightCreate`   | `(h: NewHighlight) => void`                | 新建高亮（宿主决定是否保存）    |
+| `onPageChange`        | `(page, total) => void`                    | 当前页变化                      |
+| `onZoomChange`        | `(scale) => void`                          | 缩放变化                        |
+| `onExternalLink`      | `(url) => void`                            | 外部链接点击（宿主决定怎么开）  |
+| `showPasswordDialog`  | `boolean`                                  | 用包内置密码框（加密文档）      |
+| `initialScale`        | `'width' \| number`                        | 初始缩放（默认适配宽度）        |
+| `locale` / `messages` | `'zh' \| 'en'` / `Partial<Messages>`       | 语言 / 文案覆盖                 |
+| `theme`               | `'light' \| 'dark' \| 'auto'`              | 主题                            |
+| `toolbar`             | `ToolbarConfig`                            | 工具栏开关 + 左右 slots         |
 
 完整清单见 `src/components/PdfViewer.tsx`。
 
@@ -176,6 +177,42 @@ export function Reader({ url }: { url: string }) {
 - **视口 px**——渲染
 
 选区与高亮都以归一化坐标存储 → 换设备、换缩放、换主题都不需要迁移数据。
+
+## 高亮与选区的渲染（对齐 pdf.js + WPS）
+
+### 文字层：逐 item + `scaleX`
+
+- **一个 pdf.js text item 一个 span**（不按行合并）→ 每个字的位置都对得上
+- **`scaleX = PDF 真实宽度 / 浏览器实测宽度`** → 内嵌字体与系统字体度量不同时也不偏
+  （⚠️ **不能设 `width`**，否则 scaleX 会被二次缩放抵消）
+- **`top = 基线 − 实测 ascent`**（canvas `measureText` 量出来的，不是字号）
+- **`line-height: 0`** → 同行不同字号的 span 不再各自形成行盒 →
+  `::selection` 背景**每处只涂一次**（否则叠涂出现阶梯状深浅不一）
+
+### 高亮：正片叠底（`mix-blend-mode: multiply`）
+
+高亮层在 DOM 里排在 `<canvas>` 之后（这样才能点）。
+若背景不透明就会**完全遮住文字** →
+`multiply` 让**黑字 × 高亮色 = 黑**，字清晰可见，背景被染色（荧光笔效果）。
+
+`::selection` 同理 —— 否则半透明蓝盖在 canvas 的黑字上 → 蓝 + 黑 = 灰蓝 → 字发虚。
+
+### 颜色可配（包的边界）
+
+包**只负责把颜色渲染出来**；取色器 UI、语义、持久化 → **归宿主**。
+
+```tsx
+// 1) 高亮色板：语义 key → CSS 颜色
+<PdfViewer
+  highlights={highlights} // 每条的 color 存的是 key（如 'yellow' / 'h-123'）
+  highlightPalette={{ yellow: '#ffd54a', 'h-123': '#ff6b6b' }}
+/>;
+
+// 2) 选区颜色：CSS 变量
+// :root { --scpdf-selection-color: rgba(13, 104, 189, 0.24); }
+```
+
+包内置 6 色（`DEFAULT_HIGHLIGHT_PALETTE`），宿主可完全覆盖或扩展。
 
 ## 错误码
 
@@ -216,7 +253,7 @@ pnpm demo          # 启动 demo（消费 dist 产物，真实消费者路径）
 pnpm e2e           # E2E（需先 pnpm e2e:serve）
 ```
 
-E2E 脚本（8 套，64 项断言）：
+E2E 脚本（9 套，73 项断言）：
 
 | 脚本            | 验证内容                                          |
 | --------------- | ------------------------------------------------- |
@@ -225,6 +262,7 @@ E2E 脚本（8 套，64 项断言）：
 | `e2e:panels`    | 缩略图 / 目录 / 搜索三个面板                      |
 | `e2e:links`     | 链接层（XSS 过滤 / 位置 / 点击）                  |
 | `e2e:selection` | **选区精准度**（scaleX 生效 / 起点 Δ / 整页不丢） |
+| `e2e:highlight` | **高亮效果**（逐行对齐 Δ=0 / 不叠涂 / 不遮字）    |
 | `e2e:zoom`      | **缩放**（整十比例 / 左上角锚点 / 无白屏）        |
 | `e2e:search`    | **搜索高亮**（命中矩形 / 落在文字上 / 跳转）      |
 | `e2e:thumbnail` | **缩略图**（零错位 / DPR / 无变形）               |
