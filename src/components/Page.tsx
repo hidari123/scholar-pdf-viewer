@@ -12,6 +12,9 @@
 
 import { useEffect, useState } from 'react';
 import type { LinkAnnotationLike } from '../core/annotation/links';
+import type { SearchHitRect } from '../core/search/highlight';
+import type { PositionedTextItem } from '../core/text-layer/layout';
+import { layoutTextItems } from '../core/text-layer/layout';
 import type { HighlightRecord } from '../core/types';
 import { AnnotationLayer } from './AnnotationLayer';
 import { LinkLayer } from './LinkLayer';
@@ -33,6 +36,10 @@ export interface PageProps {
   pageSizePt?: { width: number; height: number };
   /** 链接注解（宿主注入） */
   annotations?: LinkAnnotationLike[] | null;
+  /** 搜索命中矩形（当前页，归一化） */
+  searchRects?: SearchHitRect[];
+  /** 当前激活的搜索命中下标（当前页内） */
+  activeSearchRectIndex?: number | null;
   /** 高亮（受控） */
   highlights: HighlightRecord[];
   /** 激活的高亮 id */
@@ -45,6 +52,13 @@ export interface PageProps {
   onInternalLink?: (dest: string | unknown[]) => void;
   /** 渲染失败 */
   onRenderError?: (error: unknown, pageNumber: number) => void;
+  /**
+   * 文本项就绪回调（搜索高亮用）。
+   *
+   * 搜索命中的字符偏移要转成矩形 → 需要该页的文本项几何。
+   * ⚠️ 必须与**搜索索引**用的是同一份 items，否则偏移错位。
+   */
+  onTextItems?: (pageNumber: number, items: PositionedTextItem[]) => void;
   /** 无障碍标签 */
   ariaLabel?: string;
 }
@@ -62,12 +76,15 @@ export function Page(props: PageProps) {
     size,
     pageSizePt,
     annotations,
+    searchRects,
+    activeSearchRectIndex,
     highlights,
     activeHighlightId,
     onHighlightClick,
     onExternalLink,
     onInternalLink,
     onRenderError,
+    onTextItems,
     ariaLabel,
   } = props;
 
@@ -146,6 +163,24 @@ export function Page(props: PageProps) {
     };
   }, [page, scale]);
 
+  /**
+   * 排版文本项 → 报告给父组件（搜索高亮用）。
+   *
+   * ⚠️ **必须与搜索索引用同一份 items**：
+   * 索引文本 = `items.map(i => i.str).join('')`，
+   * 这里的 `layoutTextItems` 用的就是同一份 `textContent.items`（顺序不变）
+   * → 字符偏移能准确映射到矩形。
+   */
+  useEffect(() => {
+    if (!textContent || !viewport) {
+      onTextItems?.(pageNumber, []);
+      return;
+    }
+
+    const items = layoutTextItems(textContent, viewport);
+    onTextItems?.(pageNumber, items);
+  }, [textContent, viewport, pageNumber, onTextItems]);
+
   return (
     <>
       <PageCanvas page={page} scale={scale} ariaLabel={ariaLabel} onRenderError={onRenderError} />
@@ -175,6 +210,8 @@ export function Page(props: PageProps) {
         viewport={{ width: size.width, height: size.height }}
         activeHighlightId={activeHighlightId}
         onHighlightClick={onHighlightClick}
+        searchRects={searchRects}
+        activeSearchRectIndex={activeSearchRectIndex}
       />
     </>
   );

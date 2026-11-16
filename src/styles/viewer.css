@@ -290,6 +290,20 @@
   outline-offset: 0;
 }
 
+/* 搜索命中（与用户高亮区分：不同颜色） */
+.scpdf-annotation--search {
+  background: rgba(255, 173, 0, 0.42);
+  /* 搜索高亮不可点（避免挡住选区与链接） */
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+.scpdf-annotation--search-active {
+  background: rgba(255, 122, 0, 0.72);
+  outline: 1px solid rgba(255, 122, 0, 0.9);
+  outline-offset: 0;
+}
+
 /* ---------- 状态区（加载 / 空 / 错误） ---------- */
 
 .scpdf-state {

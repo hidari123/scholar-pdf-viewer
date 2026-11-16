@@ -22,7 +22,10 @@ import type { DocumentSource, LoadOptions } from '../core/document/loader';
 import type { PdfViewerError } from '../core/errors';
 import { pdfViewerError } from '../core/errors';
 import type { OutlineItemLike } from '../core/outline/outline';
+import type { SearchHitRect } from '../core/search/highlight';
+import { hitsToRects } from '../core/search/highlight';
 import type { PdfSearch, SearchHit } from '../core/search/search';
+import type { PositionedTextItem } from '../core/text-layer/layout';
 import type { HighlightRecord, NewHighlight, PdfDocInfo, SelectionData } from '../core/types';
 import { useCurrentPage } from '../hooks/useCurrentPage';
 import { usePdfDocument } from '../hooks/usePdfDocument';
@@ -199,6 +202,23 @@ export function PdfViewer(props: PdfViewerProps) {
   /** 目录数据（宿主注入） */
   const [outline, setOutline] = useState<OutlineItemLike[] | null>(null);
 
+  /** 搜索命中（由 SearchPanel 回调） */
+  const [searchHits, setSearchHits] = useState<SearchHit[]>([]);
+
+  /** 当前激活的搜索命中下标 */
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0);
+
+  /**
+   * 各页的文本项（用于把搜索命中的字符偏移转成矩形）。
+   *
+   * ⚠️ 必须与**搜索索引**用的是同一份 items，
+   * 否则偏移错位 → 高亮跑到别的字上。
+   * 这里从 `Page` 渲染时用的 textContent 来（宿主注入的 getTextContent）。
+   */
+  const [textItemsByPage, setTextItemsByPage] = useState<Map<number, PositionedTextItem[]>>(
+    new Map(),
+  );
+
   /** 密码框是否打开 */
   const [passwordOpen, setPasswordOpen] = useState(false);
 
@@ -268,6 +288,23 @@ export function PdfViewer(props: PdfViewerProps) {
     }
     return sizes;
   }, [numPages, scale, pageSizesPt]);
+
+  /**
+   * 页面尺寸表（页码 → **视口 px** 尺寸，搜索高亮归一化用）。
+   *
+   * ⚠️ 必须用**视口 px**（不是 pt）：文本项的 left/top/width 也是视口 px，
+   * 单位不一致会让归一化结果差一个缩放倍数。
+   */
+  const pageSizesByPage = useMemo(() => {
+    const map = new Map<number, { width: number; height: number }>();
+    for (let i = 0; i < numPages; i += 1) {
+      const size = pageSizes[i];
+      if (size) {
+        map.set(i + 1, { width: size.width, height: size.height });
+      }
+    }
+    return map;
+  }, [numPages, pageSizes]);
 
   /**
    * 页顶边数组（末项为文档总高哨兵）。
@@ -577,6 +614,141 @@ export function PdfViewer(props: PdfViewerProps) {
     [onHighlightClick],
   );
 
+  /**
+   * 搜索命中变化（回调给 SearchPanel）。
+   *
+   * ⚠️ **必须是稳定的引用**（useCallback）：
+   * SearchPanel 的搜索 effect 依赖它 → 每次渲染都换引用会导致
+   * **反复重搜**并把 activeIndex 重置为 0 → 点"下一个"没反应。
+   */
+  const handleSearchHitsChange = useCallback((hits: SearchHit[]) => {
+    setSearchHits(hits);
+  }, []);
+
+  /** 搜索面板关闭 */
+  const handleSearchClose = useCallback(() => {
+    setSearchOpen(false);
+    // 关闭时清掉高亮
+    setSearchHits([]);
+  }, []);
+
+  /**
+   * 搜索命中 → 高亮矩形。
+   *
+   * 流程：
+   * 1. `SearchPanel` 搜出 `SearchHit[]`（字符偏移）
+   * 2. 需要把偏移转成矩形 → 需要该页的**文本项**（与索引同一份）
+   * 3. 文本项 → 归一化矩形 → `AnnotationLayer` 渲染
+   *
+   * ⚠️ **索引与渲染必须用同一份 items**：
+   * 索引文本 = `items.map(i => i.str).join('')`，
+   * 所以渲染用的 items 顺序必须与索引时完全一致。
+   * 包从 `Page` 的文本层拿 items（`Page` 渲染时用的是宿主的 getTextContent）。
+   */
+  const searchRectsByPage = useMemo(() => {
+    if (searchHits.length === 0) {
+      return new Map<number, SearchHitRect[]>();
+    }
+
+    return hitsToRects(searchHits, textItemsByPage, pageSizesByPage);
+  }, [searchHits, textItemsByPage, pageSizesByPage]);
+
+  /**
+   * 滚到搜索命中（精确到命中所在的行）。
+   *
+   * 只跳到页首是不够的 —— 命中可能在页面的第 3 行中间。
+   * 所以用命中矩形的 y 坐标算精确滚动位置。
+   */
+  const scrollToSearchHit = useCallback(
+    (hit: SearchHit) => {
+      const rects = searchRectsByPage.get(hit.pageNumber);
+      const container = containerRef.current;
+
+      if (!rects || !container || rects.length === 0) {
+        scrollToPage(hit.pageNumber);
+        return;
+      }
+
+      // 第一个命中的矩形
+      const rect = rects[0];
+      if (!rect) {
+        scrollToPage(hit.pageNumber);
+        return;
+      }
+
+      // 页面在文档中的顶边
+      const pageTop = pageTops[hit.pageNumber - 1] ?? 0;
+      // 命中在页内的 y（px）
+      const hitY = rect.y * (pageSizes[hit.pageNumber - 1]?.height ?? 0);
+      // 留 100px 余量，让命中在视口上部可见
+      const target = pageTop + hitY - 100;
+
+      container.scrollTo({ top: Math.max(0, target), behavior: 'auto' });
+    },
+    [searchRectsByPage, pageTops, pageSizes, scrollToPage],
+  );
+
+  /**
+   * 跳到搜索命中。
+   *
+   * ⚠️ **必须是稳定的引用**（见 handleSearchHitsChange 的说明）。
+   */
+  const handleSearchNavigate = useCallback(
+    (hit: SearchHit, index: number) => {
+      setActiveSearchIndex(index);
+      scrollToSearchHit(hit);
+    },
+    [scrollToSearchHit],
+  );
+
+  /** 收到某页的文本项（搜索高亮用） */
+  const handleTextItems = useCallback((pageNumber: number, items: PositionedTextItem[]) => {
+    setTextItemsByPage((prev) => {
+      const existing = prev.get(pageNumber);
+      // 已有且数量相同 → 不更新（避免无谓重渲染）
+      if (existing && existing.length === items.length) {
+        return prev;
+      }
+      const next = new Map(prev);
+      next.set(pageNumber, items);
+      return next;
+    });
+  }, []);
+
+  /**
+   * 当前激活的搜索命中在某页的矩形下标（页内）。
+   *
+   * ⚠️ 一个命中可能产生**多个矩形**（跨 item / 跨行），
+   * 所以不能简单地"数前面有几个命中"——必须按**矩形**数。
+   *
+   * @param pageNumber 页码
+   * @returns 页内下标；该页没有激活命中时返回 null
+   */
+  const activeSearchIndexOnPage = useCallback(
+    (pageNumber: number): number | null => {
+      const hit = searchHits[activeSearchIndex];
+      if (!hit || hit.pageNumber !== pageNumber) {
+        return null;
+      }
+
+      // 累加"该页在 activeSearchIndex 之前的所有命中"产生的矩形数
+      let pageOffset = 0;
+      for (let i = 0; i < activeSearchIndex; i += 1) {
+        const earlier = searchHits[i];
+        if (!earlier || earlier.pageNumber !== pageNumber) {
+          continue;
+        }
+        const earlierRects = hitsToRects([earlier], textItemsByPage, pageSizesByPage).get(
+          pageNumber,
+        );
+        pageOffset += earlierRects?.length ?? 0;
+      }
+
+      return pageOffset;
+    },
+    [searchHits, activeSearchIndex, textItemsByPage, pageSizesByPage],
+  );
+
   const className = [
     'scpdf-root',
     theme === 'dark' ? 'scpdf-root--dark' : '',
@@ -625,11 +797,9 @@ export function PdfViewer(props: PdfViewerProps) {
       {searchOpen ? (
         <SearchPanel
           search={searchEngine ?? null}
-          onClose={() => setSearchOpen(false)}
-          onNavigate={(hit: SearchHit) => {
-            // 跳到命中所在页（宿主可再根据 start 做精确定位与高亮）
-            scrollToPage(hit.pageNumber);
-          }}
+          onClose={handleSearchClose}
+          onHitsChange={handleSearchHitsChange}
+          onNavigate={handleSearchNavigate}
           locale={locale}
           messages={messages}
         />
@@ -743,11 +913,14 @@ export function PdfViewer(props: PdfViewerProps) {
                       size={size}
                       pageSizePt={pageSizesPt[index]}
                       annotations={annotations.get(pageNumber) ?? null}
+                      searchRects={searchRectsByPage.get(pageNumber)}
+                      activeSearchRectIndex={activeSearchIndexOnPage(pageNumber)}
                       highlights={highlights}
                       activeHighlightId={activeHighlightId}
                       onHighlightClick={handleHighlightClick}
                       onExternalLink={onExternalLink}
                       onInternalLink={(dest) => onInternalLink?.(dest, pageNumber)}
+                      onTextItems={handleTextItems}
                       ariaLabel={t('a11y.page', { page: pageNumber })}
                       onRenderError={(renderError, failedPage) => {
                         onError?.(

@@ -20,6 +20,12 @@ export interface SearchPanelProps {
   onClose: () => void;
   /** 跳转到某页（宿主负责滚动 + 高亮定位） */
   onNavigate?: (hit: SearchHit, index: number) => void;
+  /**
+   * 搜索结果变化（宿主用来渲染页面上的高亮）。
+   *
+   * 有了这个回调，宿主就能拿到全部命中 → 转成矩形 → 画在页面上。
+   */
+  onHitsChange?: (hits: SearchHit[]) => void;
   /** 语言 */
   locale?: Locale;
   /** 文案覆盖 */
@@ -32,7 +38,7 @@ export interface SearchPanelProps {
  * @param props 参数
  */
 export function SearchPanel(props: SearchPanelProps) {
-  const { search, onClose, onNavigate, locale = 'zh', messages } = props;
+  const { search, onClose, onNavigate, onHitsChange, locale = 'zh', messages } = props;
 
   const [keyword, setKeyword] = useState('');
   const [hits, setHits] = useState<SearchHit[]>([]);
@@ -82,9 +88,12 @@ export function SearchPanel(props: SearchPanelProps) {
         const result = search.search(next);
         setHits(result);
         setActiveIndex(0);
+        // 通知宿主（渲染页面上的高亮）
+        onHitsChange?.(result);
       } catch {
         if (searchIdRef.current === searchId) {
           setHits([]);
+          onHitsChange?.([]);
         }
       } finally {
         if (searchIdRef.current === searchId) {
@@ -92,7 +101,7 @@ export function SearchPanel(props: SearchPanelProps) {
         }
       }
     },
-    [search],
+    [search, onHitsChange],
   );
 
   // 输入变化 → 搜索
