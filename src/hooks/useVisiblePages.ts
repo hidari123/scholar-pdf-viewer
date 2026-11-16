@@ -1,17 +1,18 @@
 /**
  * useVisiblePages —— 虚拟化：决定"哪些页要渲染"。
  *
- * 策略（方案 §7.2）：
- * - `IntersectionObserver`（root = 滚动容器，rootMargin = 3 页高）观察页占位元素
- * - 可见页 + 缓冲页 = 要渲染的页
- * - 缓冲页的作用：提前渲染好，翻页不等待
+ * **几何法**（不用 IntersectionObserver）：
+ * - 原因见 `core/virtualization/visible.ts` 的说明（IO 在缩放后会失效 → 白屏）
+ * - 触发时机：scroll（rAF 节流）/ **scale 变化** / resize
  *
- * 为什么用 IntersectionObserver 而不是 scroll 事件里算：
- * - IO 在**主线程之外**计算可见性，滚动时不掉帧
- * - 不需要自己维护"哪些元素在视口内"的状态
+ * 缩放后立即重算是修白屏的关键：
+ * 缩放改变了所有页的高度与位置，靠 IO 的异步回调会滞后一帧以上，
+ * 用户会看到"页面变白 → 又出现"���闪。
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PageBox } from '../core/virtualization/visible';
+import { computeVisiblePages } from '../core/virtualization/visible';
 
 /** useVisiblePages 参数 */
 export interface UseVisiblePagesOptions {
@@ -23,6 +24,8 @@ export interface UseVisiblePagesOptions {
   totalPages: number;
   /** 缓冲区页数（默认 3） */
   bufferPages?: number;
+  /** 当前缩放（缩放后要立刻重算） */
+  scale?: number;
 }
 
 /** useVisiblePages 返回值 */
@@ -31,6 +34,8 @@ export interface UseVisiblePagesResult {
   visiblePages: number[];
   /** 当前视口内的页（不含缓冲） */
   viewportPages: number[];
+  /** 手动触发重算（缩放 / 尺寸变化后调用） */
+  refresh: () => void;
 }
 
 /**
@@ -39,7 +44,7 @@ export interface UseVisiblePagesResult {
  * @param options 参数
  */
 export function useVisiblePages(options: UseVisiblePagesOptions): UseVisiblePagesResult {
-  const { containerRef, pageElements, totalPages, bufferPages = 3 } = options;
+  const { containerRef, pageElements, totalPages, bufferPages = 3, scale = 1 } = options;
 
   const [visiblePages, setVisiblePages] = useState<number[]>([]);
   const [viewportPages, setViewportPages] = useState<number[]>([]);
@@ -47,87 +52,151 @@ export function useVisiblePages(options: UseVisiblePagesOptions): UseVisiblePage
   /** 上一次的可见页（避免重复 setState） */
   const lastRef = useRef<number[]>([]);
 
-  useEffect(() => {
-    if (totalPages <= 0) {
+  /** rAF 句柄（scroll 节流） */
+  const rafRef = useRef<number | null>(null);
+
+  /**
+   * 收集页的占位信息。
+   *
+   * 用 `offsetTop`（相对定位的偏移）而不是 `getBoundingClientRect()`：
+   * - offsetTop 不受滚动影响 → 结果与滚动位置无关（更稳定）
+   * - 但它相对的是 offsetParent → 需要保证页容器是 offsetParent
+   *
+   * 这里用 `getBoundingClientRect` 减去容器矩形，换算成"内容坐标" ——
+   * 与滚动位置直接可比，不依赖 offsetParent 的设定。
+   */
+  const collectPageBoxes = useCallback((): PageBox[] => {
+    const container = containerRef.current;
+    if (!container) {
+      return [];
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const boxes: PageBox[] = [];
+
+    for (const [pageNumber, element] of pageElements.current) {
+      const rect = element.getBoundingClientRect();
+      boxes.push({
+        pageNumber,
+        // 元素的视口 top - 容器视口 top + scrollTop = 内容坐标
+        top: rect.top - containerRect.top + container.scrollTop,
+        height: rect.height,
+      });
+    }
+
+    boxes.sort((a, b) => a.pageNumber - b.pageNumber);
+    return boxes;
+  }, [containerRef, pageElements]);
+
+  /**
+   * 重算可见页。
+   */
+  const recompute = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || totalPages <= 0) {
       setVisiblePages([]);
       setViewportPages([]);
       return;
     }
 
+    const boxes = collectPageBoxes();
+    if (boxes.length === 0) {
+      return;
+    }
+
+    const next = computeVisiblePages({
+      scrollTop: container.scrollTop,
+      viewportHeight: container.clientHeight,
+      pages: boxes,
+      bufferPages,
+    });
+
+    // 只在真的变了时才 setState（避免无谓重渲染）
+    const changed =
+      next.length !== lastRef.current.length ||
+      next.some((page, index) => page !== lastRef.current[index]);
+
+    if (changed) {
+      lastRef.current = next;
+      setVisiblePages(next);
+    }
+
+    // 视口页（不含缓冲）
+    const viewport = computeVisiblePages({
+      scrollTop: container.scrollTop,
+      viewportHeight: container.clientHeight,
+      pages: boxes,
+      bufferPages: 0,
+    });
+    setViewportPages((prev) =>
+      prev.length === viewport.length && prev.every((p, i) => p === viewport[i]) ? prev : viewport,
+    );
+  }, [containerRef, totalPages, bufferPages, collectPageBoxes]);
+
+  /** 手动触发重算 */
+  const refresh = useCallback(() => {
+    recompute();
+  }, [recompute]);
+
+  // scroll → rAF 节流重算
+  useEffect(() => {
     const container = containerRef.current;
     if (!container) {
       return;
     }
 
-    // 环境不支持 IO（老浏览器 / SSR）→ 退化为"渲染前 N 页"
-    if (typeof IntersectionObserver === 'undefined') {
-      const fallback = Array.from(
-        { length: Math.min(totalPages, bufferPages * 2 + 1) },
-        (_, i) => i + 1,
-      );
-      setViewportPages(fallback);
-      setVisiblePages(fallback);
+    const onScroll = () => {
+      if (rafRef.current !== null) {
+        return;
+      }
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        recompute();
+      });
+    };
+
+    container.addEventListener('scroll', onScroll, { passive: true });
+
+    return () => {
+      container.removeEventListener('scroll', onScroll);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [containerRef, recompute]);
+
+  /**
+   * **缩放后立即重算**（修白屏的关键）。
+   *
+   * 缩放会改变所有页的高度与位置 → 可见页集合变了 → 必须重算。
+   * 之前靠 IO 的异步回调，会滞后 → 用户看到白屏。
+   */
+  useEffect(() => {
+    // 缩放后 DOM 还没重排 → 等一帧再算
+    const raf = requestAnimationFrame(() => {
+      recompute();
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [scale, recompute]);
+
+  // 初次挂载 + 尺寸变化
+  useEffect(() => {
+    recompute();
+
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') {
       return;
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const inViewport = new Set<number>();
+    const observer = new ResizeObserver(() => {
+      recompute();
+    });
+    observer.observe(container);
 
-        for (const entry of entries) {
-          const element = entry.target as HTMLElement;
-          const pageNumber = Number(element.dataset.pageNumber);
-          if (!Number.isFinite(pageNumber)) {
-            continue;
-          }
-          if (entry.isIntersecting) {
-            inViewport.add(pageNumber);
-          }
-        }
+    return () => observer.disconnect();
+  }, [recompute]);
 
-        const viewport = [...inViewport].sort((a, b) => a - b);
-
-        // 缓冲：在可见页前后各扩 bufferPages 页
-        const withBuffer = new Set<number>();
-        for (const pageNumber of viewport) {
-          for (let offset = -bufferPages; offset <= bufferPages; offset += 1) {
-            const target = pageNumber + offset;
-            if (target >= 1 && target <= totalPages) {
-              withBuffer.add(target);
-            }
-          }
-        }
-
-        const next = [...withBuffer].sort((a, b) => a - b);
-
-        // 只在真的变了时才 setState（避免无谓重渲染）
-        const changed =
-          next.length !== lastRef.current.length ||
-          next.some((page, index) => page !== lastRef.current[index]);
-
-        if (changed) {
-          lastRef.current = next;
-          setVisiblePages(next);
-          setViewportPages(viewport);
-        }
-      },
-      {
-        root: container,
-        // 上下各扩 3 页高 → 提前渲染，滚动到底时下一页已就绪
-        rootMargin: `${bufferPages * 100}% 0px`,
-        threshold: 0,
-      },
-    );
-
-    // 观察所有已挂载的页占位元素
-    for (const element of pageElements.current.values()) {
-      observer.observe(element);
-    }
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [containerRef, pageElements, totalPages, bufferPages]);
-
-  return { visiblePages, viewportPages };
+  return { visiblePages, viewportPages, refresh };
 }

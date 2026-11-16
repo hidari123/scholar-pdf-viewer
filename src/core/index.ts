@@ -18,3 +18,4 @@ export * from './store';
 export * from './text-layer';
 export * from './thumbnail';
 export type * from './types';
+export * from './virtualization';

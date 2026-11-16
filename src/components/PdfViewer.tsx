@@ -292,11 +292,41 @@ export function PdfViewer(props: PdfViewerProps) {
   }, [pageSizes]);
 
   // 3) 虚拟化
-  const { visiblePages } = useVisiblePages({
+  const { visiblePages, refresh: refreshVisiblePages } = useVisiblePages({
     containerRef,
     pageElements: pageElementsRef,
     totalPages: numPages,
+    // 缩放后要立刻重算可见页（修"缩放后白屏"）
+    scale,
   });
+
+  /**
+   * 已经渲染过的页（白屏兜底）。
+   *
+   * 为什么需要：可见页是**异步**算出来的（要等 DOM 重排 + 取页 proxy），
+   * 这中间如果某页已经滚出缓冲区，它的 canvas 会被卸载 → **白屏一闪**。
+   *
+   * 规则：**渲染过的页保留渲染**，直到它离缓冲区足够远（再卸载）。
+   * 多渲染一页的代价只是内存，白屏的代价是体验。
+   */
+  const renderedPagesRef = useRef<Set<number>>(new Set());
+
+  /** 要渲染的页 = 当前可见页 ∪ 渲染过的页（但排除明显远离的） */
+  const pagesToRender = useMemo(() => {
+    const toRender = new Set<number>(visiblePages);
+
+    // 记录本次要渲染的页
+    for (const pageNumber of visiblePages) {
+      renderedPagesRef.current.add(pageNumber);
+    }
+
+    // 把"渲染过但已不在缓冲区"的页也保留（防白屏）
+    for (const pageNumber of renderedPagesRef.current) {
+      toRender.add(pageNumber);
+    }
+
+    return toRender;
+  }, [visiblePages]);
 
   /** 取目录（宿主注入；懒加载 —— 打开目录面板时才取） */
   useEffect(() => {
@@ -684,7 +714,7 @@ export function PdfViewer(props: PdfViewerProps) {
           <div className="scpdf-pages" style={{ height: pageTops.at(-1) ?? 0 }}>
             {pageSizes.map((size, index) => {
               const pageNumber = index + 1;
-              const isVisible = visiblePages.includes(pageNumber);
+              const isVisible = pagesToRender.has(pageNumber);
 
               return (
                 <div

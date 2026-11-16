@@ -1,8 +1,13 @@
 /**
  * useZoom —— 缩放控制 + **锚点保持**。
  *
- * 锚点保持是"缩放不跳动"的关键：缩放前后，视口中心那个**内容点**保持在原地。
+ * 锚点保持是"缩放不跳动"的关键：缩放前后，视口**左上角**那个**内容点**保持在原地。
  * 公式在 core（纯函数、可单测），这里只负责读滚动位置 + 写回。
+ *
+ * **为什么锚点在左上角而不是中心**：
+ * - 用户明确要求"第一排文字高度不动"
+ * - 左上角锚点 = 滚动位置与内容位置的关系最简单 → 公式最稳
+ * - PDF 阅读器惯例（Chrome 内置 PDF 阅读器、macOS 预览）都是左上角锚点
  */
 
 import { useCallback, useEffect, useRef } from 'react';
@@ -14,6 +19,15 @@ export const MAX_SCALE = 2.5;
 
 /** 缩放步进 */
 export const SCALE_STEP = 0.1;
+
+/**
+ * 缩放量化步长（10%）。
+ *
+ * **为什么要量化**：用户看到的是"220%"，如果实际是 2.2205，
+ * 工具栏显示与渲染几何会不一致（点一次放大变成 232%，很突兀）。
+ * 量化后 **显示值 == 渲染几何 == 页尺寸计算**。
+ */
+export const SCALE_QUANTUM = 0.1;
 
 /** useZoom 参数 */
 export interface UseZoomOptions {
@@ -52,6 +66,21 @@ function clampScale(scale: number): number {
 }
 
 /**
+ * 把缩放量化到 10% 的倍数。
+ *
+ * 例：2.2205 → 2.2（220%）；1.04 → 1.0（100%）；1.26 → 1.3（130%）
+ *
+ * @param scale 原始比例
+ * @returns 量化后的比例
+ */
+export function quantizeScale(scale: number): number {
+  if (!Number.isFinite(scale) || scale <= 0) {
+    return scale;
+  }
+  return Math.round(scale / SCALE_QUANTUM) * SCALE_QUANTUM;
+}
+
+/**
  * 缩放控制。
  *
  * @param options 参数
@@ -69,7 +98,8 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
   /** 设置缩放并保持锚点 */
   const setScale = useCallback(
     (next: number) => {
-      const clamped = clampScale(next);
+      // 量化到 10% 的倍数（显示值与渲染几何一致）
+      const clamped = clampScale(quantizeScale(next));
       const container = containerRef.current;
 
       if (!container) {
@@ -78,7 +108,15 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
       }
 
       const scrollTop = container.scrollTop;
-      const anchorY = container.clientHeight / 2;
+      /**
+       * 锚点 = 视口**左上角**（anchorY = 0）。
+       *
+       * 效果：缩放前后，视口左上角那个内容点不动
+       *       → "第一排文字高度不动"。
+       *
+       * 之前用容器高度的一半（中心锚点）→ 顶部内容必然移动。
+       */
+      const anchorY = 0;
       const prevScale = prevScaleRef.current;
 
       if (prevScale > 0 && prevScale !== clamped) {
