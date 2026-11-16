@@ -542,6 +542,57 @@ export function PdfViewer(props: PdfViewerProps) {
     zoom.fitWidth(container.clientWidth, pt.width);
   }, [initialScale, numPages, pageSizesPt, zoom]);
 
+  /**
+   * 容器宽度变化时重新适配宽度（仅当用户没有手动缩放过）。
+   *
+   * **为什么需要**：打开/关闭缩略图侧栏会改变容器宽度 →
+   * 适配宽度的比例就过时了（页面比容器宽或窄）。
+   *
+   * **只在用户没手动缩放时做**：
+   * 用户手动调过比例就说明他有偏好，不该被覆盖。
+   */
+  const userZoomedRef = useRef(false);
+
+  useEffect(() => {
+    // 用户手动缩放 → 标记，之后不再自动适配
+    if (initialScaleAppliedRef.current) {
+      userZoomedRef.current = true;
+    }
+  }, [scale]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    let lastWidth = container.clientWidth;
+
+    const observer = new ResizeObserver(() => {
+      const width = container.clientWidth;
+      // 宽度没变 → 不管（高度变化不影响适配宽度）
+      if (Math.abs(width - lastWidth) < 2) {
+        return;
+      }
+      lastWidth = width;
+
+      // 用户手动缩放过 → 不覆盖用户的偏好
+      if (userZoomedRef.current || initialScale !== 'width') {
+        return;
+      }
+      if (numPages <= 0 || width <= 0) {
+        return;
+      }
+
+      const pt = pageSizesPt[0] ?? { width: PAGE_WIDTH_PT, height: PAGE_HEIGHT_PT };
+      zoom.fitWidth(width, pt.width);
+    });
+
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, [initialScale, numPages, pageSizesPt, zoom]);
+
   // 6) 选区
   useTextSelection({
     containerRef,

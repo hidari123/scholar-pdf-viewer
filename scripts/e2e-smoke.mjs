@@ -138,7 +138,7 @@ try {
     );
   }
 
-  // 3.5) 初始缩放 = 适配宽度（页宽应接近容器宽度）
+  // 3.5) 初始缩放 = 适配宽度（页宽应接近容器宽）
   const containerWidth = await page
     .locator('.scpdf-container')
     .evaluate((element) => element.clientWidth);
@@ -146,10 +146,15 @@ try {
     .locator('.scpdf-page canvas.scpdf-canvas')
     .first()
     .evaluate((element) => element.getBoundingClientRect().width);
+  /**
+   * 比例被量化到 10% 的倍数（用户要求"整十数"），
+   * 所以页宽不可能**精确**等于容器宽 → 容差按比例算（5%）。
+   */
+  const available = containerWidth - 32;
   check(
-    '初始缩放适配宽度（页宽接近容器宽）',
-    Math.abs(firstPageWidth - (containerWidth - 32)) < 40,
-    `页宽 ${Math.round(firstPageWidth)} / 容器 ${containerWidth}`,
+    '初始缩放适配宽度（页宽接近容器宽，误差 < 5%）',
+    Math.abs(firstPageWidth - available) / available < 0.05,
+    `页宽 ${Math.round(firstPageWidth)} / 可用 ${available}`,
   );
 
   // 存档初始状态截图（适配宽度时的样子）
