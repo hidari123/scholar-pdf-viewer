@@ -130,10 +130,7 @@ try {
 
   check(
     '有内置按钮（高亮/复制/翻译/提问/笔记）',
-    pop !== null &&
-      pop.buttons.includes('高亮') &&
-      pop.buttons.includes('复制') &&
-      pop.buttons.includes('翻译'),
+    pop?.buttons.includes('高亮') && pop.buttons.includes('复制') && pop.buttons.includes('翻译'),
     pop ? `按钮: ${pop.buttons.join(', ')}` : '',
   );
 

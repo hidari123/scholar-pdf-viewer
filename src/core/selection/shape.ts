@@ -32,43 +32,46 @@ export interface PageSelectionShape {
 }
 
 /**
- * 每页的**基线表**（页内坐标）。
+ * 每页的**字形框表**（页内坐标）。
  *
- * 用途：把浏览器的选区矩形（= 字体自然行盒）裁剪成**贴合字形**的矩形。
+ * ⚠️ **这里存的是"文字的盒子"，不是"字体的自然行盒"**：
  *
- * 每项：基线的 y + 字形的上/下距离。
+ * ```
+ * fontSize               = 20.62px   ← span 的 font-size
+ * fontBoundingBoxAscent  = 22px      ← 字体的自然上伸（比 fontSize 大！）
+ * fontBoundingBoxDescent = 5px       ← 字体的自然下伸
+ * 自然行盒                = 27px      ← 浏览器用它画选区矩形（偏高）
+ * span 的实际盒子          = 20.62px  ← font-size × line-height(1)
+ * ```
+ *
+ * → 选区要贴着**文字**，就该用 span 的盒子：`[item.top, item.top + fontSize]`。
  */
 export interface PageBaselines {
-  /** 基线的 y（页内坐标，px） */
+  /** 字形框的上边缘（页内坐标，px） */
+  top: number;
+  /** 字形框的高度（px） */
+  height: number;
+  /** 该行文字的基线（页内坐标，px）—— 匹配/排序用 */
   baseline: number;
-  /** 字形顶相对基线的高度 */
-  above: number;
-  /** 字形底相对基线的深度 */
-  below: number;
+  /** 字形框的左边缘（页内坐标，px）—— 水平匹配用 */
+  left: number;
+  /** 字形框的宽度（px）—— 水平匹配用 */
+  width: number;
 }
 
-/** 页码 → 基线表 */
+/** 页码 → 字形框表 */
 export type BaselinesByPage = Map<number, PageBaselines[]>;
 
 /**
- * 用最近的基线把矩形裁剪成贴合字形。
+ * 用最近行的字形框把矩形裁剪成贴合文字。
  *
- * 找基线的方式：取**离矩形中心最近**的那条基线。
- *
- * @param rect 选区矩形（页内坐标）
- * @param baselines 该页的基线表
- * @returns 裁剪后的矩形
- */
-/**
- * 用最近的基线把矩形裁剪成贴合字形。
- *
- * 找基线的方式：取**离矩形中心最近**的那条基线。
+ * 找行的方式：取**基线最近**的那一行。
  *
  * 泛型：矩形可以是 `{x, y, width, height}`（页内坐标）
  * 或 `{left, top, width, height}`（视图坐标）—— 两者字段名不同。
  *
  * @param rect 选区矩形
- * @param baselines 该页的基线表
+ * @param baselines 该页的字形框表
  * @returns 裁剪后的矩形
  */
 export function clipToBaseline<
@@ -79,37 +82,98 @@ export function clipToBaseline<
 
   const center = top0 + rect.height / 2;
 
-  let best: PageBaselines | undefined;
-  let bestDistance = Number.POSITIVE_INFINITY;
-
-  for (const candidate of baselines) {
-    const distance = Math.abs(candidate.baseline - center);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = candidate;
-    }
-  }
-
-  if (!best) {
-    return rect;
-  }
-
-  const top = best.baseline - best.above;
-  const bottom = best.baseline + best.below;
+  /*
+   * ⚠️ **按"基线距离"排序，逐个尝试**。
+   *
+   * 为什么不能只取最近的那一行：
+   * 同一行里可能有**正文**（font-size 20.6）+ **上标**（font-size 16），
+   * 它们的基线相差 ~9px，而浏览器的选区矩形是**一段连续的行盒**。
+   *
+   * 实测（真实 PDF）：
+   * ```
+   * 选区矩形   y=452.8 h=27      (452.8..479.8)
+   * 上标 "*"   y=451.7 h=16      (451.7..467.7)  ← 基线更近
+   * 正文       y=456.8 h=20.6    (456.8..477.4)  ← 才是正确的行
+   * ```
+   *
+   * 只取最近的 → 选中上标 → 它的盒子**顶边（451.7）在选区矩形上方**
+   * → "裁剪后必须完全在原矩形内"的保险把它**拒绝** → **不裁剪**
+   * → 选区还是那个偏高的行盒 ❌
+   *
+   * → 排序后**依次尝试**，第一个"盒子完全落在矩形内"的胜出。
+   */
+  const rectLeft = isXY ? rect.x : rect.left;
 
   /*
-   * 保险：裁剪后必须**完全在原矩形内**。
-   * 否则说明这条基线不属于这一行（选中了别的行的文字）→ 退回原矩形。
+   * ⚠️ **先按距离过滤，再按水平重叠排序**。
+   *
+   * 顺序不能反：
+   * - 先排序再过滤 → `break` 的前提（按距离有序）被破坏
+   * - 距离过滤的阈值要跟**候选自身的高度**比，不是跟 rect 的高度比
+   *   （选区矩形可能比文字高很多 → 阈值太宽 → 匹配到别的行）
    */
-  if (top < top0 || bottom > top0 + rect.height) {
-    return rect;
+  const maxDistance = Math.max(rect.height, ...baselines.map((c) => c.height)) * 2;
+
+  const candidates = baselines
+    .map((candidate) => ({
+      candidate,
+      distance: Math.abs(candidate.baseline - center),
+      // 水平重叠
+      overlap:
+        candidate.width > 0
+          ? Math.min(rectLeft + rect.width, candidate.left + candidate.width) -
+            Math.max(rectLeft, candidate.left)
+          : 0,
+    }))
+    .filter((entry) => entry.distance <= maxDistance)
+    .sort((a, b) => {
+      /*
+       * 排序：**先按"盒子中心离矩形中心多近"，再按水平重叠**。
+       *
+       * 理由：
+       * - 选区矩形横跨一行时，真正对应的是它盖住的那几个 item
+       *   （同一行可能混着正文 + 上标）→ 水平重叠要参与排序
+       * - 但**垂直上**离得远的候选（插图里的旋转标签、
+       *   上下相邻的行）必须先排掉 → 中心距离优先
+       *
+       * ⚠️ 之前只按水平重叠排 → 一个宽矩形会选到**上下相邻行**的 item
+       *    → 选区框比文字低 18.88px（用户看到的"定位跑偏"）。
+       */
+      const aCenter = a.candidate.top + a.candidate.height / 2 - center;
+      const bCenter = b.candidate.top + b.candidate.height / 2 - center;
+      if (Math.abs(aCenter - bCenter) > 2) {
+        return Math.abs(aCenter) - Math.abs(bCenter);
+      }
+      if (Math.abs(a.overlap - b.overlap) > 1) {
+        return b.overlap - a.overlap;
+      }
+      return a.distance - b.distance;
+    });
+
+  for (const { candidate } of candidates) {
+    const top = candidate.top;
+    const bottom = candidate.top + candidate.height;
+
+    /*
+     * 保险：裁剪后必须**完全在原矩形内**，且**高度为正**。
+     * 否则说明这一行不属于这个矩形（选到了别的行）→ 试下一行。
+     *
+     * ⚠️ **高度为 0 的行必须跳过**：
+     *    后面的合并算法用矩形高度当异常判据的基准，
+     *    一个 height=0 的矩形会让基准变成 0 → **所有矩形都被判为异常** → 选区消失。
+     */
+    if (top < top0 || bottom > top0 + rect.height || bottom <= top) {
+      continue;
+    }
+
+    return {
+      ...rect,
+      ...(isXY ? { y: top } : { top }),
+      height: bottom - top,
+    } as T;
   }
 
-  return {
-    ...rect,
-    ...(isXY ? { y: top } : { top }),
-    height: bottom - top,
-  } as T;
+  return rect;
 }
 
 /**
@@ -196,6 +260,14 @@ export function buildSelectionShapes(
       pageRect = clipToBaseline(pageRect, pageBaselines);
     }
 
+    /*
+     * ⚠️ **裁剪后高度可能变成 0**（基线刚好在矩形边界上）。
+     *    这种矩形必须丢掉 —— 后面合并算法的"异常判据"基准会被它污染。
+     */
+    if (pageRect.height <= 0 || pageRect.width <= 0) {
+      continue;
+    }
+
     const list = byPage.get(owner.pageNumber) ?? [];
     list.push(pageRect);
     byPage.set(owner.pageNumber, list);
@@ -204,6 +276,40 @@ export function buildSelectionShapes(
   return [...byPage.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([pageNumber, rectsForPage]) => ({ pageNumber, rects: rectsForPage }));
+}
+
+/**
+ * **截尾中位数**（trimmed median）：排序后丢掉上下各 25%，再取中位数。
+ *
+ * 为什么不用普通中位数：
+ * - 矩形**很少**时（2-3 个），中位数会被那个离群值本身占据 → 判据失效
+ *
+ * 为什么不用平均数：
+ * - 平均数会被离群值**拉偏** → 阈值过大 → 真正的异常值漏网
+ *
+ * 截尾中位数两种情况都扛得住：
+ * - `[23, 830]` → 截尾后剩 `[23, 830]`（不够截）→ 取较小的一侧 → 23 ✅
+ * - `[23, 23, 23, 830]` → 截掉最高 → `[23, 23, 23]` → 23 ✅
+ *
+ * @param sorted 升序排列的数组
+ * @returns 稳健的"正常值"
+ */
+export function trimmedMedian(sorted: readonly number[]): number {
+  if (sorted.length === 0) {
+    return 0;
+  }
+  if (sorted.length === 1) {
+    return sorted[0] ?? 0;
+  }
+
+  // 少于 4 个时，丢掉**最高**的那个（离群值只可能是高的）
+  if (sorted.length < 4) {
+    return sorted[0] ?? 0;
+  }
+
+  const trim = Math.floor(sorted.length / 4);
+  const trimmed = sorted.slice(trim, sorted.length - trim);
+  return trimmed[Math.floor(trimmed.length / 2)] ?? 0;
 }
 
 /**
@@ -233,17 +339,32 @@ export function mergeOverlappingRects(rects: readonly PageSelectionRect[]): Page
    * 旧实现只跟 `merged[last]` 比较 → 这个巨型矩形一旦垂直重叠到别的小矩形，
    * 合并后的矩形就长高，然后继续吸收 → **画出一大块**（图里的元素全变蓝块）。
    *
-   * 判据：高度 > **最小高度 × 4** → 异常。
+   * 判据：高度 > **正常高度 × 4** → 异常。
    *
-   * ⚠️ **必须用"最小高度"当基准**，不能用中位数：
-   *    当矩形很少时（比如只有 2 个），中位数会被那个巨型矩形本身占据
-   *    → 判据失效 → 巨型矩形漏网。
-   *    "最小高度"永远是正常文字行的高度 → 判据始终有效。
+   * ⚠️⚠️ **基准必须是"正常高度"，而且要能抗离群值**：
+   *
+   *    - 浏览器偶尔返回 **height=0 的矩形**（空白的行盒）。
+   *      实测：255 个 rect 里混进一个 h=0 的 → 若用"最小高度"当基准
+   *      → 阈值 = 0 → **254 个正常矩形全被判为异常** → **选区整个消失**！
+   *      （用户截图里"框选后没有选区"就是这个 bug）
+   *
+   *    - 但也不能只用"中位数"：矩形**很少**时（比如只有 2-3 个），
+   *      中位数会被那个巨型矩形本身占据 → 判据失效 → 巨型矩形漏网。
+   *
+   *    → 用**截尾中位数**（trimmed median）：
+   *      排序后丢掉上下各 25%，再取中位数。
+   *      少数离群值（中位数法）或极少数矩形（平均数法）都能扛住。
    */
-  const minHeight = Math.min(...rects.map((r) => r.height));
-  const limit = minHeight * 4;
+  const valid = rects.filter((r) => r.height > 0 && r.width > 0);
+  if (valid.length === 0) {
+    return [];
+  }
 
-  const normal = rects.filter((r) => r.height <= limit);
+  const sortedHeights = valid.map((r) => r.height).sort((a, b) => a - b);
+  const normalHeight = trimmedMedian(sortedHeights);
+  const limit = normalHeight * 4;
+
+  const normal = valid.filter((r) => r.height <= limit);
 
   if (normal.length === 0) {
     // 全是异常矩形 → 宁可漏画，也不要画出一大块

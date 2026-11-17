@@ -1,0 +1,115 @@
+fix(selection): 跨行选区失效 + 链接吞掉拖选 + 缩放基线过期
+
+用户反馈: 框选后是一大块, 缩放后定位跑偏, 特别卡。
+这轮挖出 **4 个独立根因**, 每个单独修。
+
+---
+
+## 根因 1: 跨行拖选 -> 自绘层完全没有数据（用户看到的"那一大块"）
+
+实测: `自绘层矩形数 = 0`（完全空！）, 浏览器 rect 数 = 255
+
+用户看到的那一大块 = **浏览器原生 ::selection**（自绘层没数据，
+而原生背景只是"透明"不是"没有"）。
+
+根因: useTextSelection 里一道校验
+```ts
+if (!anchorElement?.closest(TEXT_LAYER_CLASS)) { clearSelection(); return; }
+```
+**跨行拖选时 `range.commonAncestorContainer` 是 `.scpdf-page`，
+不是 `.scpdf-text-layer`！** -> 直接放弃 -> onClientRects 从没被调用
+
+修法: 祖先里有**文本层或页面**就算合法
+```ts
+const inTextLayer = !!anchorElement.closest(TEXT_LAYER_CLASS);
+const inPage = !!anchorElement.closest(PAGE_CLASS);
+if (!inTextLayer && !inPage) { clearSelection(); return; }
+```
+
+---
+
+## 根因 2: height=0 的矩形 -> 合并算法把全部矩形判为异常
+
+实测: `rawCount: 255, minHeight: 0, limit: 0, normalCount: 1`
+
+浏览器偶尔返回 **height=0 的矩形**（空白行盒），
+而异常判据用 `minHeight * 4` -> 阈值 = 0
+-> **254 个正常矩形全被判为异常** -> 选区消失。
+
+修法:
+1. 先剔除 `height <= 0` / `width <= 0`
+2. 基准改**截尾中位数**（trimmed median）
+   - 不用普通中位数: 矩形很少时（2-3 个）会被巨型矩形本身占据
+   - 不用平均数: 会被离群值拉偏
+   - 截尾中位数两种情况都扛得住
+
+---
+
+## 根因 3: 字形框用了**字体的自然行盒**，不是 **span 的盒子**
+
+实测:
+```
+fontSize               = 20.62px   <- span 的 font-size
+fontBoundingBoxAscent  = 22px      <- 字体的自然上伸（比 fontSize 大！）
+fontBoundingBoxDescent = 5px
+自然行盒                = 27px      <- 浏览器用它画选区矩形
+span 的实际盒子          = 20.62px  <- font-size × line-height(1)
+```
+-> 用"基线 + ascent/descent"推算会偏 4px、高 27px。
+
+修法: **字形框 = span 的盒子**（`top = item.top`, `height = item.fontSize`）
+实测 `item.top` 与渲染后的 `span.getBoundingClientRect().top` **完全相等**
+
+另外选行不能只取"最近的一行":
+```
+选区矩形   y=452.8 h=27      (452.8..479.8)
+上标 "*"   y=451.7 h=16      (451.7..467.7)  <- 基线更近，但盒子在选区上方
+正文       y=456.8 h=20.6    (456.8..477.4)  <- 才是正确的行
+```
+-> 改成: 按距离过滤 -> 按**盒子中心离矩形中心**排序 -> 依次尝试，
+   第一个"盒子完全落在矩形内"的胜出
+
+---
+
+## 根因 4: **链接吞掉拖选**（缩放后才暴露）
+
+实测:
+```
+初始    mouseup target= scpdf-link     <- 选区出不来
+放大后  （没有 mouseup 日志）           <- 完全没选区
+```
+`.scpdf-link { pointer-events: auto }` -> 链接矩形**接管鼠标事件**
+-> 浏览器把拖动当成"拖拽链接" -> 文本层收不到选区。
+
+摘要里正好有个 GitHub 链接在正文中间，缩放后拖选刚好落在它上面。
+
+修法（跟 pdf.js v6 一致 —— `.annotationLayer { pointer-events: none }`）:
+1. `.scpdf-links` / `.scpdf-link` 都改成 `pointer-events: none`
+2. 链接从 `<a>` 改成 `<span role="link" tabIndex={0}>`（`<a>` 会吞拖动）
+3. 点击走**容器事件委托** + **按坐标命中**
+   （`elementFromPoint` 也不行，它同样跳过 pointer-events:none 的元素）
+
+-> 现在**既能点链接，又能从链接上拖选**（E2E 两条都验证）
+
+---
+
+## 附带修的: 缩放后基线表**没更新**
+
+`handleTextItems` 用"数量相同 -> 不更新"当优化:
+```ts
+if (existing && existing.length === items.length) return prev;   // <- 错!
+```
+缩放时 item 数量不变但**几何全变** -> 基线表停留在旧缩放级别
+-> 选区裁剪用错基线 -> **缩放后定位跑偏**（用户原话）
+
+-> 改成比**几何指纹**（第 1 / 中间 / 最后三个 item 的 left/top/fontSize/text）
+
+---
+
+## 验证
+
+- `pnpm verify`: **8 门禁全绿**
+- `pnpm test`: **349 passed**（新增 baseline.test.ts 9 项 + shape.test.ts 2 项）
+- E2E: **13 套 118 项断言全通过**（新增 e2e-selection-regression.mjs 9 项）
+- **选区与文字对齐: Δtop = 0.01px, 高度比 = 1.0**（fit / 放大 / 缩小 全一致）
+- 视觉: fit 和放大两种状态下选区块都紧贴文字

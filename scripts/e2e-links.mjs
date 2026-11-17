@@ -97,21 +97,72 @@ try {
   const unsafe = await page.evaluate(
     () =>
       [...document.querySelectorAll('.scpdf-link')].filter((a) =>
-        (a.getAttribute('href') ?? '').toLowerCase().startsWith('javascript:'),
+        (a.getAttribute('data-link-url') ?? a.getAttribute('href') ?? '')
+          .toLowerCase()
+          .startsWith('javascript:'),
       ).length,
   );
   check('没有 javascript: 链接（XSS 防护）', unsafe === 0, `${unsafe} 个`);
 
+  /*
+   * ⚠️ 链接层必须对鼠标**透明**（pdf.js v6 的做法）。
+   *
+   * 否则链接矩形会"盖住"文本层 → 从链接上拖选 → **选区完全出不来**。
+   */
+  const linkPointerEvents = await page.evaluate(() => {
+    const link = document.querySelector('.scpdf-link');
+    const layer = document.querySelector('.scpdf-links');
+    return {
+      link: link ? getComputedStyle(link).pointerEvents : null,
+      layer: layer ? getComputedStyle(layer).pointerEvents : null,
+    };
+  });
+  check(
+    '链接层**不接管鼠标事件**（否则拖选失效）',
+    linkPointerEvents.link === 'none' && linkPointerEvents.layer === 'none',
+    `link=${linkPointerEvents.link} layer=${linkPointerEvents.layer}`,
+  );
+
   // click a link -> host handler fires (demo shows a hint)
-  const linkWithHref = page.locator('.scpdf-link[href]').first();
+  const linkWithHref = page.locator('.scpdf-link[data-link-url]').first();
   const hasHref = (await linkWithHref.count()) > 0;
   if (hasHref) {
-    await linkWithHref.click({ force: true });
-    await page.waitForTimeout(600);
-    const hint = await page.locator('text=打开外链').count();
-    check('点击外链触发宿主回调', hint > 0);
+    const box = await linkWithHref.boundingBox();
+    if (box) {
+      // 真实点击（不是 force —— force 会跳过命中测试）
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await page.waitForTimeout(600);
+      const hint = await page.locator('text=打开外链').count();
+      check('点击外链触发宿主回调', hint > 0);
+    }
   } else {
     console.log('SKIP 点击外链断言（当前文档没有外部链接）');
+  }
+
+  /*
+   * ⚠️ 回归：**从链接上拖选**必须还能选出文字。
+   *
+   * 曾经的 bug：`<a>` 元素吞掉拖动 → 从链接上拖选 → **选区完全出不来**。
+   * （真实 PDF 的摘要里有个 GitHub 链接，正好在正文中间。）
+   */
+  if (hasHref) {
+    const link = page.locator('.scpdf-link[data-link-url]').first();
+    const box = await link.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 60, box.y + box.height / 2, { steps: 10 });
+      await page.mouse.up();
+      await page.waitForTimeout(600);
+
+      const selected = await page.evaluate(() => window.getSelection()?.toString().length ?? 0);
+      check('**从链接上拖选仍能选出文字**', selected > 0, `选中 ${selected} 字符`);
+
+      const layerRects = await page.evaluate(
+        () => document.querySelectorAll('.scpdf-selection-layer clipPath rect').length,
+      );
+      check('从链接上拖选后自绘层有矩形', layerRects > 0, `${layerRects} 个`);
+    }
   }
 
   await page.screenshot({ path: 'e2e-shots/links.png' });

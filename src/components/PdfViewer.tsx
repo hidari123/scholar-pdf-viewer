@@ -689,13 +689,123 @@ export function PdfViewer(props: PdfViewerProps) {
    * - `buildSelectionShapes` 内部统一换算到页内坐标
    */
   /**
-   * 每页的**基线表**（用来把选区裁剪成贴合字形）。
+   * **按坐标找链接元素**。
+   *
+   * ⚠️ 为什么不能用 `document.elementFromPoint()`：
+   * 它会**跳过 `pointer-events: none` 的元素** → 链接层是透明的 → 命中不到。
+   *
+   * → 手动遍历 `.scpdf-link`，用 `getBoundingClientRect()` 判断坐标是否落在里面。
+   *   （链接数量不多，一页几十个 → O(n) 完全够用。）
+   */
+  const findLinkAtPoint = useCallback((clientX: number, clientY: number) => {
+    const links = document.querySelectorAll<HTMLElement>('.scpdf-link');
+    for (const link of links) {
+      const rect = link.getBoundingClientRect();
+      if (
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      ) {
+        return link;
+      }
+    }
+    return null;
+  }, []);
+
+  /**
+   * **容器上的链接点击委托**。
+   *
+   * ⚠️ 为什么需要事件委托（而不是在 `<a>` 上绑 onClick）：
+   *
+   * 链接层整体是 `pointer-events: none`（pdf.js v6 的做法），
+   * 否则链接矩形会"盖住"文本层 → 从链接上拖选 → **选区完全出不来**。
+   *
+   * → 在容器上监听 `click`，按**点击坐标**去命中链接矩形。
+   * → 拖动时根本不触发 `click` → 文本层正常选区 ✅
+   */
+  const handleContainerClick = useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      if (!onExternalLink && !onInternalLink) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+
+      /*
+       * ⚠️ **必须按坐标命中**，不能只看 `event.target`。
+       *
+       * 链接层是 `pointer-events: none` → 点击的 target 是**文本层**，
+       * 不是链接元素 → 只看 target 永远命中不了链接。
+       *
+       * ⚠️ `document.elementFromPoint()` 也不行 ——
+       *    它同样会**跳过 `pointer-events: none` 的元素** → 还是命中不到。
+       *
+       * → 手动遍历链接矩形，按**坐标**判断命中。
+       */
+      const linkEl =
+        findLinkAtPoint(event.clientX, event.clientY) ?? target?.closest?.('[data-link-id]');
+
+      if (!linkEl) {
+        return;
+      }
+
+      /*
+       * ⚠️ **但如果这次点击是"选区的结果"，就不当链接处理**。
+       *
+       * 拖选结束时浏览器也会触发 `click`（target 是文本层），
+       * 如果那时正好点在链接上 → 会误开链接。
+       */
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
+        return;
+      }
+
+      const pageEl = linkEl.closest('.scpdf-page');
+      const pageNumber = Number(pageEl?.getAttribute('data-page-number'));
+      const url = linkEl.getAttribute('data-link-url');
+      const destRaw = linkEl.getAttribute('data-link-dest');
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (url) {
+        onExternalLink?.(url);
+        return;
+      }
+      if (destRaw) {
+        try {
+          const dest = JSON.parse(destRaw) as unknown[];
+          onInternalLink?.(dest, Number.isFinite(pageNumber) ? pageNumber : 1);
+        } catch {
+          // 解析失败 → 忽略（不抛给宿主）
+        }
+      }
+    },
+    [onExternalLink, onInternalLink, findLinkAtPoint],
+  );
+
+  /**
+   * 每页的**字形框表**（用来把选区裁剪成贴合文字）。
    *
    * ⚠️ 为什么需要：
    * 浏览器的选区矩形 = **字体的自然行盒**（比文字高 11px、偏上 6px）
    * → 选区框跟文字对不齐（"定位不准 / 偏了"）。
    *
-   * 基线 = `item.top + ascent`（`item.top` 本身就是 `基线 − ascent`）。
+   * ⚠️⚠️ **字形框 = span 的盒子**，不是字体的自然行盒！
+   *
+   * 实测（真实 PDF）：
+   * ```
+   * fontSize               = 20.62px   ← span 的 font-size
+   * fontBoundingBoxAscent  = 22px      ← 字体的自然上伸（比 fontSize 大！）
+   * fontBoundingBoxDescent = 5px       ← 字体的自然下伸
+   * 自然行盒                = 27px      ← 浏览器用它画选区矩形（偏高）
+   * span 的实际盒子          = 20.62px  ← font-size × line-height(1)
+   * ```
+   *
+   * → 用**基线 + ascent/descent** 推算会偏（基线位置取决于字体的自然 ascent）
+   * → 直接用 **`item.top`（= span 的 top）和 `item.fontSize`（= span 的盒高）**
+   *   → 实测 `item.top` 与渲染后的 `span.getBoundingClientRect().top` **完全相等** ✅
    */
   const baselinesByPage = useMemo<BaselinesByPage>(() => {
     const result: BaselinesByPage = new Map();
@@ -706,11 +816,16 @@ export function PdfViewer(props: PdfViewerProps) {
         if (item.text.length === 0 || item.fontSize <= 0) {
           continue;
         }
-        const ascent = item.fontSize * measureAscentRatio(item.fontFamily);
         list.push({
-          baseline: item.top + ascent,
-          above: ascent,
-          below: item.fontSize - ascent,
+          // 字形框的上边缘 = span 的 top
+          top: item.top,
+          // 字形框的高度 = span 的盒高 = fontSize（line-height: 1）
+          height: item.fontSize,
+          // 基线（匹配用）：top + ascent
+          baseline: item.top + item.fontSize * measureAscentRatio(item.fontFamily),
+          // 水平范围（匹配用）：用来挑"矩形真正盖住的那几个 item"
+          left: item.left,
+          width: item.width,
         });
       }
       result.set(pageNumber, list);
@@ -1219,14 +1334,50 @@ export function PdfViewer(props: PdfViewerProps) {
     [scrollToSearchHit],
   );
 
-  /** 收到某页的文本项（搜索高亮用） */
+  /** 收到某页的文本项（搜索高亮 + 选区基线表用） */
   const handleTextItems = useCallback((pageNumber: number, items: PositionedTextItem[]) => {
     setTextItemsByPage((prev) => {
       const existing = prev.get(pageNumber);
-      // 已有且数量相同 → 不更新（避免无谓重渲染）
+
+      /*
+       * ⚠️ **不能用"数量相同"当"没变"的判据**（曾经踩过）。
+       *
+       * 缩放时 item 的**数量不变**，但**几何全变了**（left/top/fontSize 随缩放变）
+       * → 只比数量 → 缩放后不更新 → **基线表停留在旧缩放级别**
+       * → 选区裁剪用错基线 → **选区消失 / 位置跑偏**（用户实测反馈）。
+       *
+       * → 必须比**几何**：取第一个 item 的 left/top/fontSize 做指纹。
+       *   （够用：缩放一定会改这些值；而文字内容变化会改数量。）
+       */
       if (existing && existing.length === items.length) {
-        return prev;
+        /*
+         * 指纹：**取几个分布开的 item** 比几何。
+         *
+         * ⚠️ 不能只比 `existing[0]`：
+         *    第一个 item 常常是**空白**（" "）或页眉，
+         *    它的 left/top 在缩放时**可能不变**（比如刚好在 0 处）
+         *    → 指纹相同 → 跳过更新 → **基线表停留在旧缩放** ❌
+         *
+         * → 比 3 个位置（第 1 / 中间 / 最后）的 item。
+         */
+        const indices = [0, Math.floor(items.length / 2), items.length - 1];
+        const same = indices.every((index) => {
+          const a = existing[index];
+          const b = items[index];
+          return (
+            a !== undefined &&
+            b !== undefined &&
+            a.left === b.left &&
+            a.top === b.top &&
+            a.fontSize === b.fontSize &&
+            a.text === b.text
+          );
+        });
+        if (same) {
+          return prev;
+        }
       }
+
       const next = new Map(prev);
       next.set(pageNumber, items);
       return next;
@@ -1366,6 +1517,20 @@ export function PdfViewer(props: PdfViewerProps) {
           // biome-ignore lint/a11y/noNoninteractiveTabindex: 可聚焦的滚动区域（键盘翻页需要）
           tabIndex={0}
           aria-label={t('a11y.canvas')}
+          /*
+           * ⚠️ 链接点击走**事件委托**（链接层是 `pointer-events: none`）。
+           * 见 `handleContainerClick` 的说明。
+           *
+           * `onKeyDown` 满足 a11y 规则（有 click 就要有键盘等价操作）：
+           * 链接元素自己已经处理了 Enter/Space，这里只需要不阻断冒泡。
+           */
+          onClick={handleContainerClick}
+          onKeyDown={(event) => {
+            // 链接元素自己处理 Enter/Space；这里只阻止空格滚动页面
+            if (event.key === ' ') {
+              event.preventDefault();
+            }
+          }}
         >
           {!file ? (
             <div className="scpdf-state">

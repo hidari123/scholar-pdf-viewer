@@ -1735,3 +1735,199 @@ src/components/PdfViewer.tsx         baselinesByPage（useMemo）
 src/components/SelectionPopover.tsx  预估尺寸 → 单帧渲染
 src/components/TextLayer.tsx         transform 顺序改成 rotate() scaleX()
 ```
+
+---
+
+## 第十轮：选区跨行失效 + 链接吞掉拖选（2026-11-17 中午）
+
+用户反馈（附 3 张截图）：**框选后是一大块**，缩放后定位跑偏，特别卡，一个都没解决。
+
+这一轮挖出了 **4 个独立的根因**，每个都单独修。
+
+---
+
+### 根因 1：跨行拖选 → **自绘层完全没有数据**（用户看到的"那一大块"）
+
+#### 实测
+
+```
+自绘层矩形数 = 0     ← 完全空！
+浏览器 rect 数 = 255
+```
+
+用户看到的那一大块，是**浏览器原生 `::selection`**（因为自绘层没数据，
+而原生背景只是"透明"不是"没有"）。
+
+#### 根因
+
+`useTextSelection` 里有一道校验：
+
+```ts
+const anchorElement = range.commonAncestorContainer instanceof Element ? ... ;
+if (!anchorElement?.closest(TEXT_LAYER_CLASS)) {
+  clearSelection();   // ← 直接放弃！
+  return;
+}
+```
+
+**跨行拖选时，`range.commonAncestorContainer` 是 `.scpdf-page`，不是 `.scpdf-text-layer`！**
+
+```
+ancClass: "scpdf-page"
+ancInTextLayer: false     ← 校验失败 → 直接放弃
+```
+
+→ `onClientRects` 从没被调用 → 自绘层空 → 用户看到原生选区（那一大块）。
+
+#### 修法
+
+只要祖先里有**文本层或页面**就算合法（选到别的东西才拒绝）。
+
+```ts
+const inTextLayer = !!anchorElement.closest(TEXT_LAYER_CLASS);
+const inPage = !!anchorElement.closest(PAGE_CLASS);
+if (!inTextLayer && !inPage) { clearSelection(); return; }
+```
+
+---
+
+### 根因 2：`height=0` 的矩形 → **合并算法把全部矩形判为异常**
+
+#### 实测
+
+```
+rawCount: 255, minHeight: 0, limit: 0, normalCount: 1
+```
+
+浏览器偶尔会返回 **height=0 的矩形**（空白的行盒）。
+而合并算法的"异常判据"用 `minHeight * 4` 当阈值 → 阈值 = 0
+→ **254 个正常矩形全被判为异常** → 选区消失。
+
+#### 修法
+
+1. 先剔除 `height <= 0` / `width <= 0` 的退化矩形
+2. 基准改成**截尾中位数**（trimmed median）
+
+```ts
+export function trimmedMedian(sorted: readonly number[]): number {
+  if (sorted.length <= 1) return sorted[0] ?? 0;
+  if (sorted.length < 4) return sorted[0] ?? 0;   // 少数几个 → 丢掉最高的
+  const trim = Math.floor(sorted.length / 4);
+  const trimmed = sorted.slice(trim, sorted.length - trim);
+  return trimmed[Math.floor(trimmed.length / 2)] ?? 0;
+}
+```
+
+为什么不用普通中位数：矩形**很少**时（2-3 个）中位数会被巨型矩形本身占据。
+为什么不用平均数：平均数会被离群值拉偏。
+
+---
+
+### 根因 3：字形框用了**字体的自然行盒**，不是 **span 的盒子**
+
+#### 实测
+
+```
+fontSize               = 20.62px   ← span 的 font-size
+fontBoundingBoxAscent  = 22px      ← 字体的自然上伸（比 fontSize 大！）
+fontBoundingBoxDescent = 5px       ← 字体的自然下伸
+自然行盒                = 27px      ← 浏览器用它画选区矩形
+span 的实际盒子          = 20.62px  ← font-size × line-height(1)
+```
+
+→ 用"基线 + ascent/descent"推算会偏 4px、高 27px。
+
+#### 修法
+
+**字形框 = span 的盒子**：`top = item.top`，`height = item.fontSize`。
+
+实测 `item.top` 与渲染后的 `span.getBoundingClientRect().top` **完全相等** ✅
+
+另外，选行时不能只取"最近的一行"：
+
+```
+选区矩形   y=452.8 h=27      (452.8..479.8)
+上标 "*"   y=451.7 h=16      (451.7..467.7)  ← 基线更近，但盒子在选区上方
+正文       y=456.8 h=20.6    (456.8..477.4)  ← 才是正确的行
+```
+
+→ 改成：**按距离过滤 → 按"盒子中心离矩形中心"排序 → 依次尝试，
+第一个"盒子完全落在矩形内"的胜出**。
+
+---
+
+### 根因 4：**链接吞掉拖选**（缩放后才暴露）
+
+#### 实测
+
+```
+初始    [DBG] mouseup target= scpdf-link     ← 选区出不来
+放大后  （没有 mouseup 日志）                 ← 完全没选区
+```
+
+`.scpdf-link { pointer-events: auto }` → 链接矩形**接管鼠标事件**
+→ 浏览器的拖动被当成"拖拽链接" → 文本层收不到选区。
+
+摘要里正好有个 GitHub 链接（`https://github.com/datamillab/A2E`）在正文中间。
+缩放后正文位置变了，拖选刚好落在链接上 → 选区彻底不出来。
+
+#### 修法（跟 pdf.js v6 一致）
+
+pdf.js 的 `.annotationLayer { pointer-events: none }` —— 链接层**不接管鼠标事件**。
+
+本包：
+
+1. `.scpdf-links` / `.scpdf-link` 都改成 `pointer-events: none`
+2. 链接从 `<a>` 改成 `<span role="link" tabIndex={0}>`（`<a>` 会吞拖动）
+3. 点击走**容器上的事件委托** + **按坐标命中**（`elementFromPoint` 也不行，
+   它同样跳过 `pointer-events: none` 的元素）
+
+```ts
+const findLinkAtPoint = (clientX: number, clientY: number) => {
+  for (const link of document.querySelectorAll<HTMLElement>('.scpdf-link')) {
+    const rect = link.getBoundingClientRect();
+    if (clientX >= rect.left && clientX <= rect.right &&
+        clientY >= rect.top && clientY <= rect.bottom) return link;
+  }
+  return null;
+};
+```
+
+→ 现在**既能点链接，又能从链接上拖选**（E2E 两条都验证）。
+
+---
+
+### 附带修的：缩放后基线表**没更新**
+
+`handleTextItems` 原来用"数量相同 → 不更新"当优化：
+
+```ts
+if (existing && existing.length === items.length) return prev;   // ← 错！
+```
+
+缩放时 item **数量不变**但**几何全变** → 基线表停留在旧缩放级别
+→ 选区裁剪用错基线 → **缩放后定位跑偏**（用户的原话）。
+
+→ 改成比**几何指纹**（第 1 / 中间 / 最后三个 item 的 left/top/fontSize/text）。
+
+---
+
+### 验证
+
+- `pnpm verify`：**8 门禁全绿**
+- `pnpm test`：**349 passed**（新增 `baseline.test.ts` 9 项 + `shape.test.ts` 2 项）
+- E2E：**13 套 118 项断言全通过**（新增 `e2e-selection-regression.mjs` 9 项）
+- **选区与文字的对齐：Δtop = 0.01px，高度比 = 1.0**（fit / 放大 / 缩小 全一致）
+- 视觉：fit 和放大两种状态下，选区块都**紧贴文字**
+
+### 关键文件
+
+```
+src/hooks/useTextSelection.ts        允许 page 祖先 + 剔除退化矩形
+src/core/selection/shape.ts          trimmedMedian + 按盒子中心排序 + 依次尝试
+src/core/selection/baseline.test.ts  新增（9 项）
+src/components/PdfViewer.tsx         基线表用 span 盒子 + 链接点击委托
+src/components/LinkLayer.tsx         <a> → <span role="link">
+src/styles/viewer.css                链接层 pointer-events: none
+scripts/e2e-selection-regression.mjs 新增（跨行选区回归，9 项）
+```

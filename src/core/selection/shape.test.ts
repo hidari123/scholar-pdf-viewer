@@ -187,6 +187,10 @@ describe('mergeOverlappingRects', () => {
   });
 
   it('异常矩形不与正常矩形合并（高度保持正常）', () => {
+    /*
+     * ⚠️ 只有 2 个矩形时中位数会被巨型矩形占据 →
+     *    所以基准用**平均数**（见 mergeOverlappingRects 的实现说明）。
+     */
     const rects = [
       { x: 100, y: 10, width: 200, height: 23 },
       { x: 95, y: 5, width: 200, height: 830 },
@@ -196,6 +200,37 @@ describe('mergeOverlappingRects', () => {
 
     expect(merged).toHaveLength(1);
     expect(merged[0]?.height).toBe(23);
+  });
+
+  /*
+   * ⚠️ 回归：**height=0 的矩形**曾经让整个选区消失。
+   *
+   * 真实 PDF 实测：浏览器偶尔返回 height=0 的矩形（空白行盒）。
+   * 旧实现的"异常判据"用 `minHeight * 4` 当阈值 → minHeight=0 → 阈值=0
+   * → **所有正常矩形都被判为异常** → 选区整个消失。
+   */
+  it('忽略 height=0 的矩形（不拖累其他矩形）', () => {
+    const rects = [
+      { x: 100, y: 10, width: 200, height: 0 }, // ← 退化矩形
+      { x: 100, y: 20, width: 200, height: 23 },
+      { x: 100, y: 50, width: 200, height: 23 },
+      { x: 100, y: 80, width: 200, height: 23 },
+    ];
+
+    const merged = mergeOverlappingRects(rects);
+
+    // 正常矩形都要保留
+    expect(merged.length).toBeGreaterThanOrEqual(3);
+    expect(merged.every((r) => r.height > 0)).toBe(true);
+  });
+
+  it('全部都是 height=0 时返回空', () => {
+    const rects = [
+      { x: 0, y: 0, width: 100, height: 0 },
+      { x: 0, y: 10, width: 100, height: 0 },
+    ];
+
+    expect(mergeOverlappingRects(rects)).toHaveLength(0);
   });
 
   it('同一行内有空隙的片段**不合并**（避免涂到中间的空白）', () => {

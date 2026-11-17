@@ -648,17 +648,33 @@
 .scpdf-links {
   position: absolute;
   inset: 0;
+  /*
+   * ⚠️ **链接层整体不能接收鼠标事件**（pdf.js v6 的做法）。
+   *
+   * 否则链接矩形会"盖住"文本层 → 从链接上拖选 → **选区完全出不来**
+   * （真实 PDF 的摘要里有个 GitHub 链接，正在正文中间）。
+   *
+   * 点击链接改由**容器上的事件委托**处理（按坐标命中链接矩形）。
+   */
   pointer-events: none;
 }
 
 .scpdf-link {
   position: absolute;
-  pointer-events: auto;
+  /*
+   * ⚠️ 同上：链接矩形本身也不接收鼠标事件。
+   *
+   * 保留 `cursor: pointer` 的视觉提示需要另想办法 ——
+   * 容器上的委托处理可以按命中结果切换 cursor。
+   */
+  pointer-events: none;
   cursor: pointer;
   /* 透明但可点：视觉上是 PDF 自己画的链接 */
   background: transparent;
   border-radius: 2px;
   transition: background var(--scpdf-motion-fast) ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .scpdf-link:hover {

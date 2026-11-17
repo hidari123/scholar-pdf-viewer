@@ -5,6 +5,20 @@
  *
  * 安全：URL 由 core 的 `isSafeUrl` 过滤（`javascript:` 之类被丢弃），
  * 内部跳转由宿主处理（包不知道目标页怎么解析）。
+ *
+ * ⚠️⚠️ **链接层必须对鼠标"透明"**（`pointer-events: none`）——
+ * 这是 pdf.js v6 的做法（`.annotationLayer { pointer-events: none }`）。
+ *
+ * 真实 PDF 实测（用户反馈"框选没反应"）：
+ * 摘要里有个 GitHub 链接（`https://github.com/datamillab/A2E`），
+ * 从它上面开始拖选 → **选区完全出不来**。
+ *
+ * 根因：`<a>` 元素（`pointer-events: auto`）**接管了鼠标事件**
+ *      → 浏览器的拖动被当成"拖拽链接" → 文本层根本收不到选区。
+ *
+ * → 本包的做法：**链接层整体不接收鼠标事件**，
+ *   而是在**容器**上做事件委托：点击时按坐标命中某个链接矩形 → 才当链接处理。
+ *   （拖动时根本不判定链接 → 文本层正常选区。）
  */
 
 import { useMemo } from 'react';
@@ -50,34 +64,53 @@ export function LinkLayer(props: LinkLayerProps) {
         const label = link.url ?? '内部链接';
 
         return (
-          <a
+          /*
+           * ⚠️ **这里渲染成 `span` 而不是 `a`**。
+           *
+           * 理由：`<a>` 会接管拖动（浏览器当成"拖拽链接"）
+           *      → 从链接上拖选选不出文字。
+           *
+           * `<a>` 的语义（可聚焦、可右键"在新标签页打开"、可复制链接地址）
+           * 改用 **`role="link"` + `tabIndex` + `onKeyDown`** 保留，
+           * 点击由**容器上的事件委托**处理（见 `PdfViewer` 的 `handleContainerClick`）。
+           *
+           * ⚠️ biome 的 `useSemanticElements` 建议用 `<a>` ——
+           *    但 `<a>` 正是**吞掉拖选**的元凶 → 这里必须用 `span` + `role="link"`。
+           */
+          // biome-ignore lint/a11y/useSemanticElements: <a> 会吞掉拖选（链接层必须对鼠标透明）
+          <span
             key={link.id}
             className="scpdf-link"
-            href={link.url ?? undefined}
-            target={link.url ? '_blank' : undefined}
-            rel={link.url ? 'noopener noreferrer' : undefined}
+            role="link"
+            tabIndex={0}
+            aria-label={label}
+            title={label}
+            data-link-id={link.id}
+            /*
+             * ⚠️ 把**跳转目标**挂在 DOM 上（而不是回头查注解列表）。
+             *
+             * 注解列表是"归一化前的原始数据"，里面没有 id
+             * （id 是 `normalizeLinks` 生成的）→ 没法按 id 反查。
+             */
+            data-link-url={link.url ?? undefined}
+            data-link-dest={link.dest ? JSON.stringify(link.dest) : undefined}
             style={{
               left: `${rect.left}px`,
               top: `${rect.top}px`,
               width: `${rect.width}px`,
               height: `${rect.height}px`,
             }}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-
-              if (link.url) {
-                onExternalLink?.(link.url);
-              } else if (link.dest) {
-                onInternalLink?.(link.dest);
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                if (link.url) {
+                  onExternalLink?.(link.url);
+                } else if (link.dest) {
+                  onInternalLink?.(link.dest);
+                }
               }
             }}
-            aria-label={label}
-            title={label}
-          >
-            {/* 链接是"透明的可点区域" → 视觉上无内容，但读屏器需要文本 */}
-            <span className="scpdf-visually-hidden">{label}</span>
-          </a>
+          />
         );
       })}
     </div>

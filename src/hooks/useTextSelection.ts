@@ -31,6 +31,14 @@ export const PAGE_NUMBER_ATTR = 'data-page-number';
 /** 文本层的 class（用于 closest 查找） */
 const TEXT_LAYER_CLASS = '.scpdf-text-layer';
 
+/**
+ * 页面的 class。
+ *
+ * ⚠️ 选区跨多个文本层时，`commonAncestorContainer` 是 **page** 而不是 textLayer
+ *    → 判定"选区是否在文本层内"时必须同时认 page。
+ */
+const PAGE_CLASS = '.scpdf-page';
+
 /** endOfContent 哨兵的 class */
 const END_OF_CONTENT_CLASS = '.scpdf-text-layer__end';
 
@@ -158,10 +166,37 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         return;
       }
 
-      // 选区必须在文本层内（不是选到了别的 DOM）
-      const anchorNode = range.commonAncestorContainer;
-      const anchorElement = anchorNode instanceof Element ? anchorNode : anchorNode.parentElement;
-      if (!anchorElement?.closest(TEXT_LAYER_CLASS)) {
+      /*
+       * ⚠️ **选区必须在文本层（或页面）内**（不是选到了别的 DOM）。
+       *
+       * ⚠️⚠️ **不能用 `closest(TEXT_LAYER_CLASS)` 判定**！
+       *
+       * 实测（真实 PDF，跨行拖选）：
+       * ```
+       * range.commonAncestorContainer = .scpdf-page     ← 不是 textLayer!
+       * ancEl.closest('.scpdf-text-layer') = null
+       * ```
+       *
+       * 原因：选区跨了**多个 text layer**（每行/每个 span 一个 layer 结构），
+       * 或跨了页面的其他子元素 → 共同祖先是 **page**，不是 textLayer。
+       *
+       * 旧写法直接 `clearSelection()` 放弃 →
+       * **自绘选区层完全没有数据** → 用户看到的是**浏览器原生选区**
+       *   （就是那个"一大块"！用户截图里就是这个）
+       *
+       * → 改成：只要祖先里有文本层（或自己在页面里）就算合法。
+       */
+      const anchorElement =
+        range.commonAncestorContainer instanceof Element
+          ? range.commonAncestorContainer
+          : range.commonAncestorContainer.parentElement;
+      if (!anchorElement) {
+        clearSelection();
+        return;
+      }
+      const inTextLayer = !!anchorElement.closest(TEXT_LAYER_CLASS);
+      const inPage = !!anchorElement.closest(PAGE_CLASS);
+      if (!inTextLayer && !inPage) {
         clearSelection();
         return;
       }
