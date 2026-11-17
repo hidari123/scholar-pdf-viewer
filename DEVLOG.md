@@ -2120,3 +2120,53 @@ src/core/selection/optimize-rects.ts   按行分桶（O(n²) → O(n + Σ桶内�
 scripts/e2e-popover-anchor.mjs         新增（8 项断言）
 scripts/e2e-selection-perf.mjs         新增（3 项断言）
 ```
+
+### 补充：第十一轮修的两个 bug（浮层实时锚定的实现缺陷）
+
+上一轮的实现有两个真 bug，这轮修掉。
+
+#### Bug A：缩放后恢复出"整页"选区（88 字符 → 2938 字符）
+
+**根因（三个坑叠加）**：
+
+1. **坐标系不一致** —— `offsetOf` 累加**所有页**的 span，`restoreSelection` 只在**一页内**找
+2. **累加方式不一致** —— 一个按 `span.textContent`，一个按**文本节点**
+3. **结束节点是元素** —— 选区结束在 span 边界时 `endContainer` 是元素 → 退回"span 末尾"
+   （实测 `endOffset=3010`，而选区只有 88 字符）
+
+**修法：不按偏移，按文字找。**
+缩放前记住"选中了什么**文字**"+在哪一页，缩放后在这一页里**找到这段文字**→ 重新选中。
+→ 稳定、无坐标系问题，也符合用户直觉。
+
+#### Bug B：缩放后**重新框选**，浮层再也不出现
+
+```
+选中后         {len: 88, pop: true}
+缩放后         {len: 88, pop: true}
+缩放后重新选   {len: 88, pop: false}    ← 选区有了，浮层没了
+```
+
+**根因**：浮层的 `mousedown` 处理器在"点浮层外面"时 `onClose()`。
+**重新框选的 mousedown 也落在外面** → 浮层被关 → 之后选区变化想重开，时机上没接上。
+
+**修法**：按下时**不立即关闭**，`setTimeout(0)` 推迟 → 之后如果有新选区就不关（由选区变化决定开/关）。
+
+#### 另外：恢复循环里绝不能再调 `save()`
+
+它发生在重渲染之后（选区已被销毁）→ 会把好快照**覆盖成 null**。
+实测日志：
+```
+[PRES] save() called, pending= true      ← 宿主显式调（好快照）
+[PRES] save() called, pending= true      ← 循环里又调（覆盖成 null）❌
+```
+
+#### 验证
+
+E2E **15 套 132/132**（`e2e-popover-anchor.mjs` 加到 11 项）
+
+```
+1-fit:        选区88字符 自绘8个 浮层间距8px ✅
+2-zoomed:     选区88字符 自绘8个 浮层间距8px ✅
+3-zoominout:  选区88字符 自绘8个 浮层间距8px ✅
+4-scrolled:   浮层在 间距8px 选区88字符 ✅
+```
