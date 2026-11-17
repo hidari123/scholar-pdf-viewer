@@ -134,6 +134,14 @@ try {
     `间距 ${base?.gap}px → ${zoomed.gap}px`,
   );
 
+  // 选区本身必须**活下来**（缩放会重建文本层 → 浏览器会丢掉选区）
+  const afterZoomSel = await page.evaluate(() => ({
+    len: window.getSelection()?.toString().length ?? 0,
+    pop: !!document.querySelector('.scpdf-selection-popover'),
+  }));
+  check('**缩放后选区仍然存在**（不被缩放清空）', afterZoomSel.len > 0, `${afterZoomSel.len} 字符`);
+  check('缩放后浮层仍然打开', afterZoomSel.pop);
+
   await page.locator('button[aria-label="缩小"]').click();
   await page.waitForTimeout(2500);
   const shrunk = await readGap();
@@ -141,6 +149,21 @@ try {
     '**缩小后浮层仍锚定在选区上**',
     shrunk.gap !== null && Math.abs(shrunk.gap - (base.gap ?? 8)) < 14,
     `间距 ${base?.gap}px → ${shrunk.gap}px`,
+  );
+
+  // ---- 2b. 缩放后**重新框选**（浮层必须能重新打开）----
+  /*
+   * ⚠️ 曾经的 bug：浮层的 `mousedown` 处理器在"点浮层外面"时直接 `onClose()`
+   *    → 重新框选的 mousedown 也落在外面 → 浮层被关
+   *    → 之后新的选区虽然建立了，但**浮层再也不出现**。
+   */
+  await selectBody();
+  await page.waitForTimeout(400);
+  const reselected = await readGap();
+  check(
+    '**缩放后重新框选 → 浮层能重新打开**',
+    reselected.popExists && reselected.gap !== null,
+    `间距 ${reselected.gap}px`,
   );
 
   // ---- 3. 滚动时浮层跟随（不消失） ----

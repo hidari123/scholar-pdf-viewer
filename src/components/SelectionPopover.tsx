@@ -352,7 +352,35 @@ export function SelectionPopover({
       if (root && event.target instanceof Node && root.contains(event.target)) {
         return;
       }
-      onClose?.();
+
+      /*
+       * ⚠️⚠️ **在文本层上按下时不要关闭浮层**（实测踩过的坑）。
+       *
+       * 用户重新框选时：mousedown 落在文本层上（浮层外面）
+       * → 旧逻辑直接 `onClose()` → 浮层关闭
+       * → 然后新的选区建立 → `handleSelectionChange` 想打开浮层
+       * → 但此时 `popoverOpen` 已经是 `false` → 打开需要一次状态变化
+       * → **实测：浮层再也不出现**（选区有，浮层没有）
+       *
+       * → 改成：**按下时先不清空，等选区变化后由上层决定开/关**。
+       *   只有"按下后没有产生新选区"（比如点空白）才关闭。
+       *
+       * → 用 `setTimeout(0)` 推迟到 mousedown 之后：
+       *   如果这期间产生了新选区 → 选区变化会重新打开浮层 → 不关。
+       */
+      setTimeout(() => {
+        // 推迟后如果**没有选区** → 说明用户是点击空白 → 关闭
+        const selection = window.getSelection();
+        const hasSelection =
+          selection &&
+          selection.rangeCount > 0 &&
+          !selection.isCollapsed &&
+          selection.toString().trim().length > 0;
+        if (hasSelection) {
+          return;
+        }
+        onClose?.();
+      }, 0);
     };
 
     const onKeyDown = (event: KeyboardEvent) => {

@@ -16,26 +16,30 @@
  * 浏览器选区锚定的 DOM 节点没了 → 浏览器自动清空选区
  * → `selectionchange` 触发 → 浮层被关闭。
  *
- * → 所以浮层不是"没跟随"，而是**它依附的选区本身没了**。
+ * ## 做法：按**文本内容**恢复（不用字符偏移）
  *
- * ## 怎么做
+ * 缩放前记住"选中了什么**文字**" + "它在**哪一页**"，
+ * 缩放后（文本层重渲染完）在那一页里**找到这段文字** → 重新选中。
  *
- * 缩放**前**记住"选中了什么"（文本内容 + 在文本层里的字符偏移），
- * 缩放**后**（文本层重新渲染完）按字符偏移**恢复**选区。
+ * ### ⚠️ 为什么不用"字符偏移"
  *
- * 不用绝对 DOM 位置（会随缩放变），用**文本层的字符偏移**（缩放不变）。
+ * 试过用偏移（`offsetOf`），踩了三个坑：
+ * 1. 偏移要跨页累加 → 和恢复时的页内坐标系**不一致** → 恢复出"整页"
+ *    （实测 88 字符 → 2938 字符）
+ * 2. `offsetOf` 按 `span.textContent` 累加、恢复按文本节点累加 → 两者漂移
+ * 3. 选区结束在 span 边界时，`endContainer` 是**元素**而不是文本节点
+ *    → 偏移算不出来（实测 endOffset=3010，而选区只有 88 字符）
+ *
+ * → 按**文字**找：稳定、无坐标系问题、也符合用户直觉
+ *    （选的还是那段字）。
  */
 
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
-/** 选区快照（与缩放无关的表示） */
+/** 选区快照 */
 interface SelectionSnapshot {
-  /** 选中的文本 */
+  /** 选中的文字（用于恢复后核对） */
   text: string;
-  /** 起始字符偏移（在整页文本层里） */
-  startOffset: number;
-  /** 结束字符偏移 */
-  endOffset: number;
   /** 所在页码 */
   pageNumber: number;
 }
@@ -52,94 +56,89 @@ export interface UseSelectionPreservationOptions {
 
 /** useSelectionPreservation 返回值 */
 export interface UseSelectionPreservationResult {
-  /** 缩放前手动保存选区（可选；缩放变化时会自动保存） */
+  /** 缩放前手动保存选区（宿主在改缩放**之前**调用） */
   save: () => void;
 }
 
 /**
- * 计算一个 DOM 节点在文本层里的字符偏移。
+ * 取某一页的文本层 span（**按文档顺序**）。
  *
- * @param node 节点（文本节点或元素）
- * @param offset 节点内偏移
  * @param container 文本层容器
- * @returns 字符偏移；算不出时返回 -1
+ * @param pageNumber 页码
+ * @returns span 列表
  */
-function offsetOf(node: Node, offset: number, container: HTMLElement): number {
-  const spans = container.querySelectorAll<HTMLElement>('[data-page-number]');
-  let total = 0;
-
-  for (const span of spans) {
-    if (span === node || span.contains(node)) {
-      // 在这个 span 内：算 span 内的偏移
-      const walker = document.createTreeWalker(span, NodeFilter.SHOW_TEXT);
-      let within = 0;
-      let current = walker.nextNode();
-      while (current) {
-        if (current === node) {
-          return total + within + offset;
-        }
-        within += current.textContent?.length ?? 0;
-        current = walker.nextNode();
-      }
-      return total + within;
-    }
-    total += span.textContent?.length ?? 0;
-  }
-
-  return -1;
+function spansOfPage(container: HTMLElement, pageNumber: number): HTMLElement[] {
+  return [...container.querySelectorAll<HTMLElement>('[data-page-number]')].filter(
+    (span) => Number(span.getAttribute('data-page-number')) === pageNumber,
+  );
 }
 
 /**
- * 按字符偏移恢复选区。
+ * 把一段文字**定位**到 DOM 节点上（并选中它）。
+ *
+ * 做法：在该页的文本层里**按顺序拼出全文**，
+ *       找到目标文字的位置 → 映射回（文本节点, 节点内偏移）。
+ *
+ * @param text 要找的文字
+ * @param pageSpans 该页的 span 列表
+ * @returns 找到时返回 { node, offset }；没找到返回 null
+ */
+function locateText(
+  text: string,
+  pageSpans: readonly HTMLElement[],
+): { node: Text; offset: number; endNode: Text; endOffset: number } | null {
+  if (text.length === 0) {
+    return null;
+  }
+
+  /** 该页的全文（由文本节点拼成） */
+  let full = '';
+  /** 每个字符对应的（文本节点, 节点内偏移） */
+  const positions: { node: Text; offset: number }[] = [];
+
+  for (const span of pageSpans) {
+    const walker = document.createTreeWalker(span, NodeFilter.SHOW_TEXT);
+    let current = walker.nextNode();
+    while (current) {
+      const node = current as Text;
+      const content = node.textContent ?? '';
+      for (let i = 0; i < content.length; i++) {
+        positions.push({ node, offset: i });
+      }
+      full += content;
+      current = walker.nextNode();
+    }
+  }
+
+  const index = full.indexOf(text);
+  if (index < 0 || index >= positions.length) {
+    return null;
+  }
+
+  const start = positions[index];
+  const end = positions[Math.min(index + text.length - 1, positions.length - 1)];
+  if (!start || !end) {
+    return null;
+  }
+
+  return { node: start.node, offset: start.offset, endNode: end.node, endOffset: end.offset + 1 };
+}
+
+/**
+ * 按文字恢复选区。
  *
  * @param snapshot 快照
  * @param container 文本层容器
  * @returns 是否恢复成功
  */
 function restoreSelection(snapshot: SelectionSnapshot, container: HTMLElement): boolean {
-  const spans = [...container.querySelectorAll<HTMLElement>('[data-page-number]')].filter(
-    (span) => Number(span.getAttribute('data-page-number')) === snapshot.pageNumber,
-  );
+  const spans = spansOfPage(container, snapshot.pageNumber);
   if (spans.length === 0) {
     return false;
   }
 
-  // 先把整页的文本节点按顺序列出来
-  const ownerDocument = spans[0]?.ownerDocument;
-  if (!ownerDocument) {
-    return false;
-  }
-  const walker = document.createTreeWalker(ownerDocument, NodeFilter.SHOW_TEXT);
-  const texts: Text[] = [];
-  let current = walker.nextNode();
-  while (current) {
-    if (spans.some((span) => span.contains(current))) {
-      texts.push(current as Text);
-    }
-    current = walker.nextNode();
-  }
-
-  let total = 0;
-  let startNode: Text | null = null;
-  let startOffset = 0;
-  let endNode: Text | null = null;
-  let endOffset = 0;
-
-  for (const text of texts) {
-    const len = text.textContent?.length ?? 0;
-    if (startNode === null && total + len >= snapshot.startOffset) {
-      startNode = text;
-      startOffset = snapshot.startOffset - total;
-    }
-    if (endNode === null && total + len >= snapshot.endOffset) {
-      endNode = text;
-      endOffset = snapshot.endOffset - total;
-      break;
-    }
-    total += len;
-  }
-
-  if (!startNode || !endNode) {
+  const found = locateText(snapshot.text, spans);
+  if (!found) {
     return false;
   }
 
@@ -150,8 +149,8 @@ function restoreSelection(snapshot: SelectionSnapshot, container: HTMLElement): 
 
   const range = document.createRange();
   try {
-    range.setStart(startNode, Math.min(startOffset, startNode.textContent?.length ?? 0));
-    range.setEnd(endNode, Math.min(endOffset, endNode.textContent?.length ?? 0));
+    range.setStart(found.node, Math.min(found.offset, found.node.textContent?.length ?? 0));
+    range.setEnd(found.endNode, Math.min(found.endOffset, found.endNode.textContent?.length ?? 0));
   } catch {
     return false;
   }
@@ -176,22 +175,26 @@ export function useSelectionPreservation(
   const lastScaleRef = useRef(scale);
   /** 待恢复的快照 */
   const snapshotRef = useRef<SelectionSnapshot | null>(null);
-  /** 恢复定时器 */
-  const restoreTimerRef = useRef<number | null>(null);
+  /** 恢复用的 rAF 句柄 */
+  const restoreRafRef = useRef(0);
 
-  /** 保存当前选区 */
+  /** 保存当前选区（宿主在改缩放**之前**调用） */
   const save = useCallback(() => {
     const container = containerRef.current;
     const selection = window.getSelection();
+
     if (!container || !selection || selection.rangeCount === 0 || selection.isCollapsed) {
       snapshotRef.current = null;
       return;
     }
 
-    const range = selection.getRangeAt(0);
-    const startNode = range.startContainer;
-    const endNode = range.endContainer;
+    const text = selection.toString();
+    if (text.trim().length === 0) {
+      snapshotRef.current = null;
+      return;
+    }
 
+    const startNode = selection.getRangeAt(0).startContainer;
     const startElement = startNode instanceof Element ? startNode : startNode.parentElement;
     const pageElement = startElement?.closest<HTMLElement>('.scpdf-page');
     const pageNumber = Number(pageElement?.getAttribute('data-page-number'));
@@ -201,50 +204,15 @@ export function useSelectionPreservation(
       return;
     }
 
-    const startOffset = offsetOf(startNode, range.startOffset, container);
-    const endOffset = offsetOf(endNode, range.endOffset, container);
-
-    if (startOffset < 0 || endOffset < 0) {
-      snapshotRef.current = null;
-      return;
-    }
-
-    snapshotRef.current = {
-      text: selection.toString(),
-      startOffset,
-      endOffset,
-      pageNumber,
-    };
+    snapshotRef.current = { text, pageNumber };
   }, [containerRef]);
 
-  /*
-   * ⚠️⚠️ **保存必须在"恢复"之前跑**（顺序错了 → 永远存不到）。
-   *
-   * React 的 effect 执行顺序 = 声明顺序（同一次 commit 内）。
-   * 如果"恢复"effect 先跑并把 `lastScaleRef.current = scale` 更新了，
-   * 那"保存"effect 再跑时 `lastScaleRef.current === scale` → **直接 return，不保存**。
-   *
-   * → 用 `useLayoutEffect`（在 paint 之前同步执行）+ 声明在前面，
-   *   保证：先保存 → 再恢复。
-   */
-  useLayoutEffect(() => {
-    if (lastScaleRef.current === scale) {
-      return;
-    }
-    save();
-  }, [scale, save]);
-
   useEffect(() => {
-    // 第一次：不保存（没有"上一个缩放"可比）
+    // 第一次：没有"上一个缩放"可比
     if (lastScaleRef.current === scale) {
       return;
     }
 
-    /*
-     * ⚠️ 顺序很重要：
-     * 1. **先保存**（上面那个 useLayoutEffect 已经做了）
-     * 2. 再等文本层重渲染完 → **恢复**
-     */
     const snapshot = snapshotRef.current;
     lastScaleRef.current = scale;
 
@@ -252,75 +220,32 @@ export function useSelectionPreservation(
       return;
     }
 
-    if (restoreTimerRef.current !== null) {
-      cancelAnimationFrame(restoreTimerRef.current);
-      restoreTimerRef.current = null;
+    if (restoreRafRef.current !== 0) {
+      cancelAnimationFrame(restoreRafRef.current);
+      restoreRafRef.current = 0;
     }
 
     /*
-     * 等待文本层重渲染完，然后恢复选区。
-     *
-     * ⚠️⚠️ **不能只试一次**（实测踩过的坑）：
+     * ⚠️⚠️ **必须持续重试**（实测踩过的坑）。
      *
      * ```
-     * 100ms: len=199  ← 恢复了（此时文本层还是旧的）
-     * 200ms: len=0    ← 文本层重渲染 → 选区又被销毁了！
+     * attempt 0: restored=true, selLen=199   ← 恢复了
+     * 200ms:     selLen=0                     ← 文本层重渲染 → 又被销毁了！
      * ```
      *
      * 缩放后文本层会**分批**重渲染（不同页、不同 frame），
      * 恢复得太早 → 又被后面的重渲染干掉。
      *
-     * → 策略：**持续重试**。
-     *   - 每帧检查"选区是否还在"
+     * → 每帧检查"选区是否还在且文字对得上"
      *   - 不在 → 再恢复一次
-     *   - 连续 N 帧都稳定 → 收工
-     */
-    /*
-     * ⚠️⚠️ **"稳定"的判据必须够强**（实测踩过的坑）。
-     *
-     * ```
-     * attempt 1: restored=true, selLen=199   ← 恢复了
-     * 200ms:     selLen=0                     ← 文本层重渲染 → 又被销毁了！
-     * ```
-     *
-     * 早先的判据是"连续 3 帧选区还在" → 第 3 帧就收工
-     * → 但文本层在**第 4 帧之后**才重渲染 → 收工得太早 → 选区又被干掉。
-     *
-     * → 改成：**必须连续 N 帧都活着的"且"期间没有发生重渲染**。
-     *   怎么知道"没有重渲染"？→ **文本层 DOM 的版本号**：
-     *   每次文本层重渲染，span 会被替换 → 用一个 MutationObserver 计数。
+     *   - 在 → 连续 10 帧稳定才收工
      */
     let attempts = 0;
     let stableFrames = 0;
-    /** 上次恢复时的文本层版本 */
-    let versionAfterRestore = -1;
-
-    /*
-     * 文本层重渲染的计数器 —— 用来知道"选区是不是刚被重渲染干掉"。
-     *
-     * ⚠️ 每次恢复后如果文本层又重渲染了 → 选区会再次消失
-     *    → 稳定计数要归零 → 继续恢复。
-     */
-    let textLayerVersion = 0;
-    const observer = new MutationObserver((records) => {
-      for (const record of records) {
-        for (const node of record.removedNodes) {
-          if (node instanceof Element && node.matches('.scpdf-text-layer__item')) {
-            textLayerVersion += 1;
-            break;
-          }
-        }
-      }
-    });
-    observer.observe(containerRef.current ?? document.body, {
-      childList: true,
-      subtree: true,
-    });
 
     const tryRestore = () => {
       const container = containerRef.current;
       if (!container) {
-        observer.disconnect();
         return;
       }
 
@@ -329,17 +254,9 @@ export function useSelectionPreservation(
         selection &&
         selection.rangeCount > 0 &&
         !selection.isCollapsed &&
-        selection.toString().length > 0;
+        selection.toString() === snapshot.text;
 
-      if (alive && selection.toString() === snapshot.text) {
-        /*
-         * ⚠️ 文本层刚重渲染过 → 选区可能**已经又被干掉**了
-         *    （浏览器会静默丢弃选区，不触发 selectionchange）
-         * → 稳定计数归零，重新恢复。
-         */
-        if (versionAfterRestore >= 0 && textLayerVersion !== versionAfterRestore) {
-          stableFrames = 0;
-        }
+      if (alive) {
         stableFrames += 1;
         /*
          * 连续 10 帧稳定 → 收工。
@@ -348,46 +265,40 @@ export function useSelectionPreservation(
          * （实测：文本层在恢复后约 100ms 才重渲染完）。
          */
         if (stableFrames >= 10) {
-          observer.disconnect();
+          restoreRafRef.current = 0;
           snapshotRef.current = null;
           onRestored?.();
           return;
         }
       } else {
         stableFrames = 0;
+        restoreSelection(snapshot, container);
       }
-
-      // 选区没了 → 恢复
-      restoreSelection(snapshot, container);
-
-      // 记下"恢复时的文本层版本" → 下一帧如果版本变了（说明刚被重渲染干掉）→ 稳定计数归零
-      versionAfterRestore = textLayerVersion;
 
       attempts += 1;
       if (attempts > 120) {
         // 放弃（约 2s）
-        observer.disconnect();
+        restoreRafRef.current = 0;
         snapshotRef.current = null;
         return;
       }
-      restoreTimerRef.current = requestAnimationFrame(tryRestore);
+      restoreRafRef.current = requestAnimationFrame(tryRestore);
     };
 
-    restoreTimerRef.current = requestAnimationFrame(tryRestore);
+    restoreRafRef.current = requestAnimationFrame(tryRestore);
 
     return () => {
-      observer.disconnect();
-      if (restoreTimerRef.current !== null) {
-        cancelAnimationFrame(restoreTimerRef.current);
-        restoreTimerRef.current = null;
+      if (restoreRafRef.current !== 0) {
+        cancelAnimationFrame(restoreRafRef.current);
+        restoreRafRef.current = 0;
       }
     };
   }, [scale, containerRef, onRestored]);
 
   useEffect(
     () => () => {
-      if (restoreTimerRef.current !== null) {
-        cancelAnimationFrame(restoreTimerRef.current);
+      if (restoreRafRef.current !== 0) {
+        cancelAnimationFrame(restoreRafRef.current);
       }
     },
     [],
