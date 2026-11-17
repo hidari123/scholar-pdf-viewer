@@ -29,6 +29,34 @@ describe('pageOfRect', () => {
     const rect = { top: 780, left: 10, width: 100, height: 60 };
     expect(pageOfRect(rect, PAGES)).toBe(2);
   });
+
+  /*
+   * ⚠️⚠️ **页是居中时的回归测试**（实测踩过的坑）。
+   *
+   * `.scpdf-page` 用 `margin-inline: auto` 居中 →
+   * 当页宽 < 容器宽时（低缩放 / 适合页面），页会**居中偏移**。
+   *
+   * 实测（100% 缩放，容器 1384px，页 612px）：
+   * ```
+   * 页实际 left = 386
+   * 选区矩形 centerX = 681.5
+   * 若按 left=0 判定： 681.5 > 0 + 612 → **不属于任何页** ❌
+   *                 → 选区被丢弃 → **自绘选区层为空**（用户看到"选不中"）
+   * ```
+   */
+  it('页居中时（left ≠ 0）仍能归页', () => {
+    const centered: PageFrame[] = [{ pageNumber: 1, top: 0, left: 386, width: 612, height: 792 }];
+    // 选区在页的右半部分：centerX = 681.5（如果按 left=0 判定就会失败）
+    const rect = { top: 105, left: 591, width: 181, height: 19 };
+    expect(pageOfRect(rect, centered)).toBe(1);
+  });
+
+  it('页居中时，页外的矩形仍返回 null', () => {
+    const centered: PageFrame[] = [{ pageNumber: 1, top: 0, left: 386, width: 612, height: 792 }];
+    // centerX = 100 → 在页左侧的空白区
+    const rect = { top: 105, left: 50, width: 100, height: 19 };
+    expect(pageOfRect(rect, centered)).toBeNull();
+  });
 });
 
 describe('extractSelection', () => {
@@ -64,6 +92,29 @@ describe('extractSelection', () => {
 
     expect(result?.pages).toEqual([1, 2]);
     expect(result?.rects).toHaveLength(2);
+  });
+
+  /*
+   * ⚠️ **页居中时的回归测试**（实测 bug）。
+   *
+   * 旧实现把页框的 `left` 写死成 0 →
+   * 页居中时（低缩放），选区矩形落在"页框之外" → 被丢弃
+   * → `extractSelection` 返回 null → **自绘选区层为空**。
+   */
+  it('页居中（left ≠ 0）时选区不被丢弃', () => {
+    const centered: PageFrame[] = [{ pageNumber: 1, top: 0, left: 386, width: 612, height: 792 }];
+    const result = extractSelection({
+      text: 'centered',
+      rects: [{ top: 105, left: 591, width: 181, height: 19 }],
+      pages: centered,
+      reference: { width: 612, height: 792 },
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.pages).toEqual([1]);
+    expect(result?.rects).toHaveLength(1);
+    // 页内坐标 = 视口坐标 - 页的 left
+    expect(result?.rects[0]?.left).toBe(591 - 386);
   });
 
   it('同行碎矩形合并（浏览器把一行切成多段的情况）', () => {

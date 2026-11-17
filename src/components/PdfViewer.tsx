@@ -397,6 +397,27 @@ export function PdfViewer(props: PdfViewerProps) {
   }, [numPages, pageSizes]);
 
   /**
+   * **页左边距**（滚动内容坐标）。
+   *
+   * ⚠️⚠️ **不能假设 `left = 0`**（实测踩过的坑）。
+   *
+   * 页元素是**居中**的（`.scpdf-page` 用 `margin-inline: auto`）。
+   * → 当页宽 < 容器宽时（低缩放 / 适合页面），页会**居中偏移**。
+   *
+   * 实测（100% 缩放，容器 1384px 宽，页 612px 宽）：
+   * ```
+   * 页实际 left = 386（居中后）
+   * 选区矩形 centerX = 681.5
+   * 若按 left=0 判定：  681.5 > 0 + 612  → **不属于任何页** ❌
+   *                  → 选区被丢弃 → **自绘选区层为空**
+   * ```
+   *
+   * → **直接量页元素的实际 left**（比算准：能自动处理 padding、滚动条、
+   *   居中规则的变化）。
+   */
+  const [pageLeft, setPageLeft] = useState(0);
+
+  /**
    * 页顶边数组（末项为文档总高哨兵）。
    *
    * **必须取整**：浏览器的 scrollTop 是整数（Device Pixel 会对齐），
@@ -727,6 +748,9 @@ export function PdfViewer(props: PdfViewerProps) {
 
     let lastWidth = container.clientWidth;
 
+    /*
+     * ⚠️ **容器宽度变化 → 页的居中偏移也变** → `pageLeft` 要重算。
+     */
     const observer = new ResizeObserver(() => {
       const width = container.clientWidth;
       // 宽度没变 → 不管（高度变化不影响适配宽度）
@@ -749,7 +773,47 @@ export function PdfViewer(props: PdfViewerProps) {
 
     observer.observe(container);
 
-    return () => observer.disconnect();
+    /*
+     * ⚠️ **量页的居中偏移**（`pageLeft`）。
+     *
+     * 页是 `margin-inline: auto` 居中的 → left 取决于容器宽和页宽
+     * → 容器变宽 / 缩放变化时都会变。
+     *
+     * → 用 ResizeObserver + 缩放变化后各量一次。
+     */
+    const measurePageLeft = () => {
+      const pageEl = container.querySelector<HTMLElement>('.scpdf-page');
+      if (!pageEl) {
+        return;
+      }
+      /*
+       * ⚠️ **用 `offsetLeft`，不要用 `getBoundingClientRect()` 相减**。
+       *
+       * `getBoundingClientRect()` 差值在**布局还没稳定**时会算出错值
+       * （实测：先算出 395，后面变成 8、0……）。
+       * `offsetLeft` 是**布局后的偏移**，稳定可靠。
+       *
+       * ⚠️ `offsetLeft` 相对**最近的定位祖先**（offsetParent），
+       *    不一定是滚动容器 → 要减去容器自身的 offsetLeft 差值。
+       */
+      const containerLeft = container.offsetLeft;
+      const left = Math.round(pageEl.offsetLeft - containerLeft);
+      setPageLeft((prev) => (Math.abs(prev - left) >= 1 ? left : prev));
+    };
+
+    measurePageLeft();
+    const pageObserver = new ResizeObserver(() => measurePageLeft());
+    pageObserver.observe(container);
+    // 页宽变化（缩放）也会改 left → 观察页自身
+    const firstPage = container.querySelector<HTMLElement>('.scpdf-page');
+    if (firstPage) {
+      pageObserver.observe(firstPage);
+    }
+
+    return () => {
+      observer.disconnect();
+      pageObserver.disconnect();
+    };
   }, [initialScale, numPages, pageSizesPt, zoom]);
 
   /**
@@ -920,7 +984,8 @@ export function PdfViewer(props: PdfViewerProps) {
         pageSizes.map((size, index) => ({
           pageNumber: index + 1,
           top: pageTops[index] ?? 0,
-          left: 0,
+          // ⚠️ **不能用 0**（页是居中的，见 `pageLeft` 的注释）
+          left: pageLeft,
           width: size.width,
           height: size.height,
         })),
@@ -938,7 +1003,7 @@ export function PdfViewer(props: PdfViewerProps) {
         return next;
       });
     },
-    [pageSizes, pageTops, baselinesByPage],
+    [pageSizes, pageTops, baselinesByPage, pageLeft],
   );
 
   /**
@@ -990,7 +1055,8 @@ export function PdfViewer(props: PdfViewerProps) {
     pageFrames: pageSizes.map((size, index) => ({
       pageNumber: index + 1,
       top: pageTops[index] ?? 0,
-      left: 0,
+      // ⚠️ **不能用 0**（页是居中的，见 `pageLeft` 的注释）
+      left: pageLeft,
       width: size.width,
       height: size.height,
     })),
