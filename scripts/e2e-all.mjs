@@ -23,6 +23,7 @@ const suites = [
   { name: '选区浮层', file: 'e2e-selection-popover.mjs' },
   { name: '选区形状', file: 'e2e-selection-shape.mjs' },
   { name: '选区跨行回归', file: 'e2e-selection-regression.mjs' },
+  { name: '浮层锚定回归', file: 'e2e-popover-anchor.mjs' },
   { name: '高亮效果', file: 'e2e-highlight.mjs' },
   { name: '缩放行为', file: 'e2e-zoom.mjs' },
   { name: '搜索高亮', file: 'e2e-search-highlight.mjs' },

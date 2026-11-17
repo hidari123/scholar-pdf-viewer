@@ -102,6 +102,13 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
   /** 当前选区 */
   const selectionRef = useRef<SelectionData | null>(null);
 
+  /**
+   * 几何计算的 **rAF 句柄**（节流用）。
+   *
+   * 拖动时 `selectionchange` 高频触发 → 合并到下一帧。
+   */
+  const geometryRafRef = useRef(0);
+
   /** 清除选区（并通知宿主） */
   const clearSelection = useCallback(() => {
     selectionRef.current = null;
@@ -149,21 +156,35 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
       return [...pages].sort((a, b) => a - b);
     };
 
-    /** mouseup 处理 */
+    /**
+     * **mouseup 处理**。
+     *
+     * ⚠️ 现在几何计算在 `computeGeometry()` 里（`selectionchange` 也会调），
+     *    这里只负责"收尾"（失败则清空选区）。
+     */
     const onMouseUp = () => {
-      const selection = window.getSelection();
-
-      if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+      if (!computeGeometry()) {
         clearSelection();
-        return;
+      }
+    };
+
+    /**
+     * **几何计算**（选区矩形 + 选区数据）。
+     *
+     * ⚠️ 抽成独立函数是为了让 **mouseup** 和 **selectionchange** 都能调它 ——
+     *    用户要求"鼠标一开始框选就出现浮层" → 不能只在 mouseup 才算。
+     */
+    const computeGeometry = (): boolean => {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+        return false;
       }
 
       const range = selection.getRangeAt(0);
       const text = selection.toString();
 
       if (text.trim().length === 0) {
-        clearSelection();
-        return;
+        return false;
       }
 
       /*
@@ -191,20 +212,17 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
           ? range.commonAncestorContainer
           : range.commonAncestorContainer.parentElement;
       if (!anchorElement) {
-        clearSelection();
-        return;
+        return false;
       }
       const inTextLayer = !!anchorElement.closest(TEXT_LAYER_CLASS);
       const inPage = !!anchorElement.closest(PAGE_CLASS);
       if (!inTextLayer && !inPage) {
-        clearSelection();
-        return;
+        return false;
       }
 
       const pages = collectPages(range);
       if (pages.length === 0) {
-        clearSelection();
-        return;
+        return false;
       }
 
       /**
@@ -232,8 +250,7 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
       }
 
       if (rects.length === 0) {
-        clearSelection();
-        return;
+        return false;
       }
 
       /*
@@ -303,16 +320,28 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
       });
 
       if (!result) {
-        clearSelection();
-        return;
+        return false;
       }
 
       selectionRef.current = result;
       onSelectionChange?.(result);
+      return true;
     };
 
     /**
-     * selectionchange：把 endOfContent 哨兵挪到选区边界旁边。
+     * selectionchange：① 实时算几何（拖动中就出选区块 + 浮层）② 挪哨兵。
+     *
+     * ## ① 为什么要在 selectionchange 里算几何
+     *
+     * 用户要求："我需要鼠标开始框选之后立刻出现浮层"。
+     *
+     * 旧实现只在 **mouseup** 算 → 拖动全程零反馈 → 手感"巨卡"
+     * （实测：按住拖动 900ms，浮层和选区块都是 0 个）。
+     *
+     * pdf.js v6 的 `DrawLayer.#selectionChange()` 也是在 `selectionchange`
+     * 里实时画选区的 → 我们之前只抄了一半。
+     *
+     * ## ② 哨兵
      *
      * **为什么需要**（pdf.js 的 `text_layer_builder.js` 也有）：
      * 在 Chrome/Safari 里，用户在**页面空白处**点击或拖动时，
@@ -332,6 +361,21 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
         return;
+      }
+
+      /*
+       * ⚠️⚠️ **实时算几何**（拖动中就出选区块 + 浮层）。
+       *
+       * ⚠️ **必须 rAF 节流**：
+       * 拖动时 `selectionchange` 会高频触发（实测 30 步触发 15 次），
+       * 每次都重算 + setState → 会掉帧。
+       * → 合并到下一帧，最多一帧一次。
+       */
+      if (geometryRafRef.current === 0) {
+        geometryRafRef.current = requestAnimationFrame(() => {
+          geometryRafRef.current = 0;
+          computeGeometry();
+        });
       }
 
       const range = selection.getRangeAt(0);
@@ -417,6 +461,10 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     return () => {
       container.removeEventListener('mouseup', onMouseUp);
       document.removeEventListener('selectionchange', onSelectionChangeEvent);
+      if (geometryRafRef.current !== 0) {
+        cancelAnimationFrame(geometryRafRef.current);
+        geometryRafRef.current = 0;
+      }
     };
   }, [
     containerRef,

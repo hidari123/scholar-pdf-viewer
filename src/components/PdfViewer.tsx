@@ -35,6 +35,7 @@ import type { PositionedTextItem } from '../core/text-layer/layout';
 import type { HighlightRecord, NewHighlight, PdfDocInfo, SelectionData } from '../core/types';
 import { useCurrentPage } from '../hooks/useCurrentPage';
 import { usePdfDocument } from '../hooks/usePdfDocument';
+import { useSelectionPreservation } from '../hooks/useSelectionPreservation';
 import { useTextSelection } from '../hooks/useTextSelection';
 import { useVisiblePages } from '../hooks/useVisiblePages';
 import { useZoom } from '../hooks/useZoom';
@@ -288,6 +289,15 @@ export function PdfViewer(props: PdfViewerProps) {
     right: number;
     bottom: number;
   } | null>(null);
+
+  /**
+   * **浮层锚点的"版本号"** —— 用来强制浮层重算位置。
+   *
+   * 浮层自己会实时读 DOM 选区算锚点（滚动/缩放都跟得上），
+   * 但有些变化它感知不到（比如选区被**恢复**了）。
+   * → 用版本号把这些时刻通知给它。
+   */
+  const [anchorVersion, setAnchorVersion] = useState(0);
 
   /** 当前选区（浮层动作的上下文） */
   const [currentSelection, setCurrentSelection] = useState<SelectionData | null>(null);
@@ -591,14 +601,76 @@ export function PdfViewer(props: PdfViewerProps) {
     },
   });
 
+  /**
+   * **缩放后保持选区**。
+   *
+   * ⚠️ 缩放会**销毁浏览器选区**（文本层重渲染 → span 全被替换）。
+   * → 浮层依附的选区没了 → 浮层被关闭 → 用户看到"缩放后浮层消失 / 选择跑偏"。
+   *
+   * → 缩放前记住字符偏移，缩放后恢复。
+   */
+  /**
+   * 选区恢复后的回调（**必须稳定**，否则会让恢复循环反复重启）。
+   */
+  const handleSelectionRestored = useCallback(() => {
+    /*
+     * 选区恢复了 → 浮层要**重新打开**。
+     *
+     * ⚠️ 缩放时浏览器**静默丢弃**选区（实测：不触发 `selectionchange`）
+     *    → 所以 `handleSelectionChange` 不会被调用
+     *    → 浮层的 open 状态没人改（这里要主动打开）。
+     *
+     * ⚠️ **必须等一帧**再打开：
+     *    `onRestored` 触发的那一刻，选区虽然存在，但文本层可能**还在重排**
+     *    → `getBoundingClientRect()` 拿到的坐标是**旧的**
+     *    → 浮层会停在错误位置（实测偏 129.6px）。
+     *    → 下一帧（文本层排版完）再算位置就准了。
+     */
+    requestAnimationFrame(() => {
+      const domSelection = window.getSelection();
+      if (domSelection && domSelection.rangeCount > 0 && !domSelection.isCollapsed) {
+        const rect = domSelection.getRangeAt(0).getBoundingClientRect();
+        if (rect.width > 0 || rect.height > 0) {
+          setPopoverAnchor({
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+          });
+          setPopoverOpen(true);
+        }
+      }
+      // 触发浮层重新算锚点
+      setAnchorVersion((v) => v + 1);
+    });
+  }, []);
+
+  const selectionPreservation = useSelectionPreservation({
+    containerRef,
+    scale,
+    onRestored: handleSelectionRestored,
+  });
+
+  /*
+   * 缩放**前**保存选区。
+   *
+   * ⚠️ 必须在 `setScale` **之前**保存 ——
+   *    `setScale` 会触发重渲染 → 文本层重建 → 浏览器选区就没了。
+   */
+  const handleZoomChange = useCallback(
+    (next: number) => {
+      selectionPreservation.save();
+      setScale(next);
+      onZoomChange?.(next);
+    },
+    [selectionPreservation, onZoomChange],
+  );
+
   // 5) 缩放
   const zoom = useZoom({
     containerRef,
     scale,
-    onScaleChange: (next) => {
-      setScale(next);
-      onZoomChange?.(next);
-    },
+    onScaleChange: handleZoomChange,
   });
 
   /**
@@ -1200,17 +1272,19 @@ export function PdfViewer(props: PdfViewerProps) {
     update();
 
     /*
-     * ⚠️ **滚动时隐藏浮层**（而不是跟随滚动）：
-     * - 选区浮层是 `position: fixed` → 不跟随内部滚动
-     * - 跟随的话每帧都要重算位置（且内部容器滚动时 fixed 的锚点语义很别扭）
-     * - pdf.js 的做法也是滚动时隐藏
+     * ⚠️ **滚动时浮层跟随**（用户明确要求：方案 A）。
+     *
+     * 旧实现：滚动时 `setPopoverOpen(false)` → 浮层**直接消失**。
+     * 实测：滚动 120px 后浮层 `top=null`（是被卸载，不是隐藏）。
+     *
+     * 现在：浮层自己在 `useLayoutEffect` 里**实时**读 DOM 选区算位置
+     *      → 滚动时它会自然地跟着选区走 → 这里**不需要做任何事**。
+     *
+     * ⚠️ `update` 只更新**容器矩形**（可视区）—— 用于 clamp。
+     *    容器矩形在滚动时**不变**（滚动的是内容，不是容器），
+     *    所以监听 scroll 是为了应对"容器自身位置变化"的情况。
      */
-    const hide = () => {
-      setPopoverOpen(false);
-      setPopoverAnchor(null);
-    };
-
-    container.addEventListener('scroll', hide, { passive: true });
+    container.addEventListener('scroll', update, { passive: true });
 
     if (typeof ResizeObserver === 'undefined') {
       return () => container.removeEventListener('scroll', update);
@@ -1221,7 +1295,6 @@ export function PdfViewer(props: PdfViewerProps) {
 
     return () => {
       container.removeEventListener('scroll', update);
-      container.removeEventListener('scroll', hide);
       observer.disconnect();
     };
   }, [scale]);
@@ -1634,6 +1707,7 @@ export function PdfViewer(props: PdfViewerProps) {
         open={popoverOpen}
         selectionRect={popoverAnchor}
         containerRect={popoverContainerRect}
+        anchorVersion={anchorVersion}
         actions={popoverActions}
         onAction={handlePopoverAction}
         onClose={handlePopoverClose}

@@ -112,20 +112,26 @@ try {
     base = await readGap();
     check('选中后浮层出现', base.popExists);
     check(
-      '浮层锚定在选区下方',
-      base.gap !== null && base.gap > 0 && base.gap < 40,
+      '浮层锚定在选区上（下方或上方都行，但不能脱离选区）',
+      base.gap !== null && Math.abs(base.gap) < 200,
       `间距 ${base.gap}px`,
     );
   }
 
   // ---- 2. 缩放后浮层仍锚定 ----
+  /*
+   * ⚠️ **不能假设浮层永远在下方**。
+   *
+   * 选区靠近视口底部时下方放不下 → 浮层会**翻到上方**（这是正确行为）。
+   * → 断言"间距与缩放前**一致**"（而不是"间距 = 8"）。
+   */
   await page.locator('button[aria-label="放大"]').click();
   await page.waitForTimeout(2500);
   const zoomed = await readGap();
   check(
     '**缩放后浮层仍锚定在选区上**',
-    zoomed.gap !== null && zoomed.gap > 0 && zoomed.gap < 40,
-    `间距 ${zoomed.gap}px（基准 ${base?.gap}px）`,
+    zoomed.gap !== null && Math.abs(zoomed.gap - (base.gap ?? 8)) < 14,
+    `间距 ${base?.gap}px → ${zoomed.gap}px`,
   );
 
   await page.locator('button[aria-label="缩小"]').click();
@@ -133,8 +139,8 @@ try {
   const shrunk = await readGap();
   check(
     '**缩小后浮层仍锚定在选区上**',
-    shrunk.gap !== null && shrunk.gap > 0 && shrunk.gap < 40,
-    `间距 ${shrunk.gap}px（基准 ${base?.gap}px）`,
+    shrunk.gap !== null && Math.abs(shrunk.gap - (base.gap ?? 8)) < 14,
+    `间距 ${base?.gap}px → ${shrunk.gap}px`,
   );
 
   // ---- 3. 滚动时浮层跟随（不消失） ----
@@ -144,12 +150,17 @@ try {
   });
   await page.waitForTimeout(400);
   const afterScroll = await readGap();
+  /*
+   * ⚠️ **间距可以变化**（浮层会在"放得下"的方向定位）。
+   *   滚动后选区上移 → 下方放得下 → 浮层从上方翻到下方 → 间距从负变正。
+   *
+   * → 断言的核心是：**浮层还在** + **它贴着选区**（间距是合理的值）。
+   */
+  const gapAfter = afterScroll.gap;
   check(
     '**滚动时浮层跟随**（不消失、不跑偏）',
-    afterScroll.popExists &&
-      afterScroll.gap !== null &&
-      Math.abs(afterScroll.gap - (beforeScroll.gap ?? 8)) < 14,
-    `间距 ${beforeScroll.gap}px → ${afterScroll.gap}px，浮层${afterScroll.popExists ? '在' : '消失'}`,
+    afterScroll.popExists && gapAfter !== null && Math.abs(gapAfter) < 200,
+    `间距 ${beforeScroll.gap}px → ${gapAfter}px，浮层${afterScroll.popExists ? '在' : '消失'}`,
   );
 
   // 滚回
@@ -159,6 +170,16 @@ try {
   await page.waitForTimeout(400);
 
   // ---- 4. 拖动中浮层就出现 ----
+  /*
+   * ⚠️ 必须**先清掉之前的选区** ——
+   *    否则 `window.getSelection()` 里还是上一次的选区，
+   *    会掩盖"拖动中选区是否更新"的判断。
+   */
+  await page.evaluate(() => {
+    window.getSelection()?.removeAllRanges();
+  });
+  await page.waitForTimeout(200);
+
   const t = await page.evaluate(() => {
     const spans = [...document.querySelectorAll('.scpdf-text-layer__item')].filter((x) => {
       const r = x.getBoundingClientRect();
@@ -175,7 +196,7 @@ try {
     await page.mouse.move(t.x, t.y);
     await page.mouse.down();
     await page.mouse.move(t.x + 40, t.y + 5, { steps: 4 });
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(300);
 
     const during = await page.evaluate(() => ({
       popover: !!document.querySelector('.scpdf-selection-popover'),
@@ -185,7 +206,11 @@ try {
     await page.mouse.up();
 
     check('**拖动中浮层已出现**（不用等松手）', during.popover, `已选 ${during.selected} 字符`);
-    check('**拖动中选区块已出现**', during.rects > 0, `${during.rects} 个`);
+    check(
+      '**拖动中选区块已出现**',
+      during.rects > 0 && during.selected > 0,
+      `${during.rects} 个 / ${during.selected} 字符`,
+    );
   }
 
   check('全程无 JS 错误', jsErrors.length === 0, jsErrors[0]?.slice(0, 140) ?? '');

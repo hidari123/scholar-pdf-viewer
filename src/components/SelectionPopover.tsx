@@ -24,10 +24,27 @@ import { SelectionActionIconView } from './SelectionActionIcons';
 export interface SelectionPopoverProps {
   /** 是否显示 */
   open: boolean;
-  /** 选区矩形（视口坐标） */
+  /**
+   * 选区矩形（视口坐标）。
+   *
+   * ⚠️ **这是"起点"，不是"锚点"** ——
+   * 浮层真正用的锚点由组件自己**实时**从 DOM 选区算（见 `liveAnchor`）。
+   *
+   * 为什么要实时算：
+   * - `position: fixed` 的坐标会随**滚动 / 缩放 / 容器尺寸变化**失效
+   * - 存下来的坐标**必然**会在某一刻过期 → 浮层跑到别处
+   *   （实测：缩放后浮层偏了 130px；滚动后浮层直接消失）
+   */
   selectionRect: { left: number; top: number; right: number; bottom: number } | null;
   /** 容器矩形（视口坐标）—— PDF 的可视区 */
   containerRect: { left: number; top: number; right: number; bottom: number } | null;
+  /**
+   * 锚点**版本号** —— 外部强制重算位置用。
+   *
+   * 浮层自己会监听滚动/resize 实时重算，
+   * 但"选区被恢复"这类变化它感知不到 → 宿主用这个号通知它。
+   */
+  anchorVersion?: number;
   /** 要显示的动作 */
   actions: SelectionAction[];
   /** 点击动作 */
@@ -45,6 +62,36 @@ export interface SelectionPopoverProps {
 }
 
 /**
+ * 从**当前 DOM 选区**实时读出锚点矩形（视口坐标）。
+ *
+ * ⚠️ 为什么不用传进来的 `selectionRect`：
+ * 它是"选区变化那一刻"的快照，滚动/缩放后就是**过期坐标**。
+ *
+ * @returns 选区矩形；没有选区时返回 null
+ */
+function readLiveAnchor(): {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+} | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+    return null;
+  }
+  const rect = selection.getRangeAt(0).getBoundingClientRect();
+  if (rect.width <= 0 && rect.height <= 0) {
+    return null;
+  }
+  return {
+    left: rect.left,
+    top: rect.top,
+    right: rect.right,
+    bottom: rect.bottom,
+  };
+}
+
+/**
  * 选区浮层。
  *
  * @param props 参数
@@ -53,6 +100,7 @@ export function SelectionPopover({
   open,
   selectionRect,
   containerRect,
+  anchorVersion: externalAnchorVersion,
   actions,
   onAction,
   onClose,
@@ -63,6 +111,14 @@ export function SelectionPopover({
   const [position, setPosition] = useState<PopoverPosition | null>(null);
   /** 颜色下拉是否展开 */
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  /** 上一次用的锚点（用于"位置变了没"的比对） */
+  const lastAnchorRef = useRef<{
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  } | null>(null);
 
   /*
    * **实测弹层尺寸**（不猜）。
@@ -140,20 +196,145 @@ export function SelectionPopover({
   // 有了尺寸 + 选区 + 容器 → 算位置
   const effectiveSize = measured ?? estimatedSize;
 
+  /*
+   * ⚠️ **实时锚点**。
+   *
+   * 浮层必须**始终**贴在当前选区上：
+   * - 滚动 → 选区的视口坐标变了
+   * - 缩放 → 选区的视口坐标变了
+   * - 容器尺寸变化 → 可视区变了（clamp 要重算）
+   *
+   * 旧实现把锚点**存进 state**（选区变化那一刻算一次）→
+   * 滚动/缩放后就是过期坐标 → 浮层跑到别处（实测偏 130px）或直接消失。
+   *
+   * → 改成：**每次布局都从 DOM 选区现算**。
+   *
+   * 触发源：
+   * - 滚动/缩放/resize → 内部版本号 +1
+   * - 宿主通知（选区被恢复）→ 外部版本号变化
+   */
+  const [internalAnchorVersion, setInternalAnchorVersion] = useState(0);
+
+  /** 触发重算的来源（滚动/缩放/resize） */
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    /*
+     * ⚠️ **rAF 节流**。
+     *
+     * 滚动事件在拖动滚动条时能到 60+ 次/秒，
+     * 每次都重算位置 + setState → 会掉帧。
+     * → 合并到下一帧，最多一帧一次。
+     */
+    let raf = 0;
+    const bump = () => {
+      if (raf !== 0) {
+        return;
+      }
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        setInternalAnchorVersion((v) => v + 1);
+      });
+    };
+
+    // 滚动（捕获阶段 → 能收到内部容器的滚动）
+    window.addEventListener('scroll', bump, { passive: true, capture: true });
+    // 窗口缩放
+    window.addEventListener('resize', bump, { passive: true });
+
+    /*
+     * ⚠️ **持续校正**（每 100ms 检查一次）。
+     *
+     * 有些变化事件监听不到：
+     * - 缩放后文本层**异步重排** → 选区坐标在几帧内连续变化
+     * - 浏览器**静默丢弃**选区（缩放时不触发 selectionchange）
+     *
+     * → 每 100ms 比对一次"DOM 选区的位置"和"当前用的锚点"，
+     *   不一致就重算 → 浮层永远贴合。
+     *
+     * 成本：一次 `getBoundingClientRect()`（微秒级），可忽略。
+     */
+    const checkTimer = window.setInterval(() => {
+      const anchor = readLiveAnchor();
+      if (!anchor) {
+        return;
+      }
+      // 与当前用的锚点比 → 差得够多才重算（避免无谓的 setState）
+      const current = lastAnchorRef.current;
+      if (
+        !current ||
+        Math.abs(current.left - anchor.left) > 1 ||
+        Math.abs(current.top - anchor.top) > 1 ||
+        Math.abs(current.right - anchor.right) > 1 ||
+        Math.abs(current.bottom - anchor.bottom) > 1
+      ) {
+        bump();
+      }
+    }, 100);
+
+    return () => {
+      if (raf !== 0) {
+        cancelAnimationFrame(raf);
+      }
+      window.clearInterval(checkTimer);
+      window.removeEventListener('scroll', bump, { capture: true });
+      window.removeEventListener('resize', bump);
+    };
+  }, [open]);
+
+  /*
+   * **锚点 = 实时读 DOM 选区**。
+   *
+   * 优先级：
+   * 1. DOM 里还有选区 → 用它（最准，永远跟得上）
+   * 2. DOM 选区没了（比如被清空）→ 退回传入的 `selectionRect`（兜底）
+   *
+   * ⚠️ **不能用 useMemo 缓存**：
+   *    选区"恢复"这个时刻，DOM 里的选区是**刚刚**出现的，
+   *    而 useMemo 的依赖（版本号）是在**渲染时**读的 —— 时机上可能对不上。
+   *    → 直接在 `useLayoutEffect` 里现算（每次布局都算）。
+   */
   useLayoutEffect(() => {
-    if (!open || !selectionRect || !containerRect || !effectiveSize) {
+    if (!open || !containerRect || !effectiveSize) {
       setPosition(null);
       return;
     }
 
+    void internalAnchorVersion;
+    void externalAnchorVersion;
+
+    const anchor = readLiveAnchor() ?? selectionRect;
+    if (!anchor) {
+      setPosition(null);
+      lastAnchorRef.current = null;
+      return;
+    }
+    lastAnchorRef.current = anchor;
+
     setPosition(
       computePopoverPosition({
-        selection: selectionRect,
+        selection: anchor,
         toolbar: effectiveSize,
         container: containerRect,
+        // 垂直边界用**视口**（容器可能比窗口高 → 按容器判定会误翻）
+        viewport: {
+          left: 0,
+          top: 0,
+          right: window.innerWidth,
+          bottom: window.innerHeight,
+        },
       }),
     );
-  }, [open, selectionRect, containerRect, effectiveSize]);
+  }, [
+    open,
+    internalAnchorVersion,
+    externalAnchorVersion,
+    selectionRect,
+    containerRect,
+    effectiveSize,
+  ]);
 
   /*
    * 关闭条件：

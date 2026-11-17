@@ -32,6 +32,13 @@ export interface PopoverPositionInput {
   toolbar: { width: number; height: number };
   /** 容器矩形（视口坐标）—— PDF 的可视区 */
   container: PopoverRect;
+  /**
+   * 视口矩形（视口坐标）。
+   *
+   * ⚠️ **垂直方向要用"视口"，不能用"容器"** ——
+   *    容器可能比窗口还高（内部滚动）→ 按容器判定会误判"放不下"→ 浮层乱翻。
+   */
+  viewport?: PopoverRect;
   /** 间距（浮层与选区的距离） */
   gap?: number;
   /** 容器边距（离容器边缘至少留这么多） */
@@ -60,6 +67,7 @@ const DEFAULT_MARGIN = 8;
  */
 export function computePopoverPosition(input: PopoverPositionInput): PopoverPosition {
   const { selection, toolbar, container } = input;
+  const viewport = input.viewport;
   const gap = input.gap ?? DEFAULT_GAP;
   const margin = input.margin ?? DEFAULT_MARGIN;
 
@@ -79,21 +87,39 @@ export function computePopoverPosition(input: PopoverPositionInput): PopoverPosi
   const below = selection.bottom + gap;
   const above = selection.top - gap - toolbar.height;
 
+  /*
+   * ⚠️ **垂直边界用"视口"，不是"容器"**。
+   *
+   * 实测（真实 PDF，缩放后）：
+   * ```
+   * 容器可视区:  97..908     ← 容器比窗口还高（908 > 视口 900）
+   * 选区底部:    880
+   * 浮层高度:    38
+   * ```
+   * 按容器算：下方只剩 908-880 = 28px < 38 → **翻到上方** → top=750
+   *          → 浮层跑到选区**上面 130px**，看起来"跑偏了"。
+   *
+   * 但其实下方在**视口内**是有空间的（视口底 900，浮层到 918 会出屏一点）。
+   * → 判定"放得下"应该看**视口**，容器只用来做水平 clamp。
+   */
+  const viewportBottom = viewport?.bottom ?? container.bottom;
+  const viewportTop = viewport?.top ?? container.top;
+
   let top: number;
   let placement: 'top' | 'bottom';
 
-  if (below + toolbar.height <= container.bottom - margin) {
+  if (below + toolbar.height <= viewportBottom - margin) {
     // 下方放得下 → 放下方
     top = below;
     placement = 'bottom';
-  } else if (above >= container.top + margin) {
+  } else if (above >= viewportTop + margin) {
     // 下方放不下但上方放得下 → **真的翻转**到上方
     top = above;
     placement = 'top';
   } else {
     // 两边都放不下 → 选空间较大的一边，再 clamp
-    const spaceBelow = container.bottom - margin - selection.bottom;
-    const spaceAbove = selection.top - (container.top + margin);
+    const spaceBelow = viewportBottom - margin - selection.bottom;
+    const spaceAbove = selection.top - (viewportTop + margin);
 
     if (spaceAbove > spaceBelow) {
       top = above;
@@ -104,9 +130,9 @@ export function computePopoverPosition(input: PopoverPositionInput): PopoverPosi
     }
   }
 
-  // 垂直 clamp（不超出容器）
-  const minTop = container.top + margin;
-  const maxTop = container.bottom - toolbar.height - margin;
+  // 垂直 clamp（不超出**视口**）
+  const minTop = viewportTop + margin;
+  const maxTop = viewportBottom - toolbar.height - margin;
   top = Math.max(minTop, Math.min(top, Math.max(minTop, maxTop)));
 
   return { top, left, placement, arrowLeft };
