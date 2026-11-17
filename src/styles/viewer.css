@@ -274,7 +274,6 @@
  */
 .scpdf-text-layer ::selection {
   background: transparent;
-  mix-blend-mode: multiply;
 }
 
 /*
@@ -305,11 +304,19 @@
  * 在 Chrome/Safari 里，用户在页面空白处拖动时，选区会一路扩到
  * 文本层末尾。pdf.js 监听 selectionchange，把这个哨兵挪到
  * 选区边界旁边 → 选区就不会越过它。
+ *
+ * ⚠️ **尺寸必须是 0**（旧版是 `inset: 100% 0 0` → 宽 = 整个文本层 1408px）：
+ * 宽的元素参与布局 → 每次移动它都触发**整个 text layer 重排**。
+ *
+ * ⚠️ 位置用 `top` 改（**只重绘，不重排**），不要动 DOM 结构。
  */
 .scpdf-text-layer__end {
   display: block;
   position: absolute;
-  inset: 100% 0 0;
+  left: 0;
+  top: 100%;
+  width: 0;
+  height: 0;
   z-index: -1;
   cursor: default;
   user-select: none;

@@ -163,4 +163,66 @@ describe('mergeOverlappingRects', () => {
 
     expect(JSON.stringify(rects)).toBe(snapshot);
   });
+
+  /*
+   * ⚠️ 以下是"大长方形"bug 的回归测试。
+   *
+   * 真实 PDF 实测：arXiv 页边戳是 `transform: rotate(-90deg)` 的竖排文字，
+   * 浏览器给它的 rect 是 `h=829`（整页高）。
+   * 旧实现（只跟 `merged[last]` 比较）会让这个巨型矩形**吸收**掉
+   * 所有与它垂直重叠的小矩形 → 画出一大块。
+   */
+  it('剔除异常高的矩形（旋转文字），不画出一大块', () => {
+    const rects = [
+      { x: 100, y: 10, width: 200, height: 23 }, // 正常文字行
+      { x: 88, y: -460, width: 56, height: 829 }, // ← 旋转的页边戳
+      { x: 300, y: 40, width: 200, height: 23 }, // 正常文字行
+    ];
+
+    const merged = mergeOverlappingRects(rects);
+
+    // 巨型矩形被丢掉 → 不再吸收别的矩形
+    expect(merged.every((r) => r.height < 100)).toBe(true);
+    expect(merged).toHaveLength(2);
+  });
+
+  it('异常矩形不与正常矩形合并（高度保持正常）', () => {
+    const rects = [
+      { x: 100, y: 10, width: 200, height: 23 },
+      { x: 95, y: 5, width: 200, height: 830 },
+    ];
+
+    const merged = mergeOverlappingRects(rects);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.height).toBe(23);
+  });
+
+  it('同一行内有空隙的片段**不合并**（避免涂到中间的空白）', () => {
+    const rects = [
+      { x: 0, y: 0, width: 50, height: 20 },
+      { x: 200, y: 0, width: 50, height: 20 },
+    ];
+
+    const merged = mergeOverlappingRects(rects);
+
+    // 必须保持 2 段（不能取并集变成一个 250px 宽的块）
+    expect(merged).toHaveLength(2);
+    expect(merged[0]?.width).toBe(50);
+    expect(merged[1]?.x).toBe(200);
+  });
+
+  it('跨行的矩形**不合并成一个大块**', () => {
+    const rects = [
+      { x: 0, y: 0, width: 400, height: 20 },
+      { x: 0, y: 30, width: 400, height: 20 },
+      { x: 0, y: 60, width: 400, height: 20 },
+    ];
+
+    const merged = mergeOverlappingRects(rects);
+
+    // 三行 → 三个矩形（不是一个 80px 高的大长方形）
+    expect(merged).toHaveLength(3);
+    expect(merged.every((r) => r.height <= 20)).toBe(true);
+  });
 });

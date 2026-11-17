@@ -732,6 +732,13 @@ export function PdfViewer(props: PdfViewerProps) {
       if (!selection || selection.text.trim().length === 0) {
         setPopoverOpen(false);
         setPopoverAnchor(null);
+        /*
+         * ⚠️ **选区清空时必须清掉自绘层**。
+         *
+         * 旧实现只设不清 → 旧选区的蓝色块**一直留在页面上**，
+         * 和用户的高亮叠在一起（实测：取消选区后 `.scpdf-selection-layer` 仍=1）。
+         */
+        setSelectionShapes(new Map());
         onSelectionChange?.(selection);
         return;
       }
@@ -757,7 +764,7 @@ export function PdfViewer(props: PdfViewerProps) {
   );
 
   // 6) 选区
-  useTextSelection({
+  const textSelection = useTextSelection({
     containerRef,
     pageFrames: pageSizes.map((size, index) => ({
       pageNumber: index + 1,
@@ -783,6 +790,35 @@ export function PdfViewer(props: PdfViewerProps) {
     onSelectionChange: handleSelectionChange,
     onClientRects: handleSelectionClientRects,
   });
+
+  /**
+   * 高亮完成后**清掉选区**。
+   *
+   * ⚠️ 为什么要清：
+   * - 自绘选区层（蓝色块）会**叠在高亮上**（用户看到的"高亮区域叠加"）
+   * - 浮层还开着，挡住文字
+   *
+   * ⚠️⚠️ **绝对不能调 `window.getSelection().removeAllRanges()`**！
+   *
+   * 实测（真实 PDF，点了浮层里的"高亮"按钮后）：
+   * - 调了 `removeAllRanges()` → 下一次拖动**完全选不中字**
+   *   （mousedown + mouseup 都正常触发，但 **一个 selectionchange 都没有**）
+   *   → 浏览器把"选区被程序改过"当成"用户正在操作选区"
+   *   → 后续的拖动被浏览器吞掉。
+   * - 不调 → 下一次拖动**完全正常** ✅
+   *
+   * 而且**不需要调**：
+   * - 原生 `::selection` 的背景本来就是 `transparent` → 看不见
+   * - 可见的蓝色块是**自绘层** → 清掉 shape 就没了
+   */
+  const clearSelectionAfterHighlight = useCallback(() => {
+    // 只清包内部状态（**不通知宿主** → 宿主刚显示的反馈不会被冲掉）
+    textSelection.clearState();
+    setSelectionShapes(new Map());
+    setPopoverOpen(false);
+    setPopoverAnchor(null);
+    setCurrentSelection(null);
+  }, [textSelection]);
 
   // 7) 键盘快捷键
   useEffect(() => {
@@ -858,6 +894,8 @@ export function PdfViewer(props: PdfViewerProps) {
         order: 10,
         onSelect: (ctx) => {
           onHighlight?.({ ...ctx, color: pickedColor ?? undefined });
+          // 高亮完成后清掉选区（否则蓝色选区块叠在高亮上）
+          clearSelectionAfterHighlight();
         },
       },
       {
@@ -923,7 +961,16 @@ export function PdfViewer(props: PdfViewerProps) {
     }
 
     return actions;
-  }, [onHighlight, onCopy, onTranslate, onAsk, onExplain, onNote, pickedColor]);
+  }, [
+    onHighlight,
+    onCopy,
+    onTranslate,
+    onAsk,
+    onExplain,
+    onNote,
+    pickedColor,
+    clearSelectionAfterHighlight,
+  ]);
 
   /** 合并后的动作列表（宿主覆盖 + 追加） */
   const popoverActions = useMemo(
@@ -959,9 +1006,11 @@ export function PdfViewer(props: PdfViewerProps) {
         color: key,
       });
 
+      // 高亮完成后清掉选区
+      clearSelectionAfterHighlight();
       handlePopoverClose();
     },
-    [currentSelection, onHighlight, handlePopoverClose],
+    [currentSelection, onHighlight, handlePopoverClose, clearSelectionAfterHighlight],
   );
 
   /**

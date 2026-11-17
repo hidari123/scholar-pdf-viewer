@@ -9,13 +9,13 @@
 
 用户报了 5 个现象。逐个实测后，结论是 **1 个是真 bug、3 个是实现缺陷、1 个是浏览器行为**：
 
-| # | 现象 | 实测结论 | 性质 |
-|---|---|---|---|
-| 1 | `::selection` 错位 | 选区框高 **44px**，字形只有 **22px** → 上下各多 11px | **真 bug**（行盒 ≠ 字形） |
-| 2 | 只能选择整行整段 | 字符级选择**其实是准的**（实测 `"n"` 只选 1 个字符）；"整行"是浏览器对**跨行拖选**的原生行为 | **部分误解 + 视觉放大** |
-| 3 | 卡顿 | **有哨兵 17.1ms/步 vs 无哨兵 2.5ms/步 = 7 倍** | **真 bug**（哨兵移动触发全层重排） |
-| 4 | 高亮区域叠加 | 自绘选区层**从不清除** → 旧选区一直残留 | **真 bug** |
-| 5 | 高亮后 `::selection` 没去掉 | 加高亮后选区仍激活 → 自绘层继续叠在高亮上 | **真 bug** |
+| #   | 现象                        | 实测结论                                                                                     | 性质                               |
+| --- | --------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------- |
+| 1   | `::selection` 错位          | 选区框高 **44px**，字形只有 **22px** → 上下各多 11px                                         | **真 bug**（行盒 ≠ 字形）          |
+| 2   | 只能选择整行整段            | 字符级选择**其实是准的**（实测 `"n"` 只选 1 个字符）；"整行"是浏览器对**跨行拖选**的原生行为 | **部分误解 + 视觉放大**            |
+| 3   | 卡顿                        | **有哨兵 17.1ms/步 vs 无哨兵 2.5ms/步 = 7 倍**                                               | **真 bug**（哨兵移动触发全层重排） |
+| 4   | 高亮区域叠加                | 自绘选区层**从不清除** → 旧选区一直残留                                                      | **真 bug**                         |
+| 5   | 高亮后 `::selection` 没去掉 | 加高亮后选区仍激活 → 自绘层继续叠在高亮上                                                    | **真 bug**                         |
 
 ---
 
@@ -33,11 +33,11 @@
 
 **DOM 操作本身很快**（不是瓶颈）：
 
-| 操作 | 耗时 |
-|---|---|
-| 哨兵移动（`insertBefore`） | 0.001 ms/次 |
-| `getClientRects()`（小范围） | 0.002 ms/次 |
-| `getClientRects()`（整页 323 个 rect） | 0.20 ms |
+| 操作                                   | 耗时        |
+| -------------------------------------- | ----------- |
+| 哨兵移动（`insertBefore`）             | 0.001 ms/次 |
+| `getClientRects()`（小范围）           | 0.002 ms/次 |
+| `getClientRects()`（整页 323 个 rect） | 0.20 ms     |
 
 ### 根因
 
@@ -52,7 +52,7 @@ parent.insertBefore(end, reference ?? null);
 ```css
 .scpdf-text-layer__end {
   position: absolute;
-  inset: 100% 0 0;      /* ← 宽 = 整个文本层宽 (1408px), 高 0 */
+  inset: 100% 0 0; /* ← 宽 = 整个文本层宽 (1408px), 高 0 */
   z-index: -1;
 }
 ```
@@ -83,7 +83,7 @@ end.style.top = `${offsetY}px`;
   position: absolute;
   left: 0;
   top: 0;
-  width: 0;          /* ← 不要 1408px 宽 */
+  width: 0; /* ← 不要 1408px 宽 */
   height: 0;
   z-index: -1;
 }
@@ -124,14 +124,14 @@ if (end.style.top !== nextTop) {
 
 **实测证明**（改 CSS 完全无效）：
 
-| 尝试 | 选区高度 | 字形高度 |
-|---|---|---|
-| 当前（`line-height: normal`） | 44px | 22px |
-| `line-height: 1` | 44px | 22px |
-| `line-height: 0.9` | 44px | 22px |
-| `line-height: 1` + `height: 1em` | 44px | 22px |
-| `line-height: 1` + `display: inline` | 44px | 22px |
-| 显式 `height: 33px` + `overflow: hidden` | 44px | 22px |
+| 尝试                                     | 选区高度 | 字形高度 |
+| ---------------------------------------- | -------- | -------- |
+| 当前（`line-height: normal`）            | 44px     | 22px     |
+| `line-height: 1`                         | 44px     | 22px     |
+| `line-height: 0.9`                       | 44px     | 22px     |
+| `line-height: 1` + `height: 1em`         | 44px     | 22px     |
+| `line-height: 1` + `display: inline`     | 44px     | 22px     |
+| 显式 `height: 33px` + `overflow: hidden` | 44px     | 22px     |
 
 **为什么改不动**：span 是 `position: absolute` → 浏览器用**字体的自然行盒**
 （ascent + descent + lineGap）来画选区矩形，**CSS 的 `line-height`/`height` 管不着**。
@@ -144,8 +144,8 @@ if (end.style.top !== nextTop) {
 
 ```ts
 // 字体自然行盒 vs 字形墨迹高度
-const fontHeight = ascent + descent;              // 浏览器用它画选区矩形
-const glyphHeight = actualBoundingBoxAscent + actualBoundingBoxDescent;  // 真实墨迹
+const fontHeight = ascent + descent; // 浏览器用它画选区矩形
+const glyphHeight = actualBoundingBoxAscent + actualBoundingBoxDescent; // 真实墨迹
 ```
 
 **S1.2 自绘层按字形高度裁剪**
@@ -182,11 +182,11 @@ rect.height -= trim * 2;
 
 ### 实测结论：**字符级选择其实是准的**
 
-| 操作 | 选中的内容 | 判定 |
-|---|---|---|
-| 在字符 "n" 内部拖 8px | `"n"`（startOffset=1, endOffset=2） | ✅ **精确到字符** |
-| 双击单词 | `"An "` | ✅ 精确到词 |
-| 在一个 span 内拖 | `"Haoni"`（w=59px，不是整个 span 的 149px） | ✅ 精确 |
+| 操作                  | 选中的内容                                  | 判定              |
+| --------------------- | ------------------------------------------- | ----------------- |
+| 在字符 "n" 内部拖 8px | `"n"`（startOffset=1, endOffset=2）         | ✅ **精确到字符** |
+| 双击单词              | `"An "`                                     | ✅ 精确到词       |
+| 在一个 span 内拖      | `"Haoni"`（w=59px，不是整个 span 的 149px） | ✅ 精确           |
 
 **"整行整段"的真实来源**：**浏览器对跨行拖选的原生行为** —— 拖过中间的行时，
 那些行会被**整行选中**（实测：`left=116 → right=1305`，整行）。
@@ -199,7 +199,7 @@ top=528 left=497  right=630    ← 末行：到 30% ✅ 精确
 
 ### 为什么会**看起来**更糟
 
-**中间行是多个 span**（"Haoning Wang" / "*" / "Mingxun Zhang" / "*" ...），
+**中间行是多个 span**（"Haoning Wang" / "_" / "Mingxun Zhang" / "_" ...），
 每个 span 又产生 **2 个重叠的 rect**（正文 + 上标，高度不同）。
 
 → 自绘层要把这些 rect 合并 → 合并后**中间行被连成一大片**。
@@ -314,13 +314,13 @@ onHighlight={({ text, color, position }) => {
 
 ## 实施顺序
 
-| 步骤 | 内容 | 风险 | 验证 |
-|---|---|---|---|
-| **S4.1** | 选区清空时清 shape（修高亮叠加） | 低 | E2E：取消选区后 layer=0 |
-| **S4.3** | 高亮后 `clearSelection()`（修 ::selection 不去掉） | 低 | E2E：高亮后 selText='' |
-| **S3.1-3.3** | 哨兵改 CSS 变量驱动，去掉 DOM 移动（修卡顿） | 中 | E2E：拖动 50 步 < 5ms/步 |
-| **S1.3** | 自己算选区矩形（用 text item 几何，不用 getClientRects）（修错位） | **高** | E2E：选区框高 ≈ 字形高（误差 < 3px） |
-| **S2.2** | 合并算法按视觉行分组（改善视觉） | 中 | E2E：视觉对比 |
+| 步骤         | 内容                                                               | 风险   | 验证                                 |
+| ------------ | ------------------------------------------------------------------ | ------ | ------------------------------------ |
+| **S4.1**     | 选区清空时清 shape（修高亮叠加）                                   | 低     | E2E：取消选区后 layer=0              |
+| **S4.3**     | 高亮后 `clearSelection()`（修 ::selection 不去掉）                 | 低     | E2E：高亮后 selText=''               |
+| **S3.1-3.3** | 哨兵改 CSS 变量驱动，去掉 DOM 移动（修卡顿）                       | 中     | E2E：拖动 50 步 < 5ms/步             |
+| **S1.3**     | 自己算选区矩形（用 text item 几何，不用 getClientRects）（修错位） | **高** | E2E：选区框高 ≈ 字形高（误差 < 3px） |
+| **S2.2**     | 合并算法按视觉行分组（改善视觉）                                   | 中     | E2E：视觉对比                        |
 
 ---
 

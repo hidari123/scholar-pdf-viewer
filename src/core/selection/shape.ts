@@ -123,37 +123,98 @@ export function mergeOverlappingRects(rects: readonly PageSelectionRect[]): Page
     return [];
   }
 
-  const sorted = [...rects].sort((a, b) => a.y - b.y || a.x - b.x);
+  /*
+   * ---- 0. 先剔除异常矩形（旋转文字等） ----
+   *
+   * 真实 PDF 实测：arXiv 页边戳是 `transform: rotate(-90deg)` 的竖排文字，
+   * 浏览器给它的 rect 是 `h=829`（整页高）。
+   * 旧实现只跟 `merged[last]` 比较 → 这个巨型矩形一旦垂直重叠到别的小矩形，
+   * 合并后的矩形就长高，然后继续吸收 → **画出一大块**（图里的元素全变蓝块）。
+   *
+   * 判据：高度 > **最小高度 × 4** → 异常。
+   *
+   * ⚠️ **必须用"最小高度"当基准**，不能用中位数：
+   *    当矩形很少时（比如只有 2 个），中位数会被那个巨型矩形本身占据
+   *    → 判据失效 → 巨型矩形漏网。
+   *    "最小高度"永远是正常文字行的高度 → 判据始终有效。
+   */
+  const minHeight = Math.min(...rects.map((r) => r.height));
+  const limit = minHeight * 4;
 
-  const merged: PageSelectionRect[] = [];
+  const normal = rects.filter((r) => r.height <= limit);
 
+  if (normal.length === 0) {
+    // 全是异常矩形 → 宁可漏画，也不要画出一大块
+    return [];
+  }
+
+  // ---- 1. 按"视觉行"分组：垂直中心相近 → 同一行 ----
+  const sorted = [...normal].sort((a, b) => a.y + a.height / 2 - (b.y + b.height / 2));
+
+  const rows: PageSelectionRect[][] = [];
   for (const rect of sorted) {
-    const last = merged[merged.length - 1];
+    const center = rect.y + rect.height / 2;
+    const row = rows[rows.length - 1];
 
-    // 与上一个矩形**垂直重叠** → 同一行 → 合并
-    if (last) {
-      const lastBottom = last.y + last.height;
-      const overlapY = Math.min(lastBottom, rect.y + rect.height) - Math.max(last.y, rect.y);
-      const overlapX =
-        Math.min(last.x + last.width, rect.x + rect.width) - Math.max(last.x, rect.x);
-
-      if (overlapY > 0 && overlapX > 0) {
-        const left = Math.min(last.x, rect.x);
-        const right = Math.max(last.x + last.width, rect.x + rect.width);
-        const top = Math.min(last.y, rect.y);
-        const bottom = Math.max(lastBottom, rect.y + rect.height);
-
-        merged[merged.length - 1] = {
-          x: left,
-          y: top,
-          width: right - left,
-          height: bottom - top,
-        };
-        continue;
+    if (row) {
+      const first = row[0];
+      if (first) {
+        const rowCenter = first.y + first.height / 2;
+        const rowHeight = Math.max(...row.map((r) => r.height));
+        if (Math.abs(center - rowCenter) <= Math.max(rowHeight, rect.height) / 2) {
+          row.push(rect);
+          continue;
+        }
       }
     }
 
-    merged.push({ ...rect });
+    rows.push([rect]);
+  }
+
+  // ---- 2. 组内按 x 排序，逐段合并（**只合并水平有重叠的**） ----
+  /*
+   * ⚠️ **不能把整行取并集** —— 同一行里可能有**互不相邻**的片段
+   * （例：一行里 "Name*" / "Mingxun" / "Zhang*" 之间有空隙，
+   *   或者选区只覆盖了行的左右两端）。
+   * 取并集会把中间的空白也涂上 → **选区看起来比实际选的大**。
+   *
+   * 正确做法：按 x 排序，**逐段**合并"水平有重叠"的矩形，
+   * 遇到有空隙就断开（产生多个矩形）。
+   */
+  const merged: PageSelectionRect[] = [];
+
+  for (const row of rows) {
+    const byX = [...row].sort((a, b) => a.x - b.x);
+
+    let current: PageSelectionRect | null = null;
+
+    for (const rect of byX) {
+      if (!current) {
+        current = { ...rect };
+        continue;
+      }
+
+      const currentRight = current.x + current.width;
+      const overlapX = Math.min(currentRight, rect.x + rect.width) - Math.max(current.x, rect.x);
+
+      if (overlapX > 0) {
+        // 有重叠 → 并进当前段
+        const left = Math.min(current.x, rect.x);
+        const right = Math.max(currentRight, rect.x + rect.width);
+        const top = Math.min(current.y, rect.y);
+        const bottom = Math.max(current.y + current.height, rect.y + rect.height);
+        current = { x: left, y: top, width: right - left, height: bottom - top };
+        continue;
+      }
+
+      // 有空隙 → 断开，另起一段
+      merged.push(current);
+      current = { ...rect };
+    }
+
+    if (current) {
+      merged.push(current);
+    }
   }
 
   return merged;

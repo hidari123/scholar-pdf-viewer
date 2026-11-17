@@ -61,8 +61,10 @@ export interface UseTextSelectionOptions {
 
 /** useTextSelection 返回值 */
 export interface UseTextSelectionResult {
-  /** 清除选区 */
+  /** 清除选区（并通知宿主 `onSelectionChange(null)`） */
   clearSelection: () => void;
+  /** 只清包内部状态（**不通知宿主**） */
+  clearState: () => void;
 }
 
 /**
@@ -83,11 +85,23 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
   /** 当前选区 */
   const selectionRef = useRef<SelectionData | null>(null);
 
-  /** 清除选区 */
+  /** 清除选区（并通知宿主） */
   const clearSelection = useCallback(() => {
     selectionRef.current = null;
     onSelectionChange?.(null);
   }, [onSelectionChange]);
+
+  /**
+   * 只清**包内部**的状态，**不通知宿主**。
+   *
+   * ⚠️ 什么时候用：
+   * 宿主刚基于当前选区做了动作（比如"高亮"）→ 宿主**已经知道**选区没了
+   * → 再发一次 `onSelectionChange(null)` 会把宿主刚显示的反馈**冲掉**
+   *   （实测：demo 的"已高亮（pink）"被"选中 0 字"覆盖）。
+   */
+  const clearState = useCallback(() => {
+    selectionRef.current = null;
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -178,8 +192,25 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         return;
       }
 
-      // 原始形状给自绘选区层（保留每个 client rect 的细节）
-      onClientRects?.(rects);
+      /*
+       * ⚠️ **过滤掉"旋转文字"的矩形**。
+       *
+       * 真实 PDF 实测（arXiv 论文）：页边戳是 `transform: rotate(-90deg)` 的竖排文字。
+       * 浏览器给它的 rect 是 `h=829`（**整页高**）→ 自绘层会画出一大块。
+       *
+       * 判据：矩形高度 > 页面高度的 1/3 → 一定是旋转/异常项。
+       * （正常文字行的高度 ≈ 字号 × 1.2，永远不会超过页高的 1/3）
+       */
+      const tallestPage = pageFrames.reduce((max, f) => Math.max(max, f.height), 0);
+      const maxNormalHeight = tallestPage > 0 ? tallestPage / 3 : Infinity;
+
+      const usable = rects.filter((r) => r.height <= maxNormalHeight);
+
+      /*
+       * 原始形状给自绘选区层（保留每个 client rect 的细节）。
+       * 全部异常时传空数组 → 自绘层清空（宁可漏画，也不要画出一大块）。
+       */
+      onClientRects?.(usable.length > 0 ? usable : []);
 
       /**
        * 坐标系统一（⚠️ 这里曾经有个双重扣减的 bug）：
@@ -297,18 +328,41 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         return;
       }
 
-      const reference = endContainer.nextSibling;
-
       /*
-       * ⚠️ **必须校验引用节点属于同一父节点**（否则 insertBefore 抛 NotFoundError）。
-       * 降级策略：直接放到父节点末尾（语义上等价 —— 哨兵就在选区边界之后）。
+       * ⚠️ **不要移动 DOM 节点**（性能 + 稳定性）。
+       *
+       * 旧写法：`parent.insertBefore(end, reference)` —— 每次 `selectionchange`
+       * 都把哨兵在 DOM 里挪一次：
+       * - 触发整个 text layer 重排
+       * - `reference` 可能不属于同一 parent → 抛 `NotFoundError` → 整页消失
+       *
+       * 改成：**只改 `style.top`**（绝对定位元素改 top → **只重绘，不重排**），
+       * DOM 结构保持不变 → 不会抛错，也不会重排。
+       *
+       * ⚠️ 目标位置必须**自己算**（不能用哨兵自己的 `getBoundingClientRect()`，
+       *    那是它**当前**的位置 → 永远算不出新位置）。
+       *    用选区下边界：哨兵放在选区底部往下一点 → 用户继续往下拖时选区到此为止
+       *    （这正是 pdf.js 哨兵的用途）。
        */
-      if (reference && reference.parentElement !== parent) {
-        parent.appendChild(end);
-        return;
-      }
+      /*
+       * 目标位置 = **选区结束边界**的下一行起点。
+       *
+       * ⚠️ 不能用哨兵自己的 `getBoundingClientRect()`（那是它**当前**的位置，
+       *    永远算不出新位置 —— 会一直停在页底）。
+       *
+       * 用 `range.getBoundingClientRect()` 的下边界：
+       * 哨兵放到选区底部**往下一点** → 用户继续往下拖时，选区到此为止
+       * （这正是 pdf.js 哨兵的用途：防止选区一路扩到文本层末尾）。
+       */
+      const rangeRect = range.getBoundingClientRect();
+      const parentRect = parent.getBoundingClientRect();
+      const offsetY = rangeRect.bottom - parentRect.top + 1;
 
-      parent.insertBefore(end, reference ?? null);
+      // 位置没变就别写（避免无谓的样式失效）
+      if (end.dataset.scpdfOffsetY !== String(offsetY)) {
+        end.dataset.scpdfOffsetY = String(offsetY);
+        end.style.top = `${offsetY}px`;
+      }
     };
 
     container.addEventListener('mouseup', onMouseUp);
@@ -328,5 +382,5 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     clearSelection,
   ]);
 
-  return { clearSelection };
+  return { clearSelection, clearState };
 }

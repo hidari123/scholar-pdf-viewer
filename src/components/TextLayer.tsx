@@ -84,9 +84,15 @@ export function TextLayer({
              * ⚠️ **不要设 width**（pdf.js 也不设）：
              * 浏览器会在固定宽度盒子里排字，scaleX 的补偿就会被二次缩放抵消。
              * 宽度完全由 scaleX 控制。
+             *
+             * ⚠️ **rotate 必须独立判断**（不能只看 scaleX）：
+             * 旧写法 `scaleX !== 1 ? 'scaleX(...) rotate(...)' : undefined`
+             * → 当 scaleX 恰好等于 1 时，**旋转被整个丢掉** →
+             *   竖排文字（如 arXiv 页边戳 `rotate(-90deg)`）被横着渲染 →
+             *   它的选区矩形变成 `h=829`（整页高）→ 自绘层画出一大块。
              */
             transform:
-              item.scaleX !== 1
+              item.scaleX !== 1 || item.angle !== 0
                 ? `scaleX(${item.scaleX})${item.angle !== 0 ? ` rotate(${(item.angle * 180) / Math.PI}deg)` : ''}`
                 : undefined,
             transformOrigin: 'left top',
