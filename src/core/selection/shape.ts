@@ -63,6 +63,49 @@ export interface PageBaselines {
 export type BaselinesByPage = Map<number, PageBaselines[]>;
 
 /**
+ * 候选行（裁剪时的匹配候选）。
+ */
+interface CandidateEntry {
+  /** 该行的字形框 */
+  candidate: PageBaselines;
+  /** 基线到矩形中心的距离 */
+  distance: number;
+  /** 水平重叠 */
+  overlap: number;
+  /** 盒子中心到矩形中心的距离 */
+  centerDelta: number;
+}
+
+/**
+ * 候选表的**保留数量**。
+ *
+ * 为什么是 8：同一行的 item 数量通常 ≤ 3（正文 + 上标 + 空格），
+ * 加上相邻两行 → 8 足够覆盖所有可能的匹配。
+ */
+const CANDIDATE_LIMIT = 8;
+
+/**
+ * 候选的**优劣比较**（小的更好）。
+ *
+ * 排序键（按优先级）：
+ * 1. **盒子中心离矩形中心的距离**（垂直上最接近的）
+ * 2. **水平重叠**（矩形确实盖住了它）
+ * 3. **基线距离**
+ *
+ * ⚠️ 之前只按水平重叠排 → 一个宽矩形会选到**上下相邻行**的 item
+ *    → 选区框比文字低 18.88px（用户看到的"定位跑偏"）。
+ */
+function compareCandidates(a: CandidateEntry, b: CandidateEntry): number {
+  if (Math.abs(a.centerDelta - b.centerDelta) > 2) {
+    return a.centerDelta - b.centerDelta;
+  }
+  if (Math.abs(a.overlap - b.overlap) > 1) {
+    return b.overlap - a.overlap;
+  }
+  return a.distance - b.distance;
+}
+
+/**
  * 用最近行的字形框把矩形裁剪成贴合文字。
  *
  * 找行的方式：取**基线最近**的那一行。
@@ -105,52 +148,66 @@ export function clipToBaseline<
   const rectLeft = isXY ? rect.x : rect.left;
 
   /*
-   * ⚠️ **先按距离过滤，再按水平重叠排序**。
+   * ⚠️⚠️ **性能**：这个函数在**每个选区矩形**上都会跑（一次拖选可能有几百个矩形），
+   *    而每页的基线有几十~几百条。
    *
-   * 顺序不能反：
-   * - 先排序再过滤 → `break` 的前提（按距离有序）被破坏
-   * - 距离过滤的阈值要跟**候选自身的高度**比，不是跟 rect 的高度比
-   *   （选区矩形可能比文字高很多 → 阈值太宽 → 匹配到别的行）
+   * 旧实现：对每个矩形都 `map` + `filter` + `sort` 整个基线表
+   *        → **O(矩形数 × 基线数 × log 基线数)**，而且每次都分配新数组。
+   *
+   * → 改成：**只保留最近的一小撮候选**（K=8），不对全量排序：
+   *   1. 一次线性扫描，把"好的"候选插进一个长度 ≤ K 的小表
+   *   2. 只对这 K 个排序
+   *
+   * → O(矩形数 × 基线数)，常数也小得多（不分配大数组）。
    */
   const maxDistance = Math.max(rect.height, ...baselines.map((c) => c.height)) * 2;
 
-  const candidates = baselines
-    .map((candidate) => ({
-      candidate,
-      distance: Math.abs(candidate.baseline - center),
-      // 水平重叠
-      overlap:
-        candidate.width > 0
-          ? Math.min(rectLeft + rect.width, candidate.left + candidate.width) -
-            Math.max(rectLeft, candidate.left)
-          : 0,
-    }))
-    .filter((entry) => entry.distance <= maxDistance)
-    .sort((a, b) => {
-      /*
-       * 排序：**先按"盒子中心离矩形中心多近"，再按水平重叠**。
-       *
-       * 理由：
-       * - 选区矩形横跨一行时，真正对应的是它盖住的那几个 item
-       *   （同一行可能混着正文 + 上标）→ 水平重叠要参与排序
-       * - 但**垂直上**离得远的候选（插图里的旋转标签、
-       *   上下相邻的行）必须先排掉 → 中心距离优先
-       *
-       * ⚠️ 之前只按水平重叠排 → 一个宽矩形会选到**上下相邻行**的 item
-       *    → 选区框比文字低 18.88px（用户看到的"定位跑偏"）。
-       */
-      const aCenter = a.candidate.top + a.candidate.height / 2 - center;
-      const bCenter = b.candidate.top + b.candidate.height / 2 - center;
-      if (Math.abs(aCenter - bCenter) > 2) {
-        return Math.abs(aCenter) - Math.abs(bCenter);
-      }
-      if (Math.abs(a.overlap - b.overlap) > 1) {
-        return b.overlap - a.overlap;
-      }
-      return a.distance - b.distance;
-    });
+  /** 候选表（长度 ≤ K） */
+  const topCandidates: CandidateEntry[] = [];
 
-  for (const { candidate } of candidates) {
+  for (const candidate of baselines) {
+    const distance = Math.abs(candidate.baseline - center);
+    if (distance > maxDistance) {
+      continue;
+    }
+
+    // 水平重叠
+    const overlap =
+      candidate.width > 0
+        ? Math.min(rectLeft + rect.width, candidate.left + candidate.width) -
+          Math.max(rectLeft, candidate.left)
+        : 0;
+
+    const entry: CandidateEntry = {
+      candidate,
+      distance,
+      overlap,
+      centerDelta: Math.abs(candidate.top + candidate.height / 2 - center),
+    };
+
+    if (topCandidates.length < CANDIDATE_LIMIT) {
+      topCandidates.push(entry);
+      continue;
+    }
+
+    // 找当前最差的（排序键最大的那个）
+    let worstIndex = 0;
+    for (let i = 1; i < topCandidates.length; i++) {
+      const current = topCandidates[i];
+      const worst = topCandidates[worstIndex];
+      if (current && worst && compareCandidates(current, worst) > 0) {
+        worstIndex = i;
+      }
+    }
+    const worst = topCandidates[worstIndex];
+    if (worst && compareCandidates(entry, worst) < 0) {
+      topCandidates[worstIndex] = entry;
+    }
+  }
+
+  topCandidates.sort(compareCandidates);
+
+  for (const { candidate } of topCandidates) {
     const top = candidate.top;
     const bottom = candidate.top + candidate.height;
 

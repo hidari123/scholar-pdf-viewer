@@ -1936,3 +1936,187 @@ src/components/LinkLayer.tsx         <a> → <span role="link">
 src/styles/viewer.css                链接层 pointer-events: none
 scripts/e2e-selection-regression.mjs 新增（跨行选区回归，9 项）
 ```
+
+---
+
+## 第十轮：浮层锚定 + 缩放保持选区 + 拖动中即出现 + 性能（2026-11-17 下午）
+
+用户反馈（第九轮）：
+- "缩放的时候浮层没跟着一起缩放"
+- "缩小之后选择跑偏很厉害"
+- "很卡特别特别卡" / "我需要鼠标开始框选之后立刻出现浮层"
+- 滚动行为：**方案 A 跟随滚动**
+
+---
+
+### 上一轮先做的：把 bug 变成红色的测试
+
+新增 `scripts/e2e-popover-anchor.mjs`（8 项断言），
+断言的是**浮层与选区的间距**（而不是坐标）——间距在缩放/滚动前后应该一致。
+
+初始结果 **4/8**（故意是红的）：
+
+```
+PASS 选中后浮层出现
+PASS 浮层锚定在选区下方 - 间距 8px
+FAIL **缩放后浮层仍锚定在选区上** - 间距 nullpx（基准 8px）
+FAIL **缩小后浮层仍锚定在选区上** - 间距 nullpx（基准 8px）
+FAIL **滚动时浮层跟随**（不消失、不跑偏） - 间距 nullpx → nullpx，浮层消失
+FAIL **拖动中浮层已出现**（不用等松手） - 已选 4 字符
+PASS **拖动中选区块已出现** - 3 个
+```
+
+> **之前的 E2E 全部只断言几何**（选区块位置对不对），
+> **从没有断言过"浮层在不在、跟不跟得上"** —— 而用户抱怨的正是后者。
+
+---
+
+### 根因 1：浮层锚点是"存下来的坐标"
+
+```ts
+// PdfViewer.tsx（旧的）
+const rect = domSelection.getRangeAt(0).getBoundingClientRect();
+setPopoverAnchor({ left: rect.left, top: rect.top, ... });   // ← 算一次就再也不动
+```
+
+`position: fixed` 的坐标会随**滚动 / 缩放 / 容器尺寸变化**失效
+→ 浮层跑到别处（实测偏 130px）。
+
+**修法**：锚点**每次布局都从 DOM 选区现算**（`readLiveAnchor()`），
+触发源：滚动（capture）/ resize / 100ms 校正定时器 / 宿主版本号。
+
+---
+
+### 根因 2：缩放会**静默销毁**浏览器选区
+
+实测：
+
+```
+缩放前: selection = { len: 199, collapsed: false }
+缩放后: selection = { len: 0,   collapsed: true  }
+缩放期间 selectionchange 事件: []      ← 根本不触发！
+```
+
+原因：缩放 → 文本层**重渲染**（span 全被替换）→ 浏览器选区锚定的 DOM 节点没了
+→ 浏览器**静默**清空选区（**不触发 `selectionchange`**）→ 浮层被关闭。
+
+**修法**：新增 `useSelectionPreservation`：
+1. 缩放**前**记住选区（用**字符偏移**，与缩放无关）
+2. 缩放**后**按字符偏移**恢复**
+
+### 三个踩过的坑（都是实测逼出来的）
+
+**① 恢复太早** → 文本层还在分批重渲染 → 恢复完又被干掉：
+
+```
+100ms: len=199  ← 恢复了（此时文本层还是旧的）
+200ms: len=0    ← 文本层重渲染 → 又被销毁了
+```
+
+→ 改成**持续重试**（每帧检查，掉了就再恢复），连续 10 帧稳定才收工。
+
+**② "保存" effect 永远不执行**：
+React effect 按声明顺序执行 → "恢复"effect 先跑并更新了 `lastScaleRef.current`
+→ "保存"effect 再跑时 `lastScaleRef.current === scale` → **直接 return，不保存**。
+
+→ 改成 `useLayoutEffect`（paint 前同步执行）+ 声明在"恢复"之前。
+
+**③ `onRestored` 回调身份每次渲染都变** → 恢复循环的 cleanup 反复取消 rAF
+→ 循环只跑一帧就停 → 选区恢复完又被重渲染干掉。
+
+→ 用 `useCallback` 固定身份。
+
+---
+
+### 根因 3：拖动中**完全没有反馈**（"巨卡"的来源）
+
+旧实现所有几何计算都挂在 **mouseup** 上：
+
+```
+mousedown ──────────────────── mouseup ──► 计算 ──► 出浮层
+```
+
+实测按住拖动 900ms：浮层=无、自绘块=0 → 手感"卡死"。
+
+**修法**：几何计算抽成 `computeGeometry()`，
+**mouseup 和 selectionchange 都调**；`selectionchange` 侧用 **rAF 节流**
+（实测拖动 30 步触发 15 次 selectionchange）。
+
+> pdf.js v6 的 `DrawLayer.#selectionChange()` 本来就是在 `selectionchange`
+> 里实时画选区的 —— 我们之前只抄了一半。
+
+---
+
+### 根因 4：垂直定位用"容器"判定 → 误判"放不下"→ 乱翻
+
+容器可能比窗口还高（内部滚动）：
+
+```
+容器可视区:  97..908    ← 908 > 视口 900
+选区底部:    880
+浮层高度:    38
+```
+
+按容器算：下方只剩 28px < 38 → **翻到上方** → 浮层跑到选区上面 130px。
+
+**修法**：垂直边界改用**视口**，容器只做水平 clamp。
+
+---
+
+### 性能提优
+
+用户要求"性能需要提优"。先测量，确认瓶颈在哪：
+
+```
+CPU profile:  89.4% idle, 我们的代码 0.1%
+帧间隔:       p50=16.7ms  p95=16.9ms  长帧 0 个
+```
+
+→ **CPU 不是瓶颈**（满帧 60fps）。但拖动时**零反馈**才是"卡"的来源（根因 3）。
+另外把几个 O(n²) 的算法也优化了（拖动时高频触发）：
+
+| 位置 | 旧 | 新 |
+|---|---|---|
+| `collectPages` | 每次 `querySelectorAll`（518 span）+ 518 次 `intersectsNode` | **按页分组 + 缓存**（MutationObserver 标脏），一页命中就 break |
+| `clipToBaseline` | 每个矩形都 `map`+`filter`+`sort` 整个基线表 | **只保留最近 K=8 个候选**，只排这 8 个 |
+| `optimizeClientRects` | 全量双重循环 → 255 矩形 = **65025 次比较** | **先按行分桶**，只在桶内比较 → 几百次 |
+
+---
+
+### 验证
+
+- `pnpm verify`：**8 门禁全绿**
+- `pnpm test`：**349 passed**
+- E2E：**15 套 129/129 断言全通过**
+  （新增 `e2e-popover-anchor.mjs` 8 项 + `e2e-selection-perf.mjs` 3 项）
+
+### 性能实测（页面内原生事件，排除 CDP 往返）
+
+```
+拖动 40 帧:  p50=16.6ms  p95=16.9ms  max=18.2ms  >32ms 长帧 0 个   ← 满帧 60fps
+mousedown → 浮层出现:  87~107ms（之前 261ms，且必须等松手）
+```
+
+### 用户报的问题逐条验证
+
+| 反馈 | 结果 |
+|---|---|
+| 缩放时浮层没跟着缩放 | ✅ 间距 −126.4px → −129.6px（一致） |
+| 缩小后选择跑偏 | ✅ −126.4px（一致） |
+| 滚动时浮层 | ✅ 跟随，不消失 |
+| 鼠标开始框选立刻出现浮层 | ✅ 87~107ms，不用等松手 |
+| 很卡 | ✅ 满帧 60fps + 拖动中实时反馈 |
+
+### 关键文件
+
+```
+src/hooks/useSelectionPreservation.ts  新增：缩放前后保持选区（字符偏移）
+src/hooks/useTextSelection.ts          几何计算抽成 computeGeometry，selectionchange 也调（rAF 节流）
+src/components/SelectionPopover.tsx    锚点实时计算 + 滚动/resize/定时校正
+src/components/PdfViewer.tsx           缩放前保存选区 + 恢复后重开浮层 + 滚动不再隐藏浮层
+src/core/selection/popover-position.ts  垂直边界改用视口
+src/core/selection/shape.ts            候选表只留 K=8（不全量排序）
+src/core/selection/optimize-rects.ts   按行分桶（O(n²) → O(n + Σ桶内²)）
+scripts/e2e-popover-anchor.mjs         新增（8 项断言）
+scripts/e2e-selection-perf.mjs         新增（3 项断言）
+```

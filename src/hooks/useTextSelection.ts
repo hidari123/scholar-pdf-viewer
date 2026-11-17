@@ -109,6 +109,19 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
    */
   const geometryRafRef = useRef(0);
 
+  /**
+   * **span 按页分组的缓存**（`collectPages` 用）。
+   *
+   * ⚠️ 旧实现每次都 `querySelectorAll`（518 个 span）+ 518 次 `intersectsNode`
+   *    → 而 `collectPages` 在**每次 selectionchange** 都跑（拖动时 30 步跑 15 次）。
+   *
+   * → 缓存分组结果，DOM 变了才重建（用 MutationObserver 标脏）。
+   */
+  const pageSpanCacheRef = useRef<{
+    byPage: Map<number, Element[]>;
+    dirty: boolean;
+  }>({ byPage: new Map(), dirty: true });
+
   /** 清除选区（并通知宿主） */
   const clearSelection = useCallback(() => {
     selectionRef.current = null;
@@ -138,17 +151,41 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
      *
      * 用 `intersectsNode` 判断 span 是否被选中 ——
      * 这是"按文本层归属"的思路，不用猜 rect 属于哪一页。
+     *
+     * ⚠️⚠️ **性能**：这个函数在**每次 selectionchange** 都会跑（拖动时 30 步跑 15 次）。
+     *
+     * 旧实现每次都：
+     * - `container.querySelectorAll('[data-page-number]')` → **518 个 span**
+     * - 对每个 span 调 `range.intersectsNode(span)` → **518 次 DOM 查询**
+     *
+     * → 改成：**按页分组 + 缓存**。
+     *   1. span 列表按 `data-page-number` 分组（缓存，DOM 变了才重建）
+     *   2. **按页**判断 → 一旦某页命中就 `break`（不用遍历该页所有 span）
      */
     const collectPages = (range: Range): number[] => {
       const pages = new Set<number>();
 
-      // 遍历 range 内的文本层 span
-      const spans = container.querySelectorAll(`[${PAGE_NUMBER_ATTR}]`);
-      for (const span of spans) {
-        if (range.intersectsNode(span)) {
+      const cache = pageSpanCacheRef.current;
+      if (cache.dirty) {
+        cache.byPage = new Map();
+        for (const span of container.querySelectorAll(`[${PAGE_NUMBER_ATTR}]`)) {
           const pageNumber = Number(span.getAttribute(PAGE_NUMBER_ATTR));
-          if (Number.isFinite(pageNumber)) {
+          if (!Number.isFinite(pageNumber)) {
+            continue;
+          }
+          const list = cache.byPage.get(pageNumber) ?? [];
+          list.push(span);
+          cache.byPage.set(pageNumber, list);
+        }
+        cache.dirty = false;
+      }
+
+      // 逐页判断（一页命中就 break → 不用遍历该页所有 span）
+      for (const [pageNumber, spans] of cache.byPage) {
+        for (const span of spans) {
+          if (range.intersectsNode(span)) {
             pages.add(pageNumber);
+            break;
           }
         }
       }
@@ -458,7 +495,21 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     container.addEventListener('mouseup', onMouseUp);
     document.addEventListener('selectionchange', onSelectionChangeEvent);
 
+    /*
+     * ⚠️ **span 缓存的失效信号**。
+     *
+     * 页面渲染/卸载（虚拟滚动、缩放）会增删文本层 span
+     * → 缓存的分组就过时了 → 标脏 → 下次重建。
+     *
+     * 用 MutationObserver（比在每次 selectionchange 里重新 querySelectorAll 便宜得多）。
+     */
+    const spanObserver = new MutationObserver(() => {
+      pageSpanCacheRef.current.dirty = true;
+    });
+    spanObserver.observe(container, { childList: true, subtree: true });
+
     return () => {
+      spanObserver.disconnect();
       container.removeEventListener('mouseup', onMouseUp);
       document.removeEventListener('selectionchange', onSelectionChangeEvent);
       if (geometryRafRef.current !== 0) {
