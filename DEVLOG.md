@@ -1811,7 +1811,7 @@ rawCount: 255, minHeight: 0, limit: 0, normalCount: 1
 ```ts
 export function trimmedMedian(sorted: readonly number[]): number {
   if (sorted.length <= 1) return sorted[0] ?? 0;
-  if (sorted.length < 4) return sorted[0] ?? 0;   // 少数几个 → 丢掉最高的
+  if (sorted.length < 4) return sorted[0] ?? 0; // 少数几个 → 丢掉最高的
   const trim = Math.floor(sorted.length / 4);
   const trimmed = sorted.slice(trim, sorted.length - trim);
   return trimmed[Math.floor(trimmed.length / 2)] ?? 0;
@@ -1886,8 +1886,13 @@ pdf.js 的 `.annotationLayer { pointer-events: none }` —— 链接层**不接�
 const findLinkAtPoint = (clientX: number, clientY: number) => {
   for (const link of document.querySelectorAll<HTMLElement>('.scpdf-link')) {
     const rect = link.getBoundingClientRect();
-    if (clientX >= rect.left && clientX <= rect.right &&
-        clientY >= rect.top && clientY <= rect.bottom) return link;
+    if (
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom
+    )
+      return link;
   }
   return null;
 };
