@@ -12,6 +12,8 @@
 import { viewToNorm } from '../geometry/transform';
 import type { NormPosition, SelectionData, ViewRect } from '../types';
 import { boundingRectOf, optimizeClientRects } from './optimize-rects';
+import type { BaselinesByPage } from './shape';
+import { clipToBaseline } from './shape';
 
 /** 一页在容器坐标系里的位置与尺寸 */
 export interface PageFrame {
@@ -44,6 +46,13 @@ export interface ExtractSelectionInput {
   scale?: number;
   /** 采集时的参考尺寸（写入归一化结构；通常是当前视口尺寸） */
   reference: { width: number; height: number };
+  /**
+   * 每页的**基线表**（用于把选区裁剪成贴合字形）。
+   *
+   * ⚠️ 不传 → 选区用浏览器给的行盒高度（比文字高 11px、偏上 6px）
+   *    → 高亮块跟文字对不齐。
+   */
+  baselines?: BaselinesByPage;
 }
 
 /**
@@ -74,7 +83,7 @@ export function pageOfRect(rect: RectInput, pages: PageFrame[]): number | null {
  * 流程：原始矩形 → 归页 → 页内坐标化 → 同行合并 → 双空间输出（视口 px + 归一化）
  */
 export function extractSelection(input: ExtractSelectionInput): SelectionData | null {
-  const { text, rects, pages, scale = 1, reference } = input;
+  const { text, rects, pages, scale = 1, reference, baselines } = input;
 
   if (rects.length === 0 || pages.length === 0) {
     return null;
@@ -93,14 +102,29 @@ export function extractSelection(input: ExtractSelectionInput): SelectionData | 
       continue;
     }
 
-    const group = byPage.get(pageNumber) ?? [];
-    group.push({
+    /*
+     * ⚠️ **裁剪成贴合字形**。
+     *
+     * 浏览器的选区矩形 = **字体的自然行盒**（比文字高 11px、偏上 6px）
+     * → 高亮块跟文字对不齐（用户说的"定位不准 / 偏了"）。
+     *
+     * 裁剪用**该行的基线** + 字形的 ascent/descent。
+     */
+    let pageRect: ViewRect = {
       left: rect.left - page.left,
       top: rect.top - page.top,
       width: rect.width,
       height: rect.height,
       pageNumber,
-    });
+    };
+
+    const pageBaselines = baselines?.get(pageNumber);
+    if (pageBaselines && pageBaselines.length > 0) {
+      pageRect = { ...clipToBaseline(pageRect, pageBaselines), pageNumber };
+    }
+
+    const group = byPage.get(pageNumber) ?? [];
+    group.push(pageRect);
     byPage.set(pageNumber, group);
   }
 

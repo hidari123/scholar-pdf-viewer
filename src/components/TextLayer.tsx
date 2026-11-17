@@ -90,10 +90,15 @@ export function TextLayer({
              * → 当 scaleX 恰好等于 1 时，**旋转被整个丢掉** →
              *   竖排文字（如 arXiv 页边戳 `rotate(-90deg)`）被横着渲染 →
              *   它的选区矩形变成 `h=829`（整页高）→ 自绘层画出一大块。
+             *
+             * ⚠️ **顺序必须是 `rotate() scaleX()`**（对齐 pdf.js v6）：
+             * pdf.js: `transform: rotate(var(--rotate)) scaleX(var(--scale-x))`
+             * 反过来（先 scaleX 再 rotate）会**先横向拉伸再旋转**，
+             * 对旋转文字（角度 ≠ 0）结果完全不同 → 位置错。
              */
             transform:
-              item.scaleX !== 1 || item.angle !== 0
-                ? `scaleX(${item.scaleX})${item.angle !== 0 ? ` rotate(${(item.angle * 180) / Math.PI}deg)` : ''}`
+              item.angle !== 0 || item.scaleX !== 1
+                ? `${item.angle !== 0 ? `rotate(${(item.angle * 180) / Math.PI}deg) ` : ''}scaleX(${item.scaleX})`
                 : undefined,
             transformOrigin: 'left top',
           }}

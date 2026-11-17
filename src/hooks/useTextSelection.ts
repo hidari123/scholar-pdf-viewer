@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { PageFrame } from '../core/selection/extract';
 import { extractSelection } from '../core/selection/extract';
+import type { BaselinesByPage } from '../core/selection/shape';
 import type { SelectionData } from '../core/types';
 
 /** 文本层 span 上的页码标记（与 PageCanvas 约定） */
@@ -43,6 +44,13 @@ export interface UseTextSelectionOptions {
   scale?: number;
   /** 参考尺寸（写入归一化结构） */
   reference: { width: number; height: number };
+  /**
+   * 每页的**基线表**（把选区裁剪成贴合字形）。
+   *
+   * ⚠️ 不传 → 选区用浏览器给的行盒高度（比文字高 11px、偏上 6px）
+   *    → 选区块/高亮块跟文字对不齐。
+   */
+  baselines?: BaselinesByPage;
   /** 选区变化 */
   onSelectionChange?: (selection: SelectionData | null) => void;
   /**
@@ -78,6 +86,7 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     pageFrames,
     scale = 1,
     reference,
+    baselines,
     onSelectionChange,
     onClientRects,
   } = options;
@@ -254,6 +263,8 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         pages: frames,
         scale,
         reference,
+        // 裁剪成贴合字形
+        baselines,
       });
 
       if (!result) {
@@ -377,6 +388,7 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     pageFrames,
     scale,
     reference,
+    baselines,
     onSelectionChange,
     onClientRects,
     clearSelection,

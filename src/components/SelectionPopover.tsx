@@ -12,7 +12,7 @@
  * **包的边界**：只做 UI + 事件，不做业务（翻译/提问/笔记由宿主实现）。
  */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { HighlightPalette } from '../core/highlight/palette';
 import type { SelectionAction } from '../core/selection/actions';
 import { BUILTIN_ACTION_KEYS, isBuiltinIcon } from '../core/selection/actions';
@@ -87,10 +87,39 @@ export function SelectionPopover({
    * - 量不到尺寸 → 算不出位置 → 永远 null
    *
    * 解决：**第一帧先渲染**（定位到 0,0 且不可见），量到尺寸后再算真正的位置。
+   *
+   * ⚠️ **代价：两帧渲染**（第一帧量尺寸，第二帧算位置）
+   *    → 浮层从"选完"到"出现"多一次 React 渲染（约 +15ms）。
+   *
+   * **优化**：弹层的尺寸只跟**动作数量**有关（按钮固定 28px 宽），
+   * 所以可以**预先算出来** → 只渲染一帧。
+   * 下面的 `useLayoutEffect` 仍然保留（兜底：万一算错了会自我修正）。
    */
   const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
 
-  // 尺寸变化（动作数量/标签变化）→ 重新测量
+  /** 可见动作（过滤 disabled） */
+  const visibleActions = useMemo(() => actions.filter((action) => !action.disabled), [actions]);
+
+  /**
+   * **预估**弹层尺寸（不用等渲染完再量）。
+   *
+   * 尺寸 = padding(4×2) + border(1×2) + 按钮数 × 28 + 间距(2×(n-1))
+   * （色板按钮多一个 16px 的分裂按钮）
+   */
+  const estimatedSize = useMemo(() => {
+    let buttons = visibleActions.length;
+    // 🖍 高亮是分裂按钮（多一个 16px 的下拉箭头）
+    if (visibleActions.some((a) => a.key === BUILTIN_ACTION_KEYS.highlight)) {
+      buttons += 1;
+    }
+    const buttonWidth = (visibleActions.length - (buttons - visibleActions.length)) * 28;
+    const splitWidth = (buttons - visibleActions.length) * 16;
+    const width = 4 * 2 + 1 * 2 + buttonWidth + splitWidth + 2 * Math.max(0, buttons - 1);
+    const height = 4 * 2 + 1 * 2 + 28;
+    return { width, height };
+  }, [visibleActions]);
+
+  // 尺寸变化（动作数量/标签变化）→ 重新测量（兜底，修正预估值）
   useLayoutEffect(() => {
     if (!open) {
       return;
@@ -109,8 +138,10 @@ export function SelectionPopover({
   }, [open, actions, measure]);
 
   // 有了尺寸 + 选区 + 容器 → 算位置
+  const effectiveSize = measured ?? estimatedSize;
+
   useLayoutEffect(() => {
-    if (!open || !selectionRect || !containerRect || !measured) {
+    if (!open || !selectionRect || !containerRect || !effectiveSize) {
       setPosition(null);
       return;
     }
@@ -118,11 +149,11 @@ export function SelectionPopover({
     setPosition(
       computePopoverPosition({
         selection: selectionRect,
-        toolbar: measured,
+        toolbar: effectiveSize,
         container: containerRect,
       }),
     );
-  }, [open, selectionRect, containerRect, measured]);
+  }, [open, selectionRect, containerRect, effectiveSize]);
 
   /*
    * 关闭条件：
@@ -161,8 +192,6 @@ export function SelectionPopover({
   if (!open) {
     return null;
   }
-
-  const visibleActions = actions.filter((action) => !action.disabled);
 
   if (visibleActions.length === 0) {
     return null;

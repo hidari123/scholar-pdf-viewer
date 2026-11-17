@@ -1593,3 +1593,145 @@ src/hooks/useTextSelection.ts      哨兵改 CSS 变量驱动 + clearState
 src/components/PdfViewer.tsx       选区清空时清 shape + 高亮后清理
 scripts/e2e-selection-shape.mjs    选区形状 + 高亮清理 E2E（10 项）
 ```
+
+---
+
+## 第九轮：选区/高亮与文字对齐 + 浮层延迟（2026-11-17 上午）
+
+用户反馈：**要和 `scpdf-text-layer__item` 对齐**、**现在特别卡**、**定位不准**。
+
+> 先查了 pdf.js v6 的源码（`pdf.mjs` + `pdf_viewer.mjs` + `pdf_viewer.css`），
+> 对比出 3 个关键差异。
+
+### 问题 1：选区/高亮比文字高 11px、偏上 6px
+
+#### 实测（真实 PDF，230%）
+
+|                  | 值                        |
+| ---------------- | ------------------------- |
+| 浏览器选区矩形   | `y=231.92, h=44`          |
+| 文字本身（span） | `y=237.92, h=33`          |
+| **偏差**         | **偏上 6px，框高多 11px** |
+
+#### 根因
+
+浏览器的选区矩形 = **字体的自然行盒**（ascent + descent + lineGap），
+而 span 的 box = `fontSize × line-height`。
+
+**CSS 改不动它**（实测 7 种全无效）：
+
+| 尝试                               | 选区高                    |
+| ---------------------------------- | ------------------------- |
+| `line-height: 1` / `0.9` / `0.62`  | 44 / 44 / 30px            |
+| `height: 1em` + `overflow: hidden` | 44px                      |
+| `display: inline` / `inline-block` | 44px                      |
+| `transform: scaleY(0.65)`          | 20px ✅ 但**字被压扁** ❌ |
+
+#### pdf.js v6 怎么做的
+
+pdf.js v6 的 `DrawLayer` **也用 `range.getClientRects()`**（`pdf.mjs:4228`），
+关键在 CSS：
+
+```css
+.textLayer {
+  line-height: 1;
+}
+.textLayer :is(span, br) {
+  position: absolute;
+  white-space: pre;
+  transform-origin: 0% 0%;
+}
+```
+
+→ span 的行盒 = `fontSize` → **浏览器行盒和 span 的 box 对齐了**。
+
+**本包也设了 `line-height: 1`，但没用** ——
+因为 span 的 `top` = `基线 − ascent`（pdf.js 也一样），
+浏览器的行盒从 top 往下 `fontSize` 高，
+其**基线位置** = `top + 浏览器字体的 ascent'`（≠ 我们实测的 ascent）→ 差 6px。
+
+#### 修法：**用文本项的基线裁剪**
+
+```
+水平：保留 getClientRects() 的 left/width（浏览器知道字距/kerning/连字）
+垂直：用文本项的基线 + 字形的 ascent/descent 自己算
+```
+
+**实测效果**：
+
+|                   | 之前             | 之后                     |
+| ----------------- | ---------------- | ------------------------ |
+| 选区 rect         | `y=231.92, h=44` | **`y=237.92, h=32.996`** |
+| 与文字的 Δtop     | 6px              | **0.002px** ✅           |
+| 与墨迹的 Δtop     | 10px             | **4px** ✅               |
+| 与墨迹的 Δbottom  | 12px             | **7px** ✅               |
+| 高亮 vs 文字 Δtop | 10px             | **0.0px** ✅             |
+
+**新增** `src/core/selection/item-geometry.ts` + `clipToBaseline()`。
+
+### 问题 2：transform 顺序反了
+
+pdf.js v6：`transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv))`
+本包（旧）：`transform: scaleX(...) rotate(...)`
+
+→ 反过来会**先横向拉伸再旋转**，对旋转文字（角度 ≠ 0）结果完全不同。
+→ **已改成 `rotate() scaleX()`**（与 pdf.js 一致）。
+
+### 问题 3：浮层延迟（27-33ms）
+
+#### 实测（精确到 DOM 出现）
+
+```
+mouseup → 浮层 DOM 出现: 27.2ms
+```
+
+CPU profile：**86.7% idle** → 不是 JS 忙，是**渲染/合成**。
+
+#### 根因：浮层要**两帧渲染**
+
+1. 第一帧：渲染出来 → `getBoundingClientRect()` 量尺寸
+2. 第二帧：算出位置 → 定位到正确的地方
+
+#### 修法：**预先算尺寸**
+
+弹层尺寸只跟**动作数量**有关（按钮固定 28px 宽）→ 可以预估：
+
+```
+width  = 4*2 + 1*2 + 按钮数*28 + 分裂按钮*16 + 2*(按钮数-1)
+height = 4*2 + 1*2 + 28
+```
+
+→ **只渲染一帧**（`measured ?? estimatedSize`）。
+
+**实测**：27-33ms → **21-25ms**。
+
+### ⚠️ 又一次测量教训
+
+这轮一开始我用 `waitForFunction` 测延迟，得到 **130-150ms** ——
+那是 `waitForFunction` 的**轮询量化**（rAF / 100ms 间隔），不是真实延迟。
+
+改用 **MutationObserver 打时间戳** → 真实值 **27ms**。
+
+**教训**：测延迟要用 MutationObserver / PerformanceObserver 打点，
+不能用 `waitForFunction`（它测的是"轮询发现"的时间）。
+
+### 验证
+
+- `pnpm verify`：**8 门禁全绿**
+- `pnpm test`：**344 passed**（新增 `baseline.test.ts` 7 项）
+- E2E：**12 套 106 项断言全通过**
+  - `e2e-highlight.mjs` 的对齐断言改成**以文字本身为基准**
+    （旧断言拿"浏览器选区矩形"当基准 = 认可了错的）
+- 视觉确认：选区框紧贴文字；高亮块上边缘与文字完全对齐
+
+### 关键文件
+
+```
+src/core/selection/item-geometry.ts  按文本项几何算选区（基线裁剪）
+src/core/selection/shape.ts          clipToBaseline + 基线表类型
+src/core/selection/extract.ts        高亮几何也走基线裁剪
+src/hooks/useTextSelection.ts        接收 baselines
+src/components/PdfViewer.tsx         baselinesByPage（useMemo）
+src/components/SelectionPopover.tsx  预估尺寸 → 单帧渲染
+src/components/TextLayer.tsx         transform 顺序改成 rotate() scaleX()
+```

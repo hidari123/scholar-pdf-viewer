@@ -180,41 +180,81 @@ try {
       };
     });
 
-    return { hlRects, selRects };
+    /*
+     * **文本层 span** —— 高亮对齐的**基准**。
+     *
+     * ⚠️ 不能拿"浏览器的选区矩形"当基准：
+     * 那是**字体的自然行盒**（比文字高 11px）→ 用它当基准 = 认可了错的。
+     * 真正的基准是**文字本身**（文本层 span 的 box）。
+     */
+    const pageEl = list[0]?.closest('.scpdf-page');
+    /*
+     * 文本层 span —— 高亮对齐的**基准**。
+     *
+     * ⚠️ 不能拿"浏览器的选区矩形"当基准：
+     * 那是**字体的自然行盒**（比文字高 11px）→ 用它当基准 = 认可了错的。
+     * 真正的基准是**文字本身**（文本层 span 的 box）。
+     */
+    const spanRects = pageEl
+      ? [...pageEl.querySelectorAll('.scpdf-text-layer__item')].map((s) => {
+          const r = s.getBoundingClientRect();
+          return {
+            top: r.top,
+            left: r.left,
+            width: r.width,
+            height: r.height,
+            text: (s.textContent ?? '').slice(0, 20),
+          };
+        })
+      : [];
+
+    return { hlRects, selRects, spanRects };
   });
 
   check('高亮已创建', hl?.hlRects.length > 0, hl ? `${hl.hlRects.length} 个块` : '');
 
-  // ---- 断言 1：逐行对齐 ----
-  if (hl && hl.hlRects.length > 0 && hl.selRects.length > 0) {
+  // ---- 断言 1：与**文字本身**对齐 ----
+  if (hl && hl.hlRects.length > 0 && hl.spanRects.length > 0) {
     let worst = 0;
     let worstDesc = '';
 
     for (const h of hl.hlRects) {
-      // 找最匹配的选区 rect
+      /*
+       * 找**同一视觉行**的文本层 span。
+       *
+       * ⚠️ 不能只按横向重叠找：一页里很多 span 横向重叠（不同行）→ 会匹配到别的行。
+       * → 必须**垂直也接近**（同一行）。
+       */
       let best = null;
       let bestD = Infinity;
-      for (const s of hl.selRects) {
-        if (s.width === 0 || s.height === 0) continue;
-        const d = Math.abs(s.left - h.left) + Math.abs(s.top - h.top);
-        if (d < bestD) {
-          bestD = d;
+      for (const s of hl.spanRects) {
+        const dTop = Math.abs(s.top - h.top);
+        if (dTop < bestD) {
+          bestD = dTop;
           best = s;
         }
       }
       if (!best) continue;
 
-      const dLeft = Math.abs(best.left - h.left);
+      /*
+       * **垂直必须完全对齐**。
+       *
+       * 这是本轮修的核心 bug：浏览器的选区矩形 = 字体自然行盒
+       * → 高亮块比文字高 11px、偏上 6px。
+       *
+       * 水平不比：选区可能只覆盖行的一部分，
+       * 高亮的左右边对应 span 的**某个字符位置**，不是 span 的两端。
+       */
       const dTop = Math.abs(best.top - h.top);
-      const d = Math.max(dLeft, dTop);
-      if (d > worst) {
-        worst = d;
-        worstDesc = `Δleft=${dLeft.toFixed(1)} Δtop=${dTop.toFixed(1)}`;
+
+      if (dTop > worst) {
+        worst = dTop;
+        worstDesc = `Δtop=${dTop.toFixed(1)}（span h=${best.height.toFixed(1)} vs 高亮 h=${h.height.toFixed(1)}）`;
       }
     }
 
     check(
-      '高亮与被选文字逐行精确对齐（Δ < 2px）',
+      '高亮与**文字**垂直精确对齐（Δtop < 2px）',
       worst < 2,
       `最大偏差 ${worst.toFixed(1)}px ${worstDesc}`,
     );

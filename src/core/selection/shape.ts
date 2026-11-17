@@ -32,6 +32,87 @@ export interface PageSelectionShape {
 }
 
 /**
+ * 每页的**基线表**（页内坐标）。
+ *
+ * 用途：把浏览器的选区矩形（= 字体自然行盒）裁剪成**贴合字形**的矩形。
+ *
+ * 每项：基线的 y + 字形的上/下距离。
+ */
+export interface PageBaselines {
+  /** 基线的 y（页内坐标，px） */
+  baseline: number;
+  /** 字形顶相对基线的高度 */
+  above: number;
+  /** 字形底相对基线的深度 */
+  below: number;
+}
+
+/** 页码 → 基线表 */
+export type BaselinesByPage = Map<number, PageBaselines[]>;
+
+/**
+ * 用最近的基线把矩形裁剪成贴合字形。
+ *
+ * 找基线的方式：取**离矩形中心最近**的那条基线。
+ *
+ * @param rect 选区矩形（页内坐标）
+ * @param baselines 该页的基线表
+ * @returns 裁剪后的矩形
+ */
+/**
+ * 用最近的基线把矩形裁剪成贴合字形。
+ *
+ * 找基线的方式：取**离矩形中心最近**的那条基线。
+ *
+ * 泛型：矩形可以是 `{x, y, width, height}`（页内坐标）
+ * 或 `{left, top, width, height}`（视图坐标）—— 两者字段名不同。
+ *
+ * @param rect 选区矩形
+ * @param baselines 该页的基线表
+ * @returns 裁剪后的矩形
+ */
+export function clipToBaseline<
+  T extends PageSelectionRect | { left: number; top: number; width: number; height: number },
+>(rect: T, baselines: readonly PageBaselines[]): T {
+  const isXY = 'x' in rect;
+  const top0 = isXY ? rect.y : rect.top;
+
+  const center = top0 + rect.height / 2;
+
+  let best: PageBaselines | undefined;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const candidate of baselines) {
+    const distance = Math.abs(candidate.baseline - center);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = candidate;
+    }
+  }
+
+  if (!best) {
+    return rect;
+  }
+
+  const top = best.baseline - best.above;
+  const bottom = best.baseline + best.below;
+
+  /*
+   * 保险：裁剪后必须**完全在原矩形内**。
+   * 否则说明这条基线不属于这一行（选中了别的行的文字）→ 退回原矩形。
+   */
+  if (top < top0 || bottom > top0 + rect.height) {
+    return rect;
+  }
+
+  return {
+    ...rect,
+    ...(isXY ? { y: top } : { top }),
+    height: bottom - top,
+  } as T;
+}
+
+/**
  * 把浏览器的 client rects 分组成"每页一个形状"。
  *
  * @param rects 浏览器给的矩形（**视口坐标**）
@@ -51,6 +132,12 @@ export function buildSelectionShapes(
   }[],
   containerRect: { top: number; left: number },
   scrollTop: number,
+  /**
+   * 每页的**基线表**（用于把选区裁剪成贴合字形）。
+   *
+   * 不传 → 不裁剪（退回浏览器给的行盒高度）。
+   */
+  baselines?: BaselinesByPage,
 ): PageSelectionShape[] {
   /** 视口坐标 → 容器内容坐标 */
   const toContentX = (x: number) => x - containerRect.left;
@@ -89,13 +176,28 @@ export function buildSelectionShapes(
     }
 
     // 页内坐标（相对页面元素）
-    const list = byPage.get(owner.pageNumber) ?? [];
-    list.push({
+    let pageRect: PageSelectionRect = {
       x: contentLeft - owner.left,
       y: contentTop - owner.top,
       width: rect.width,
       height: rect.height,
-    });
+    };
+
+    /*
+     * ⚠️ **把矩形裁剪成贴合字形**。
+     *
+     * 浏览器的选区矩形 = **字体的自然行盒**（比 span 的 box 高 11px、偏上 6px）
+     * → 选区框跟文字对不齐（用户说的"定位不准 / 偏了"）。
+     *
+     * 裁剪方式：用**该行的基线** + 字形的 ascent/descent。
+     */
+    const pageBaselines = baselines?.get(owner.pageNumber);
+    if (pageBaselines && pageBaselines.length > 0) {
+      pageRect = clipToBaseline(pageRect, pageBaselines);
+    }
+
+    const list = byPage.get(owner.pageNumber) ?? [];
+    list.push(pageRect);
     byPage.set(owner.pageNumber, list);
   }
 

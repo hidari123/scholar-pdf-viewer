@@ -28,8 +28,9 @@ import { hitsToRects } from '../core/search/highlight';
 import type { PdfSearch, SearchHit } from '../core/search/search';
 import type { SelectionAction, SelectionActionContext } from '../core/selection/actions';
 import { BUILTIN_ACTION_KEYS, mergeSelectionActions } from '../core/selection/actions';
-import type { PageSelectionShape } from '../core/selection/shape';
+import type { BaselinesByPage, PageBaselines, PageSelectionShape } from '../core/selection/shape';
 import { buildSelectionShapes } from '../core/selection/shape';
+import { measureAscentRatio } from '../core/text-layer/font-metrics';
 import type { PositionedTextItem } from '../core/text-layer/layout';
 import type { HighlightRecord, NewHighlight, PdfDocInfo, SelectionData } from '../core/types';
 import { useCurrentPage } from '../hooks/useCurrentPage';
@@ -687,6 +688,37 @@ export function PdfViewer(props: PdfViewerProps) {
    * - `pageFrames` 的 top/left 是**滚动内容坐标**
    * - `buildSelectionShapes` 内部统一换算到页内坐标
    */
+  /**
+   * 每页的**基线表**（用来把选区裁剪成贴合字形）。
+   *
+   * ⚠️ 为什么需要：
+   * 浏览器的选区矩形 = **字体的自然行盒**（比文字高 11px、偏上 6px）
+   * → 选区框跟文字对不齐（"定位不准 / 偏了"）。
+   *
+   * 基线 = `item.top + ascent`（`item.top` 本身就是 `基线 − ascent`）。
+   */
+  const baselinesByPage = useMemo<BaselinesByPage>(() => {
+    const result: BaselinesByPage = new Map();
+
+    for (const [pageNumber, items] of textItemsByPage) {
+      const list: PageBaselines[] = [];
+      for (const item of items) {
+        if (item.text.length === 0 || item.fontSize <= 0) {
+          continue;
+        }
+        const ascent = item.fontSize * measureAscentRatio(item.fontFamily);
+        list.push({
+          baseline: item.top + ascent,
+          above: ascent,
+          below: item.fontSize - ascent,
+        });
+      }
+      result.set(pageNumber, list);
+    }
+
+    return result;
+  }, [textItemsByPage]);
+
   const handleSelectionClientRects = useCallback(
     (rects: { top: number; left: number; width: number; height: number }[]) => {
       const container = containerRef.current;
@@ -707,6 +739,8 @@ export function PdfViewer(props: PdfViewerProps) {
         })),
         { top: containerRect.top, left: containerRect.left },
         container.scrollTop,
+        // 把选区裁剪成贴合字形（对齐文本层）
+        baselinesByPage,
       );
 
       setSelectionShapes(() => {
@@ -717,7 +751,7 @@ export function PdfViewer(props: PdfViewerProps) {
         return next;
       });
     },
-    [pageSizes, pageTops],
+    [pageSizes, pageTops, baselinesByPage],
   );
 
   /**
@@ -787,6 +821,8 @@ export function PdfViewer(props: PdfViewerProps) {
       width: pageSizes[0]?.width ?? 595 * scale,
       height: pageSizes[0]?.height ?? 842 * scale,
     },
+    // 基线表（把选区裁剪成贴合字形）
+    baselines: baselinesByPage,
     onSelectionChange: handleSelectionChange,
     onClientRects: handleSelectionClientRects,
   });
