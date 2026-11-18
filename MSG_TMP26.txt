@@ -1,0 +1,44 @@
+feat(demo): 宿主侧的高亮持久化（localStorage + 防抖）
+
+补齐 PLAN-ROUND13 §3b② 的**宿主侧持久化**（之前只有内存态 + 手动 JSON 导入导出）。
+
+## 为什么在宿主而不是包里
+
+包的边界（v2 原则）：**包只给"格式 + 纯函数"，不碰存储**。
+
+→ 换后端（localStorage → IndexedDB → 自己的接口）**不用改包**
+→ demo 里只改了 `highlight-store.ts` 一个文件
+
+## 实现（`demo/src/highlight-store.ts`）
+
+| 函数                     | 作用                                     |
+| ------------------------ | ---------------------------------------- |
+| `loadHighlights(id)`     | 从 localStorage 读（用包的 `importHighlights` 校验） |
+| `saveHighlights(id, hs)` | 用包的 `exportHighlights` 写             |
+| `createDebouncedSaver()` | **防抖 500ms** → 连续操作合并成一次写    |
+
+⚠️ 读失败 / 配额满 / 隐私模式 → **静默降级**（不能让宿主整个崩掉）
+⚠️ 保存器放在**组件外**（`useMemo`）→ 不会因重渲染重建（重建会丢掉待保存的数据）
+
+## 接进 demo
+
+- **文档切换 → 加载对应文档的高亮**（`useEffect` on `[documentId]`）
+- **每次改动都保存**（用户要求"如有接口则每次改动都保存到接口"）
+  → `setHighlights` 里调 `saver.schedule(documentId, value)`
+
+## 测试（E2E `scripts/e2e-highlight-persist.mjs`，7 项，全绿）
+
+```
+PASS 先加一条高亮 - 1 个高亮元素
+PASS **高亮落到了 localStorage** - scholar-pdf-viewer:highlights:local
+PASS **存储的是包的格式**（version / documentId / highlights / exportedAt）
+PASS **刷新后高亮还在**（持久化生效） - 1 个高亮元素
+PASS **切换文档后高亮是"那一份"**（隔离生效，不是残留） - 0 个高亮元素
+PASS **切回原文档 → 高亮还在** - 1 个高亮元素
+PASS 全程无 JS 错误
+```
+
+## 验证
+
+- `pnpm verify`: **8/8 全绿**
+- E2E: **310/311**（唯一失败是**基线同样失败**的面板开合定位）

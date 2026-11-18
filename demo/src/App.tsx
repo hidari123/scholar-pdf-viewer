@@ -30,6 +30,7 @@ import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import * as pdfjs from 'pdfjs-dist';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HighlightPicker, PRESET_COLORS } from './HighlightPicker';
+import { createDebouncedSaver, loadHighlights } from './highlight-store';
 import './demo.css';
 import '@scholar-club/pdf-viewer/styles.css';
 
@@ -76,13 +77,33 @@ export default function App() {
   const [documentId, setDocumentId] = useState('local');
 
   /**
+   * **防抖保存器**（宿主的持久化）。
+   *
+   * ⚠️ **放在组件外** → 不会因为重渲染而重建（重建会丢掉待保存的数据）。
+   */
+  const saver = useMemo(() => createDebouncedSaver(500), []);
+
+  /**
    * 高亮（受控状态 —— 宿主的数据）。
    *
    * ⚠️ **按文档隔离**（用户要求"切换文档时高亮要重置"）。
    * → `documentId → 高亮列表` → 切文档时自动切到对应的那份。
    * → 切回原来的文档，高亮还在（比"直接清空"更友好）。
+   *
+   * ⚠️ **持久化也在宿主**（包不碰存储）→ 见 `highlight-store.ts`。
    */
   const [highlightsByDoc, setHighlightsByDoc] = useState<Record<string, HighlightRecord[]>>({});
+
+  /**
+   * **文档切换 → 从持久化里加载对应文档的高亮**。
+   *
+   * ⚠️ **包不碰存储**（这是包的边界）→ 加载 / 保存都是**宿主的事**。
+   * → 换后端（localStorage → IndexedDB → 接口）**只改 `highlight-store.ts`**。
+   */
+  useEffect(() => {
+    const loaded = loadHighlights(documentId);
+    setHighlightsByDoc((prev) => (prev[documentId] ? prev : { ...prev, [documentId]: loaded }));
+  }, [documentId]);
 
   /** 当前文档的高亮（传给包的） */
   const highlights = useMemo(
@@ -114,8 +135,15 @@ export default function App() {
           ? (next as (p: HighlightRecord[]) => HighlightRecord[])(current)
           : next;
       setHighlightsByDoc((prev) => ({ ...prev, [documentId]: value }));
+      /*
+       * ⚠️ **每次改动都保存**（用户要求"如有接口则每次改动都保存到接口"）。
+       *
+       * → 这里用 localStorage（宿主选的方案）→ **包不碰存储**。
+       * → 防抖 500ms → 连续操作（选中 → 高亮 → 换色）合并成一次写。
+       */
+      saver.schedule(documentId, value);
     },
-    [highlightsByDoc, documentId],
+    [highlightsByDoc, documentId, saver],
   );
 
   /** 当前选中的高亮颜色 key（宿主的 UI 状态） */
