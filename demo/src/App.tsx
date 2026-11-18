@@ -25,6 +25,7 @@ import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import * as pdfjs from 'pdfjs-dist';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HighlightPicker, PRESET_COLORS } from './HighlightPicker';
+import './demo.css';
 import '@scholar-club/pdf-viewer/styles.css';
 
 /**
@@ -700,13 +701,13 @@ export default function App() {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div className="demo-root">
       <div
+        className="demo-header"
         style={{
           padding: '8px 12px',
           fontSize: 13,
           borderBottom: '1px solid var(--scpdf-color-border)',
-          display: 'flex',
           gap: 12,
           alignItems: 'center',
           flexWrap: 'wrap',

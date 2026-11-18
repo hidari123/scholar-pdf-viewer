@@ -3,6 +3,7 @@
  */
 export * from './useCurrentPage';
 export * from './usePdfDocument';
+export * from './usePrint';
 export * from './useStore';
 export * from './useTextSelection';
 export * from './useVisiblePages';

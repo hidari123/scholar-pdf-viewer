@@ -911,3 +911,160 @@
   color: var(--scpdf-color-primary);
   font-weight: 600;
 }
+
+/* ==========================================================================
+   打印
+   ==========================================================================
+
+   ⚠️⚠️ **打印时必须把滚动容器"摊平"**（实测踩过的坑）。
+
+   屏幕上：
+   ```
+   .scpdf-container { overflow: auto; height: 811px }   ← 滚动容器
+   .scpdf-pages     { height: 33093px }                  ← 18 页全在里面
+   ```
+
+   不加打印样式时，浏览器按**屏幕样式**打印 →
+   ```
+   toolbarVisible: true        ← ❌ 工具栏被打印出来
+   containerOverflow: "auto"   ← ❌ 还是滚动容器
+   containerHeight: "811px"    ← ❌ 只有一屏高
+   pagesHeight: "33093px"      ← 18 页在里面，但被裁成第一屏
+   ```
+
+   → 打印时必须：
+     - 容器 `overflow: visible` + `height: auto`（**摊平**）
+     - 工具栏 / 面板 / 浮层 / 选区层 / **文本层** 全部隐藏
+     - 每页 `break-after: page`（一页一张纸）
+     - 去掉页阴影（打印机不印阴影，白费墨）
+   ========================================================================== */
+
+@media print {
+  /* ---------- 该藏的藏起来 ---------- */
+
+  .scpdf-toolbar,
+  .scpdf-panel,
+  .scpdf-selection-popover,
+  .scpdf-selection-layer,
+  .scpdf-annotations,
+  /*
+   * ⚠️ **文本层必须隐藏**。
+   *
+   * 文本层是**透明的**（给选区用的）→ 屏幕上看不见
+   * → 但某些浏览器会把透明文字也打出来（"幽灵文字"）
+   * → 打印时必须 `display: none`。
+   */
+  .scpdf-text-layer,
+  .scpdf-link-layer,
+  .scpdf-state {
+    display: none;
+  }
+
+  /* ---------- 把滚动容器摊平 ---------- */
+
+  .scpdf-root {
+    height: auto;
+    min-height: 0;
+    background: #fff;
+    overflow: visible;
+  }
+
+  .scpdf-container {
+    overflow: visible;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    background: #fff;
+    padding: 0;
+  }
+
+  .scpdf-body {
+    display: block;
+  }
+
+  .scpdf-pages {
+    height: auto;
+    display: block;
+    margin: 0;
+  }
+
+  /* ---------- 每页一张纸 ---------- */
+
+  .scpdf-page {
+    box-shadow: none;
+    border-radius: 0;
+    border: none;
+    margin: 0;
+    background: #fff;
+    /*
+     * ⚠️ **每页都从新的一张纸开始**。
+     *
+     * `break-after` 是现代写法，`page-break-after` 是老浏览器的兼容写法。
+     */
+    break-after: page;
+    page-break-after: always;
+    /* 避免最后一页后面多出一张空白页 */
+    break-inside: avoid;
+    page-break-inside: avoid;
+    /*
+     * ⚠️ **按纸张缩放**（`--scpdf-print-scale` 由 JS 在打印前算好）。
+     *
+     * 屏幕上缩放是"适合窗口"，打印时必须"适合**纸张**"
+     * → 不算的话要么超出纸张被裁掉，要么缩得极小。
+     *
+     * ⚠️ `transform-origin: top left` + `transform: scale()`
+     *    → 页的左上角对齐纸张左上角。
+     */
+    transform: scale(var(--scpdf-print-scale, 1));
+    transform-origin: top left;
+    /* transform 不改变布局盒 → 要用负 margin 收回多出来的空白 */
+    margin-bottom: calc((var(--scpdf-print-scale, 1) - 1) * 100%);
+  }
+
+  .scpdf-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  /* ---------- 高亮：保留，但不能用正片叠底 ---------- */
+
+  .scpdf-annotation {
+    /*
+     * ⚠️ **`mix-blend-mode: multiply` 在打印时可能失效** → 颜色会变。
+     * → 打印时改成**普通混合 + 透明度**（效果接近，但更稳）。
+     */
+    mix-blend-mode: normal;
+    opacity: 0.45;
+    /*
+     * ⚠️ **必须 `print-color-adjust: exact`**！
+     *
+     * 浏览器默认会**省掉背景色**（省墨）→ 高亮印不出来。
+     * → 显式要求"按原样打印颜色"。
+     */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ---------- 页面设置 ---------- */
+
+  @page {
+    /* `size: auto` → 用打印机默认纸张；`margin` 留出打印边距 */
+    size: auto;
+    margin: 12mm;
+  }
+}
+
+/*
+ * **"只打印原 PDF"模式**（不带高亮）。
+ *
+ * ⚠️ 怎么用：
+ * ```tsx
+ * <PdfViewer printMode="original" />   // 打印时隐藏高亮
+ * ```
+ * → 包会给根节点加 `scpdf-root--print-original`。
+ */
+@media print {
+  .scpdf-root--print-original .scpdf-annotation {
+    display: none;
+  }
+}

@@ -29,6 +29,7 @@ const suites = [
   { name: '面板开合时的选区定位', file: 'e2e-panel-offset.mjs' },
   { name: '高亮后的清选区 + 操作条', file: 'e2e-highlight-popover.mjs' },
   { name: '切换文档时重置高亮/选区', file: 'e2e-document-switch.mjs' },
+  { name: '打印效果', file: 'e2e-print.mjs' },
   { name: '缩放矩阵（选区/高亮/性能）', file: 'e2e-zoom-matrix.mjs' },
   { name: '高亮效果', file: 'e2e-highlight.mjs' },
   { name: '缩放行为', file: 'e2e-zoom.mjs' },

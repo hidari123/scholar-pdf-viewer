@@ -1,0 +1,46 @@
+/*
+ * demo 自己的样式（**不是包的一部分**）。
+ *
+ * 放在这里是为了演示"宿主自己的 UI 在打印时怎么处理" ——
+ * 包的 `@media print` 只管**包内部**的元素（工具栏 / 侧栏 / 浮层 / 文本层）。
+ * 宿主自己的 header / 提示条要**自己**处理。
+ *
+ * ⚠️ **`display` 必须写在 CSS 里，不能写 inline style**！
+ * → inline style 的优先级**高于**样式表里的普通规则
+ * → 打印时 `display: none` 会被 inline 的 `display: flex` 盖掉
+ * → header 就还是被打印出来了（实测踩过）。
+ */
+
+/* ---------- 布局 ---------- */
+
+.demo-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.demo-header {
+  display: flex;
+}
+
+/* ---------- 打印时藏起 demo 自己的界面 ---------- */
+
+@media print {
+  /*
+   * ⚠️ demo 的头部（标题 / 按钮 / 高亮色选择器）不该被打印。
+   * → 宿主自己的 UI，宿主自己负责（包的 print CSS 管不到）。
+   */
+  .demo-header {
+    display: none;
+  }
+
+  /*
+   * ⚠️ demo 的根容器不能限制高度
+   * → 否则打印时只有一屏（和包里的滚动容器同一个坑）。
+   */
+  .demo-root {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+}

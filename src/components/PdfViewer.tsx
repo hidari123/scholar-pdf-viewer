@@ -23,6 +23,7 @@ import type { PdfViewerError } from '../core/errors';
 import { pdfViewerError } from '../core/errors';
 import type { HighlightPalette } from '../core/highlight/palette';
 import type { OutlineItemLike } from '../core/outline/outline';
+import { computePrintScale, DEFAULT_PRINT_MARGIN, PAPER_SIZES } from '../core/print';
 import type { SearchHitRect } from '../core/search/highlight';
 import { hitsToRects } from '../core/search/highlight';
 import type { PdfSearch, SearchHit } from '../core/search/search';
@@ -145,6 +146,19 @@ export interface PdfViewerProps {
   messages?: Partial<Messages>;
   /** 主题 */
   theme?: 'light' | 'dark' | 'auto';
+  /**
+   * **打印模式**。
+   *
+   * - `'with-highlights'`（默认）：打印**带高亮**（用户要求"保留"）
+   * - `'original'`：**只打印原 PDF**（不带高亮 / 不带标注）
+   *
+   * ⚠️ 高亮是 DOM（`.scpdf-annotation`）→ 默认会被打印
+   * → `'original'` 模式用 CSS 隐藏它们（见 `viewer.css` 的 `@media print`）。
+   *
+   * ⚠️ 无论哪种模式，**工具栏 / 侧栏 / 浮层 / 文本层都不会被打印**
+   *    （见 `@media print` 里的隐藏规则）。
+   */
+  printMode?: 'with-highlights' | 'original';
   /** 取页（由宿主注入 pdf.js） */
   getPage?: (pageNumber: number) => Promise<PageProxyLike | undefined>;
   /**
@@ -280,6 +294,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     locale = 'zh',
     messages,
     theme = 'auto',
+    printMode = 'with-highlights',
     getPage,
     getPageSizes,
     getDocInfo,
@@ -2241,6 +2256,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     'scpdf-root',
     theme === 'dark' ? 'scpdf-root--dark' : '',
     theme === 'auto' ? 'scpdf-root--auto' : '',
+    // ⚠️ "只打印原 PDF"模式（不带高亮）
+    printMode === 'original' ? 'scpdf-root--print-original' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -2277,7 +2294,30 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
             ? undefined
             : () => setSidebar((v) => (v === 'outline' ? 'none' : 'outline'))
         }
-        onPrint={features.print === false ? undefined : () => globalThis.print?.()}
+        onPrint={
+          features.print === false
+            ? undefined
+            : () => {
+                /*
+                 * ⚠️ **打印前按纸张重算缩放**。
+                 *
+                 * 屏幕是"缩放到适合窗口"，打印必须"适合**纸张**"
+                 * → 不算的话要么超出纸张被裁掉，要么缩得极小。
+                 */
+                const target = document.querySelector<HTMLElement>('.scpdf-root');
+                const pageSize = pageSizesPt[0];
+                if (target && pageSize) {
+                  const scale = computePrintScale(pageSize, PAPER_SIZES.A4, DEFAULT_PRINT_MARGIN);
+                  target.style.setProperty('--scpdf-print-scale', String(scale));
+                }
+                // 等两帧（样式应用 + 布局完成）再打印
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    globalThis.print?.();
+                  });
+                });
+              }
+        }
       />
 
       {children}
