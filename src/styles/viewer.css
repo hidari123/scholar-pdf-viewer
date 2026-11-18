@@ -954,7 +954,15 @@
   .scpdf-text-layer,
   .scpdf-link-layer,
   .scpdf-state {
-    display: none;
+    /*
+     * ⚠️ **必须 `!important`**（实测踩过的坑）。
+     *
+     * 宿主经常给自己的 UI 写 `.my-toolbar { display: flex }`
+     * → 特异度可能和包的一样 → **打印时工具栏会被打出来**。
+     *
+     * → 打印规则要"赢过一切" → `!important`。
+     */
+    display: none !important;
   }
 
   /* ---------- 把滚动容器摊平 ---------- */
@@ -987,11 +995,32 @@
 
   /* ---------- 每页一张纸 ---------- */
 
+  /*
+   * ⚠️⚠️ **必须把页的绝对定位改回静态流**（实测踩过的坑）。
+   *
+   * 屏幕上页是**绝对定位**的（内联 `top: pageTops[i]`）：
+   * ```
+   * position: absolute; top: 16px / 1854px / 3691px …   ← 18 页各自定位
+   * ```
+   *
+   * → 打印时如果**不改**：
+   *   1. 18 个绝对定位的页 → 浏览器按**绝对位置**分页 → **页面重叠 / 大量空白页**
+   *   2. `.scpdf-pages` 的 `height` 是"所有页的总高" → 但绝对定位的页**不撑开父元素**
+   *      → 打印流里只有第一页的位置 → **后面的页全丢**
+   *
+   * → 打印时改成 **static 流**：
+   *   - `position: static` → 页按文档顺序流下来 → `break-after: page` 才有效
+   *   - `top: auto` → 干掉内联的绝对定位偏移
+   *   - `margin-bottom` → 用**页间距**（不是 0）→ 视觉上分开
+   */
   .scpdf-page {
+    position: static;
+    top: auto;
     box-shadow: none;
     border-radius: 0;
     border: none;
-    margin: 0;
+    /* ⚠️ 页间距（屏幕上用 `PAGE_GAP` 撑开，这里用 margin 还原） */
+    margin: 0 0 12px;
     background: #fff;
     /*
      * ⚠️ **每页都从新的一张纸开始**。
@@ -1011,16 +1040,41 @@
      *
      * ⚠️ `transform-origin: top left` + `transform: scale()`
      *    → 页的左上角对齐纸张左上角。
+     *
+     * ⚠️ **`transform` 不改变布局盒** → 缩小后页在流里仍占原高度
+     *    → 每页后面会多出一截空白 → **用负 margin 把它收回来**。
+     *
+     *    负 margin 的量 = `(原高 - 缩放后高) = 原高 × (1 - scale)`
+     *    → `margin-bottom: calc(-1 * (1 - scale) * 100%)`？
+     *    → 不行：`margin` 的百分比是**相对宽度**的，不是高度。
+     *    → 正确做法：用 `height` 一起缩（见下）。
      */
     transform: scale(var(--scpdf-print-scale, 1));
     transform-origin: top left;
-    /* transform 不改变布局盒 → 要用负 margin 收回多出来的空白 */
-    margin-bottom: calc((var(--scpdf-print-scale, 1) - 1) * 100%);
   }
 
+  /*
+   * ⚠️ **`transform: scale()` 不改变布局盒** → 缩小后页在流里仍占原高度
+   * → 每页后面多出一截空白 → 打印出来是"一页纸 + 一页空白"（实测）。
+   *
+   * → 解法：**同时把 `height` 缩掉**（`height` 是内联样式 → 要 `!important` 覆盖）。
+   *
+   * ```css
+   * height: calc(var(--scpdf-page-height, 0) * var(--scpdf-print-scale, 1));
+   * ```
+   *
+   * ⚠️ `--scpdf-page-height` 由 JS 在打印前按页写好（见 `usePrint` / PdfViewer 的 onPrint）。
+   *    没写（0）时 → `height: 0` → **页不见了** → 所以要有兜底。
+   */
+  .scpdf-page {
+    height: calc(var(--scpdf-page-height, 100%) * var(--scpdf-print-scale, 1));
+  }
+
+  /* 最后一页：不要多余的空白页 + 不要间距 */
   .scpdf-page:last-child {
     break-after: auto;
     page-break-after: auto;
+    margin-bottom: 0;
   }
 
   /* ---------- 高亮：保留，但不能用正片叠底 ---------- */

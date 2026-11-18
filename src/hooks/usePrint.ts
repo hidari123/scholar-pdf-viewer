@@ -21,7 +21,7 @@
  * ```
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   computePrintScale,
   DEFAULT_PRINT_MARGIN,
@@ -67,6 +67,28 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
   /** 恢复用的旧值 */
   const restoreRef = useRef<{ scale: string; page: string } | null>(null);
 
+  /**
+   * ⚠️ **把 margin 拆成 4 个 number**（避免每次渲染都是新对象）。
+   *
+   * `margin` 是对象 → 宿主每次传字面量 `{ margin: {...} }` → 引用每次都变
+   * → 放进 `useCallback` 的依赖 → **`print` 每次都是新函数**
+   * → 宿主把它放进 `useEffect` 依赖 → **反复触发**。
+   */
+  const marginTop = margin?.top ?? DEFAULT_PRINT_MARGIN.top;
+  const marginRight = margin?.right ?? DEFAULT_PRINT_MARGIN.right;
+  const marginBottom = margin?.bottom ?? DEFAULT_PRINT_MARGIN.bottom;
+  const marginLeft = margin?.left ?? DEFAULT_PRINT_MARGIN.left;
+
+  /*
+   * ⚠️ **`onAfterPrint` 放进 ref**（避免它进依赖数组）。
+   *
+   * 宿主传 inline 箭头函数 → 每次渲染都是新引用 → 同上问题。
+   */
+  const onAfterPrintRef = useRef(onAfterPrint);
+  useEffect(() => {
+    onAfterPrintRef.current = onAfterPrint;
+  }, [onAfterPrint]);
+
   const print = useCallback(() => {
     const target = root ?? document.querySelector<HTMLElement>('.scpdf-root');
     if (!target) {
@@ -75,7 +97,12 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
     }
 
     const paperSize = typeof paper === 'string' ? PAPER_SIZES[paper] : paper;
-    const fullMargin: PrintMargin = { ...DEFAULT_PRINT_MARGIN, ...margin };
+    const fullMargin: PrintMargin = {
+      top: marginTop,
+      right: marginRight,
+      bottom: marginBottom,
+      left: marginLeft,
+    };
 
     // 算打印缩放（按纸张）
     const scale = pageSizePt ? computePrintScale(pageSizePt, paperSize, fullMargin) : 1;
@@ -87,6 +114,27 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
     };
 
     target.style.setProperty('--scpdf-print-scale', String(scale));
+
+    /*
+     * ⚠️ **写每页的高度**（配合打印 CSS 的 `height: calc(...)`）。
+     *
+     * 打印时页要：
+     * 1. 绝对定位 → 静态流（否则重叠 / 丢页）
+     * 2. 按纸张缩放 → 但 `transform: scale()` **不改变布局盒**
+     *    → 页在流里仍占**原高度** → 每页后面多一截空白 → **空白页**
+     *
+     * → 所以要把 `height` 也缩掉 → 需要知道"原高度" → 写进 CSS 变量。
+     *
+     * ⚠️ 所有页的高度一样吗？**不一定**（PDF 每页可以不同尺寸）
+     *    → 所以要**逐页写**（用 `--scpdf-print-page-height` + 页的 index）。
+     */
+    const pages = target.querySelectorAll<HTMLElement>('.scpdf-page');
+    for (const pageEl of pages) {
+      const height = pageEl.getBoundingClientRect().height;
+      if (height > 0) {
+        pageEl.style.setProperty('--scpdf-print-page-height', `${height}px`);
+      }
+    }
 
     setPreparing(true);
 
@@ -103,8 +151,19 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
         setPreparing(false);
         globalThis.print?.();
 
-        // 打印对话框关掉后恢复（用 afterprint 事件更准，但 Safari 不支持）
+        /*
+         * ⚠️ **恢复只能执行一次**（实测踩过的坑）。
+         *
+         * 两条恢复路径：`afterprint` 事件 + `setTimeout` 兜底
+         * → 谁先触发都行 → **但只能恢复一次**（否则 `onAfterPrint` 会调两次）。
+         */
+        let restored = false;
         const restore = () => {
+          if (restored) {
+            return;
+          }
+          restored = true;
+
           const saved = restoreRef.current;
           if (saved) {
             if (saved.scale) {
@@ -119,7 +178,13 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
             }
           }
           restoreRef.current = null;
-          onAfterPrint?.();
+
+          // 逐页清掉高度变量
+          for (const pageEl of pages) {
+            pageEl.style.removeProperty('--scpdf-print-page-height');
+          }
+
+          onAfterPrintRef.current?.();
         };
 
         if (typeof globalThis.addEventListener === 'function') {
@@ -131,7 +196,7 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
         }
       });
     });
-  }, [pageSizePt, paper, margin, root, onAfterPrint]);
+  }, [pageSizePt, paper, marginTop, marginRight, marginBottom, marginLeft, root]);
 
   return { print, preparing };
 }

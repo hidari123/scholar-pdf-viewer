@@ -73,10 +73,11 @@ export type {
   PdfViewerAppearance,
   PdfViewerChrome,
   PdfViewerDensity,
+  PdfViewerSlots,
   PdfViewerTheme,
 } from './core/theme';
 /* ---------- 主题与外观 ---------- */
-export { THEME_LABELS, THEMES, themeClasses } from './core/theme';
+export { appearanceStyles, THEME_LABELS, THEMES, themeClasses } from './core/theme';
 export type * from './core/types';
 export * from './hooks';
 export type { Locale, Messages } from './i18n/messages';

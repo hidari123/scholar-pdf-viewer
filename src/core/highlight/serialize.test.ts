@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { HighlightRecord } from '../types';
 import {
   exportHighlights,
   HIGHLIGHT_DOC_VERSION,
@@ -6,6 +7,29 @@ import {
   parseHighlightDoc,
   stringifyHighlightDoc,
 } from './serialize';
+
+/** 造一条合法的高亮（字段完整） */
+function makeHighlight(overrides: Partial<HighlightRecord> = {}): HighlightRecord {
+  return {
+    id: 'h1',
+    color: 'yellow',
+    selectedText: '选中的文字',
+    position: {
+      pageNumber: 1,
+      rects: [],
+      boundingRect: {
+        x1: 0,
+        y1: 0,
+        x2: 1,
+        y2: 1,
+        width: 600,
+        height: 800,
+        pageNumber: 1,
+      },
+    },
+    ...overrides,
+  };
+}
 
 describe('exportHighlights', () => {
   it('导出带版本号 / 文档 id / 时间戳', () => {
@@ -18,14 +42,16 @@ describe('exportHighlights', () => {
   });
 
   it('导出的是**深拷贝**（改源不影响导出结果）', () => {
-    const source = [{ id: 'h1', color: 'yellow' }];
+    const source = [makeHighlight()];
     const doc = exportHighlights('doc-1', source);
 
-    // @ts-expect-error 测试用：故意改类型
-    source[0].color = 'pink';
+    // 改源 → 导出结果不变
+    const first = source[0];
+    if (first) {
+      first.color = 'pink';
+    }
 
-    // @ts-expect-error 测试用
-    expect(doc.highlights[0].color).toBe('yellow');
+    expect(doc.highlights[0]?.color).toBe('yellow');
   });
 });
 
@@ -86,22 +112,14 @@ describe('importHighlights', () => {
     });
 
     expect(doc?.highlights).toHaveLength(1);
-    // @ts-expect-error 测试用
-    expect(doc?.highlights[0].id).toBe('ok');
+    expect(doc?.highlights[0]?.id).toBe('ok');
   });
 });
 
 describe('stringify / parse', () => {
   it('导出 → 字符串 → 导入，round-trip 保持数据', () => {
     // ⚠️ 高亮必须**有 id 和 position**（没位置就没法画）→ 导入时会被过滤
-    const highlights = [
-      {
-        id: 'h1',
-        color: 'label-6',
-        selectedText: '文字',
-        position: { pageNumber: 1, rects: [], boundingRect: { pageNumber: 1 } },
-      },
-    ];
+    const highlights = [makeHighlight({ color: 'label-6' })];
     const doc = exportHighlights('doc-1', highlights);
 
     const text = stringifyHighlightDoc(doc);

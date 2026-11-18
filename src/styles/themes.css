@@ -148,6 +148,13 @@
   --scpdf-selection-color: rgba(76, 141, 255, 0.3);
   --scpdf-bbox-color: #4c8dff;
   --scpdf-shadow-page: 0 2px 10px rgba(0, 0, 0, 0.6);
+  /*
+   * ⚠️ **圆角也要覆盖**（实测发现暗色漏了它）。
+   *
+   * → 不覆盖的话暗色下沿用 `:root` 的 2px
+   * → 和 `contrast` / `minimal`（0px）的意图不一致 → **每套主题都要完整**。
+   */
+  --scpdf-radius-page: 2px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -163,6 +170,8 @@
     --scpdf-selection-color: rgba(76, 141, 255, 0.3);
     --scpdf-bbox-color: #4c8dff;
     --scpdf-shadow-page: 0 2px 10px rgba(0, 0, 0, 0.6);
+    /* ⚠️ 圆角（同上：每套主题都要完整） */
+    --scpdf-radius-page: 2px;
   }
 }
 
@@ -226,4 +235,19 @@
 
 .scpdf-root--page-radius-0 .scpdf-page {
   border-radius: 0;
+}
+
+/* ---------- 页码 ---------- */
+
+/*
+ * ⚠️ **`showPageNumber` 之前是"死 prop"**（只在类型里声明，从没被读过）。
+ * → 现在真正生效：控制工具栏里的页码（翻页器）。
+ */
+.scpdf-root--no-page-number .scpdf-toolbar__pager {
+  display: none;
+}
+
+/* 强制显示（覆盖主题的默认隐藏） */
+.scpdf-root--show-page-number .scpdf-toolbar__pager {
+  display: flex;
 }

@@ -128,6 +128,21 @@ try {
       pageCount: document.querySelectorAll('.scpdf-page').length,
       firstPageBreakAfter: page1 ? getComputedStyle(page1).breakAfter : null,
       firstPageShadow: page1 ? getComputedStyle(page1).boxShadow : null,
+      /*
+       * ⚠️ **页必须是"静态流"**（不是绝对定位）。
+       *
+       * 屏幕上页是 `position: absolute` + 内联 `top`（用于虚拟滚动的定位）
+       * → 打印时如果**不改**：
+       *   1. 18 个绝对定位的页 → 浏览器按绝对位置分页 → **重叠 / 空白页**
+       *   2. 绝对定位的页**不撑开父元素** → 打印流里只剩第一页的位置 → **后面的页全丢**
+       *
+       * → 打印 CSS 必须 `position: static`（实测修好后：rectTop 8 / 1842 / 3675 顺序排列）。
+       */
+      firstPagePosition: page1 ? getComputedStyle(page1).position : null,
+      /** 几页的 top 是递增的（= 在正常流里，没有重叠） */
+      pageTops: [...document.querySelectorAll('.scpdf-page')]
+        .slice(0, 5)
+        .map((p) => Math.round(p.getBoundingClientRect().top)),
       annotationVisible: (() => {
         const a = document.querySelector('.scpdf-annotation');
         if (!a) return null;
@@ -175,6 +190,20 @@ try {
     '**打印时每页都换页**（break-after: page）',
     printState.firstPageBreakAfter === 'page',
     printState.firstPageBreakAfter,
+  );
+  /*
+   * ⚠️ **页必须在正常流里**（`position: static`）—— 否则打印出来是重叠 / 空白页。
+   */
+  check(
+    '**打印时页是静态流**（不是绝对定位 → 不会重叠 / 丢页）',
+    printState.firstPagePosition === 'static',
+    printState.firstPagePosition,
+  );
+  check(
+    '**打印时各页依次排列**（top 递增 → 没有重叠）',
+    Array.isArray(printState.pageTops) &&
+      printState.pageTops.every((top, i) => i === 0 || top > (printState.pageTops[i - 1] ?? 0)),
+    JSON.stringify(printState.pageTops),
   );
   check(
     '打印时页阴影去掉（省墨）',

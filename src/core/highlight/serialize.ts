@@ -39,6 +39,8 @@
  * `position` 是**归一化坐标**（缩放无关）→ 任何缩放下读回来落点相同。
  */
 
+import type { HighlightRecord } from '../types';
+
 /** 格式版本（以后改格式时靠它做迁移） */
 export const HIGHLIGHT_DOC_VERSION = 1;
 
@@ -48,8 +50,16 @@ export interface HighlightDoc {
   version: number;
   /** 文档标识（宿主给，比如文件 hash / 业务 id） */
   documentId: string;
-  /** 高亮列表 */
-  highlights: unknown[];
+  /**
+   * 高亮列表。
+   *
+   * ⚠️ 类型是 `HighlightRecord[]`（不是 `unknown[]`）→ **宿主拿得到类型安全**
+   *    → 不用再写 `doc.highlights as HighlightRecord[]`。
+   *
+   * ⚠️ 但**运行时仍然逐条校验**（数据可能来自用户上传的文件）
+   *    → 不合法的条目会被**丢掉**，而不是让包内部崩掉。
+   */
+  highlights: HighlightRecord[];
   /** 导出时间（ms） */
   exportedAt: number;
 }
@@ -61,11 +71,14 @@ export interface HighlightDoc {
  * @param highlights 高亮列表
  * @returns 可序列化的文档对象
  */
-export function exportHighlights(documentId: string, highlights: readonly unknown[]): HighlightDoc {
+export function exportHighlights(
+  documentId: string,
+  highlights: readonly HighlightRecord[],
+): HighlightDoc {
   return {
     version: HIGHLIGHT_DOC_VERSION,
     documentId,
-    highlights: highlights.map((h) => JSON.parse(JSON.stringify(h)) as unknown),
+    highlights: highlights.map((h) => JSON.parse(JSON.stringify(h)) as HighlightRecord),
     exportedAt: Date.now(),
   };
 }
@@ -96,6 +109,10 @@ export function importHighlights(raw: unknown): HighlightDoc | null {
    * ⚠️ **逐条过滤掉不合法的高亮**。
    *
    * 数据可能来自外部（用户上传）→ 某一条坏了不能让整份文档都废掉。
+   *
+   * ⚠️ 过滤后**断言成 `HighlightRecord[]`**：
+   *    - 运行时只校验了 `id` 和 `position`（够画出来）
+   *    - 其余字段（`color` / `selectedText` …）由**渲染层**兜底
    */
   const valid = highlights.filter((h): h is Record<string, unknown> => {
     if (!h || typeof h !== 'object') {
@@ -106,7 +123,7 @@ export function importHighlights(raw: unknown): HighlightDoc | null {
     return (
       typeof record.id === 'string' && !!record.position && typeof record.position === 'object'
     );
-  });
+  }) as unknown as HighlightRecord[];
 
   const version = typeof obj.version === 'number' ? obj.version : HIGHLIGHT_DOC_VERSION;
 

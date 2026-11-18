@@ -23,7 +23,6 @@ import type { PdfViewerError } from '../core/errors';
 import { pdfViewerError } from '../core/errors';
 import type { HighlightPalette } from '../core/highlight/palette';
 import type { OutlineItemLike } from '../core/outline/outline';
-import { computePrintScale, DEFAULT_PRINT_MARGIN, PAPER_SIZES } from '../core/print';
 import type { SearchHitRect } from '../core/search/highlight';
 import { hitsToRects } from '../core/search/highlight';
 import type { PdfSearch, SearchHit } from '../core/search/search';
@@ -34,8 +33,8 @@ import type { BaselinesByPage, PageBaselines, PageSelectionShape } from '../core
 import { buildSelectionShapes } from '../core/selection/shape';
 import { measureAscentRatio } from '../core/text-layer/font-metrics';
 import type { PositionedTextItem } from '../core/text-layer/layout';
-import type { PdfViewerAppearance, PdfViewerTheme } from '../core/theme';
-import { themeClasses } from '../core/theme';
+import type { PdfViewerAppearance, PdfViewerSlots, PdfViewerTheme } from '../core/theme';
+import { appearanceStyles, themeClasses } from '../core/theme';
 import type {
   HighlightRecord,
   NewHighlight,
@@ -45,6 +44,7 @@ import type {
 } from '../core/types';
 import { useCurrentPage } from '../hooks/useCurrentPage';
 import { usePdfDocument } from '../hooks/usePdfDocument';
+import { usePrint } from '../hooks/usePrint';
 import { useSelectionPreservation } from '../hooks/useSelectionPreservation';
 import { useTextSelection } from '../hooks/useTextSelection';
 import { useVisiblePages } from '../hooks/useVisiblePages';
@@ -200,6 +200,30 @@ export interface PdfViewerProps {
    *    （见 `@media print` 里的隐藏规则）。
    */
   printMode?: 'with-highlights' | 'original';
+  /**
+   * **插槽**（方案 D：完全自定义）。
+   *
+   * 每个槽给了就**替换**内置的那块；不给就用内置的。
+   *
+   * | 槽            | 替换什么         | 宿主要自己负责什么                       |
+   * | ------------- | ---------------- | ---------------------------------------- |
+   * | `toolbar`     | 整个工具栏       | 翻页 / 缩放 / 搜索 / 打印 等所有按钮      |
+   * | `panel`       | 侧栏（缩略图/目录） | 缩略图 / 目录的全部逻辑                   |
+   * | `pageOverlay` | 页内叠加层       | 盖在页上的任意内容（批注、印章…）         |
+   *
+   * ⚠️ **替换掉的部分，包不再负责它的功能**：
+   * 比如替换了 `toolbar` → 包**不会**再渲染缩放按钮 → 宿主自己接 `viewerRef`。
+   *
+   * @example
+   * ```tsx
+   * <PdfViewer
+   *   slots={{
+   *     toolbar: <MyToolbar onZoomIn={() => viewerRef.current?.zoomIn()} />,
+   *   }}
+   * />
+   * ```
+   */
+  slots?: PdfViewerSlots;
   /** 取页（由宿主注入 pdf.js） */
   getPage?: (pageNumber: number) => Promise<PageProxyLike | undefined>;
   /**
@@ -337,6 +361,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     theme = 'auto',
     appearance,
     printMode = 'with-highlights',
+    slots,
     getPage,
     getPageSizes,
     getDocInfo,
@@ -396,11 +421,14 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * 用户要求："点击高亮之后 应该也会出现那个选择的弹框 可以选择颜色等"
    * → 点高亮块 → 在高亮的位置弹出浮层 → 复用选区浮层的样式。
+   *
+   * ⚠️ **`rect` 可能为 `null`**（高亮被删了 / 还没渲染出来）
+   * → 浮层这时不显示（而不是显示在 0,0）。
    */
   const [highlightPopover, setHighlightPopover] = useState<{
     id: string;
     text: string;
-    rect: { left: number; top: number; right: number; bottom: number };
+    rect: { left: number; top: number; right: number; bottom: number } | null;
   } | null>(null);
 
   /** 侧栏：'none' | 'thumbnails' | 'outline' */
@@ -891,6 +919,21 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onScaleChange: handleZoomChange,
     fitMode,
     onFitModeChange: setFitMode,
+  });
+
+  /**
+   * **打印**（用 `usePrint` 编排，不自己手写）。
+   *
+   * ⚠️ **必须用 `usePrint`**（实测踩过的坑）：
+   * 之前这里内联手写了一遍"算缩放 → setProperty → 双 rAF → print"
+   * → **打印完不恢复**（`--scpdf-print-scale` 永久残留）
+   * → 而且和 `usePrint` 的逻辑重复 → 修 bug 要改两处。
+   *
+   * → 现在统一走 `usePrint` → 它负责：算缩放 → 应用 → 等重排 → 打印 → **恢复**。
+   */
+  const { print: printDocument } = usePrint({
+    pageSizePt: pageSizesPt[0],
+    paper: 'A4',
   });
 
   /**
@@ -1498,7 +1541,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     setActiveHighlightId(null);
     // 搜索
     setSearchHits([]);
-    setActiveSearchIndex(0);
+    /*
+     * ⚠️ **必须用 `-1`**（"没有激活命中"），不能用 `0`。
+     *
+     * `activeSearchIndex` 是 **0-based** 的数组下标
+     * → `0` 意味着"第 0 个命中是激活的" → 语义上不对（明明一个命中都没有）
+     * → `-1` → `searchHits[-1]` 是 `undefined` → `activeSearchIndexOnPage` 返回 `null`
+     * → **渲染上无差异**，但语义正确（宿主若在切换文档后立刻搜索，不会从 0 开始）。
+     */
+    setActiveSearchIndex(-1);
     setSearchOpen(false);
     // 滚动位置回到顶部
     // ⚠️ jsdom 里 `scrollTo` 不存在 → 要防御（否则 SSR / 单测直接崩）
@@ -1724,9 +1775,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * 点了高亮块 → 用户的意思是"我要操作这个高亮"，不是"我还在选文字"
    * → 旧的原生选区还在 → 浮层还锚在旧选区上 → 看起来"选不掉"。
    *
-   * ⚠️ `removeAllRanges()` 在这里是安全的：
-   * 这是**点击处理器**，但时机是"点击已经完成之后"（React 的 onClick 在 mousedown 之后）
-   * → 不会吞掉后续的拖动（实测：点完高亮后立刻拖选，正常）。
+   * ⚠️ **清原生选区用的是 `clearNativeSelection()`**（不是 `removeAllRanges()`）：
+   * `removeAllRanges()` 会让浏览器进入"选区被程序改过"状态 → **后续再也选不中字**。
+   * → `clearNativeSelection` 用 `collapseToStart()` + rAF + 归还焦点 → 安全。
    */
   const handleHighlightClick = useCallback(
     (highlight: HighlightRecord) => {
@@ -2112,6 +2163,64 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   }, []);
 
   /**
+   * **高亮浮层的锚点要跟着滚动 / 缩放走**（实测踩过的坑）。
+   *
+   * ⚠️ 浮层的"实时校正"（`SelectionPopover` 的 100ms 轮询）在
+   *    **"外部锚点"模式下是跳过的**（它只认 DOM 选区）
+   * → 如果锚点只在点击时算一次 → **滚动一下浮层就飘了**。
+   *
+   * → 这里自己重算：滚动 / 缩放 / 换页 → 重新量高亮的 DOM 矩形。
+   */
+  useEffect(() => {
+    if (!highlightPopover) {
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    let raf = 0;
+    const remeasure = () => {
+      raf = 0;
+      const highlight = highlights.find((h) => h.id === highlightPopover.id);
+      const rect = highlight ? measureHighlightRect(highlight) : null;
+      // 只在真的变了才 setState（避免每次滚动都重渲染）
+      const prev = highlightPopover.rect;
+      const same =
+        prev === rect ||
+        (prev !== null &&
+          rect !== null &&
+          Math.abs(prev.left - rect.left) < 0.5 &&
+          Math.abs(prev.top - rect.top) < 0.5 &&
+          Math.abs(prev.right - rect.right) < 0.5 &&
+          Math.abs(prev.bottom - rect.bottom) < 0.5);
+      if (!same) {
+        setHighlightPopover((current) => (current ? { ...current, rect } : current));
+      }
+    };
+
+    const onScroll = () => {
+      if (raf === 0) {
+        raf = requestAnimationFrame(remeasure);
+      }
+    };
+
+    container.addEventListener('scroll', onScroll, { passive: true });
+    // 缩放 / 换页 → 位置也变
+    window.addEventListener('resize', onScroll);
+
+    return () => {
+      container.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf !== 0) {
+        cancelAnimationFrame(raf);
+      }
+    };
+  }, [highlightPopover, highlights, measureHighlightRect]);
+
+  /**
    * 高亮浮层的**动作列表**。
    *
    * ⚠️ **规则和选区浮层一致**：宿主没传回调 ⇒ 对应按钮不渲染。
@@ -2412,74 +2521,71 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     .filter(Boolean)
     .join(' ');
 
+  /*
+   * ⚠️ **任意值的外观配置走内联 CSS 变量**（见 `core/theme` 的 `appearanceStyles`）。
+   *
+   * - `pageRadius`（任意数值）→ class 表达不了（只能特判 0）
+   * - `accentColor` / `fontFamily` / `fontSize`（任意值）→ 同理
+   *
+   * → 走 CSS 变量 → 覆盖主题，不影响其他层。
+   */
+  const appearanceStyle = appearanceStyles(appearance);
+
   return (
-    <div className={className} data-testid="pdf-viewer">
-      <Toolbar
-        toolbar={{
-          ...toolbar,
-          /*
-           * ⚠️ **`appearance` 的结构开关覆盖 `toolbar` 的配置**。
-           *
-           * 优先级：`appearance` > `toolbar`（appearance 更"上层"）。
-           * → 宿主用 `appearance` 统一控制，用 `toolbar` 做细调。
-           */
-          showSearch: appearance?.showSearch ?? toolbar?.showSearch,
-          showThumbnails: appearance?.showThumbnails ?? toolbar?.showThumbnails,
-          showOutline: appearance?.showOutline ?? toolbar?.showOutline,
-        }}
-        page={page}
-        totalPages={numPages}
-        scale={scale}
-        locale={locale}
-        messages={messages}
-        onPageChange={(next) => scrollToPage(next)}
-        onZoomIn={zoom.zoomIn}
-        onZoomOut={zoom.zoomOut}
-        onFitWidth={() => zoom.fitWidth(containerRef.current?.clientWidth ?? 0, PAGE_WIDTH_PT)}
-        onFitPage={() =>
-          zoom.fitPage(
-            containerRef.current?.clientWidth ?? 0,
-            containerRef.current?.clientHeight ?? 0,
-            PAGE_WIDTH_PT,
-            PAGE_HEIGHT_PT,
-          )
-        }
-        onToggleSearch={features.search === false ? undefined : () => setSearchOpen((v) => !v)}
-        onToggleThumbnails={
-          features.thumbnails === false || !renderThumbnail
-            ? undefined
-            : () => setSidebar((v) => (v === 'thumbnails' ? 'none' : 'thumbnails'))
-        }
-        onToggleOutline={
-          features.outline === false || !getOutline
-            ? undefined
-            : () => setSidebar((v) => (v === 'outline' ? 'none' : 'outline'))
-        }
-        onPrint={
-          features.print === false
-            ? undefined
-            : () => {
-                /*
-                 * ⚠️ **打印前按纸张重算缩放**。
-                 *
-                 * 屏幕是"缩放到适合窗口"，打印必须"适合**纸张**"
-                 * → 不算的话要么超出纸张被裁掉，要么缩得极小。
-                 */
-                const target = document.querySelector<HTMLElement>('.scpdf-root');
-                const pageSize = pageSizesPt[0];
-                if (target && pageSize) {
-                  const scale = computePrintScale(pageSize, PAPER_SIZES.A4, DEFAULT_PRINT_MARGIN);
-                  target.style.setProperty('--scpdf-print-scale', String(scale));
-                }
-                // 等两帧（样式应用 + 布局完成）再打印
-                requestAnimationFrame(() => {
-                  requestAnimationFrame(() => {
-                    globalThis.print?.();
-                  });
-                });
-              }
-        }
-      />
+    <div className={className} style={appearanceStyle} data-testid="pdf-viewer">
+      {/*
+        插槽 `toolbar`（方案 D）：宿主给了就**整个替换**内置工具栏。
+
+        ⚠️ 替换后包**不再渲染**缩放 / 搜索 / 打印等按钮
+        → 宿主自己接 `viewerRef`（`zoomIn` / `zoomOut` / `print` …）。
+      */}
+      {slots?.toolbar !== undefined ? (
+        (slots.toolbar as React.ReactNode)
+      ) : (
+        <Toolbar
+          toolbar={{
+            ...toolbar,
+            /*
+             * ⚠️ **`appearance` 的结构开关覆盖 `toolbar` 的配置**。
+             *
+             * 优先级：`appearance` > `toolbar`（appearance 更"上层"）。
+             * → 宿主用 `appearance` 统一控制，用 `toolbar` 做细调。
+             */
+            showSearch: appearance?.showSearch ?? toolbar?.showSearch,
+            showThumbnails: appearance?.showThumbnails ?? toolbar?.showThumbnails,
+            showOutline: appearance?.showOutline ?? toolbar?.showOutline,
+          }}
+          page={page}
+          totalPages={numPages}
+          scale={scale}
+          locale={locale}
+          messages={messages}
+          onPageChange={(next) => scrollToPage(next)}
+          onZoomIn={zoom.zoomIn}
+          onZoomOut={zoom.zoomOut}
+          onFitWidth={() => zoom.fitWidth(containerRef.current?.clientWidth ?? 0, PAGE_WIDTH_PT)}
+          onFitPage={() =>
+            zoom.fitPage(
+              containerRef.current?.clientWidth ?? 0,
+              containerRef.current?.clientHeight ?? 0,
+              PAGE_WIDTH_PT,
+              PAGE_HEIGHT_PT,
+            )
+          }
+          onToggleSearch={features.search === false ? undefined : () => setSearchOpen((v) => !v)}
+          onToggleThumbnails={
+            features.thumbnails === false || !renderThumbnail
+              ? undefined
+              : () => setSidebar((v) => (v === 'thumbnails' ? 'none' : 'thumbnails'))
+          }
+          onToggleOutline={
+            features.outline === false || !getOutline
+              ? undefined
+              : () => setSidebar((v) => (v === 'outline' ? 'none' : 'outline'))
+          }
+          onPrint={features.print === false ? undefined : printDocument}
+        />
+      )}
 
       {children}
 
@@ -2500,30 +2606,42 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         也不影响页面流的居中计算。
       */}
       <div className="scpdf-body">
-        {sidebar === 'thumbnails' && renderThumbnail ? (
-          <ThumbnailPanel
-            totalPages={numPages}
-            currentPage={page}
-            visiblePages={visiblePages}
-            pageSizes={pageSizesPt}
-            renderThumbnail={renderThumbnail}
-            onPageSelect={(target) => scrollToPage(target)}
-            locale={locale}
-            messages={messages}
-          />
-        ) : null}
+        {/*
+          插槽 `panel`（方案 D）：宿主给了就**整个替换**内置侧栏。
 
-        {sidebar === 'outline' && getOutline ? (
-          <OutlinePanel
-            outline={outline}
-            pageRefToNumber={pageRefToNumber ?? (() => null)}
-            resolveToken={outlineResolveToken}
-            currentPage={page}
-            onPageSelect={(target) => scrollToPage(target)}
-            locale={locale}
-            messages={messages}
-          />
-        ) : null}
+          ⚠️ 替换后包**不再渲染**缩略图 / 目录面板
+          → 宿主自己实现（可以用 `viewerRef` 拿页数、当前页）。
+        */}
+        {slots?.panel !== undefined ? (
+          (slots.panel as React.ReactNode)
+        ) : (
+          <>
+            {sidebar === 'thumbnails' && renderThumbnail ? (
+              <ThumbnailPanel
+                totalPages={numPages}
+                currentPage={page}
+                visiblePages={visiblePages}
+                pageSizes={pageSizesPt}
+                renderThumbnail={renderThumbnail}
+                onPageSelect={(target) => scrollToPage(target)}
+                locale={locale}
+                messages={messages}
+              />
+            ) : null}
+
+            {sidebar === 'outline' && getOutline ? (
+              <OutlinePanel
+                outline={outline}
+                pageRefToNumber={pageRefToNumber ?? (() => null)}
+                resolveToken={outlineResolveToken}
+                currentPage={page}
+                onPageSelect={(target) => scrollToPage(target)}
+                locale={locale}
+                messages={messages}
+              />
+            ) : null}
+          </>
+        )}
 
         {/*
           滚动容器：section（自带 region 语义）+ tabIndex。
@@ -2635,6 +2753,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                       onRenderError={handlePageRenderError}
                     />
                   ) : null}
+
+                  {/*
+                    插槽 `pageOverlay`（方案 D）：盖在页上的任意内容。
+
+                    ⚠️ **每页都渲染一次** → 宿主可以在里面做"页内批注 / 印章"之类。
+                    → 传函数则按页号调用（能拿到当前页）。
+                  */}
+                  {slots?.pageOverlay !== undefined
+                    ? typeof slots.pageOverlay === 'function'
+                      ? (slots.pageOverlay as (pageNumber: number) => React.ReactNode)(pageNumber)
+                      : (slots.pageOverlay as React.ReactNode)
+                    : null}
                 </div>
               );
             })}

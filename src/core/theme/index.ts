@@ -78,6 +78,40 @@ export interface PdfViewerAppearance {
   showThumbnails?: boolean;
   /** 显示搜索按钮 */
   showSearch?: boolean;
+  /**
+   * 强调色（主色）。
+   *
+   * ⚠️ **覆盖主题的 `--scpdf-color-primary`** → 主题是"底色"，这个是"点缀"。
+   */
+  accentColor?: string;
+  /** 字体族（覆盖 `--scpdf-font-family`） */
+  fontFamily?: string;
+  /** 字号（px，覆盖 `--scpdf-font-size`） */
+  fontSize?: number;
+}
+
+/**
+ * **插槽**（方案 D：完全自定义）。
+ *
+ * 每个槽给了就**替换**内置的那块；不给就用内置的。
+ *
+ * ⚠️ **替换掉的部分，包不再负责它的功能**。
+ *
+ * ⚠️ 类型用 `unknown` 而不是 `ReactNode` → **core 层保持零 React 依赖**
+ *    （core 的铁律：不 import react）。
+ *    → React 层（`PdfViewer`）会把它当 `ReactNode` 渲染。
+ */
+export interface PdfViewerSlots {
+  /** 替换整个工具栏 */
+  toolbar?: unknown;
+  /** 替换侧栏（缩略图 / 目录） */
+  panel?: unknown;
+  /**
+   * 页内叠加层（盖在页上的任意内容）。
+   *
+   * ⚠️ 可以传**函数** → 按页号调用（能拿到"当前是第几页"）。
+   */
+  pageOverlay?: unknown;
 }
 
 /**
@@ -115,6 +149,51 @@ export function themeClasses(
   if (appearance?.pageRadius === 0) {
     classes.push('scpdf-root--page-radius-0');
   }
+  /*
+   * ⚠️ **`showPageNumber` 必须产出 class**（实测踩过的坑）。
+   *
+   * 之前它只在类型里声明 → **死 prop** → 宿主传了完全没效果。
+   * → 现在：`false` → 隐藏页码；`true` → 强制显示（覆盖主题的默认）。
+   */
+  if (appearance?.showPageNumber === false) {
+    classes.push('scpdf-root--no-page-number');
+  } else if (appearance?.showPageNumber === true) {
+    classes.push('scpdf-root--show-page-number');
+  }
 
   return classes;
+}
+
+/**
+ * 把外观配置翻译成**根节点的内联样式**。
+ *
+ * ⚠️ **为什么有些走内联样式而不是 class**：
+ * - `pageRadius` 是**任意数值** → class 表达不了（只能特判 `0`）
+ * - `accentColor` / `fontFamily` / `fontSize` 是**任意值** → 同理
+ *
+ * → 这些走 **CSS 变量**（内联）→ 覆盖主题，不影响其他层。
+ *
+ * @param appearance 外观配置
+ * @returns React 的 style 对象（空对象 = 不覆盖）
+ */
+export function appearanceStyles(appearance?: PdfViewerAppearance): Record<string, string> {
+  const style: Record<string, string> = {};
+  if (!appearance) {
+    return style;
+  }
+
+  if (typeof appearance.pageRadius === 'number' && appearance.pageRadius > 0) {
+    style['--scpdf-radius-page'] = `${appearance.pageRadius}px`;
+  }
+  if (appearance.accentColor) {
+    style['--scpdf-color-primary'] = appearance.accentColor;
+  }
+  if (appearance.fontFamily) {
+    style['--scpdf-font-family'] = appearance.fontFamily;
+  }
+  if (typeof appearance.fontSize === 'number' && appearance.fontSize > 0) {
+    style['--scpdf-font-size'] = `${appearance.fontSize}px`;
+  }
+
+  return style;
 }

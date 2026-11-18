@@ -35,6 +35,7 @@ const suites = [
   { name: '多行选择的覆盖率', file: 'e2e-selection-coverage.mjs' },
   { name: '跨页选择', file: 'e2e-cross-page-selection.mjs' },
   { name: '导出带高亮的 PDF', file: 'e2e-export-pdf.mjs' },
+  { name: '插槽（方案 D）', file: 'e2e-slots.mjs' },
   { name: '缩放矩阵（选区/高亮/性能）', file: 'e2e-zoom-matrix.mjs' },
   { name: '高亮效果', file: 'e2e-highlight.mjs' },
   { name: '缩放行为', file: 'e2e-zoom.mjs' },

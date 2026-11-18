@@ -127,6 +127,16 @@ export default function App() {
   /** 密度（appearance 的结构开关） */
   const [density, setDensity] = useState<PdfViewerDensity>('cozy');
 
+  /**
+   * **插槽演示**（方案 D）。
+   *
+   * ⚠️ 用 URL 参数 `?slots=1` 开启 → 方便 E2E 直接验证。
+   */
+  const useSlots = useMemo(
+    () => new URLSearchParams(globalThis.location?.search ?? '').get('slots') === '1',
+    [],
+  );
+
   /** 用户自定义的颜色（key → 颜色）；持久化也是宿主的事 */
   const [customColors, setCustomColors] = useState<Record<string, string>>({});
 
@@ -146,6 +156,55 @@ export default function App() {
 
   /** 选区（宿主拿到的几何） */
   const [selection, setSelection] = useState<SelectionData | null>(null);
+
+  /**
+   * **插槽内容**（方案 D 的宿主示例）。
+   *
+   * ⚠️ 传了插槽 → 包**不再渲染**对应的那块 → 宿主自己负责全部逻辑。
+   * 这里演示最小可用版本：工具栏只放一个"翻页"按钮，页内放一个角标。
+   */
+  const demoSlots = useMemo(
+    () => ({
+      toolbar: (
+        <div className="demo-slot-toolbar" data-slot="toolbar">
+          <button
+            type="button"
+            className="scpdf-toolbar__btn"
+            onClick={() => {
+              const current = viewerRef.current?.getCurrentPage() ?? 1;
+              viewerRef.current?.goToPage(current >= 5 ? 1 : current + 1);
+            }}
+          >
+            宿主工具栏（插槽）
+          </button>
+        </div>
+      ),
+      panel: (
+        <aside className="demo-slot-panel" data-slot="panel">
+          <p style={{ padding: 8 }}>宿主侧栏（插槽）</p>
+        </aside>
+      ),
+      pageOverlay: (pageNumber: number) => (
+        <span
+          data-slot="page-overlay"
+          style={{
+            position: 'absolute',
+            right: 6,
+            bottom: 6,
+            padding: '2px 6px',
+            borderRadius: 4,
+            background: 'rgba(0,0,0,0.45)',
+            color: '#fff',
+            fontSize: 11,
+            pointerEvents: 'none',
+          }}
+        >
+          第 {pageNumber} 页
+        </span>
+      ),
+    }),
+    [],
+  );
 
   /** 当前页（宿主展示用） */
   const [currentPage, setCurrentPage] = useState(1);
@@ -642,7 +701,7 @@ export default function App() {
           setHint('导入失败：文件格式不对');
           return;
         }
-        setHighlights((prev) => [...prev, ...(doc.highlights as HighlightRecord[])]);
+        setHighlights((prev) => [...prev, ...doc.highlights]);
         setHint(`已导入 ${doc.highlights.length} 条高亮`);
       });
     };
@@ -897,6 +956,7 @@ export default function App() {
           documentId={documentId}
           theme={theme}
           appearance={{ density }}
+          slots={useSlots ? demoSlots : undefined}
           highlights={highlights}
           highlightPalette={highlightPalette}
           toolbar={{ rightSlot: toolbarSlot }}
