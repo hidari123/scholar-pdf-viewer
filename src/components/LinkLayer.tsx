@@ -33,10 +33,12 @@ export interface LinkLayerProps {
   pageSize: { width: number; height: number };
   /** 视口尺寸（px，当前缩放下） */
   viewport: { width: number; height: number };
+  /** 页码（内部跳转要告诉宿主是哪一页） */
+  pageNumber: number;
   /** 点击外部链接（宿主决定怎么开：新窗口 / 应用内） */
   onExternalLink?: (url: string) => void;
   /** 点击内部跳转（宿主解析 dest → 页码） */
-  onInternalLink?: (dest: string | unknown[]) => void;
+  onInternalLink?: (dest: string | unknown[], pageNumber: number) => void;
 }
 
 /**
@@ -45,7 +47,7 @@ export interface LinkLayerProps {
  * @param props 参数
  */
 export function LinkLayer(props: LinkLayerProps) {
-  const { annotations, pageSize, viewport, onExternalLink, onInternalLink } = props;
+  const { annotations, pageSize, viewport, pageNumber, onExternalLink, onInternalLink } = props;
 
   /** 归一化后的链接 */
   const links = useMemo(
@@ -106,7 +108,7 @@ export function LinkLayer(props: LinkLayerProps) {
                 if (link.url) {
                   onExternalLink?.(link.url);
                 } else if (link.dest) {
-                  onInternalLink?.(link.dest);
+                  onInternalLink?.(link.dest, pageNumber);
                 }
               }
             }}

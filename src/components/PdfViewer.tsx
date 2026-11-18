@@ -2245,6 +2245,33 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   );
 
   /** 收到某页的文本项（搜索高亮 + 选区基线表用） */
+  /**
+   * 页面渲染失败 → 抛给宿主。
+   *
+   * ⚠️⚠️ **必须是稳定的引用**（实测的性能坑）。
+   *
+   * 之前是 inline 箭头函数：
+   * ```tsx
+   * onRenderError={(err, page) => { onError?.(...); }}   // ❌ 每次渲染都是新函数
+   * ```
+   * → `PageCanvas` 的 `useEffect` 依赖它 → **每次渲染都重跑**
+   * → **canvas 被重新渲染**（`drawImage` 占 CPU 的 18%！）
+   * → 拖动选区时每一步都在重画 PDF → **明显卡顿**。
+   *
+   * → 提成 `useCallback` → 引用稳定 → 只在 `page` / `scale` 变化时才重画。
+   */
+  const handlePageRenderError = useCallback(
+    (renderError: unknown, failedPage: number) => {
+      onError?.(
+        pdfViewerError('E_RENDER_PAGE', {
+          cause: renderError,
+          pageNumber: failedPage,
+        }),
+      );
+    },
+    [onError],
+  );
+
   const handleTextItems = useCallback((pageNumber: number, items: PositionedTextItem[]) => {
     setTextItemsByPage((prev) => {
       const existing = prev.get(pageNumber);
@@ -2554,17 +2581,10 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                       selectionShape={selectionShapes.get(pageNumber)}
                       onHighlightClick={handleHighlightClick}
                       onExternalLink={onExternalLink}
-                      onInternalLink={(dest) => onInternalLink?.(dest, pageNumber)}
+                      onInternalLink={onInternalLink}
                       onTextItems={handleTextItems}
                       ariaLabel={t('a11y.page', { page: pageNumber })}
-                      onRenderError={(renderError, failedPage) => {
-                        onError?.(
-                          pdfViewerError('E_RENDER_PAGE', {
-                            cause: renderError,
-                            pageNumber: failedPage,
-                          }),
-                        );
-                      }}
+                      onRenderError={handlePageRenderError}
                     />
                   ) : null}
                 </div>

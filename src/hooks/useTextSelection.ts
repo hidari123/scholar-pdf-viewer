@@ -314,12 +314,71 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         cache.dirty = false;
       }
 
-      // 逐页判断（一页命中就 break → 不用遍历该页所有 span）
+      /*
+       * ⚠️⚠️ **只对"候选页"做 `intersectsNode`**（实测的性能优化）。
+       *
+       * 旧实现：逐页遍历该页的**每个 span** → 调 `range.intersectsNode(span)`
+       * ```
+       * 451 个 span × 每次 selectionchange → intersectsNode 要遍历 DOM 树 → 非常贵
+       * ```
+       *
+       * → 优化：**先用矩形的位置粗筛**，只有候选页才做精确判断。
+       *
+       * ⚠️ **粗筛要用"缓存的页矩形"，不能每次 `getBoundingClientRect()`**
+       *    → 那会**强制重排** → 比 `intersectsNode` 还贵（实测没提速）。
+       *    → 页的位置在滚动/缩放时才变 → 用 `pageFrames` 推算。
+       */
+      const rects = range.getClientRects();
+      const candidates = new Set<number>();
+
+      for (const rect of rects) {
+        if (rect.width <= 0 || rect.height <= 0) {
+          continue;
+        }
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        // 页的位置（视口坐标）：`pageFrames` 是内容坐标 → 换算成视口
+        const containerRect = container.getBoundingClientRect();
+        for (const frame of pageFrames) {
+          const frameTop = containerRect.top + frame.top - container.scrollTop;
+          const frameLeft = containerRect.left + frame.left;
+          if (
+            centerX >= frameLeft - 4 &&
+            centerX <= frameLeft + frame.width + 4 &&
+            centerY >= frameTop &&
+            centerY <= frameTop + frame.height
+          ) {
+            candidates.add(frame.pageNumber);
+          }
+        }
+      }
+
+      // 候选页 → 用 intersectsNode 确认（准确，但只对少数候选页做）
       for (const [pageNumber, spans] of cache.byPage) {
+        if (!candidates.has(pageNumber)) {
+          continue;
+        }
         for (const span of spans) {
           if (range.intersectsNode(span)) {
             pages.add(pageNumber);
             break;
+          }
+        }
+      }
+
+      /*
+       * ⚠️ **兜底**：一个候选页都没命中 → 用老办法全查一遍。
+       *
+       * 什么时候会这样：选区跨到了**没渲染文字层的页**（虚拟滚动没渲染）
+       * → 或者矩形判断漏了 → 宁可多查一次，也不能丢页。
+       */
+      if (pages.size === 0) {
+        for (const [pageNumber, spans] of cache.byPage) {
+          for (const span of spans) {
+            if (range.intersectsNode(span)) {
+              pages.add(pageNumber);
+              break;
+            }
           }
         }
       }
