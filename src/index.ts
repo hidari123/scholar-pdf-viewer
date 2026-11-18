@@ -17,8 +17,29 @@
  */
 
 export * from './components';
+/* ---------- 下载（纯 DOM，无网络依赖） ---------- */
+export { downloadFile } from './core/document/download';
 export type { PdfViewerError, PdfViewerErrorCode } from './core/errors';
 export { isRetryable, pdfViewerError } from './core/errors';
+export type { PdfAnnot, PdfBbox } from './core/highlight/annotations';
+export {
+  highlightsToPdfAnnots,
+  highlightToPdfAnnots,
+} from './core/highlight/annotations';
+export type { HighlightDoc } from './core/highlight/serialize';
+/*
+ * ---------- 高亮的序列化 / PDF 批注（宿主侧的高层工具） ----------
+ *
+ * ⚠️ **包只给"格式 + 纯函数"，不碰存储** →
+ *    宿主自己决定存哪（localStorage / IndexedDB / 接口）→ **换后端不用改包**。
+ */
+export {
+  exportHighlights,
+  HIGHLIGHT_DOC_VERSION,
+  importHighlights,
+  parseHighlightDoc,
+  stringifyHighlightDoc,
+} from './core/highlight/serialize';
 export type { OutlineItemLike } from './core/outline/outline';
 export type {
   SearchHit,

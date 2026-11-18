@@ -1,0 +1,152 @@
+feat(highlight): 切换文档时重置高亮/选区 + 高亮的序列化与导出工具
+
+用户反馈（第三轮）：
+1. "如果已经高亮或者选中了文字 切换文档的时候还是会展示在文档上
+    →切换文档时高亮要重置"
+2. "如有接口则每次改动都保存到接口"
+3. "支持高亮文档导出和导入"
+4. "支持 PDF 下载"
+5. "导出带高亮的 PDF" → **宿主自己做**（用户确认）
+
+## 实测（复现）
+
+```
+高亮后:     annotations=1  selectionLayer=1  nativeSel=11  pages=18
+切换文档后: annotations=1  selectionLayer=1  nativeSel=11  pages=3   ← ❌ 全都还在
+```
+
+## ① 切换文档 → 清掉包内部的"上一份文档"状态
+
+**根因**：
+- **高亮**是**受控**的（`highlights` 是宿主的 prop）→ 宿主不换，包就一直渲染旧的
+  → **这是设计如此，不是 bug**
+- 但**选区**（自绘块 / 浮层 / 原生选区）是**包内部状态** → **必须清**
+
+**修法**（`PdfViewer`）：
+
+```ts
+useEffect(() => {
+  clearNativeSelection();   // 浏览器原生选区
+  clearState();             // 包内选区状态
+  setSelectionShapes(new Map());
+  setPopoverOpen(false);
+  setPopoverAnchor(null);
+  setCurrentSelection(null);
+  setHighlightPopover(null);
+  setActiveHighlightId(null);
+  setSearchHits([]);
+  setActiveSearchIndex(0);
+  setSearchOpen(false);
+  container.scrollTo({ top: 0 });
+}, [documentId, file, clearNativeSelection, clearState]);
+```
+
+### ⚠️ 两个坑
+
+**坑 1：依赖里不能用 `textSelection` 对象**
+
+`useTextSelection` 每次渲染都返回**新对象** → 依赖永远变 → effect 每次渲染都跑
+→ setState → 重渲染 → **无限循环**（实测报 "Maximum update depth exceeded"）。
+
+→ 依赖**具体的函数**（`clearNativeSelection` / `clearState`，它们是稳定的 useCallback）。
+
+**坑 2：不能用 `data` 当依赖**
+
+`data` 是 `Uint8Array`，每次都是新引用 → 会误触发（每次重渲染都清一遍选区）。
+→ 用 `documentId` + `file`。
+
+**坑 3：jsdom 里 `scrollTo` 不存在** → 要防御，否则单测直接崩。
+
+## ② 高亮的序列化（**包只给格式，不碰存储**）
+
+新增 `src/core/highlight/serialize.ts`：
+
+| 函数 | 作用 |
+|---|---|
+| `exportHighlights(documentId, highlights)` | 导出（深拷贝） |
+| `importHighlights(raw)` | 导入（**逐条校验 + 兜底**） |
+| `stringifyHighlightDoc(doc)` | 转 JSON 字符串 |
+| `parseHighlightDoc(text)` | 从字符串解析（**永不抛异常**） |
+
+**为什么放在包里**：宿主各写各的格式 → 互不兼容 → 换后端就废。
+→ 包提供**一套标准格式 + 纯函数** → 任何后端都能用。
+
+**包的边界（重要）**：
+- ❌ 不碰 localStorage / IndexedDB / HTTP / fetch
+- ✅ 只提供纯函数（输入 → 输出）
+- → **换后端不用改包**（这正是"和后端解耦"的含义）
+
+**导入的校验**：数据可能来自**用户上传的文件** → 字段可能缺失/类型不对
+→ 不校验就会让包内部崩掉 → **逐条过滤**（一条坏了不能让整份文档都废掉）。
+
+## ③ "导出带高亮的 PDF" —— **宿主自己做**（用户确认）
+
+包提供**纯计算**（高亮 → PDF 坐标），写文件由宿主做（pdf.js / pdf-lib 在宿主侧）。
+
+新增 `src/core/highlight/annotations.ts`：
+
+```ts
+highlightToPdfAnnots(highlight, pageSizesPt)  // → PdfAnnot[]
+highlightsToPdfAnnots(highlights, pageSizesPt)
+```
+
+**坐标系**：PDF 是 72dpi、原点**左下**、y 向上
+→ 我们的归一化坐标是视口 px、原点左上、y 向下 → **要翻转**。
+
+实测：归一化 (100, 200) 在 595×842 的页上 → PDF (100, 842-220=622)…(300, 642)。
+
+## ④ PDF 下载
+
+新增 `src/core/document/download.ts` → `downloadFile(data, filename, mimeType?)`。
+
+**纯 DOM，零网络依赖**：
+- 包**不负责取文件**（文件是宿主的：URL / Blob / ArrayBuffer / 服务端流）
+- → 宿主拿到文件后调一下即可 → **换后端不用改包**
+- 放在包里是因为每个宿主都会重复写，而且容易漏掉 `URL.revokeObjectURL`（内存泄漏）
+
+## ⑤ 宿主侧（demo）怎么用
+
+**高亮按文档隔离**（切文档重置，切回来还在）：
+
+```tsx
+const [highlightsByDoc, setHighlightsByDoc] = useState<Record<string, HighlightRecord[]>>({});
+const highlights = highlightsByDoc[documentId] ?? [];
+```
+
+**每次改动都保存**（防抖 500ms → 一次请求）—— demo 里用 localStorage 演示，
+换成接口只要改那一处。
+
+**导入 / 导出 / 下载**：
+
+```tsx
+const doc = exportHighlights(documentId, highlights);
+downloadFile(stringifyHighlightDoc(doc), `highlights-${documentId}.json`, 'application/json');
+
+const parsed = parseHighlightDoc(await file.text());
+if (parsed) setHighlights((prev) => [...prev, ...parsed.highlights]);
+```
+
+## 回归测试
+
+**单测**（+19，共 373）：
+- `src/core/highlight/serialize.test.ts`（10）：导出 / 导入 / 校验 / round-trip / 非法 JSON
+- `src/core/highlight/annotations.test.ts`（7）：y 轴翻转 / 页码越界 / 多行 / **缩放无关**
+
+**E2E**（`scripts/e2e-document-switch.mjs`，新增 8 项）：
+- 切换文档后：选区块 / 原生选区 / 浮层 **全部清除**
+- 切换文档后：高亮**重置**
+- 切回原文档：高亮**还在**（按文档隔离，不是清空）
+
+## 顺带修的
+
+- `src/index.ts` 补上 `exportHighlights` / `importHighlights` / `parseHighlightDoc` /
+  `stringifyHighlightDoc` / `highlightToPdfAnnots` / `downloadFile` 的导出
+  （之前只在 `./core` 子路径有 → 主入口 import 会报
+  "does not provide an export named 'downloadFile'"）
+- demo 加"载入本地真实文档"按钮（用来测"切回原文档"）
+
+## 验证
+
+- `pnpm verify`: **8/8 全绿**
+- `pnpm test`: **373 passed**（+19）
+- E2E: **212/212 断言通过，0 个套件失败**（+22）

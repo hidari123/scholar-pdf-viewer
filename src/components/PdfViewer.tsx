@@ -1319,6 +1319,63 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onClientRects: handleSelectionClientRects,
   });
 
+  /*
+   * ⚠️⚠️ **文档切换 → 清掉所有"属于上一份文档"的内部状态**。
+   *
+   * 用户反馈："如果已经高亮或者选中了文字 切换文档的时候还是会展示在文档上"
+   *
+   * 实测（复现）：
+   * ```
+   * 高亮后:     annotations=1  selectionLayer=1  nativeSel=11  pages=18
+   * 切换文档后: annotations=1  selectionLayer=1  nativeSel=11  pages=3   ← ❌ 全都还在
+   * ```
+   *
+   * ### 为什么高亮也残留
+   *
+   * 高亮是**受控**的（`highlights` 是宿主的 prop）
+   * → 宿主不换 `highlights`，包就一直渲染旧高亮 → **这是设计如此，不是 bug**。
+   * → 但**选区**（自绘块 / 浮层 / 原生选区）是**包内部状态** → **必须清**。
+   *
+   * ⚠️ **依赖用 `documentId` + `file`**，不要用 `data`：
+   *    `data` 是 `Uint8Array`，每次都是新引用 → 会误触发（每次重渲染都清一遍）。
+   *
+   * ⚠️⚠️ **依赖里不能用 `textSelection` 对象**！
+   *    `useTextSelection` 每次渲染都返回**新对象** → 依赖永远变
+   *    → effect 每次渲染都跑 → setState → 重渲染 → **无限循环**
+   *    （实测报 "Maximum update depth exceeded"）。
+   *    → 依赖**具体的函数**（它们是稳定的 useCallback）。
+   */
+  const { clearNativeSelection, clearState } = textSelection;
+
+  useEffect(() => {
+    // 浏览器原生选区
+    clearNativeSelection();
+    // 包内的选区状态（不通知宿主）
+    clearState();
+    // 自绘的蓝色选区块
+    setSelectionShapes(new Map());
+    // 浮层
+    setPopoverOpen(false);
+    setPopoverAnchor(null);
+    setCurrentSelection(null);
+    setHighlightPopover(null);
+    // 激活的高亮（蓝框）
+    setActiveHighlightId(null);
+    // 搜索
+    setSearchHits([]);
+    setActiveSearchIndex(0);
+    setSearchOpen(false);
+    // 滚动位置回到顶部
+    // ⚠️ jsdom 里 `scrollTo` 不存在 → 要防御（否则 SSR / 单测直接崩）
+    const container = containerRef.current;
+    if (container && typeof container.scrollTo === 'function') {
+      container.scrollTo({ top: 0 });
+    }
+    // ⚠️ `documentId` / `file` 只作为**触发器**（ biome 要求在体内引用）
+    void documentId;
+    void file;
+  }, [documentId, file, clearNativeSelection, clearState]);
+
   /**
    * 卸载时清理定时器。
    */

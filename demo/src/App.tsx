@@ -13,7 +13,14 @@ import type {
   PdfViewerHandle,
   SelectionData,
 } from '@scholar-club/pdf-viewer';
-import { PdfSearch, PdfViewer } from '@scholar-club/pdf-viewer';
+import {
+  downloadFile,
+  exportHighlights,
+  PdfSearch,
+  PdfViewer,
+  parseHighlightDoc,
+  stringifyHighlightDoc,
+} from '@scholar-club/pdf-viewer';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import * as pdfjs from 'pdfjs-dist';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -54,8 +61,39 @@ export default function App() {
    */
   const viewerRef = useRef<PdfViewerHandle>(null);
 
-  /** 高亮（受控状态 —— 宿主的数据） */
-  const [highlights, setHighlights] = useState<HighlightRecord[]>([]);
+  /**
+   * **当前文档 id**（高亮按文档隔离的 key）。
+   *
+   * ⚠️ **切换文档时高亮要重置**（用户要求）。
+   * → 高亮按 `documentId` 分开存 → 切文档时自动切到对应的那份。
+   */
+  const [documentId, setDocumentId] = useState('local');
+
+  /**
+   * 高亮（受控状态 —— 宿主的数据）。
+   *
+   * ⚠️ **按文档隔离**（用户要求"切换文档时高亮要重置"）。
+   * → `documentId → 高亮列表` → 切文档时自动切到对应的那份。
+   * → 切回原来的文档，高亮还在（比"直接清空"更友好）。
+   */
+  const [highlightsByDoc, setHighlightsByDoc] = useState<Record<string, HighlightRecord[]>>({});
+
+  /** 当前文档的高亮（传给包的） */
+  const highlights = useMemo(
+    () => highlightsByDoc[documentId] ?? [],
+    [highlightsByDoc, documentId],
+  );
+
+  /** 更新当前文档的高亮 */
+  const setHighlights = useCallback(
+    (updater: (prev: HighlightRecord[]) => HighlightRecord[]) => {
+      setHighlightsByDoc((prevByDoc) => {
+        const current = prevByDoc[documentId] ?? [];
+        return { ...prevByDoc, [documentId]: updater(current) };
+      });
+    },
+    [documentId],
+  );
 
   /** 当前选中的高亮颜色 key（宿主的 UI 状态） */
   const [highlightColor, setHighlightColor] = useState('yellow');
@@ -113,11 +151,18 @@ export default function App() {
       }
       setSampleUrl('/samples/local.pdf');
       setSampleLabel('本地真实文档');
+      // ⚠️ **换文档 → 换 documentId** → 高亮按文档隔离（切回原来的文档还在）
+      setDocumentId('local');
       return true;
     } catch {
       return false;
     }
   }, []);
+
+  /** 重新载入本地真实文档（切回原文档） */
+  const reloadLocal = useCallback(() => {
+    void loadLocal();
+  }, [loadLocal]);
 
   /** 生成样张 PDF（3 页，带文字，便于测试选中/搜索） */
   const createSample = useCallback(async () => {
@@ -129,6 +174,8 @@ export default function App() {
     ) as ArrayBuffer;
     setSampleUrl(URL.createObjectURL(new Blob([buffer], { type: 'application/pdf' })));
     setSampleLabel('内置样张（3 页）');
+    // ⚠️ **换文档 → 换 documentId** → 高亮按文档隔离（切回原来的文档还在）
+    setDocumentId('sample');
   }, []);
 
   // 启动时优先加载本地真实文档
@@ -469,20 +516,23 @@ export default function App() {
   }, []);
 
   /** 新建高亮（宿主保存） */
-  const handleHighlightCreate = useCallback((highlight: NewHighlight) => {
-    highlightSeq += 1;
-    setHighlights((prev) => [
-      ...prev,
-      {
-        id: `h-${highlightSeq}`,
-        color: highlight.color ?? 'label-6',
-        selectedText: highlight.selectedText,
-        position: highlight.position,
-        source: 'my',
-        createdAt: Date.now(),
-      },
-    ]);
-  }, []);
+  const handleHighlightCreate = useCallback(
+    (highlight: NewHighlight) => {
+      highlightSeq += 1;
+      setHighlights((prev) => [
+        ...prev,
+        {
+          id: `h-${highlightSeq}`,
+          color: highlight.color ?? 'label-6',
+          selectedText: highlight.selectedText,
+          position: highlight.position,
+          source: 'my',
+          createdAt: Date.now(),
+        },
+      ]);
+    },
+    [setHighlights],
+  );
 
   /**
    * 宿主自己创建高亮的**统一入口**（工具栏插槽按钮用）。
@@ -502,51 +552,151 @@ export default function App() {
   );
 
   /** 换高亮的颜色（宿主实现 —— 包只抛事件） */
-  const handleHighlightColorChange = useCallback((id: string, color: string) => {
-    setHighlights((prev) => prev.map((h) => (h.id === id ? { ...h, color } : h)));
-    setHint(`已换色（${color}）`);
-  }, []);
+  const handleHighlightColorChange = useCallback(
+    (id: string, color: string) => {
+      setHighlights((prev) => prev.map((h) => (h.id === id ? { ...h, color } : h)));
+      setHint(`已换色（${color}）`);
+    },
+    [setHighlights],
+  );
 
   /** 删除高亮（宿主实现） */
-  const handleHighlightRemove = useCallback((id: string) => {
-    setHighlights((prev) => prev.filter((h) => h.id !== id));
-    setHint('已删除高亮');
-  }, []);
+  const handleHighlightRemove = useCallback(
+    (id: string) => {
+      setHighlights((prev) => prev.filter((h) => h.id !== id));
+      setHint('已删除高亮');
+    },
+    [setHighlights],
+  );
+
+  /**
+   * **导出高亮**（JSON 文件）。
+   *
+   * ⚠️ **包只给格式，存储是宿主的事** → 换后端不用改包。
+   */
+  const handleExportHighlights = useCallback(() => {
+    const doc = exportHighlights(documentId, highlights);
+    downloadFile(stringifyHighlightDoc(doc), `highlights-${documentId}.json`, 'application/json');
+    setHint(`已导出 ${highlights.length} 条高亮`);
+  }, [documentId, highlights]);
+
+  /**
+   * **导入高亮**（JSON 文件）。
+   *
+   * ⚠️ 导入的数据可能来自外部 → 用包的 `parseHighlightDoc`（**带校验，永不抛异常**）。
+   */
+  const handleImportHighlights = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      void file.text().then((text) => {
+        const doc = parseHighlightDoc(text);
+        if (!doc) {
+          setHint('导入失败：文件格式不对');
+          return;
+        }
+        setHighlights((prev) => [...prev, ...(doc.highlights as HighlightRecord[])]);
+        setHint(`已导入 ${doc.highlights.length} 条高亮`);
+      });
+    };
+    input.click();
+  }, [setHighlights]);
+
+  /**
+   * **下载 PDF**。
+   *
+   * ⚠️ 包**不负责取文件**（文件是宿主的）→ 只提供 `downloadFile` 这个纯 DOM 工具。
+   */
+  const handleDownloadPdf = useCallback(() => {
+    if (!sampleUrl) {
+      setHint('没有可下载的文档');
+      return;
+    }
+    void fetch(sampleUrl)
+      .then((r) => r.blob())
+      .then((blob) => {
+        downloadFile(blob, `${documentId}.pdf`, 'application/pdf');
+        setHint('已下载 PDF');
+      })
+      .catch(() => setHint('下载失败'));
+  }, [sampleUrl, documentId]);
 
   /** 工具栏插槽（宿主塞自己的按钮 —— 证明包不需要业务入口） */
   const toolbarSlot = useMemo(
     () => (
-      <button
-        type="button"
-        className="scpdf-toolbar__btn"
-        onClick={() => {
-          if (!selection) {
-            setHint('请先在页面里选中一段文字');
-            return;
-          }
-          /*
-           * ⚠️ **走 `onHighlightCreate`** → 包会顺带清掉选区。
-           *
-           * 直接调 `handleHighlightCreate` 的话，包不知道"高亮做完了"
-           * → 选区的蓝色块一直浮在新高亮上（用户反馈"无法取消选中状态"）。
-           */
-          createHighlight(highlightColor, selection.text, selection.norm);
-          setHint('已添加高亮（宿主自存，包不碰后端）');
-          /*
-           * ⚠️ **告诉包"高亮做完了"** → 包清掉选区。
-           *
-           * 不清的话：选区的蓝色块一直浮在新高亮上
-           *（用户反馈"点击高亮之后 无法取消选中状态 一直都有外边框"）。
-           */
-          viewerRef.current?.clearSelection();
-        }}
-        title="添加高亮"
-        aria-label="添加高亮"
-      >
-        +
-      </button>
+      <>
+        <button
+          type="button"
+          className="scpdf-toolbar__btn"
+          onClick={() => {
+            if (!selection) {
+              setHint('请先在页面里选中一段文字');
+              return;
+            }
+            /*
+             * ⚠️ **走 `onHighlightCreate`** → 包会顺带清掉选区。
+             *
+             * 直接调 `handleHighlightCreate` 的话，包不知道"高亮做完了"
+             * → 选区的蓝色块一直浮在新高亮上（用户反馈"无法取消选中状态"）。
+             */
+            createHighlight(highlightColor, selection.text, selection.norm);
+            setHint('已添加高亮（宿主自存，包不碰后端）');
+            /*
+             * ⚠️ **告诉包"高亮做完了"** → 包清掉选区。
+             *
+             * 不清的话：选区的蓝色块一直浮在新高亮上
+             *（用户反馈"点击高亮之后 无法取消选中状态 一直都有外边框"）。
+             */
+            viewerRef.current?.clearSelection();
+          }}
+          title="添加高亮"
+          aria-label="添加高亮"
+        >
+          +
+        </button>
+
+        <button
+          type="button"
+          className="scpdf-toolbar__btn"
+          onClick={handleExportHighlights}
+          title="导出高亮（JSON）"
+          aria-label="导出高亮"
+        >
+          ⤓
+        </button>
+
+        <button
+          type="button"
+          className="scpdf-toolbar__btn"
+          onClick={handleImportHighlights}
+          title="导入高亮（JSON）"
+          aria-label="导入高亮"
+        >
+          ⤒
+        </button>
+
+        <button
+          type="button"
+          className="scpdf-toolbar__btn"
+          onClick={handleDownloadPdf}
+          title="下载 PDF"
+          aria-label="下载 PDF"
+        >
+          ⭳
+        </button>
+      </>
     ),
-    [selection, highlightColor, createHighlight],
+    [
+      selection,
+      highlightColor,
+      createHighlight,
+      handleExportHighlights,
+      handleImportHighlights,
+      handleDownloadPdf,
+    ],
   );
 
   return (
@@ -565,6 +715,9 @@ export default function App() {
         <strong>@scholar-club/pdf-viewer</strong>
         <button type="button" className="scpdf-btn" onClick={createSample}>
           载入内置样张
+        </button>
+        <button type="button" className="scpdf-btn" onClick={reloadLocal}>
+          载入本地真实文档
         </button>
         {sampleUrl ? (
           <span>
@@ -595,6 +748,7 @@ export default function App() {
         <PdfViewer
           ref={viewerRef}
           file={sampleUrl}
+          documentId={documentId}
           highlights={highlights}
           highlightPalette={highlightPalette}
           toolbar={{ rightSlot: toolbarSlot }}
