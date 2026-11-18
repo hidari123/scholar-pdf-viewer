@@ -2328,3 +2328,25 @@ pnpm demo            → http://127.0.0.1:5180
 pnpm e2e:all         → 目标 http://127.0.0.1:5180
                         16 套 181/181 断言通过（0 个套件失败）
 ```
+
+### 追加：修"Vite 预打包缓存过期导致 demo 白屏"
+
+启动 demo 时发现**白屏 + 500**：
+
+```
+Failed to resolve import "@scholar-club/pdf-viewer/styles.css" from "src/App.tsx"
+```
+
+**根因**：demo 消费的是**包的 `dist/`**（workspace 软链）。
+在 demo **运行期间**执行 `pnpm build`（`dist/` 被删了重建）
+→ Vite 的**预打包缓存**失效 → 之后所有请求都报"解析不了"。
+
+（迷惑点：`require.resolve` 在 Node 侧是**能**解析的
+→ 看起来像"文件不存在"，其实是 Vite 的预打包缓存过期了。）
+
+**修法（两处）**：
+
+1. `demo/vite.config.ts` 加 `optimizeDeps.exclude: ['@scholar-club/pdf-viewer']`
+   → Vite **按源码直接服务** workspace 包 → dist 重建后不需要重启
+2. `scripts/demo.mjs` **先构建包再起服务**
+   → 每次 `pnpm demo` 都保证 `dist/` 是最新的

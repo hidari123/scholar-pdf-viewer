@@ -23,7 +23,7 @@
  *    然后**重启** demo（Vite 会缓存 workspace 依赖）。
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +34,27 @@ const DEMO_URL = `http://127.0.0.1:${DEMO_PORT}`;
 
 console.log(`[demo] 固定端口 ${DEMO_PORT} → ${DEMO_URL}`);
 console.log('[demo] 停止服务：Ctrl+C');
+console.log('');
+
+/*
+ * ⚠️ **先构建包**（demo 消费的是 `dist/`）。
+ *
+ * 不构建的话，如果 `dist/` 不存在或过期，demo 会白屏 / 报
+ * "Failed to resolve import @scholar-club/pdf-viewer/styles.css"。
+ *
+ * → 每次起 demo 都保证 `dist/` 是最新的。
+ */
+console.log('[demo] 构建包（dist/）…');
+const build = spawnSync('pnpm', ['build'], {
+  cwd: root,
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+});
+if (build.status !== 0) {
+  console.error('[demo] 构建失败 → 退出');
+  process.exit(build.status ?? 1);
+}
+console.log('[demo] 构建完成');
 console.log('');
 
 const child = spawn('pnpm', ['--filter', '@scholar-club/pdf-viewer-demo', 'dev'], {
