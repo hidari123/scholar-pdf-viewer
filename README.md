@@ -290,25 +290,68 @@ if (isRetryable(error)) showRetryButton();
 ```sh
 pnpm install
 pnpm verify        # 8 门禁：lint + typecheck + test + build + demo:typecheck + size + publint + attw
-pnpm demo          # 启动 demo（消费 dist 产物，真实消费者路径）
-pnpm e2e           # E2E（需先 pnpm e2e:serve）
+pnpm demo          # 启动 demo → http://127.0.0.1:5180（固定端口）
+pnpm e2e:all      # 全部 E2E（需先 pnpm demo）
 ```
 
-E2E 脚本（11 套，96 项断言）：
+### 启动（固定端口 5180）
 
-| 脚本            | 验证内容                                          |
-| --------------- | ------------------------------------------------- |
-| `e2e`           | 渲染 / 缩放 / 跳页 / 页码                         |
-| `e2e:text`      | 文本层渲染与对齐                                  |
-| `e2e:panels`    | 缩略图 / 目录 / 搜索三个面板                      |
-| `e2e:links`     | 链接层（XSS 过滤 / 位置 / 点击）                  |
-| `e2e:selection` | **选区精准度**（scaleX 生效 / 起点 Δ / 整页不丢） |
-| `e2e:selection` | **选区稳定性**（跨页 + 缩放不崩 / 哨兵不搬家）    |
-| `e2e:selection` | **选区浮层**（定位 / 翻转 / clamp / 关闭 / 色板） |
-| `e2e:highlight` | **高亮效果**（逐行对齐 Δ=0 / 不遮挡 / 样式）      |
-| `e2e:zoom`      | **缩放**（整十比例 / 左上角锚点 / 无白屏）        |
-| `e2e:search`    | **搜索高亮**（命中矩形 / 落在文字上 / 跳转）      |
-| `e2e:thumbnail` | **缩略图**（零错位 / DPR / 无变形）               |
+demo 的地址**永远是** <http://127.0.0.1:5180>。
+
+| 方式       | 命令              | 地址                             |
+| ---------- | ----------------- | -------------------------------- |
+| 开发服务器 | `pnpm demo`       | <http://127.0.0.1:5180>          |
+| 构建静态站 | `pnpm demo:build` | `demo/dist/`（用任意静态服务器） |
+
+> **端口为什么固定**：`demo/vite.config.ts` 里 `server.port = 5180` +
+> `strictPort: true`。
+> `strictPort` 的作用是：端口被占用时**直接报错**，而不是像 Vite 默认那样
+> **偷偷往后找一个**（5180 → 5181 → 5182 …）—— 那正是之前每次地址都不同的原因。
+>
+> 端口被占用时先关掉旧进程：
+> ```sh
+> # Windows
+> netstat -ano | findstr :5180
+> taskkill /PID <pid> /F
+> ```
+
+### E2E
+
+所有 E2E 脚本共用 `scripts/e2e-base.mjs` 里的**同一个基址**
+（默认 <http://127.0.0.1:5180>），**不需要手动设 `E2E_BASE_URL`**：
+
+```sh
+pnpm demo        # 另开一个终端起 demo
+pnpm e2e:all     # 跑全部 16 套
+pnpm e2e         # 只跑冒烟
+```
+
+E2E 脚本（16 套，181 项断言）：
+
+| 脚本                    | 验证内容                                          |
+| ----------------------- | ------------------------------------------------- |
+| `e2e`                   | 渲染 / 缩放 / 跳页 / 页码                         |
+| `e2e:text`              | 文本层渲染与对齐                                  |
+| `e2e:panels`            | 缩略图 / 目录 / 搜索三个面板                      |
+| `e2e:links`             | 链接层（XSS 过滤 / 位置 / 点击）                  |
+| `e2e:selection`         | **选区精准度**（scaleX 生效 / 起点 Δ / 整页不丢） |
+| `e2e:selection:stable`  | **选区稳定性**（跨页 + 缩放不崩 / 哨兵不搬家）    |
+| `e2e:selection:popover` | **选区浮层**（定位 / 翻转 / clamp / 关闭 / 色板） |
+| `e2e:selection:shape`   | **选区形状**（碎矩形合并 / 基线裁剪）             |
+| `e2e:highlight`         | **高亮效果**（逐行对齐 Δ=0 / 不遮挡 / 样式）      |
+| `e2e:zoom`              | **缩放**（整十比例 / 左上角锚点 / 无白屏）        |
+| `e2e:search`            | **搜索高亮**（命中矩形 / 落在文字上 / 跳转）      |
+| `e2e:thumbnail`         | **缩略图**（零错位 / DPR / 无变形）               |
+| `e2e:all`               | 上面全部（汇总）                                  |
+
+另外还有几个回归套件（也走同一个基址）：
+
+| 脚本                       | 验证内容                                           |
+| -------------------------- | -------------------------------------------------- |
+| `e2e-selection-regression` | 跨行选区回归（Δtop / 高度比 / 缩放后仍对齐）       |
+| `e2e-popover-anchor`       | 浮层锚定回归（缩放 / 滚动 / 拖动中）               |
+| `e2e-selection-perf`       | 选区性能（满帧 / 浮层延迟）                        |
+| `e2e-zoom-matrix`          | **全缩放矩阵**（6 档 × 选区 / 高亮 / 性能 / 浮层） |
 
 本地放一份真实 PDF 到 `demo/public/samples/local.pdf` 即可用真实文档测（不入库）。
 

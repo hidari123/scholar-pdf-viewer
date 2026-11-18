@@ -1,3 +1,4 @@
+import { E2E_BASE_URL } from './e2e-base.mjs';
 /**
  * E2E：选区精准性验证（对齐 pdf.js 的做法）。
  *
@@ -28,7 +29,7 @@ function resolveChromium() {
   return undefined;
 }
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:5187';
+const BASE = E2E_BASE_URL;
 const results = [];
 function check(name, ok, detail = '') {
   results.push({ name, ok });

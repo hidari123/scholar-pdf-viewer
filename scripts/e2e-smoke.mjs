@@ -1,3 +1,4 @@
+import { E2E_BASE_URL } from './e2e-base.mjs';
 /**
  * E2E 冒烟：真实浏览器里验证包的核心行为。
  *
@@ -13,7 +14,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 
-const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:5180';
+const BASE_URL = E2E_BASE_URL;
 const SHOT_DIR = 'e2e-shots';
 
 /**

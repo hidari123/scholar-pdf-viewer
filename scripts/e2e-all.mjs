@@ -3,14 +3,15 @@
  *
  * 用法：
  * ```sh
- * pnpm e2e:all              # 默认 http://localhost:5181
- * E2E_BASE_URL=http://localhost:5191 pnpm e2e:all
+ * pnpm demo        # 先起 demo（固定端口 5180）
+ * pnpm e2e:all     # 跑全部（默认 http://127.0.0.1:5180）
  * ```
  *
  * ⚠️ 跑之前必须：`pnpm build`（demo 消费 dist）+ 启动 demo。
  */
 
 import { spawnSync } from 'node:child_process';
+import { E2E_BASE_URL } from './e2e-base.mjs';
 
 /** 所有 E2E 脚本 */
 const suites = [
@@ -32,7 +33,7 @@ const suites = [
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 
-const baseUrl = process.env.E2E_BASE_URL ?? 'http://localhost:5181';
+const baseUrl = E2E_BASE_URL;
 console.log(`[e2e:all] 目标 ${baseUrl}\n`);
 
 const summary = [];

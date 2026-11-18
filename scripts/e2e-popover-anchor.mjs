@@ -1,3 +1,4 @@
+import { E2E_BASE_URL } from './e2e-base.mjs';
 /**
  * E2E：浮层**锚定**回归。
  *
@@ -33,7 +34,7 @@ function resolveChromium() {
   return undefined;
 }
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:5200';
+const BASE = E2E_BASE_URL;
 const results = [];
 function check(name, ok, detail = '') {
   results.push({ name, ok });

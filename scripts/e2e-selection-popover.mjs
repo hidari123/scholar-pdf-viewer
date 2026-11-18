@@ -1,3 +1,4 @@
+import { E2E_BASE_URL } from './e2e-base.mjs';
 /**
  * E2E：选区浮层（选中文字后的操作条）。
  *
@@ -30,7 +31,7 @@ function resolveChromium() {
   return undefined;
 }
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:5198';
+const BASE = E2E_BASE_URL;
 const results = [];
 function check(name, ok, detail = '') {
   results.push({ name, ok });

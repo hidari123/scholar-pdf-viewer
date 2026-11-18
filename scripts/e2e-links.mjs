@@ -1,3 +1,4 @@
+import { E2E_BASE_URL } from './e2e-base.mjs';
 /**
  * E2E: link layer + password dialog.
  *
@@ -25,7 +26,7 @@ function resolveChromium() {
   return undefined;
 }
 
-const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:5181';
+const BASE_URL = E2E_BASE_URL;
 const results = [];
 function check(name, ok, detail = '') {
   results.push({ name, ok });
