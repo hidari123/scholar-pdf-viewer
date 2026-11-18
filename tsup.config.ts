@@ -14,5 +14,6 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   // 边界线：这些是"我的依赖"，不进产物，由消费方的包管理器解析
-  external: ['pdfjs-dist', 'idb'],
+  // ⚠️ `pdf-lib` 是**可选依赖**（动态 import）→ 也不能进产物
+  external: ['pdfjs-dist', 'idb', 'pdf-lib'],
 });

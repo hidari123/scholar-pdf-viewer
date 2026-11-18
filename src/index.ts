@@ -21,6 +21,19 @@ export * from './components';
 export { downloadFile } from './core/document/download';
 export type { PdfViewerError, PdfViewerErrorCode } from './core/errors';
 export { isRetryable, pdfViewerError } from './core/errors';
+export type {
+  ExportHighlightedPdfOptions,
+  ExportHighlightLike,
+  PageSizePt,
+} from './core/export/export-pdf';
+/*
+ * ---------- 导出带高亮的 PDF ----------
+ *
+ * ⚠️ **pdf-lib 是"可选依赖"**（optional peerDependency）
+ * → 不用导出的宿主：不用装（那段代码不会被打包进去）
+ * → 用导出的宿主：`npm i pdf-lib`
+ */
+export { colorToRgb, exportHighlightedPdf } from './core/export/export-pdf';
 export type { PdfAnnot, PdfBbox } from './core/highlight/annotations';
 export {
   highlightsToPdfAnnots,

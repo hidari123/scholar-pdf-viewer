@@ -115,6 +115,21 @@ export interface PdfViewerHandle {
   getCurrentPage: () => number;
   /** 总页数 */
   getNumPages: () => number;
+  /**
+   * 每页的**点尺寸**（72dpi，如 A4 = 595 × 842）。
+   *
+   * ⚠️ **导出带高亮的 PDF 时需要它**（归一化坐标 → PDF 点坐标要按页尺寸换算）。
+   *
+   * @example
+   * ```ts
+   * const bytes = await exportHighlightedPdf({
+   *   pdfBytes,
+   *   highlights,
+   *   pageSizesPt: viewerRef.current.getPageSizesPt(),
+   * });
+   * ```
+   */
+  getPageSizesPt: () => { width: number; height: number }[];
   /** 跳到某页 */
   goToPage: (page: number) => void;
 }
@@ -1596,12 +1611,14 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       },
       getCurrentPage: () => page,
       getNumPages: () => numPages,
+      getPageSizesPt: () => pageSizesPt.map((size) => ({ ...size })),
       goToPage: (target: number) => scrollToPage(target),
     }),
     [
       textSelection,
       page,
       numPages,
+      pageSizesPt,
       scrollToPage,
       onHighlightCreated,
       onHighlightCreate,

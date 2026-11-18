@@ -34,6 +34,7 @@ const suites = [
   { name: '侧栏开合时自动重适配', file: 'e2e-sidebar-fit.mjs' },
   { name: '多行选择的覆盖率', file: 'e2e-selection-coverage.mjs' },
   { name: '跨页选择', file: 'e2e-cross-page-selection.mjs' },
+  { name: '导出带高亮的 PDF', file: 'e2e-export-pdf.mjs' },
   { name: '缩放矩阵（选区/高亮/性能）', file: 'e2e-zoom-matrix.mjs' },
   { name: '高亮效果', file: 'e2e-highlight.mjs' },
   { name: '缩放行为', file: 'e2e-zoom.mjs' },

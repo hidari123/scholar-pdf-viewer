@@ -114,7 +114,7 @@ try {
     });
 
     console.log(
-      `  选中 ${r.textLen} 字；` + r.perPage.map((p) => `第 ${p.page} 页 ${p.n} 个矩形`).join('，'),
+      `  选中 ${r.textLen} 字；${r.perPage.map((p) => `第 ${p.page} 页 ${p.n} 个矩形`).join('，')}`,
     );
 
     check('浏览器选中了文字', r.textLen > 10, `${r.textLen} 字`);

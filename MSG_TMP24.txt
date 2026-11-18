@@ -1,0 +1,106 @@
+feat(export): 导出带高亮的 PDF（真正的 PDF 批注，不是 JSON）
+
+用户反馈："导出高亮我的意思是直接导出带高亮的pdf不是导出json"
+
+## 做了什么
+
+新增 `core/export/export-pdf.ts`：
+
+```ts
+const bytes = await exportHighlightedPdf({
+  pdfBytes,        // 原始 PDF 的字节
+  highlights,      // 高亮列表
+  pageSizesPt,     // 每页的点尺寸（viewer.getPageSizesPt()）
+});
+download(new Blob([bytes], { type: 'application/pdf' }), 'annotated.pdf');
+```
+
+写的是**真正的 PDF 高亮批注**（`/Subtype /Highlight`）：
+- Acrobat / Preview / Chrome / Edge 打开 → **能看到彩色高亮**
+- 批注里带原文（`/Contents`）→ 点开能看到文字
+- 是**标准 PDF 特性** → 别的软件也认
+
+## 关键设计：pdf-lib 是**可选依赖**
+
+包的边界（v2 原则）：**只做 PDF 相关的、纯前端的事**。
+但"写 PDF 文件"需要 PDF 读写库 —— 大多数宿主**用不到**导出。
+
+- `pdf-lib` → **optional peerDependency** + **动态 import**
+- 不用导出的宿主：**不用装**（那段代码不会被打包进去 → 0 体积）
+- 用导出的宿主：`npm i pdf-lib`
+- 宿主也可以自己传：`exportHighlightedPdf({ pdfLib })`
+
+## 踩的坑（都记在代码注释里）
+
+### 坑 1：`setAnnots` 的高层对象**没有 `QuadPoints` 字段**
+
+```ts
+// ❌ 不行
+page.node.setAnnots([{ subtype: 'Highlight', rect, color, opacity, contents }]);
+page.node.setRectangle('QuadPoints', quadPoints);   // ← 还写到"页"上了！
+```
+
+`/QuadPoints` **必须挂在批注上**（不是页上）。
+→ 解法：**用 pdf-lib 的底层 API 手写批注字典**
+（`PDFDict` → `set(...)` → `context.obj()` → `context.register()` → 挂进页的 `/Annots`）。
+
+### 坑 2：pdf-lib 的 `PDFArray.push()` **只接受一个参数**
+
+```js
+PDFArray.prototype.push = function (object) { ... }   // ← 只有 1 个形参
+```
+
+→ `push(a, b, c, d)` **只 push 了第一个** → 数组里只有 1 个元素
+→ 读回来是 `[ 10 ]` → `asRectangle()` 报错：
+```
+Attempted to convert PDFArray with 1 elements to rectangle, but must have exactly 4 elements.
+```
+
+→ 必须**一个一个 push**。
+
+### 坑 3：数组必须先 `context.register()` 再 `set`
+
+`dict.set(key, array)` 会把数组**当成一个普通对象**再包一层
+→ 读回来是"1 个元素的数组"
+
+→ 正确做法：`context.register(array)` → `PDFRef` → 再 set。
+
+### 坑 4：`Uint8Array` 可能是**更大的 buffer 的一段**
+
+→ 必须 `buffer.slice(byteOffset, byteOffset + byteLength)` 再传给 pdf-lib
+（否则会把整个底层 buffer 传进去 → 加载失败）。
+
+## 顺带加的
+
+- `PdfViewerHandle.getPageSizesPt()` → 宿主导出时需要**每页的点尺寸**
+  （归一化坐标 → PDF 点坐标要按页尺寸换算）
+- demo 加了"导出带高亮的 PDF"按钮（**宿主侧**完整接线示例）
+
+## 回归测试
+
+**单测**（`src/core/export/export-pdf.test.ts`，9 项）：
+
+- 颜色映射（语义色 / `#rrggbb` / `#rgb` / 未知色兜底）
+- 没有高亮 → 原样返回（不调 pdf-lib）
+- pdf-lib 不可用 → 可读的错误
+- **`Uint8Array` 是大 buffer 的一段 → 只切自己的部分**
+- **真 pdf-lib 往返**：造 PDF → 导出 → 读回来 → 断言
+  `/Subtype /Highlight` ✓、`/QuadPoints` 16 个数（2 行）✓、
+  `/Rect` = `[10, 740, 110, 780]` ✓
+
+**E2E**（`scripts/e2e-export-pdf.mjs`，9 项）：
+
+- 加一条高亮 → 点"导出带高亮的 PDF" → **真的下载了 .pdf**
+- 是合法 PDF（`%PDF-1.7` 头）
+- **用 pdf-lib 读回来 → 有 `/Subtype /Highlight` 批注**
+- 批注带 `/QuadPoints`（每行 8 个数）
+- 批注带 `/Contents`（原文）
+
+⚠️ **E2E 不能只搜原始字节** —— 真实 PDF 用**对象流压缩** → 批注在压缩流里
+→ 搜不到 `/Highlight` → 必须用 pdf-lib 读回来看。
+
+## 验证
+
+- `pnpm verify`: **8/8 全绿**
+- `pnpm test`: **416 passed**
+- E2E: **294/295**（唯一失败是**基线同样失败**的面板开合定位）

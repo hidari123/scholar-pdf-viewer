@@ -17,6 +17,7 @@ import type {
 } from '@scholar-club/pdf-viewer';
 import {
   downloadFile,
+  exportHighlightedPdf,
   exportHighlights,
   PdfSearch,
   PdfViewer,
@@ -667,6 +668,42 @@ export default function App() {
       .catch(() => setHint('下载失败'));
   }, [sampleUrl, documentId]);
 
+  /**
+   * **导出带高亮的 PDF**。
+   *
+   * ⚠️ **包只给"纯函数 + 可选依赖"**：
+   * - `exportHighlightedPdf`（包）→ 算好批注 + 用 pdf-lib 写文件
+   * - `pdf-lib` 是**可选 peerDependency** → 宿主自己装（`npm i pdf-lib`）
+   * - 取原始文件、触发下载 → **宿主的事**（包不碰网络）
+   */
+  const handleExportAnnotatedPdf = useCallback(() => {
+    if (!sampleUrl) {
+      setHint('没有可导出的文档');
+      return;
+    }
+    setHint('正在导出带高亮的 PDF…');
+    void fetch(sampleUrl)
+      .then((r) => r.arrayBuffer())
+      .then((buffer) =>
+        exportHighlightedPdf({
+          pdfBytes: buffer,
+          highlights,
+          pageSizesPt: viewerRef.current?.getPageSizesPt() ?? [],
+        }),
+      )
+      .then((bytes) => {
+        downloadFile(
+          new Blob([bytes as BlobPart], { type: 'application/pdf' }),
+          `${documentId}-annotated.pdf`,
+          'application/pdf',
+        );
+        setHint(`已导出带高亮的 PDF（${highlights.length} 条高亮）`);
+      })
+      .catch((error: unknown) => {
+        setHint(`导出失败：${error instanceof Error ? error.message : String(error)}`);
+      });
+  }, [sampleUrl, documentId, highlights]);
+
   /** 工具栏插槽（宿主塞自己的按钮 —— 证明包不需要业务入口） */
   const toolbarSlot = useMemo(
     () => (
@@ -710,6 +747,22 @@ export default function App() {
           ⤓
         </button>
 
+        {/*
+        **导出带高亮的 PDF**（不是 JSON）。
+
+        ⚠️ `pdf-lib` 是**可选 peerDependency** → 宿主自己装（demo 里装了）。
+        → 包只给纯函数 + 坐标换算；取文件 / 触发下载是宿主的事。
+        */}
+        <button
+          type="button"
+          className="scpdf-toolbar__btn"
+          onClick={handleExportAnnotatedPdf}
+          title="导出带高亮的 PDF"
+          aria-label="导出带高亮的 PDF"
+        >
+          ⤓ᴾ
+        </button>
+
         <button
           type="button"
           className="scpdf-toolbar__btn"
@@ -731,7 +784,14 @@ export default function App() {
         </button>
       </>
     ),
-    [selection, highlightColor, handleExportHighlights, handleImportHighlights, handleDownloadPdf],
+    [
+      selection,
+      highlightColor,
+      handleExportHighlights,
+      handleImportHighlights,
+      handleDownloadPdf,
+      handleExportAnnotatedPdf,
+    ],
   );
 
   return (

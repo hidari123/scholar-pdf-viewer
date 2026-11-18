@@ -14,6 +14,9 @@
  * PDF 的坐标系：**72dpi，原点在左下、y 向上**。
  * 我们的归一化坐标是**视口 px、原点在左上、y 向下**。
  * → 需要翻转变换。
+ *
+ * ⚠️ **真正"写文件"的实现**在 `core/export/export-pdf.ts`
+ *    （`exportHighlightedPdf`，pdf-lib 是**可选依赖**）。
  */
 
 /** PDF 点坐标 bbox：[x1, y1, x2, y2]（原点在左下、y 向上） */
@@ -32,7 +35,7 @@ export interface PdfAnnot {
 }
 
 /** 归一化矩形的最小形状 */
-interface NormRectLike {
+export interface NormRectLike {
   x1: number;
   y1: number;
   x2: number;
@@ -45,14 +48,14 @@ interface NormRectLike {
 }
 
 /** 归一化位置的最小形状 */
-interface NormPositionLike {
+export interface NormPositionLike {
   boundingRect: NormRectLike;
   rects: NormRectLike[];
   pageNumber: number;
 }
 
 /** 高亮的最小形状 */
-interface HighlightLike {
+export interface HighlightLike {
   id: string;
   color: string;
   selectedText: string;

@@ -10,6 +10,7 @@ export * from './annotation';
 export * from './cache';
 export * from './document';
 export * from './errors';
+export * from './export';
 export * from './geometry';
 export * from './highlight';
 export * from './outline';
