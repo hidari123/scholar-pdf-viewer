@@ -7,7 +7,11 @@
  */
 
 import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+
+/** 包根目录（demo 是 workspace 成员 → 父目录就是包本体） */
+const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
@@ -32,26 +36,39 @@ export default defineConfig({
     port: 5180,
     strictPort: true,
   },
+  resolve: {
+    /*
+     * ⚠️⚠️ **必须显式 alias 样式入口**。
+     *
+     * ## 现象
+     *
+     * demo 消费的是**包的 `dist/`**（workspace 软链）。
+     * `import "@scholar-club/pdf-viewer/styles.css"` 走的是 package.json 的
+     * **exports 子路径** → Vite 解析不到 → 500：
+     *
+     * ```
+     * Failed to resolve import "@scholar-club/pdf-viewer/styles.css" from "src/App.tsx"
+     * ```
+     *
+     * ## 为什么 `optimizeDeps.exclude` 不管用
+     *
+     * `exclude` 只影响 **JS 依赖的预打包**，对 **CSS 子路径导出**无效
+     * → 解析阶段就失败了，根本走不到预打包那一步。
+     *
+     * 而且现象很迷惑：`require.resolve()` 在 Node 侧**能**解析
+     * （`dist/styles.css` 明明存在）→ 看起来像"文件不见了"。
+     *
+     * ## 修法
+     *
+     * 直接 alias 到**文件路径** → Vite 按普通 CSS 文件处理，不走 exports 解析。
+     */
+    alias: {
+      '@scholar-club/pdf-viewer/styles.css': `${packageRoot}dist/styles.css`,
+    },
+  },
   /*
-   * ⚠️⚠️ **不要预打包 workspace 包**（`optimizeDeps.exclude`）。
-   *
-   * ## 现象
-   *
-   * demo 消费的是**包的 `dist/`**（workspace 软链）。
-   * 一旦在 demo **运行期间**执行 `pnpm build`（dist 被删了重建），
-   * Vite 的预打包缓存就**失效**了 → 之后所有请求都报：
-   *
-   * ```
-   * Failed to resolve import "@scholar-club/pdf-viewer/styles.css" from "src/App.tsx"
-   * ```
-   *
-   * （而且 `require.resolve` 在 Node 侧是**能**解析的 → 看起来像"文件不存在"，
-   *   其实是 Vite 的**预打包缓存**过期了。）
-   *
-   * ## 修法
-   *
-   * 把 workspace 包排除出预打包 → Vite **按源码直接服务**它
-   * → dist 重建后不需要重启，也不会缓存过期。
+   * 预打包排除 workspace 包 → `dist/` 重建后不需要重启 demo
+   * （dist 被删了重建会让预打包缓存失效）。
    */
   optimizeDeps: {
     exclude: ['@scholar-club/pdf-viewer'],
