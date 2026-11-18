@@ -276,7 +276,7 @@ import { isRetryable } from '@scholar-club/pdf-viewer';
 if (isRetryable(error)) showRetryButton();
 ```
 
-## 主题与外观（三层分层）
+## 主题与外观（四层分层）
 
 ### 第 1 层：主题（整体风格）
 
@@ -304,12 +304,37 @@ if (isRetryable(error)) showRetryButton();
     density: 'compact', // 'compact' | 'cozy' | 'comfortable'
     chrome: 'full', // 'full' | 'minimal' | 'hidden'
     pageShadow: false, // 页阴影
+    pageRadius: 8, // 页圆角（px，任意值）
+    showPageNumber: false, // 隐藏工具栏的页码
     showSearch: false, // 隐藏搜索按钮
     showThumbnails: false,
     showOutline: false,
+    accentColor: '#fa541c', // 强调色（覆盖主题的 primary）
+    fontFamily: 'Inter, sans-serif',
+    fontSize: 14,
   }}
 />;
 ```
+
+> ⚠️ **任意数值**（`pageRadius` / `accentColor` / `fontFamily` / `fontSize`）
+> 走**内联 CSS 变量**（class 表达不了任意值）→ 覆盖主题，不影响其他层。
+
+### 第 4 层：插槽（完全自定义）
+
+每个槽给了就**替换**内置的那块；不给就用内置的：
+
+```tsx
+<PdfViewer
+  slots={{
+    toolbar: <MyToolbar />, // 整个替换内置工具栏
+    panel: <MySidebar />, // 整个替换内置侧栏
+    pageOverlay: (pageNumber) => <MyStamp page={pageNumber} />, // 每页都渲染
+  }}
+/>;
+```
+
+⚠️ **替换掉的部分，包不再负责它的功能**：
+替换了 `toolbar` → 包**不会**再渲染缩放 / 搜索 / 打印按钮 → 宿主自己接 `viewerRef`。
 
 ### 第 3 层：CSS 变量（像素微调）
 
@@ -407,6 +432,30 @@ downloadFile(new Blob([bytes], { type: 'application/pdf' }), 'annotated.pdf');
 
 ⚠️ **包只管"算坐标 + 写批注"**：
 取原始文件、触发下载、存高亮 —— **全是宿主的事** → **换后端不用改包**。
+
+## 高亮的持久化（宿主负责）
+
+包**只给"格式 + 纯函数"**，**不碰存储** → 换后端不用改包。
+
+```tsx
+import { exportHighlights, importHighlights } from '@scholar-club/pdf-viewer';
+
+// 存（用包的格式 → 任何后端都能存）
+localStorage.setItem('my-highlights', JSON.stringify(exportHighlights(docId, highlights)));
+
+// 读（用包的校验 → 坏数据不会让宿主崩）
+const doc = importHighlights(JSON.parse(localStorage.getItem('my-highlights') ?? 'null'));
+const list = doc?.highlights ?? [];
+```
+
+| 方案                | 存哪       | 适合                        |
+| ------------------- | ---------- | --------------------------- |
+| **A. localStorage** | 浏览器本地 | 单机使用、小数据量（< 5MB） |
+| **B. IndexedDB**    | 浏览器本地 | 大文档、大量高亮            |
+| **C. 后端接口**     | 服务器     | 多人协作、跨设备            |
+
+⚠️ **每次改动都保存** → 宿主用一个**防抖 + 队列**（连续操作合并成一次请求）。
+demo 里是 `demo/src/highlight-store.ts`（localStorage + 500ms 防抖）。
 
 ## 开发
 
