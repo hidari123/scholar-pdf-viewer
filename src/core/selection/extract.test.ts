@@ -57,6 +57,30 @@ describe('pageOfRect', () => {
     const rect = { top: 105, left: 50, width: 100, height: 19 };
     expect(pageOfRect(rect, centered)).toBeNull();
   });
+
+  /*
+   * ⚠️ **水平容差**（实测踩过的坑）。
+   *
+   * 页框的 `left` 是**量出来的**（页是 `margin-inline: auto` 居中的）
+   * → 面板开合 / 缩放 / 容器尺寸变化都会让它变，测量有 1~2px 误差。
+   *
+   * 实测（面板打开时）：页 left 本该是 0，量成了 −245
+   * → 选区中心 681.5 > −245 + 612 = 367 → **不属于任何页** ❌
+   */
+  it('页框 left 有几像素误差时仍能归页（水平容差）', () => {
+    // 页 left 应该是 0，量成了 −2（2px 误差）
+    const slightlyOff: PageFrame[] = [{ pageNumber: 1, top: 0, left: -2, width: 612, height: 792 }];
+    // 选区在页的**最右侧**（贴着右边界）→ 没有容差就会被判成"不在页内"
+    const rect = { top: 105, left: 600, width: 20, height: 19 }; // centerX = 610
+    expect(pageOfRect(rect, slightlyOff)).toBe(1);
+  });
+
+  it('页框 left 误差很大时仍然判为不属于该页', () => {
+    const wayOff: PageFrame[] = [{ pageNumber: 1, top: 0, left: 200, width: 612, height: 792 }];
+    // 页 spans 200..812，centerX = 100 → 在页左边 100px → 不属于该页
+    const rect = { top: 105, left: 50, width: 100, height: 19 };
+    expect(pageOfRect(rect, wayOff)).toBeNull();
+  });
 });
 
 describe('extractSelection', () => {

@@ -1,0 +1,100 @@
+fix(selection): 修"面板打开时选区整体右偏 245px"的 bug
+
+用户反馈："如果缩略图或者是打开的状态 框选文字的时候会整体往右偏移"
+
+## 实测（复现）
+
+```
+无面板时选中: selRects[0].x = 716.6, 浏览器选区 left = 725  → Δ左=245  ❌
+有面板时选中: selRects[0].x = 716.6, 浏览器选区 left = 725  → Δ左=245  ❌
+```
+
+偏移量正好 = **面板宽度**（253 − 8 = 245）。
+
+## 根因
+
+**是上一轮引入的 bug**（为了修"页居中时选区被丢弃"）。
+
+`src/components/PdfViewer.tsx` 的 `measurePageLeft` 用了：
+
+```ts
+const left = Math.round(pageEl.offsetLeft - container.offsetLeft);
+```
+
+实测：
+
+```
+pageOffsetParent: "scpdf-pages"      ← 页的 offsetParent 不是容器！
+无面板: pageOffsetLeft=0, containerOffsetLeft=0   → 0    ✅
+有面板: pageOffsetLeft=0, containerOffsetLeft=245 → -245  ❌
+```
+
+`offsetLeft` 是相对 **offsetParent** 的，而页的 offsetParent 是 `.scpdf-pages`
+（不是滚动容器）→ 减容器的 `offsetLeft` 是**错的**
+→ 面板一开，`pageLeft = -245` → 归页判定用这个错的 left → 整块选区偏移。
+
+### 为什么上一轮换过公式
+
+早先用的是 `getBoundingClientRect()` 差值，但**测量时机**不对：
+布局还没稳定时会算出错值（实测：先算出 395，后面变成 8、0……）。
+
+→ **根因是时机，不是公式**。上一轮换公式是"用错药治对症"。
+
+## 修法
+
+### ① 换回 `getBoundingClientRect()` 差值 + **rAF 推迟测量**
+
+```ts
+const measurePageLeft = () => {
+  const pageEl = container.querySelector<HTMLElement>('.scpdf-page');
+  if (!pageEl) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const pageRect = pageEl.getBoundingClientRect();
+
+  // 页宽为 0 → 还没布局好 → 不更新（否则算出垃圾值）
+  if (pageRect.width <= 0) return;
+
+  // 视口坐标 → 滚动内容坐标
+  const left = Math.round(pageRect.left - containerRect.left + container.scrollLeft);
+  setPageLeft((prev) => (Math.abs(prev - left) >= 1 ? left : prev));
+};
+
+// ⚠️ rAF 里测 → 等布局稳定
+const scheduleMeasure = () => requestAnimationFrame(measurePageLeft);
+```
+
+ResizeObserver 的回调触发时布局可能还没完成 → 直接测会拿到过期值。
+
+### ② 归页判定加**水平容差**（安全网）
+
+页框的 `left` 是**量出来的** → 永远可能有 1~2px 误差
+→ 归页判定（`pageOfRect` / `buildSelectionShapes`）水平允许 **±4px** 容差。
+
+垂直**不放容差**（页的上下边界是硬的，容差会让跨页的矩形判错页）。
+
+→ 这样即使 `pageLeft` 量不准，**也不会丢选区**。
+
+## 回归测试
+
+**单测**（`extract.test.ts`，+2）：
+- 页框 left 有 2px 误差时，选区贴着页右边界仍能归页
+- 页框 left 误差很大时，正确判为"不属于该页"
+
+**E2E**（`scripts/e2e-panel-offset.mjs`，新增 7 项）：
+- 无面板 → 选区块 Δ ≤ 3px
+- 打开面板 → 选区块 Δ ≤ 3px
+- 面板关闭后 → 选区块 Δ ≤ 3px
+
+```
+=== 无面板 ===     PASS Δ左=0 Δ上=2
+=== 打开面板 ===   PASS Δ左=0 Δ上=2
+=== 面板开合后 === PASS Δ左=0 Δ上=2
+结果：7/7 通过
+```
+
+## 验证
+
+- `pnpm test`: **354 passed**（+2）
+- `pnpm build`: ok
+- E2E: 新增 `e2e-panel-offset` 套件

@@ -6,13 +6,13 @@
 
 ## 摘要：5 个问题，3 个是坐标/状态的 bug，2 个是功能缺失
 
-| # | 问题 | 性质 | 根因 |
-|---|------|------|------|
-| 1 | 点高亮后选区不清除；点高亮块不弹浮层 | **bug** + 功能缺失 | `clearState()` 只清包内 state，**没清浏览器原生选区**；点高亮块只置 `activeHighlightId` |
-| 2 | 面板打开时框选整体右偏 | **bug** | `pageLeft` 用 `offsetLeft` 算，**offsetParent 不是容器** → 面板一开就偏 −245px |
-| 3 | 切换文档后高亮/选区残留 | **bug** + 功能缺失 | 包**不知道**文档换了；demo 高亮没持久化 |
-| 4 | 页面样式不可配 | 功能缺失 | 只有 28 个 CSS 变量 + `theme: light/dark/auto`，没有"整套方案"的概念 |
-| 5 | 打印效果不对 | 功能缺失 | **完全没有 `@media print` CSS** |
+| #   | 问题                                 | 性质               | 根因                                                                                    |
+| --- | ------------------------------------ | ------------------ | --------------------------------------------------------------------------------------- |
+| 1   | 点高亮后选区不清除；点高亮块不弹浮层 | **bug** + 功能缺失 | `clearState()` 只清包内 state，**没清浏览器原生选区**；点高亮块只置 `activeHighlightId` |
+| 2   | 面板打开时框选整体右偏               | **bug**            | `pageLeft` 用 `offsetLeft` 算，**offsetParent 不是容器** → 面板一开就偏 −245px          |
+| 3   | 切换文档后高亮/选区残留              | **bug** + 功能缺失 | 包**不知道**文档换了；demo 高亮没持久化                                                 |
+| 4   | 页面样式不可配                       | 功能缺失           | 只有 28 个 CSS 变量 + `theme: light/dark/auto`，没有"整套方案"的概念                    |
+| 5   | 打印效果不对                         | 功能缺失           | **完全没有 `@media print` CSS**                                                         |
 
 ---
 
@@ -41,7 +41,7 @@
 
 ```ts
 const clearState = useCallback(() => {
-  selectionRef.current = null;      // ← 只清了包内的引用
+  selectionRef.current = null; // ← 只清了包内的引用
 }, []);
 ```
 
@@ -55,10 +55,13 @@ const clearState = useCallback(() => {
 ### 1b. 点高亮块只置 active 标记
 
 ```ts
-const handleHighlightClick = useCallback((highlight: HighlightRecord) => {
-  setActiveHighlightId(highlight.id);   // ← 只是加个蓝框
-  onHighlightClick?.(highlight);
-}, [onHighlightClick]);
+const handleHighlightClick = useCallback(
+  (highlight: HighlightRecord) => {
+    setActiveHighlightId(highlight.id); // ← 只是加个蓝框
+    onHighlightClick?.(highlight);
+  },
+  [onHighlightClick],
+);
 ```
 
 包没有"高亮块的操作条"这个概念 —— 浮层只绑在**浏览器选区**上。
@@ -91,13 +94,13 @@ const clearNativeSelection = useCallback(() => {
 
 ```ts
 const clearSelectionAfterHighlight = useCallback(() => {
-  textSelection.clearState();        // 包内 state
+  textSelection.clearState(); // 包内 state
   textSelection.clearNativeSelection(); // ← 新增：浏览器原生选区
-  setSelectionShapes(new Map());     // 自绘蓝色块
+  setSelectionShapes(new Map()); // 自绘蓝色块
   setPopoverOpen(false);
   setPopoverAnchor(null);
   setCurrentSelection(null);
-  setActiveHighlightId(null);        // ← 新增：去掉高亮的蓝框
+  setActiveHighlightId(null); // ← 新增：去掉高亮的蓝框
 }, [textSelection]);
 ```
 
@@ -120,11 +123,11 @@ const clearSelectionAfterHighlight = useCallback(() => {
 
 **关键设计决策（需要你定）**：
 
-| 方案 | 说明 | 优点 | 缺点 |
-|------|------|------|------|
-| **A. 复用 SelectionPopover** | 点高亮块时，用高亮的 `position` 算出一个矩形，塞进 `SelectionPopover` | 复用度高，改动小 | `SelectionPopover` 依赖**浏览器原生选区**（`readLiveAnchor`）→ 要改成支持"外部锚点" |
-| **B. 新增 HighlightPopover** | 独立的组件，锚点来自高亮的 DOM 矩形 | 语义清晰，不污染选区浮层 | 多一个组件 |
-| **C. 不弹浮层，点高亮块只选中它** | 高亮块获得 focus（键盘可达），用右键菜单 | 最简单 | 用户明确要求"点击高亮之后应该也会出现那个选择的弹框" → 不满足 |
+| 方案                              | 说明                                                                  | 优点                     | 缺点                                                                                |
+| --------------------------------- | --------------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------- |
+| **A. 复用 SelectionPopover**      | 点高亮块时，用高亮的 `position` 算出一个矩形，塞进 `SelectionPopover` | 复用度高，改动小         | `SelectionPopover` 依赖**浏览器原生选区**（`readLiveAnchor`）→ 要改成支持"外部锚点" |
+| **B. 新增 HighlightPopover**      | 独立的组件，锚点来自高亮的 DOM 矩形                                   | 语义清晰，不污染选区浮层 | 多一个组件                                                                          |
+| **C. 不弹浮层，点高亮块只选中它** | 高亮块获得 focus（键盘可达），用右键菜单                              | 最简单                   | 用户明确要求"点击高亮之后应该也会出现那个选择的弹框" → 不满足                       |
 
 **我推荐 B**，但**改造 `SelectionPopover` 让它支持"外部锚点模式"**（A 的机制 + B 的语义）：
 
@@ -302,7 +305,7 @@ const [highlights, setHighlights] = useState<HighlightRecord[]>([]);
 
 **包需要知道"文档换了"**。已有的 `documentId` prop 就是干这个的（`usePdfDocument` 用它做缓存 key）。
 
-```tsx
+````tsx
 // PdfViewer.tsx
 /**
  * ⚠️ **文档切换 → 清掉所有"属于上一份文档"的内部状态**。
@@ -326,7 +329,7 @@ useEffect(() => {
   // 滚动位置也重置
   containerRef.current?.scrollTo({ top: 0 });
 }, [documentId, file]);
-```
+````
 
 ⚠️ **依赖用 `documentId` + `file`**，不要用 `data`（Uint8Array 每次都是新引用 → 会误触发）。
 
@@ -384,11 +387,11 @@ export function parseHighlightDoc(text: string): HighlightDoc | null;
 
 #### ② 宿主侧：三种持久化方案（按需选一种）
 
-| 方案 | 存哪 | 适合 |
-|------|------|------|
-| **A. localStorage** | 浏览器本地 | 单机使用、小数据量（< 5MB） |
-| **B. IndexedDB** | 浏览器本地 | 大文档、大量高亮 |
-| **C. 后端接口** | 服务器 | 多人协作、跨设备（**用户要的**） |
+| 方案                | 存哪       | 适合                             |
+| ------------------- | ---------- | -------------------------------- |
+| **A. localStorage** | 浏览器本地 | 单机使用、小数据量（< 5MB）      |
+| **B. IndexedDB**    | 浏览器本地 | 大文档、大量高亮                 |
+| **C. 后端接口**     | 服务器     | 多人协作、跨设备（**用户要的**） |
 
 **C 的接口契约**（包不实现，宿主实现；包只给数据格式）：
 
@@ -406,21 +409,24 @@ DELETE /api/documents/:id/highlights/:hid  单条删除
 const saveQueue = useRef<HighlightRecord[]>([]);
 const saving = useRef(false);
 
-const scheduleSave = useCallback((next: HighlightRecord[]) => {
-  saveQueue.current = next;
-  if (saving.current) return;
-  saving.current = true;
-  // 500ms 防抖：连续操作合并成一次请求
-  setTimeout(async () => {
-    const payload = saveQueue.current;
-    saving.current = false;
-    await fetch(`/api/documents/${docId}/highlights`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(exportHighlights(docId, payload)),
-    });
-  }, 500);
-}, [docId]);
+const scheduleSave = useCallback(
+  (next: HighlightRecord[]) => {
+    saveQueue.current = next;
+    if (saving.current) return;
+    saving.current = true;
+    // 500ms 防抖：连续操作合并成一次请求
+    setTimeout(async () => {
+      const payload = saveQueue.current;
+      saving.current = false;
+      await fetch(`/api/documents/${docId}/highlights`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(exportHighlights(docId, payload)),
+      });
+    }, 500);
+  },
+  [docId],
+);
 ```
 
 > **包不内置 fetch**（换后端也能用）→ 包只给 `exportHighlights` / `importHighlights`。
@@ -531,13 +537,13 @@ export function highlightToPdfAnnots(
 
 ```ts
 type PdfViewerTheme =
-  | 'light'      // 亮色（默认）
-  | 'dark'       // 暗色
-  | 'auto'       // 跟随系统
-  | 'paper'      // 纸张（米黄护眼）
-  | 'sepia'      // 深色护眼
-  | 'contrast'   // 高对比度（无障碍）
-  | 'minimal';   // 极简黑白（打印友好）
+  | 'light' // 亮色（默认）
+  | 'dark' // 暗色
+  | 'auto' // 跟随系统
+  | 'paper' // 纸张（米黄护眼）
+  | 'sepia' // 深色护眼
+  | 'contrast' // 高对比度（无障碍）
+  | 'minimal'; // 极简黑白（打印友好）
 ```
 
 包内提供 CSS：
@@ -592,11 +598,11 @@ type PdfViewerTheme =
 ```tsx
 <PdfViewer
   slots={{
-    toolbar: <MyToolbar />,      // 完全替换工具栏
-    panel: <MySidebar />,        // 完全替换侧栏
-    pageOverlay: <MyOverlay />,  // 页内叠加层
+    toolbar: <MyToolbar />, // 完全替换工具栏
+    panel: <MySidebar />, // 完全替换侧栏
+    pageOverlay: <MyOverlay />, // 页内叠加层
   }}
-/>
+/>;
 ```
 
 **优点**：自由度最高
@@ -614,11 +620,11 @@ type PdfViewerTheme =
 
 **分层表**：
 
-| 层 | 控制什么 | 手段 |
-|---|---|---|
-| 1 | 整体风格 | `theme="paper"` |
-| 2 | 结构开关 | `appearance={{...}}` |
-| 3 | 像素微调 | CSS 变量覆盖 |
+| 层  | 控制什么 | 手段                 |
+| --- | -------- | -------------------- |
+| 1   | 整体风格 | `theme="paper"`      |
+| 2   | 结构开关 | `appearance={{...}}` |
+| 3   | 像素微调 | CSS 变量覆盖         |
 
 ### 具体要新增的
 
@@ -723,7 +729,7 @@ type PdfViewerTheme =
 ```ts
 // 宿主侧
 const handlePrint = () => {
-  zoom.fitPage(printWidthPt, printHeightPt);  // 按 A4 内容区算
+  zoom.fitPage(printWidthPt, printHeightPt); // 按 A4 内容区算
   setTimeout(() => globalThis.print?.(), 300); // 等重排
 };
 ```
@@ -744,6 +750,7 @@ const handlePrint = () => {
 **这个不该在包里做**（pdf.js 在宿主侧）。
 
 > **我的建议**：包里做 5a（CSS）+ 提供一个 `print` 辅助 hook：
+>
 > ```ts
 > const { print, preparing } = usePrint({ pageWidthPt, pageHeightPt, paper: 'A4' });
 > ```
@@ -760,8 +767,8 @@ const handlePrint = () => {
 ```css
 @media print {
   .scpdf-annotation {
-    mix-blend-mode: normal !important;   /* 打印时不用正片叠底 */
-    opacity: 0.45 !important;            /* 用透明度模拟"高亮但不遮字" */
+    mix-blend-mode: normal !important; /* 打印时不用正片叠底 */
+    opacity: 0.45 !important; /* 用透明度模拟"高亮但不遮字" */
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -798,25 +805,25 @@ onPrint={
 
 # 实施顺序建议
 
-| 阶段 | 内容 | 理由 |
-|---|---|---|
-| **1** | 问题 2（页居中偏移）| 纯 bug，且会让问题 1/3 的验证变复杂 → 先修 |
-| **2** | 问题 1（选区清除 + 高亮浮层）| 用户可见的核心体验 |
-| **3** | 问题 3（文档切换清理）| 依赖 1、2 的状态管理 |
-| **4** | 问题 5（打印）| 独立，可并行 |
-| **5** | 问题 4（主题方案）| 功能增强，放最后 |
+| 阶段  | 内容                          | 理由                                       |
+| ----- | ----------------------------- | ------------------------------------------ |
+| **1** | 问题 2（页居中偏移）          | 纯 bug，且会让问题 1/3 的验证变复杂 → 先修 |
+| **2** | 问题 1（选区清除 + 高亮浮层） | 用户可见的核心体验                         |
+| **3** | 问题 3（文档切换清理）        | 依赖 1、2 的状态管理                       |
+| **4** | 问题 5（打印）                | 独立，可并行                               |
+| **5** | 问题 4（主题方案）            | 功能增强，放最后                           |
 
 ---
 
 # 需要你确认的 5 个决策点
 
-| # | 问题 | 我的建议 |
-|---|---|---|
-| 1 | 点高亮块弹出的浮层，**长什么样**？ | 复用选区浮层的样式（同一套 `SelectionPopover`），但锚点用高亮块 |
-| 2 | 高亮浮层里**默认放哪些按钮**？ | 🖍换色 / 📋复制 / 🗑删除（仅当宿主传了 `onHighlightRemove` 才显示）/ 更多 |
-| 3 | 高亮持久化走**哪种后端**？ | 包只给**格式 + 纯函数**，具体存储（localStorage / IndexedDB / 接口）由宿主实现 —— **换后端也能用** |
-| 4 | 主题要**几套**？ | `light / dark / auto / paper / sepia / contrast / minimal` 共 7 套 |
-| 5 | 打印要不要**保留高亮**？ | **保留**（用透明度模拟，避免遮字） |
+| #   | 问题                               | 我的建议                                                                                           |
+| --- | ---------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 1   | 点高亮块弹出的浮层，**长什么样**？ | 复用选区浮层的样式（同一套 `SelectionPopover`），但锚点用高亮块                                    |
+| 2   | 高亮浮层里**默认放哪些按钮**？     | 🖍换色 / 📋复制 / 🗑删除（仅当宿主传了 `onHighlightRemove` 才显示）/ 更多                            |
+| 3   | 高亮持久化走**哪种后端**？         | 包只给**格式 + 纯函数**，具体存储（localStorage / IndexedDB / 接口）由宿主实现 —— **换后端也能用** |
+| 4   | 主题要**几套**？                   | `light / dark / auto / paper / sepia / contrast / minimal` 共 7 套                                 |
+| 5   | 打印要不要**保留高亮**？           | **保留**（用透明度模拟，避免遮字）                                                                 |
 
 ---
 

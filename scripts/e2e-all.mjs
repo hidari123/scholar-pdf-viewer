@@ -26,6 +26,7 @@ const suites = [
   { name: '选区跨行回归', file: 'e2e-selection-regression.mjs' },
   { name: '浮层锚定回归', file: 'e2e-popover-anchor.mjs' },
   { name: '选区性能', file: 'e2e-selection-perf.mjs' },
+  { name: '面板开合时的选区定位', file: 'e2e-panel-offset.mjs' },
   { name: '缩放矩阵（选区/高亮/性能）', file: 'e2e-zoom-matrix.mjs' },
   { name: '高亮效果', file: 'e2e-highlight.mjs' },
   { name: '缩放行为', file: 'e2e-zoom.mjs' },

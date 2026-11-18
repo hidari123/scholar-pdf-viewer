@@ -6,8 +6,8 @@
  * Copyright (c) 2026 by hidari, All Rights Reserved.
  */
 
-import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
+import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 /** 包根目录（demo 是 workspace 成员 → 父目录就是包本体） */

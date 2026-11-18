@@ -786,23 +786,53 @@ export function PdfViewer(props: PdfViewerProps) {
       if (!pageEl) {
         return;
       }
+
       /*
-       * ⚠️ **用 `offsetLeft`，不要用 `getBoundingClientRect()` 相减**。
+       * ⚠️⚠️ **必须用 `getBoundingClientRect()` 差值**（不能用 `offsetLeft`）。
        *
-       * `getBoundingClientRect()` 差值在**布局还没稳定**时会算出错值
-       * （实测：先算出 395，后面变成 8、0……）。
-       * `offsetLeft` 是**布局后的偏移**，稳定可靠。
+       * ## 为什么 `offsetLeft` 不行（实测踩过的坑）
        *
-       * ⚠️ `offsetLeft` 相对**最近的定位祖先**（offsetParent），
-       *    不一定是滚动容器 → 要减去容器自身的 offsetLeft 差值。
+       * ```
+       * pageOffsetParent: "scpdf-pages"      ← 页的 offsetParent 不是容器！
+       * 面板打开后: pageOffsetLeft=0, containerOffsetLeft=245
+       *   offsetLeft 公式 = 0 - 245 = -245     ← ❌ 整个选区偏 245px（面板宽度）
+       *   正确公式       = 0                   ← ✅
+       * ```
+       *
+       * `offsetLeft` 是相对 **offsetParent** 的，而页的 offsetParent 是
+       * `.scpdf-pages`（不是滚动容器）→ 减容器的 offsetLeft 是**错的**。
+       *
+       * ## 为什么之前换过公式
+       *
+       * 早先用的是 `getBoundingClientRect()` 差值，但**测量时机**不对：
+       * 布局还没稳定时会算出错值（实测：先算出 395，后面变成 8、0……）。
+       * → **根因是时机，不是公式** → 用 rAF 推迟到布局完成后测。
        */
-      const containerLeft = container.offsetLeft;
-      const left = Math.round(pageEl.offsetLeft - containerLeft);
+      const containerRect = container.getBoundingClientRect();
+      const pageRect = pageEl.getBoundingClientRect();
+
+      // 页宽为 0 → 还没布局好 → 不更新（否则会算出垃圾值）
+      if (pageRect.width <= 0) {
+        return;
+      }
+
+      // 视口坐标 → 滚动内容坐标
+      const left = Math.round(pageRect.left - containerRect.left + container.scrollLeft);
       setPageLeft((prev) => (Math.abs(prev - left) >= 1 ? left : prev));
     };
 
-    measurePageLeft();
-    const pageObserver = new ResizeObserver(() => measurePageLeft());
+    /*
+     * ⚠️ **rAF 里测** → 等布局稳定。
+     *
+     * ResizeObserver 的回调触发时，布局可能还没完成
+     * → 直接测会拿到过期值（实测：395 → 8 → 0）。
+     */
+    const scheduleMeasure = () => {
+      requestAnimationFrame(measurePageLeft);
+    };
+
+    scheduleMeasure();
+    const pageObserver = new ResizeObserver(() => scheduleMeasure());
     pageObserver.observe(container);
     // 页宽变化（缩放）也会改 left → 观察页自身
     const firstPage = container.querySelector<HTMLElement>('.scpdf-page');

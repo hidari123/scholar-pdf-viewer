@@ -61,17 +61,38 @@ export interface ExtractSelectionInput {
  * 为什么用中心点而不是"完全包含"：跨页的选区矩形会被浏览器切在页边界上，
  * 用"完全包含"会两边都不属于（矩形被丢弃）→ 选区缺页。
  * 中心点判定稳定且 O(1)。
+ *
+ * ⚠️⚠️ **水平方向必须留容差**（实测踩过的坑）。
+ *
+ * 页框的 `left` 是**量出来的**（页是 `margin-inline: auto` 居中的），
+ * 面板开合、缩放、容器尺寸变化都会让它变 —— 而测量有 1~2px 的误差。
+ *
+ * 实测（面板打开）：
+ * ```
+ * 归页判定: centerX = 681.5 > 0 + 612 → **不属于任何页** ❌
+ *           → 选区被丢弃 → 自绘选区层为空
+ * ```
+ *
+ * → 水平允许 **±4px** 容差 → 测量误差不会导致选区丢失。
+ * 垂直**不放容差**（页的上下边界是硬的，容差会让跨页的矩形判错页）。
  */
 export function pageOfRect(rect: RectInput, pages: PageFrame[]): number | null {
   const centerX = rect.left + rect.width / 2;
   const centerY = rect.top + rect.height / 2;
 
+  /** 水平容差（px） */
+  const TOLERANCE = 4;
+
   for (const page of pages) {
-    const inX = centerX >= page.left && centerX <= page.left + page.width;
-    const inY = centerY >= page.top && centerY <= page.top + page.height;
-    if (inX && inY) {
-      return page.pageNumber;
+    // 垂直：硬边界
+    if (centerY < page.top || centerY > page.top + page.height) {
+      continue;
     }
+    // 水平：带容差
+    if (centerX < page.left - TOLERANCE || centerX > page.left + page.width + TOLERANCE) {
+      continue;
+    }
+    return page.pageNumber;
   }
 
   return null;

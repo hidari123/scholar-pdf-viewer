@@ -279,14 +279,22 @@ export function buildSelectionShapes(
     const centerX = contentLeft + rect.width / 2;
     const centerY = contentTop + rect.height / 2;
 
+    /*
+     * ⚠️ **水平要留容差**（和 `pageOfRect` 保持一致）。
+     *
+     * 页框的 `left` 是**量出来的**（页是 `margin-inline: auto` 居中的）
+     * → 面板开合 / 缩放 / 容器尺寸变化都会让它变，测量有 1~2px 误差。
+     * → 没有容差 → 选区被判成"不属于任何页" → **自绘选区层为空**。
+     *
+     * 垂直**不放容差**（页的上下边界是硬的）。
+     */
+    const TOLERANCE = 4;
+
     let owner: (typeof pageBoxes)[number] | undefined;
     for (const box of pageBoxes) {
-      if (
-        centerX >= box.left &&
-        centerX <= box.left + box.width &&
-        centerY >= box.top &&
-        centerY <= box.top + box.height
-      ) {
+      const inX = centerX >= box.left - TOLERANCE && centerX <= box.left + box.width + TOLERANCE;
+      const inY = centerY >= box.top && centerY <= box.top + box.height;
+      if (inX && inY) {
         owner = box;
         break;
       }
