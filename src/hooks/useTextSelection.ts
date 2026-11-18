@@ -19,7 +19,7 @@
  * 不用像老 scholar-club 那样"每个 rect × 每页"双重循环 + 猜。
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { filterByDragOrigin } from '../core/selection/drag-origin';
 import type { PageFrame } from '../core/selection/extract';
 import { extractSelection } from '../core/selection/extract';
@@ -786,5 +786,14 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     [],
   );
 
-  return { clearSelection, clearState, clearNativeSelection };
+  /*
+   * ⚠️ **返回值必须稳定**（用 `useMemo` 包）。
+   *
+   * 否则每次渲染都返回**新对象** → 依赖它的 `useCallback` / `useEffect` 每次都变
+   * → **effect 每次渲染都重跑** → 观察器被反复重建 → 状态丢失。
+   */
+  return useMemo(
+    () => ({ clearSelection, clearState, clearNativeSelection }),
+    [clearSelection, clearState, clearNativeSelection],
+  );
 }

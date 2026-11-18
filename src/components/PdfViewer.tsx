@@ -831,10 +831,21 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   );
 
   // 5) 缩放
+  /**
+   * **当前的适配模式**（`'width'` / `'page'` / `null` = 用户手动定的）。
+   *
+   * ⚠️ **用 state 而不是 ref** → ResizeObserver 的回调要读它 → 得是 state 才会重新订阅。
+   */
+  const [fitMode, setFitMode] = useState<'width' | 'page' | null>(
+    initialScale === 'width' ? 'width' : null,
+  );
+
   const zoom = useZoom({
     containerRef,
     scale,
     onScaleChange: handleZoomChange,
+    fitMode,
+    onFitModeChange: setFitMode,
   });
 
   /**
@@ -843,9 +854,6 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * 必须在**容器有宽度**之后才能算准；只做一次（之后由用户控制）→ ref 记住是否已执行。
    */
   const initialScaleAppliedRef = useRef(false);
-
-  /** 初始适配宽度算出的比例（用来区分"用户手动缩放"） */
-  const initialFitScaleRef = useRef<number | null>(null);
 
   useEffect(() => {
     // 只在 initialScale === 'width' 时做适配宽度；数字初始值直接用
@@ -860,28 +868,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     initialScaleAppliedRef.current = true;
     const pt = pageSizesPt[0] ?? { width: PAGE_WIDTH_PT, height: PAGE_HEIGHT_PT };
     zoom.fitWidth(container.clientWidth, pt.width);
-    // 记下适配出的比例（后面用来判断用户是否手动缩放过）
-    initialFitScaleRef.current = scale;
-  }, [initialScale, numPages, pageSizesPt, zoom, scale]);
-
-  /**
-   * 容器宽度变化时重新适配宽度（仅当用户没有手动缩放过）。
-   *
-   * **为什么需要**：打开/关闭缩略图侧栏会改变容器宽度 →
-   * 适配宽度的比例就过时了（页面比容器宽或窄）。
-   *
-   * **只在用户没手动缩放时做**：
-   * 用户手动调过比例就说明他有偏好，不该被覆盖。
-   */
-  const userZoomedRef = useRef(false);
-
-  useEffect(() => {
-    // 用户手动缩放 → 标记，之后不再自动适配
-    // （scale 变化说明用户动过缩放；但初始适配也会触发一次 → 用标记区分）
-    if (scale !== initialFitScaleRef.current) {
-      userZoomedRef.current = true;
-    }
-  }, [scale]);
+  }, [initialScale, numPages, pageSizesPt, zoom]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -890,28 +877,62 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     }
 
     let lastWidth = container.clientWidth;
+    let lastHeight = container.clientHeight;
 
     /*
      * ⚠️ **容器宽度变化 → 页的居中偏移也变** → `pageLeft` 要重算。
+     *
+     * ⚠️⚠️ **容器变窄 → 自动重新适配**（WPS 式行为，用户要求）。
+     *
+     * 实测（修复前）：
+     * ```
+     * 初始:      scale=230%  containerW=1384  pageW=1408
+     * 开缩略图:  scale=230%  containerW=1139  pageW=1408   ← ❌ 页比容器还宽！
+     * ```
+     * → 页**横向溢出了**（要横向滚动才能看全）→ 很难用。
+     *
+     * WPS / Chrome 的行为：**打开侧栏 → 重新适配宽度** → 页还是完整可见。
+     *
+     * ⚠️ **只在"适配模式"下才重适配**：
+     * - 用户手动缩放过（`fitMode === null`）→ **不动**（尊重用户的偏好）
+     * - 适配宽度（`fitMode === 'width'`）→ 按新宽度重算
+     * - 适配整页（`fitMode === 'page'`）→ 宽高都变了就重算
      */
     const observer = new ResizeObserver(() => {
       const width = container.clientWidth;
+      const height = container.clientHeight;
+      const widthChanged = Math.abs(width - lastWidth) >= 2;
+      const heightChanged = Math.abs(height - lastHeight) >= 2;
       // 宽度没变 → 不管（高度变化不影响适配宽度）
-      if (Math.abs(width - lastWidth) < 2) {
+      if (!widthChanged && !heightChanged) {
         return;
       }
       lastWidth = width;
+      lastHeight = height;
 
-      // 用户手动缩放过 → 不覆盖用户的偏好
-      if (userZoomedRef.current || initialScale !== 'width') {
-        return;
-      }
       if (numPages <= 0 || width <= 0) {
         return;
       }
 
       const pt = pageSizesPt[0] ?? { width: PAGE_WIDTH_PT, height: PAGE_HEIGHT_PT };
-      zoom.fitWidth(width, pt.width);
+
+      /*
+       * ⚠️ **只处理"宽度变了"**（适配宽度 / 适配整页）。
+       *
+       * 高度变化（滚动条出现/消失）不该触发重适配 → 否则会抖。
+       */
+      if (!widthChanged) {
+        return;
+      }
+
+      if (fitMode === 'width') {
+        zoom.fitWidth(width, pt.width);
+        return;
+      }
+      if (fitMode === 'page') {
+        zoom.fitPage(width, height, pt.width, pt.height);
+      }
+      // fitMode === null → 用户手动定的比例 → 不动
     });
 
     observer.observe(container);
@@ -1002,7 +1023,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       observer.disconnect();
       pageObserver.disconnect();
     };
-  }, [initialScale, numPages, pageSizesPt, zoom]);
+  }, [numPages, pageSizesPt, zoom, fitMode]);
 
   /**
    * 收到选区的原始 client rects → 转成"每页的形状"（自绘选区用）。

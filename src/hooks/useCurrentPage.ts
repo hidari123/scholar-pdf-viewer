@@ -6,7 +6,7 @@
  * - 当前页用**二分查找**（页顶边数组单调）而不是全量遍历
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { findCurrentPage } from '../core/store/instance';
 
 /** useCurrentPage 参数 */
@@ -113,5 +113,11 @@ export function useCurrentPage(options: UseCurrentPageOptions): UseCurrentPageRe
     [containerRef, pageTops],
   );
 
-  return { scrollToPage };
+  /*
+   * ⚠️ **返回值必须稳定**（用 `useMemo` 包）。
+   *
+   * 否则每次渲染都返回**新对象** → 依赖它的 `useCallback` / `useEffect` 每次都变
+   * → **effect 每次渲染都重跑** → 观察器被反复重建 → 状态丢失。
+   */
+  return useMemo(() => ({ scrollToPage }), [scrollToPage]);
 }

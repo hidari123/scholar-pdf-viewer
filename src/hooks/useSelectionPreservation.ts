@@ -34,7 +34,7 @@
  *    （选的还是那段字）。
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 /** 选区快照 */
 interface SelectionSnapshot {
@@ -304,5 +304,16 @@ export function useSelectionPreservation(
     [],
   );
 
-  return { save };
+  /*
+   * ⚠️⚠️ **返回值必须稳定**（用 `useMemo` 包）。
+   *
+   * 否则每次渲染都返回**新对象** → 依赖它的 `useCallback` 每次都变
+   * → 再往上传 → `useZoom` 的返回值每次都变
+   * → 依赖它的 `useEffect` **每次渲染都重跑**
+   * → cleanup 把 `ResizeObserver` 拆了重建 → `lastWidth` 被重置
+   * → **宽度变化永远检测不到**！
+   *
+   * （实测：打开缩略图 → 容器 1384→1139 → 缩放没变 → 页横向溢出）
+   */
+  return useMemo(() => ({ save }), [save]);
 }

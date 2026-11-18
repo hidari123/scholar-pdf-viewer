@@ -10,7 +10,7 @@
  * 用户会看到"页面变白 → 又出现"���闪。
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PageBox } from '../core/virtualization/visible';
 import { computeVisiblePages } from '../core/virtualization/visible';
 
@@ -213,5 +213,14 @@ export function useVisiblePages(options: UseVisiblePagesOptions): UseVisiblePage
     return () => observer.disconnect();
   }, [recompute, containerRef]);
 
-  return { visiblePages, viewportPages, refresh };
+  /*
+   * ⚠️ **返回值必须稳定**（用 `useMemo` 包）。
+   *
+   * 否则每次渲染都返回**新对象** → 依赖它的 `useCallback` / `useEffect` 每次都变
+   * → **effect 每次渲染都重跑** → 观察器被反复重建 → 状态丢失。
+   */
+  return useMemo(
+    () => ({ visiblePages, viewportPages, refresh }),
+    [visiblePages, viewportPages, refresh],
+  );
 }
