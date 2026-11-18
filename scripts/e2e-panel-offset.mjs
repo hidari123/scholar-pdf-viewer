@@ -130,7 +130,29 @@ try {
         (r) => r.width > 0 && r.height > 0 && r.left < pr.left + (pr?.width ?? 0) - 60,
       );
       const inkLeft = Math.min(...selectedSpans.map((r) => r.left));
-      const inkTop = Math.min(...selectedSpans.map((r) => r.top));
+
+      /*
+       * ⚠️⚠️ **垂直基准必须用"文字 span 的 top"，不能用 client rect 的 top**（实测踩过的坑）。
+       *
+       * 浏览器的 client rect = **字体的自然行盒**（比文字高、偏上）
+       * ```
+       * 无面板: clientTop=198.33（行盒）  spanTop=200（字形）  drawnTop=200.34 ✅
+       * 有面板: clientTop=321.19（行盒）  spanTop=326（字形）  drawnTop=326.20 ✅
+       * ```
+       * → 自绘块是**贴着字形**的（这是刻意的：让高亮块和文字对齐）
+       * → 和行盒比 → **天然差 2~5px** → 那是**正常的**，不是定位错了。
+       *
+       * → 而且这个差值**和面板开不开无关**（是字体的固有行高）
+       * → 用行盒当基准 → 字号大的行差得多 → **误报**。
+       *
+       * → 正确基准：**被选中的文字 span 的 top**（= 字形盒的 top）。
+       */
+      const inkSpans = [...document.querySelectorAll('.scpdf-text-layer__item')].filter((x) =>
+        range.intersectsNode(x),
+      );
+      const inkTop = inkSpans.length
+        ? Math.min(...inkSpans.map((x) => x.getBoundingClientRect().top))
+        : Math.min(...selectedSpans.map((r) => r.top));
 
       if (!first || !pr || selectedSpans.length === 0) {
         return { ok: false, rects: rects.length };
