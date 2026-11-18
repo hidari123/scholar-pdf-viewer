@@ -35,6 +35,21 @@ export interface PageProps {
   scale: number;
   /** 页面尺寸（当前缩放下的 px） */
   size: { width: number; height: number };
+  /**
+   * **是否渲染 canvas**（默认 true）。
+   *
+   * ⚠️ **跨页选择需要"缓冲区内的页"也挂上文本层**（实测踩过的坑）。
+   *
+   * ```
+   * 用户从第 1 页底部拖到第 2 页顶部
+   * → 第 2 页如果**没挂文本层** → 浏览器的选区**到不了第 2 页**
+   * → 浏览器只给一个"整页"的大矩形 → 自绘层画不出来 → **跨页选不了**
+   * ```
+   *
+   * → 让缓冲区内的页**挂文本层但不挂 canvas**
+   * → canvas 是最贵的（要重绘 PDF），文本层便宜（只是 DOM）
+   */
+  renderCanvas?: boolean;
   /** 页面尺寸（pt，归一化用） */
   pageSizePt?: { width: number; height: number };
   /** 链接注解（宿主注入） */
@@ -88,6 +103,7 @@ export function PageInner(props: PageProps) {
     scale,
     size,
     pageSizePt,
+    renderCanvas = true,
     annotations,
     searchRects,
     activeSearchRectIndex,
@@ -209,7 +225,9 @@ export function PageInner(props: PageProps) {
 
   return (
     <>
-      <PageCanvas page={page} scale={scale} ariaLabel={ariaLabel} onRenderError={onRenderError} />
+      {renderCanvas ? (
+        <PageCanvas page={page} scale={scale} ariaLabel={ariaLabel} onRenderError={onRenderError} />
+      ) : null}
 
       {textContent && viewport ? (
         <TextLayer content={textContent} viewport={viewport} pageNumber={pageNumber} />

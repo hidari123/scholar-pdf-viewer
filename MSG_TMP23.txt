@@ -1,0 +1,70 @@
+feat(selection): 支持跨页选择
+
+用户反馈："现在不能跨页选择 我需要有跨页选择的功能"
+
+## 实测（修复前）
+
+```
+选中文本长度: 2553   ← 浏览器**选中了**跨页的文字
+选区层数: 0          ← 但自绘层是空的 → 用户什么都看不到
+```
+
+## 根因 ①：跨页选区的共同祖先是"页容器"
+
+```ts
+const inTextLayer = !!anchorElement.closest(TEXT_LAYER_CLASS);
+const inPage = !!anchorElement.closest(PAGE_CLASS);
+if (!inTextLayer && !inPage) {
+  return false;      // ❌ 跨页选区直接被丢弃
+}
+```
+
+```
+单页选区: commonAncestorContainer = .scpdf-page      ✓
+跨页选区: commonAncestorContainer = .scpdf-pages     ← 两者都不是！
+```
+
+修法：加第三种情况 —— **在页容器里也算合法**（`PAGES_CONTAINER_CLASS`）。
+
+## 根因 ②：缓冲区外的页没挂文本层
+
+虚拟滚动只给可见页挂 `<Page>` → 缓冲区外的页**连文本层都没有**
+→ 浏览器的选区**到不了那一页**（只能给一个"整页"的大矩形）。
+
+修法：**文本层挂载范围比 canvas 更大**：
+
+- `Page` 新增 `renderCanvas?: boolean`（默认 true）
+- `PdfViewer` 新增 `textLayerPages`：可见页 **±2 页**都挂 `<Page>`
+- 缓冲区内的页**只挂文本层，不挂 canvas**（canvas 要重绘 PDF，很贵）
+
+## 验证（真实 PDF，跨第 1/2 页拖选）
+
+```
+选中 44 字；第 1 页 2 个矩形，第 2 页 4 个矩形
+```
+
+→ **两页都有选区块** ✓
+
+## 回归测试
+
+**E2E**（`scripts/e2e-cross-page-selection.mjs`，6 项）：
+
+- 浏览器选中了文字
+- 自绘选区层不是空的（跨页不再被丢弃）
+- 第 1 页有选区块
+- **第 2 页也有选区块**（真的跨页了）
+- 涉及 2 页
+- 全程无 JS 错误
+
+## 已知限制（浏览器行为，非包的 bug）
+
+拖动**超出视口**时浏览器会**自动滚动** → 布局在拖动中变化
+→ 浏览器给的是"整页大矩形"而不是逐行矩形 → 那一页画不出逐行的底色。
+
+→ 缓解：文本层挂载范围已扩到 **±2 页**，正常拖动（两页同时可见）没问题。
+
+## 验证
+
+- `pnpm verify`: **8/8 全绿**
+- `pnpm test`: **407 passed**
+- E2E: **285/286**（唯一失败是**基线同样失败**的面板开合定位）

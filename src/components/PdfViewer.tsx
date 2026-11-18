@@ -619,6 +619,36 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     return toRender;
   }, [visiblePages]);
 
+  /**
+   * 要挂**文本层**的页。
+   *
+   * ⚠️ **比"要渲染 canvas 的页"更多**（实测踩过的坑）。
+   *
+   * ```
+   * 用户从第 1 页底部拖到第 2 页顶部
+   * → 第 2 页如果没挂文本层 → 浏览器的选区**到不了第 2 页**
+   * → 浏览器只给一个"整页"的大矩形 → 自绘层画不出来 → **跨页选不了**
+   * ```
+   *
+   * → 文本层**必须覆盖可见页 + 缓冲区**（比 canvas 多几页）。
+   *
+   * ⚠️ canvas 不跟着多渲染（canvas 要重绘 PDF，很贵）
+   *    → 缓冲区内的页：**只挂文本层，不挂 canvas**。
+   */
+  const textLayerPages = useMemo(() => {
+    const set = new Set<number>(pagesToRender);
+
+    // 可见页的前后各多几页（跨页选择要够到相邻页）
+    const visible = [...visiblePages].sort((a, b) => a - b);
+    const first = visible[0] ?? 1;
+    const last = visible[visible.length - 1] ?? 1;
+    for (let p = Math.max(1, first - 2); p <= Math.min(numPages, last + 2); p++) {
+      set.add(p);
+    }
+
+    return set;
+  }, [pagesToRender, visiblePages, numPages]);
+
   /** 取目录（宿主注入；懒加载 —— 打开目录面板时才取） */
   useEffect(() => {
     if (!getOutline || sidebar !== 'outline' || outline !== null) {
@@ -2565,13 +2595,14 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                     top: pageTops[index] ?? 0,
                   }}
                 >
-                  {isVisible ? (
+                  {isVisible || textLayerPages.has(pageNumber) ? (
                     <Page
                       pageNumber={pageNumber}
                       page={pageProxies.get(pageNumber) ?? null}
                       scale={scale}
                       size={size}
                       pageSizePt={pageSizesPt[index]}
+                      renderCanvas={isVisible}
                       annotations={annotations.get(pageNumber) ?? null}
                       searchRects={searchRectsByPage.get(pageNumber)}
                       activeSearchRectIndex={activeSearchIndexOnPage(pageNumber)}

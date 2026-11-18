@@ -31,7 +31,6 @@ export const PAGE_NUMBER_ATTR = 'data-page-number';
 
 /** 文本层的 class（用于 closest 查找） */
 const TEXT_LAYER_CLASS = '.scpdf-text-layer';
-
 /**
  * 页面的 class。
  *
@@ -39,6 +38,18 @@ const TEXT_LAYER_CLASS = '.scpdf-text-layer';
  *    → 判定"选区是否在文本层内"时必须同时认 page。
  */
 const PAGE_CLASS = '.scpdf-page';
+
+/**
+ * **页容器**的 class（所有页的父元素）。
+ *
+ * ⚠️ **跨页选区的共同祖先就是这个**（实测）：
+ * ```
+ * 单页选区: commonAncestorContainer = .scpdf-page
+ * 跨页选区: commonAncestorContainer = .scpdf-pages   ← 两者都不是
+ * ```
+ * → 判定"选区是否合法"时必须**也认**页容器，否则跨页选区会被整个丢弃。
+ */
+const PAGES_CONTAINER_CLASS = '.scpdf-pages';
 
 /** endOfContent 哨兵的 class */
 const END_OF_CONTENT_CLASS = '.scpdf-text-layer__end';
@@ -446,7 +457,20 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
       }
       const inTextLayer = !!anchorElement.closest(TEXT_LAYER_CLASS);
       const inPage = !!anchorElement.closest(PAGE_CLASS);
-      if (!inTextLayer && !inPage) {
+      /*
+       * ⚠️⚠️ **跨页选区：共同祖先是"页容器"，不是某一页**（实测踩过的坑）。
+       *
+       * ```
+       * 单页选区: commonAncestorContainer = .scpdf-page      ✓
+       * 跨页选区: commonAncestorContainer = .scpdf-pages     ← 既不是 page 也不是 textLayer！
+       * ```
+       * → 旧逻辑 `if (!inTextLayer && !inPage) return false;` → **跨页选区直接被丢弃**
+       * → 用户看到的现象："**没法跨页选择**"（浏览器选中了 2553 字，但自绘层是空的）。
+       *
+       * → 补上第三种情况：**在页容器里**（`.scpdf-pages`）也算合法。
+       */
+      const inPagesContainer = !!anchorElement.closest(PAGES_CONTAINER_CLASS);
+      if (!inTextLayer && !inPage && !inPagesContainer) {
         return false;
       }
 
