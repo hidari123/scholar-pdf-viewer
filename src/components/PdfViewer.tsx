@@ -1188,12 +1188,39 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
     for (const [pageNumber, items] of textItemsByPage) {
       const list: PageBaselines[] = [];
+
+      /*
+       * ⚠️⚠️ **必须换算到"页内坐标"**（实测踩过的坑）。
+       *
+       * `item.top` / `item.left` 是**视口坐标**（= span 的 `getBoundingClientRect()`）
+       * 而 `clipToBaseline` 拿到的是**页内坐标**（相对页元素）
+       * → 两个空间差了一整个容器的偏移 → **裁剪到错误的行**！
+       *
+       * 实测（真实 PDF，跨多行拖选）：
+       * ```
+       * 原生选区: top=372, 521, 555
+       * 画出来的:  y=238（← 页面标题那一行！）, 381, 385, 419
+       * ```
+       * → 用户看到的现象就是"**中间有的行没有底色**"（多画了标题行，
+       *    真正选中的行反而没画上 / 画错位置）。
+       *
+       * → 换算：`item.top - 页的视口 top` = 页内 y。
+       */
+      /*
+       * ⚠️⚠️ **基线表保持"视口坐标"**（不要在这里换算）。
+       *
+       * 换算要等到 `buildSelectionShapes` 里做 —— 因为那里才知道
+       * **页的视口位置**（页在滚动内容里的位置 + 容器的视口位置 - 滚动量）。
+       *
+       * → 在这里换算的话，滚动一变就得重算整张表（滚动很频繁）→ 性能差。
+       */
       for (const item of items) {
         if (item.text.length === 0 || item.fontSize <= 0) {
           continue;
         }
+
         list.push({
-          // 字形框的上边缘 = span 的 top
+          // 字形框的上边缘 = span 的 top（**视口坐标**）
           top: item.top,
           // 字形框的高度 = span 的盒高 = fontSize（line-height: 1）
           height: item.fontSize,
@@ -2205,6 +2232,16 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       scrollToSearchHit(hit);
     },
     [scrollToSearchHit],
+  );
+
+  /**
+   * 每页的**视口偏移**（页元素相对视口的位置）。
+   *
+   * ⚠️ **必须单独存成 state** → 缩放 / 滚动 / 面板开合都会变
+   * → 基线表要跟着重算（换算到页内坐标）。
+   */
+  const [_pageOffsets, _setPageOffsets] = useState<Map<number, { top: number; left: number }>>(
+    new Map(),
   );
 
   /** 收到某页的文本项（搜索高亮 + 选区基线表用） */

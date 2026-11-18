@@ -375,10 +375,31 @@ export function buildSelectionShapes(
      * → 选区框跟文字对不齐（用户说的"定位不准 / 偏了"）。
      *
      * 裁剪方式：用**该行的基线** + 字形的 ascent/descent。
+     *
+     * ⚠️⚠️ **基线表和矩形本来就在同一个坐标空间**（"页内坐标"）—— **不要换算**！
+     *
+     * `item.top` / `item.left` 来自 `positionTextItem`：
+     * ```
+     * top  = tx[5] - fontAscent     （tx = viewport ∘ item）
+     * left = tx[4]
+     * ```
+     * → `viewport` 变换把 PDF 单位映射到**页像素**（612pt × 2.3 = 1408px）
+     * → 而页元素本身就是 1408px 宽 → **两者是同一个空间**（页内坐标）✓
+     *
+     * ⚠️ 我曾经误以为"基线是视口坐标"→ 加了一次换算
+     *    → Δtop 从 0.01px 变成 **4px**（候选挑错）。
      */
     const pageBaselines = baselines?.get(owner.pageNumber);
     if (pageBaselines && pageBaselines.length > 0) {
-      pageRect = clipToBaseline(pageRect, pageBaselines);
+      const pageBaselinesInPage: PageBaselines[] = pageBaselines.map((b) => ({
+        top: b.top,
+        height: b.height,
+        baseline: b.baseline,
+        left: b.left,
+        width: b.width,
+      }));
+
+      pageRect = clipToBaseline(pageRect, pageBaselinesInPage);
     }
 
     /*

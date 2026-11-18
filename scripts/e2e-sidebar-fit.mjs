@@ -10,9 +10,10 @@
  * 开缩略图:  scale=230%  containerW=1139  pageW=1408   ← ❌ 页比容器还宽（横向溢出）
  * ```
  */
-import { chromium } from 'playwright';
+
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { chromium } from 'playwright';
 import { E2E_BASE_URL } from './e2e-base.mjs';
 
 function resolveChromium() {
@@ -61,9 +62,12 @@ const snap = () =>
 try {
   await page.goto(E2E_BASE_URL, { waitUntil: 'networkidle' });
   await page.waitForTimeout(3000);
-  await page.waitForFunction(() => document.querySelectorAll('.scpdf-text-layer__item').length > 50, {
-    timeout: 30000,
-  });
+  await page.waitForFunction(
+    () => document.querySelectorAll('.scpdf-text-layer__item').length > 50,
+    {
+      timeout: 30000,
+    },
+  );
   await page.waitForTimeout(1500);
 
   const before = await snap();
@@ -77,10 +81,14 @@ try {
   const withPanel = await snap();
   console.log(`  开缩略图: ${JSON.stringify(withPanel)}`);
 
-  check('**打开缩略图后：容器变窄了**', withPanel.containerW < before.containerW, `${before.containerW} → ${withPanel.containerW}`);
+  check(
+    '**打开缩略图后：容器变窄了**',
+    withPanel.containerW < before.containerW,
+    `${before.containerW} → ${withPanel.containerW}`,
+  );
   check(
     '**打开缩略图后：缩放自动变小**',
-    Number.parseInt(withPanel.scale) < Number.parseInt(before.scale),
+    Number.parseInt(withPanel.scale, 10) < Number.parseInt(before.scale, 10),
     `${before.scale} → ${withPanel.scale}`,
   );
   check(
@@ -111,7 +119,7 @@ try {
    */
   check(
     '**关闭缩略图后：缩放恢复（±10%，一个量化步长）**',
-    Math.abs(Number.parseInt(closed.scale) - Number.parseInt(before.scale)) <= 10,
+    Math.abs(Number.parseInt(closed.scale, 10) - Number.parseInt(before.scale, 10)) <= 10,
     `${before.scale} → ${closed.scale}`,
   );
   check('关闭缩略图后：页完整可见', closed.overflow === false);
@@ -126,7 +134,7 @@ try {
   console.log(`  手动放大: ${JSON.stringify(zoomed)}`);
   check(
     '手动放大生效了',
-    Number.parseInt(zoomed.scale) > Number.parseInt(before.scale),
+    Number.parseInt(zoomed.scale, 10) > Number.parseInt(before.scale, 10),
     `${before.scale} → ${zoomed.scale}`,
   );
 
