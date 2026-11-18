@@ -74,6 +74,12 @@ interface CandidateEntry {
   overlap: number;
   /** 盒子中心到矩形中心的距离 */
   centerDelta: number;
+  /**
+   * **是否被降权**（和矩形没有水平重叠）。
+   *
+   * ⚠️ 用来挡"竖排的页边戳"（垂直距离近但水平完全不在一块）。
+   */
+  penalized: boolean;
 }
 
 /**
@@ -83,6 +89,16 @@ interface CandidateEntry {
  * 加上相邻两行 → 8 足够覆盖所有可能的匹配。
  */
 const CANDIDATE_LIMIT = 8;
+
+/**
+ * "差一点就重叠"的容差（px）。
+ *
+ * 浏览器给的行盒可能**略微超出**文字（行盒比字形盒高）
+ * → 严格判 `overlap > 0` 会把**正确的行**也丢掉。
+ *
+ * ⚠️ 必须**远小于**一行文字的宽度 → 旋转戳（差 800px+）仍然会被排除。
+ */
+const NEAR_MISS_TOLERANCE = 40;
 
 /**
  * 候选的**优劣比较**（小的更好）。
@@ -96,6 +112,17 @@ const CANDIDATE_LIMIT = 8;
  *    → 选区框比文字低 18.88px（用户看到的"定位跑偏"）。
  */
 function compareCandidates(a: CandidateEntry, b: CandidateEntry): number {
+  /*
+   * ⚠️⚠️ **不重叠的候选排到最后**（实测踩过的坑）。
+   *
+   * 真实 PDF 的页边戳是竖排文字 → 垂直距离几乎为 0 → centerDelta 更小
+   * → 不加这一条的话它会赢 → 选区框跳到页的右边缘。
+   *
+   * ⚠️ **用"降权"而不是"丢掉"**（丢掉会改变正常情况下的胜出者）。
+   */
+  if (a.penalized !== b.penalized) {
+    return a.penalized ? 1 : -1;
+  }
   if (Math.abs(a.centerDelta - b.centerDelta) > 2) {
     return a.centerDelta - b.centerDelta;
   }
@@ -178,11 +205,40 @@ export function clipToBaseline<
           Math.max(rectLeft, candidate.left)
         : 0;
 
+    /*
+     * ⚠️⚠️ **水平不重叠的候选要"降权"，不要直接丢掉**（实测踩过的坑）。
+     *
+     * 真实 PDF（arXiv 论文）的页边戳是**竖排文字**：
+     * ```
+     * 选区矩形   x=175（正文）
+     * 竖排戳     x=1217, top≈250   ← 垂直距离几乎为 0！
+     * ```
+     * → 只按垂直距离排序 → **竖排戳的 centerDelta 更小** → 赢了
+     * → 选区框**跳到页的右边缘**（实测 Δ左 = 1050px）。
+     *
+     * ### 为什么是"降权"而不是"丢掉"
+     *
+     * 之前用 `continue` 直接丢掉 → 候选表的内容变了
+     * → **胜出的候选也变了** → 选区框的 x/width 变了（Δ右 从 3.4 变成 7.1）。
+     *
+     * → 改成：**给不重叠的候选一个"很差的排序键"**
+     *    → 它们还在候选表里（万一没有重叠的候选，还能兜底）
+     *    → 但**排不到前面** → 正常情况下的胜出者**不变** ✓
+     *
+     * ⚠️ 容差 40px：矩形的 left 可能是**行首之前**的位置
+     *    （浏览器的行盒会略微超出文字）→ 严格判 `overlap > 0` 会把**正确的行**也降权。
+     */
+    const overlapGap = candidate.width > 0 ? candidate.left - (rectLeft + rect.width) : 0;
+    const candidateIsLeft = candidate.width > 0 ? rectLeft - (candidate.left + candidate.width) : 0;
+    const nearEnough = Math.min(overlapGap, candidateIsLeft) <= NEAR_MISS_TOLERANCE;
+
     const entry: CandidateEntry = {
       candidate,
       distance,
       overlap,
       centerDelta: Math.abs(candidate.top + candidate.height / 2 - center),
+      // ⚠️ 不重叠 → 排序键加一个大惩罚（不是丢弃）
+      penalized: overlap <= 0 && !nearEnough,
     };
 
     if (topCandidates.length < CANDIDATE_LIMIT) {

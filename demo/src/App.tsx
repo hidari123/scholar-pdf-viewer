@@ -10,7 +10,9 @@ import type {
   HighlightRecord,
   NewHighlight,
   OutlineItemLike,
+  PdfViewerDensity,
   PdfViewerHandle,
+  PdfViewerTheme,
   SelectionData,
 } from '@scholar-club/pdf-viewer';
 import {
@@ -20,6 +22,8 @@ import {
   PdfViewer,
   parseHighlightDoc,
   stringifyHighlightDoc,
+  THEME_LABELS,
+  THEMES,
 } from '@scholar-club/pdf-viewer';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import * as pdfjs from 'pdfjs-dist';
@@ -85,19 +89,42 @@ export default function App() {
     [highlightsByDoc, documentId],
   );
 
-  /** 更新当前文档的高亮 */
+  /**
+   * 更新当前文档的高亮。
+   *
+   * ⚠️⚠️ **必须用"直接赋值"，不能套 updater**（实测踩过的坑）。
+   *
+   * 之前写成：
+   * ```tsx
+   * setHighlightsByDoc((prev) => ({ ...prev, [documentId]: updater(prev[documentId] ?? []) }));
+   * ```
+   * → **套了两层 updater** → React 的 StrictMode 会**双重调用**外层 updater
+   * → 内层 `updater` 被调用 2~3 次 → 每次都**追加**一条 → **高亮翻倍**！
+   *
+   * 实测：点一次"高亮" → 生成了 **3 条**。
+   *
+   * → 改成**直接用当前值算新值**（不是 updater）→ StrictMode 调几次都一样的结果。
+   */
   const setHighlights = useCallback(
-    (updater: (prev: HighlightRecord[]) => HighlightRecord[]) => {
-      setHighlightsByDoc((prevByDoc) => {
-        const current = prevByDoc[documentId] ?? [];
-        return { ...prevByDoc, [documentId]: updater(current) };
-      });
+    (next: HighlightRecord[] | ((prev: HighlightRecord[]) => HighlightRecord[])) => {
+      const current = highlightsByDoc[documentId] ?? [];
+      const value =
+        typeof next === 'function'
+          ? (next as (p: HighlightRecord[]) => HighlightRecord[])(current)
+          : next;
+      setHighlightsByDoc((prev) => ({ ...prev, [documentId]: value }));
     },
-    [documentId],
+    [highlightsByDoc, documentId],
   );
 
   /** 当前选中的高亮颜色 key（宿主的 UI 状态） */
   const [highlightColor, setHighlightColor] = useState('yellow');
+
+  /** 主题（宿主可切换） */
+  const [theme, setTheme] = useState<PdfViewerTheme>('light');
+
+  /** 密度（appearance 的结构开关） */
+  const [density, setDensity] = useState<PdfViewerDensity>('cozy');
 
   /** 用户自定义的颜色（key → 颜色）；持久化也是宿主的事 */
   const [customColors, setCustomColors] = useState<Record<string, string>>({});
@@ -519,11 +546,26 @@ export default function App() {
   /** 新建高亮（宿主保存） */
   const handleHighlightCreate = useCallback(
     (highlight: NewHighlight) => {
+      /*
+       * ⚠️⚠️ **ID 必须在 updater 外面生成**（实测踩过的坑）。
+       *
+       * 之前写成：
+       * ```tsx
+       * setHighlights((prev) => [...prev, { id: `h-${++highlightSeq}`, ... }]);
+       * ```
+       * → updater 里**有副作用**（改计数器）
+       * → React 的 StrictMode 会**双重调用** updater
+       * → 同一个高亮被**加了 2~3 次**（每次 ID 还不同）
+       * → 实测：点一次"高亮" → **3 条** + "Encountered two children with the same key"。
+       *
+       * → ID 在外面生成 → updater 是**纯函数** → 调几次结果都一样。
+       */
       highlightSeq += 1;
+      const id = `h-${highlightSeq}`;
       setHighlights((prev) => [
         ...prev,
         {
-          id: `h-${highlightSeq}`,
+          id,
           color: highlight.color ?? 'label-6',
           selectedText: highlight.selectedText,
           position: highlight.position,
@@ -638,20 +680,19 @@ export default function App() {
               return;
             }
             /*
-             * ⚠️ **走 `onHighlightCreate`** → 包会顺带清掉选区。
+             * ⚠️ **走 `viewerRef.current.createHighlight()`**（包的统一入口）。
+             *
+             * → 包会：① 调 `onHighlightCreate`（宿主存）② **清掉选区**。
              *
              * 直接调 `handleHighlightCreate` 的话，包不知道"高亮做完了"
              * → 选区的蓝色块一直浮在新高亮上（用户反馈"无法取消选中状态"）。
              */
-            createHighlight(highlightColor, selection.text, selection.norm);
+            viewerRef.current?.createHighlight({
+              color: highlightColor,
+              selectedText: selection.text,
+              position: selection.norm,
+            });
             setHint('已添加高亮（宿主自存，包不碰后端）');
-            /*
-             * ⚠️ **告诉包"高亮做完了"** → 包清掉选区。
-             *
-             * 不清的话：选区的蓝色块一直浮在新高亮上
-             *（用户反馈"点击高亮之后 无法取消选中状态 一直都有外边框"）。
-             */
-            viewerRef.current?.clearSelection();
           }}
           title="添加高亮"
           aria-label="添加高亮"
@@ -690,27 +731,38 @@ export default function App() {
         </button>
       </>
     ),
-    [
-      selection,
-      highlightColor,
-      createHighlight,
-      handleExportHighlights,
-      handleImportHighlights,
-      handleDownloadPdf,
-    ],
+    [selection, highlightColor, handleExportHighlights, handleImportHighlights, handleDownloadPdf],
   );
 
   return (
-    <div className="demo-root">
+    <div
+      className="demo-root"
+      style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}
+    >
       <div
         className="demo-header"
         style={{
+          display: 'flex',
           padding: '8px 12px',
           fontSize: 13,
           borderBottom: '1px solid var(--scpdf-color-border)',
           gap: 12,
           alignItems: 'center',
-          flexWrap: 'wrap',
+          /*
+           * ⚠️ **不换行 + 固定高度**（实测踩过的坑）。
+           *
+           * 控件一多，`flex-wrap: wrap` 会让 header **变高**
+           * → PDF 区域整体下移 → E2E 里"按坐标选字"的用例选到**不同的行**
+           * → 缩放矩阵的"选区水平贴合墨迹"从 49/49 掉到 46/49。
+           *
+           * → header 高度**固定**（`height` + `overflow: hidden`）
+           * → 加控件也不会影响 PDF 区域的位置。
+           */
+          flexWrap: 'nowrap',
+          height: 46,
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          flexShrink: 0,
         }}
       >
         <strong>@scholar-club/pdf-viewer</strong>
@@ -728,6 +780,39 @@ export default function App() {
           <span style={{ opacity: 0.6 }}>加载中…</span>
         )}
         {hint ? <span style={{ color: 'var(--scpdf-color-primary)' }}>{hint}</span> : null}
+
+        {/*
+          主题切换器 —— **宿主侧的 UI**。
+          包提供 `theme` prop + `THEMES` / `THEME_LABELS` 常量。
+
+          ⚠️ **放在同一行**（不另起一行）
+          → 否则 header 变高 → PDF 区域下移 → E2E 的坐标选字用例会选到不同的行
+          → 实测缩放矩阵的"选区水平贴合墨迹"从 49/49 掉到 46/49。
+        */}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ opacity: 0.7 }}>主题：</span>
+          <select
+            value={theme}
+            onChange={(e) => setTheme(e.target.value as PdfViewerTheme)}
+            aria-label="主题"
+          >
+            {THEMES.map((t) => (
+              <option key={t} value={t}>
+                {THEME_LABELS[t]}
+              </option>
+            ))}
+          </select>
+          <span style={{ opacity: 0.7, marginLeft: 12 }}>密度：</span>
+          <select
+            value={density}
+            onChange={(e) => setDensity(e.target.value as PdfViewerDensity)}
+            aria-label="密度"
+          >
+            <option value="compact">紧凑</option>
+            <option value="cozy">适中</option>
+            <option value="comfortable">宽松</option>
+          </select>
+        </span>
 
         {/*
           高亮颜色选择器 —— **宿主侧的 UI**。
@@ -750,6 +835,8 @@ export default function App() {
           ref={viewerRef}
           file={sampleUrl}
           documentId={documentId}
+          theme={theme}
+          appearance={{ density }}
           highlights={highlights}
           highlightPalette={highlightPalette}
           toolbar={{ rightSlot: toolbarSlot }}
@@ -765,13 +852,12 @@ export default function App() {
           onSelectionChange={handleSelection}
           onHighlightCreate={(h) => {
             /*
-             * ⚠️ **包的统一入口** → 存高亮。
+             * ⚠️ **宿主自己的按钮创建了高亮**（走 `viewerRef.createHighlight`）→ 这里存。
              *
-             * 包在调这个之前/之后会清掉选区（"清选区"是 UI 行为，属于包）。
+             * → 包会顺带清掉选区（"清选区"是 UI 行为，属于包）。
              *
-             * ⚠️ **提示语放这里**（而不是 `onHighlight`）：
-             *   - 颜色下拉那条路径走的是 `onHighlightCreate`，**不走** `onHighlight`
-             *   - 提示放 `onHighlight` → 选色后提示不更新（实测：提示被覆盖成"选中 N 字"）
+             * ⚠️ **包内置的"高亮"按钮不走这里**（它走 `onHighlight`）
+             *    → 两个都走 → 会**保存两次**（实测：点一次生成 3 条）。
              */
             handleHighlightCreate(h);
             setHint(`已高亮（${h.color ?? '默认'}）`);
@@ -788,14 +874,16 @@ export default function App() {
           onNote={({ text }) => setHint(`【笔记】${text.slice(0, 20)}…（宿主实现）`)}
           onHighlight={({ text, color, position }) => {
             /*
-             * ⚠️ **走 `onHighlightCreate`（包的统一入口）** → 包会顺带清掉选区。
+             * ⚠️ **包内置的"高亮"按钮** → 走 `onHighlight`。
              *
-             * 直接调 `handleHighlightCreate` 的话，包不知道"高亮做完了"
-             * → 选区的蓝色块一直浮在新高亮上（用户反馈"无法取消选中状态"）。
+             * → 宿主在这里存高亮（**只存一次**）。
+             * → 包会**自己清选区**（不用宿主再通知）。
              *
-             * ⚠️ **提示语在 `onHighlightCreate` 里设**（统一入口）→ 这里不用再设。
+             * ⚠️ **不要**在这里再调 `onHighlightCreate` / `createHighlight` 的
+             *    包的入口 → 会**保存两次**（实测：点一次生成 3 条）。
              */
             createHighlight(color ?? highlightColor, text, position);
+            setHint(`已高亮（${color ?? highlightColor}）`);
           }}
           onExternalLink={(url) => {
             // 宿主决定怎么开外链（新窗口 / 应用内 WebView）

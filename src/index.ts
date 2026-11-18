@@ -41,12 +41,29 @@ export {
   stringifyHighlightDoc,
 } from './core/highlight/serialize';
 export type { OutlineItemLike } from './core/outline/outline';
+export type { PaperSize, PrintMargin } from './core/print';
+/* ---------- 打印 ---------- */
+export {
+  computePrintPageSize,
+  computePrintScale,
+  DEFAULT_PRINT_MARGIN,
+  MM_TO_PX,
+  PAPER_SIZES,
+} from './core/print';
 export type {
   SearchHit,
   SearchOptions,
   TextPageLike,
 } from './core/search/search';
 export { PdfSearch } from './core/search/search';
+export type {
+  PdfViewerAppearance,
+  PdfViewerChrome,
+  PdfViewerDensity,
+  PdfViewerTheme,
+} from './core/theme';
+/* ---------- 主题与外观 ---------- */
+export { THEME_LABELS, THEMES, themeClasses } from './core/theme';
 export type * from './core/types';
 export * from './hooks';
 export type { Locale, Messages } from './i18n/messages';

@@ -41,12 +41,25 @@ page.on('pageerror', (e) => errors.push(String(e).slice(0, 120)));
 const state = () =>
   page.evaluate(() => {
     const sel = window.getSelection();
+    /*
+     * ⚠️ **按"唯一的高亮 id"计数**，不是按 DOM 元素个数。
+     *
+     * 一个高亮可能**跨多行 / 多个矩形** → 渲染成多个 `<button>`
+     * （实测一段正文 → 3 个 `.scpdf-annotation--mine` 元素，但只是 **1 条高亮**）
+     * → 按元素计数会误判成"生成了 3 条"。
+     */
+    const ids = new Set(
+      [...document.querySelectorAll('.scpdf-annotation--mine')].map((el) =>
+        el.getAttribute('data-highlight-id'),
+      ),
+    );
     return {
       nativeSelLen: sel?.toString().length ?? 0,
       nativeCollapsed: sel?.isCollapsed ?? null,
       selectionLayer: document.querySelectorAll('.scpdf-selection-layer').length,
       selectionPopover: document.querySelectorAll('.scpdf-selection-popover').length,
-      annotations: document.querySelectorAll('.scpdf-annotation--mine').length,
+      annotations: ids.size,
+      annotationEls: document.querySelectorAll('.scpdf-annotation--mine').length,
       activeAnnotations: document.querySelectorAll('.scpdf-annotation--active').length,
     };
   });

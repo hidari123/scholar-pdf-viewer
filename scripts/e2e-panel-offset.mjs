@@ -111,10 +111,28 @@ try {
       const first = rects[0];
       const pageEl = document.querySelector('.scpdf-page');
       const pr = pageEl?.getBoundingClientRect();
-      const s = window.getSelection();
-      const rr = s?.rangeCount ? s.getRangeAt(0).getBoundingClientRect() : null;
 
-      if (!first || !pr || !rr) {
+      /*
+       * ⚠️ **参考基准不能用 `range.getBoundingClientRect()`**（实测踩过的坑）。
+       *
+       * 浏览器的 Range 会把**页边戳**（逐字符竖排，在 x=1226）也包进来
+       * → `rr.top` / `rr.left` 被污染 → Δ上 = 15（看起来"偏了"）
+       *   其实**自绘的选区块是对的**（页边戳已经被包过滤掉了）。
+       *
+       * → 改用**选中的文字 span**（真正被选中的那些）做基准。
+       */
+      const s = window.getSelection();
+      if (!s || s.rangeCount === 0) {
+        return { ok: false, rects: rects.length };
+      }
+      const range = s.getRangeAt(0);
+      const selectedSpans = [...range.getClientRects()].filter(
+        (r) => r.width > 0 && r.height > 0 && r.left < pr.left + (pr?.width ?? 0) - 60,
+      );
+      const inkLeft = Math.min(...selectedSpans.map((r) => r.left));
+      const inkTop = Math.min(...selectedSpans.map((r) => r.top));
+
+      if (!first || !pr || selectedSpans.length === 0) {
         return { ok: false, rects: rects.length };
       }
 
@@ -125,8 +143,8 @@ try {
       return {
         ok: true,
         rects: rects.length,
-        dLeft: Math.round(selViewportLeft - rr.left),
-        dTop: Math.round(selViewportTop - rr.top),
+        dLeft: Math.round(selViewportLeft - inkLeft),
+        dTop: Math.round(selViewportTop - inkTop),
         panelOpen: !!document.querySelector('.scpdf-panel'),
         pageLeftContent: Math.round(
           pr.left - (document.querySelector('.scpdf-container')?.getBoundingClientRect().left ?? 0),

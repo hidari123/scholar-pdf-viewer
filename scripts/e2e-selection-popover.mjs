@@ -184,7 +184,26 @@ try {
   await selectText();
   await page.waitForTimeout(300);
   const beforeOutside = await page.locator('.scpdf-selection-popover').count();
-  await page.mouse.click(200, 60);
+  /*
+   * ⚠️ **点在画布上**，不要点固定坐标（如 200, 60）。
+   *
+   * 固定坐标会随 demo 的布局变化而命中**不同的元素**
+   * （实测：demo 加了主题切换器后，"载入内置样张"按钮移到了 x=202
+   *   → 点 (200,60) 命中了那个按钮 → **换了文档** → 后续步骤全乱）。
+   *
+   * → 点**画布的空白处**（页面的右边距）→ 一定是"文字层之外"，
+   *   而且不会触发任何按钮。
+   */
+  const outsidePoint = await page.evaluate(() => {
+    const canvas = document.querySelector('.scpdf-canvas');
+    if (!canvas) return null;
+    const r = canvas.getBoundingClientRect();
+    // 页面右边距（没有文字）
+    return { x: r.right - 12, y: r.top + 20 };
+  });
+  if (outsidePoint) {
+    await page.mouse.click(outsidePoint.x, outsidePoint.y);
+  }
   await page.waitForTimeout(300);
   const afterOutside = await page.locator('.scpdf-selection-popover').count();
 

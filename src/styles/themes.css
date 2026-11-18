@@ -1,0 +1,229 @@
+/*
+ * @scholar-club/pdf-viewer —— **主题**
+ *
+ * ## 分层
+ *
+ * | 层 | 控制什么 | 手段 |
+ * |---|---|---|
+ * | 1 | 整体风格 | `theme="paper"` |
+ * | 2 | 结构开关 | `appearance={{ density: 'compact' }}` |
+ * | 3 | 像素微调 | 宿主覆盖 CSS 变量 |
+ *
+ * 三层**不冲突** —— 2 和 3 都能覆盖 1。
+ *
+ * ## 主题清单
+ *
+ * | 主题 | 说明 |
+ * |---|---|
+ * | `light` | 亮色（默认） |
+ * | `dark` | 暗色 |
+ * | `auto` | 跟随系统 |
+ * | `paper` | 纸张（米黄护眼） |
+ * | `sepia` | 深色护眼（棕褐） |
+ * | `contrast` | 高对比度（无障碍） |
+ * | `minimal` | 极简黑白（打印友好） |
+ *
+ * ## 每套主题都**完整**
+ *
+ * ⚠️ 旧实现只有 `light` / `dark` / `auto`，而且**暗色漏了一堆变量**
+ * （primary / shadow / selection-color / bbox-color 都没覆盖）
+ * → 换主题时颜色"半新半旧"，很难看。
+ *
+ * → 现在每套主题都覆盖**全部**变量。
+ */
+
+/* ==========================================================================
+   1. paper —— 纸张（米黄护眼）
+   ========================================================================== */
+
+.scpdf-root--paper {
+  --scpdf-color-surface: #faf8f3;
+  --scpdf-color-surface-alt: #f2ede3;
+  --scpdf-color-text: #2b2620;
+  --scpdf-color-border: #ddd5c5;
+  --scpdf-color-primary: #b45309;
+  --scpdf-highlight-my: #ffe9a8;
+  --scpdf-highlight-others: #dbe7f5;
+  --scpdf-highlight-active: #b45309;
+  --scpdf-selection-color: rgba(180, 83, 9, 0.22);
+  --scpdf-bbox-color: #b45309;
+  --scpdf-shadow-page: 0 4px 16px rgba(120, 90, 40, 0.15);
+  --scpdf-radius-page: 6px;
+}
+
+/* 纸张主题的暗色变体（跟随系统） */
+@media (prefers-color-scheme: dark) {
+  .scpdf-root--paper.scpdf-root--auto {
+    --scpdf-color-surface: #26221c;
+    --scpdf-color-surface-alt: #1c1915;
+    --scpdf-color-text: #ece5d8;
+    --scpdf-color-border: #453d33;
+    --scpdf-color-primary: #f59e0b;
+    --scpdf-highlight-my: #6b5518;
+    --scpdf-highlight-others: #2b4460;
+    --scpdf-highlight-active: #f59e0b;
+    --scpdf-selection-color: rgba(245, 158, 11, 0.24);
+    --scpdf-bbox-color: #f59e0b;
+    --scpdf-shadow-page: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* ==========================================================================
+   2. sepia —— 深色护眼（棕褐，长时间阅读不刺眼）
+   ========================================================================== */
+
+.scpdf-root--sepia {
+  --scpdf-color-surface: #f4ecd8;
+  --scpdf-color-surface-alt: #e9dfc6;
+  --scpdf-color-text: #433422;
+  --scpdf-color-border: #d3c4a4;
+  --scpdf-color-primary: #8a5a2b;
+  --scpdf-highlight-my: #f7dc94;
+  --scpdf-highlight-others: #d6e0d0;
+  --scpdf-highlight-active: #8a5a2b;
+  --scpdf-selection-color: rgba(138, 90, 43, 0.24);
+  --scpdf-bbox-color: #8a5a2b;
+  --scpdf-shadow-page: 0 3px 12px rgba(90, 70, 40, 0.22);
+  --scpdf-radius-page: 3px;
+}
+
+/* ==========================================================================
+   3. contrast —— 高对比度（无障碍）
+   ========================================================================== */
+
+.scpdf-root--contrast {
+  --scpdf-color-surface: #000000;
+  --scpdf-color-surface-alt: #000000;
+  --scpdf-color-text: #ffffff;
+  --scpdf-color-border: #ffffff;
+  --scpdf-color-primary: #ffff00;
+  --scpdf-highlight-my: #ffff00;
+  --scpdf-highlight-others: #00ffff;
+  --scpdf-highlight-active: #ffff00;
+  --scpdf-selection-color: rgba(255, 255, 0, 0.4);
+  --scpdf-bbox-color: #ffff00;
+  /* 高对比度 → 不要阴影（会降低可读性） */
+  --scpdf-shadow-page: none;
+  --scpdf-radius-page: 0;
+}
+
+/* ==========================================================================
+   4. minimal —— 极简黑白（打印友好）
+   ========================================================================== */
+
+.scpdf-root--minimal {
+  --scpdf-color-surface: #ffffff;
+  --scpdf-color-surface-alt: #ffffff;
+  --scpdf-color-text: #000000;
+  --scpdf-color-border: #d0d0d0;
+  --scpdf-color-primary: #333333;
+  --scpdf-highlight-my: #f0f0f0;
+  --scpdf-highlight-others: #e8e8e8;
+  --scpdf-highlight-active: #333333;
+  --scpdf-selection-color: rgba(0, 0, 0, 0.15);
+  --scpdf-bbox-color: #333333;
+  /* 极简 → 不要阴影 */
+  --scpdf-shadow-page: none;
+  --scpdf-radius-page: 0;
+}
+
+/* ==========================================================================
+   暗色主题补全
+   ==========================================================================
+
+   ⚠️ 旧实现的暗色只覆盖了 4 个颜色变量，
+   primary / shadow / selection-color / bbox-color **都没覆盖**
+   → 暗色下用的还是亮色的值（蓝色高亮框在黑底上很刺眼）。
+ */
+
+.scpdf-root--dark {
+  --scpdf-color-surface: #1f1f1f;
+  --scpdf-color-surface-alt: #141414;
+  --scpdf-color-text: #e6e6e6;
+  --scpdf-color-border: #333333;
+  --scpdf-color-primary: #4c8dff;
+  --scpdf-highlight-my: #6b5a1f;
+  --scpdf-highlight-others: #26426b;
+  --scpdf-highlight-active: #4c8dff;
+  --scpdf-selection-color: rgba(76, 141, 255, 0.3);
+  --scpdf-bbox-color: #4c8dff;
+  --scpdf-shadow-page: 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  .scpdf-root--auto {
+    --scpdf-color-surface: #1f1f1f;
+    --scpdf-color-surface-alt: #141414;
+    --scpdf-color-text: #e6e6e6;
+    --scpdf-color-border: #333333;
+    --scpdf-color-primary: #4c8dff;
+    --scpdf-highlight-my: #6b5a1f;
+    --scpdf-highlight-others: #26426b;
+    --scpdf-highlight-active: #4c8dff;
+    --scpdf-selection-color: rgba(76, 141, 255, 0.3);
+    --scpdf-bbox-color: #4c8dff;
+    --scpdf-shadow-page: 0 2px 10px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* ==========================================================================
+   5. appearance —— 结构开关
+   ==========================================================================
+
+   ⚠️ **这些是"结构"，不是"颜色"** → 用 JS 配（CSS 变量做不到）。
+
+   | 选项 | 值 | 作用 |
+   |---|---|---|
+   | `density` | `compact` / `cozy` / `comfortable` | 工具栏 / 面板的密度 |
+   | `chrome` | `full` / `minimal` / `hidden` | 显示多少外壳 |
+   | `pageShadow` | `boolean` | 页阴影 |
+   | `pageRadius` | `number` | 页圆角（px） |
+   | `showPageNumber` | `boolean` | 页码 |
+   | `showOutline` | `boolean` | 目录按钮 |
+   | `showThumbnails` | `boolean` | 缩略图按钮 |
+   | `showSearch` | `boolean` | 搜索按钮 |
+ */
+
+/* ---------- 密度 ---------- */
+
+.scpdf-root--density-compact {
+  --scpdf-toolbar-height: 32px;
+  --scpdf-panel-width: 180px;
+  --scpdf-gap: 8px;
+}
+
+.scpdf-root--density-cozy {
+  --scpdf-toolbar-height: 40px;
+  --scpdf-panel-width: 220px;
+  --scpdf-gap: 12px;
+}
+
+.scpdf-root--density-comfortable {
+  --scpdf-toolbar-height: 48px;
+  --scpdf-panel-width: 260px;
+  --scpdf-gap: 16px;
+}
+
+/* ---------- 外壳 ---------- */
+
+/* 极简：工具栏只留必要的东西（隐藏文字标签） */
+.scpdf-root--chrome-minimal .scpdf-toolbar__btn span,
+.scpdf-root--chrome-minimal .scpdf-toolbar__label {
+  display: none;
+}
+
+/* 隐藏：整个外壳都不要（宿主自己做 UI） */
+.scpdf-root--chrome-hidden .scpdf-toolbar,
+.scpdf-root--chrome-hidden .scpdf-panel {
+  display: none;
+}
+
+/* ---------- 页阴影 / 圆角 ---------- */
+
+.scpdf-root--no-page-shadow .scpdf-page {
+  box-shadow: none;
+}
+
+.scpdf-root--page-radius-0 .scpdf-page {
+  border-radius: 0;
+}

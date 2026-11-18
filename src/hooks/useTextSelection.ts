@@ -20,6 +20,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
+import { filterByDragOrigin } from '../core/selection/drag-origin';
 import type { PageFrame } from '../core/selection/extract';
 import { extractSelection } from '../core/selection/extract';
 import type { BaselinesByPage } from '../core/selection/shape';
@@ -133,6 +134,35 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
 
   /** 清原生选区的 rAF 句柄（延迟清除，见 `clearNativeSelection`） */
   const clearRafRef = useRef(0);
+
+  /**
+   * **拖动的起点**（视口坐标）。
+   *
+   * ## 为什么需要（实测踩过的坑）
+   *
+   * 真实 PDF（arXiv 论文）的页边戳是**逐字符竖排**的（`left=1231`，每行一个字符）。
+   * 浏览器在选区时**按视觉行**把同一行的 inline box 一起选中 →
+   * 页边戳的字符虽然 `left=1231`（离正文 1000px），却因为 `top` 相同
+   * 被**一起选中**。
+   *
+   * 实测：拖选正文（x=175~445）→ 浏览器选区宽达 **1060px**！
+   * ```
+   * clientRects: [
+   *   { l: 175.4, ... },   ← 正文
+   *   { l: 1225.9, ... },  ← 页边戳（离正文 1000px）
+   * ]
+   * ```
+   *
+   * → 自绘层把页边戳也画出来 → 用户看到"选区横跨整页"。
+   *
+   * ## 修法
+   *
+   * 记住**鼠标按下和松开的位置** → 只保留**和拖动范围重叠**的矩形。
+   * → 页边戳的字符和拖动范围不重叠 → 丢掉。
+   */
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  /** 拖动的终点（视口坐标） */
+  const dragEndRef = useRef<{ x: number; y: number } | null>(null);
 
   /**
    * **span 按页分组的缓存**（`collectPages` 用）。
@@ -409,10 +439,32 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
       const usable = rects.filter((r) => r.height <= maxNormalHeight);
 
       /*
+       * ⚠️⚠️ **丢掉"另一列"的矩形**（实测踩过的坑）。
+       *
+       * 真实 PDF（arXiv 论文）的页边戳是**逐字符竖排**的（`left=1231`）。
+       * 浏览器按**视觉行**选中同一行的所有 inline box →
+       * 页边戳的字符虽然离正文 1000px，`top` 却和正文行相同 → **被一起选中**。
+       *
+       * 实测：拖选正文（x=175~445）→ 浏览器选区宽达 **1060px**。
+       *
+       * → 用**水平连续性**判断：把矩形按水平区间合并成"段"，
+       *   只保留**和鼠标按下位置同一段**的那些矩形。
+       *   （页边戳和正文之间有 780px 的空洞 → 不同段 → 丢掉。）
+       *
+       * ⚠️ **只在有拖动起点时生效**（没有起点就用全部）。
+       */
+      const withDragOrigin = filterByDragOrigin(
+        usable,
+        dragStartRef.current && dragEndRef.current
+          ? { startX: dragStartRef.current.x, endX: dragEndRef.current.x }
+          : null,
+      );
+
+      /*
        * 原始形状给自绘选区层（保留每个 client rect 的细节）。
        * 全部异常时传空数组 → 自绘层清空（宁可漏画，也不要画出一大块）。
        */
-      onClientRects?.(usable.length > 0 ? usable : []);
+      onClientRects?.(withDragOrigin.length > 0 ? withDragOrigin : []);
 
       /**
        * 坐标系统一（⚠️ 这里曾经有个双重扣减的 bug）：
@@ -612,6 +664,39 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     document.addEventListener('selectionchange', onSelectionChangeEvent);
 
     /*
+     * ⚠️ **记住拖动的起点**（用于过滤"另一列"的矩形）。
+     *
+     * 见 `core/selection/drag-origin.ts` 的说明。
+     *
+     * → 在**容器**上监听（不是 document）→ 点容器外的按钮不算拖动。
+     * → 只在**文本层内**按下才算（否则点工具栏也会被记成起点）。
+     */
+    const onMouseDown = (event: MouseEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest(TEXT_LAYER_CLASS)) {
+        dragStartRef.current = { x: event.clientX, y: event.clientY };
+        dragEndRef.current = { x: event.clientX, y: event.clientY };
+      } else {
+        dragStartRef.current = null;
+        dragEndRef.current = null;
+      }
+    };
+    container.addEventListener('mousedown', onMouseDown);
+
+    /*
+     * ⚠️ **拖动过程中也要更新终点**。
+     *
+     * → `selectionchange` 在拖动中就会触发 → 那时终点还在变
+     * → 不用等 mouseup（否则拖动时的浮层位置会不对）。
+     */
+    const onMouseMove = (event: MouseEvent) => {
+      if (dragStartRef.current) {
+        dragEndRef.current = { x: event.clientX, y: event.clientY };
+      }
+    };
+    container.addEventListener('mousemove', onMouseMove);
+
+    /*
      * ⚠️ **span 缓存的失效信号**。
      *
      * 页面渲染/卸载（虚拟滚动、缩放）会增删文本层 span
@@ -627,6 +712,8 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     return () => {
       spanObserver.disconnect();
       container.removeEventListener('mouseup', onMouseUp);
+      container.removeEventListener('mousedown', onMouseDown);
+      container.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('selectionchange', onSelectionChangeEvent);
       if (geometryRafRef.current !== 0) {
         cancelAnimationFrame(geometryRafRef.current);

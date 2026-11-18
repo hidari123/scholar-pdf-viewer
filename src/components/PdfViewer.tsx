@@ -34,6 +34,8 @@ import type { BaselinesByPage, PageBaselines, PageSelectionShape } from '../core
 import { buildSelectionShapes } from '../core/selection/shape';
 import { measureAscentRatio } from '../core/text-layer/font-metrics';
 import type { PositionedTextItem } from '../core/text-layer/layout';
+import type { PdfViewerAppearance, PdfViewerTheme } from '../core/theme';
+import { themeClasses } from '../core/theme';
 import type {
   HighlightRecord,
   NewHighlight,
@@ -100,6 +102,15 @@ export interface PdfViewerHandle {
    * 宿主自己做了"高亮"这类**消费选区**的操作后调它。
    */
   clearSelection: () => void;
+  /**
+   * **宿主自己创建了高亮**（自己的工具栏按钮）→ 通知包。
+   *
+   * → 包会调 `onHighlightCreate`（宿主存高亮）+ **清掉选区**。
+   *
+   * ⚠️ **包内置的"高亮"按钮不要用这个**（它自己会走 `onHighlight`）
+   *    → 两个都走 → 宿主会保存两次。
+   */
+  createHighlight: (highlight: NewHighlight) => void;
   /** 当前页码（1 起） */
   getCurrentPage: () => number;
   /** 总页数 */
@@ -145,7 +156,22 @@ export interface PdfViewerProps {
   /** 文案覆盖 */
   messages?: Partial<Messages>;
   /** 主题 */
-  theme?: 'light' | 'dark' | 'auto';
+  theme?: PdfViewerTheme;
+  /**
+   * **外观配置**（结构开关，不是颜色）。
+   *
+   * ⚠️ **和 `theme` 的分工**：
+   * - `theme` → **整体风格**（颜色、阴影、圆角）
+   * - `appearance` → **结构**（显示哪些按钮、密度）
+   *
+   * ```tsx
+   * <PdfViewer
+   *   theme="paper"                              // 米黄护眼
+   *   appearance={{ density: 'compact' }}        // 紧凑
+   * />
+   * ```
+   */
+  appearance?: PdfViewerAppearance;
   /**
    * **打印模式**。
    *
@@ -294,6 +320,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     locale = 'zh',
     messages,
     theme = 'auto',
+    appearance,
     printMode = 'with-highlights',
     getPage,
     getPageSizes,
@@ -1476,11 +1503,32 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         setHighlightPopover(null);
         setActiveHighlightId(null);
       },
+      /**
+       * **宿主自己创建了高亮**（比如自己的工具栏按钮）→ 通知包。
+       *
+       * → 包会：① 调 `onHighlightCreate`（宿主存）② 清掉选区。
+       *
+       * ⚠️ **包内置的"高亮"按钮不要用这个**（它自己会走 `onHighlight`）
+       *    → 两个都走 → 宿主保存两次。
+       */
+      createHighlight: (highlight: NewHighlight) => {
+        onHighlightCreate?.(highlight);
+        clearSelectionAfterHighlight();
+        onHighlightCreated?.();
+      },
       getCurrentPage: () => page,
       getNumPages: () => numPages,
       goToPage: (target: number) => scrollToPage(target),
     }),
-    [textSelection, page, numPages, scrollToPage],
+    [
+      textSelection,
+      page,
+      numPages,
+      scrollToPage,
+      onHighlightCreated,
+      onHighlightCreate,
+      clearSelectionAfterHighlight,
+    ],
   );
 
   // 7) 键盘快捷键
@@ -1679,33 +1727,6 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   );
 
   /**
-   * **宿主创建了高亮** → 清掉选区。
-   *
-   * ⚠️ 为什么需要这个统一入口（实测踩过的坑）：
-   *
-   * 用户反馈："点击高亮之后 发现无法取消选中状态 一直都有外边框"
-   *
-   * 之前只有**内置的"高亮"按钮**会清选区
-   * → 宿主自己做的按钮（比如 demo 的工具栏插槽）**不会清**
-   * → 选区的蓝色块一直浮在新高亮上面 → "选不掉"。
-   *
-   * → 宿主**创建了高亮**就通知包一下 → 包负责清选区。
-   *   （"清选区"是 UI 行为，属于包；"存高亮"是业务，属于宿主。）
-   *
-   * ⚠️ **必须声明在 `builtinActions` 之前**（JS 的"先用后声明"是 TDZ 错误）。
-   */
-  const handleHighlightCreated = useCallback(
-    (highlight: NewHighlight) => {
-      onHighlightCreate?.(highlight);
-      // 高亮已创建 → 选区没用了 → 清掉（含浏览器原生选区）
-      clearSelectionAfterHighlight();
-      // 通知宿主"包这边也清了"（宿主可能要同步自己的状态）
-      onHighlightCreated?.();
-    },
-    [onHighlightCreate, onHighlightCreated, clearSelectionAfterHighlight],
-  );
-
-  /**
    * 选区浮层的**内置动作**。
    *
    * ⚠️ **"翻译/提问/笔记/解释"默认是隐藏的**：
@@ -1722,20 +1743,20 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         order: 10,
         onSelect: (ctx) => {
           /*
-           * ⚠️ **两个回调都调**（向后兼容 + 统一入口）：
+           * ⚠️ **只调 `onHighlight`**（不要同时调 `onHighlightCreate`）。
            *
-           * - `onHighlight`（旧的"动作回调"）→ 宿主自己决定要不要存
-           * - `handleHighlightCreated`（新的统一入口）→ 通知包"高亮好了，清选区"
+           * ### 为什么
            *
-           * → 宿主**没配** `onHighlightCreate` 时，`handleHighlightCreated`
-           *   依然会清选区 → 行为一致。
+           * `onHighlight` = 选区浮层里的"高亮"动作 → 宿主决定要不要存。
+           * `onHighlightCreate` = **宿主自己**的按钮创建了高亮后通知包。
+           *
+           * 两个都调 → 宿主**保存两次**（实测：点一次高亮 → 生成了 3 条）。
+           *
+           * → 包自己清选区（不用宿主再通知一次）。
            */
           onHighlight?.({ ...ctx, color: pickedColor ?? undefined });
-          handleHighlightCreated({
-            selectedText: ctx.text,
-            position: ctx.position as never,
-            color: pickedColor ?? 'label-6',
-          });
+          // 包自己清选区（"清选区"是 UI 行为，属于包）
+          clearSelectionAfterHighlight();
         },
       },
       {
@@ -1807,22 +1828,14 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onAsk,
     onExplain,
     onNote,
-    pickedColor /*
-     * ⚠️ **走 `handleHighlightCreated`**（而不是直接 `onHighlight`）。
+    pickedColor,
+    /*
+     * ⚠️ **内置的"高亮"按钮只调 `onHighlight`**（不要同时调 `onHighlightCreate`）。
      *
-     * → 统一"宿主创建了高亮"的入口 → 包在这里清选区。
-     * → 宿主自己实现按钮时也调同一个回调 → 行为一致。
-     */,
-    handleHighlightCreated /*
-     * ⚠️ **两个回调都调**（向后兼容 + 统一入口）：
-     *
-     * - `onHighlight`（旧的"动作回调"）→ 宿主自己决定要不要存
-     * - `handleHighlightCreated`（新的统一入口）→ 通知包"高亮好了，清选区"
-     *
-     * → 宿主**没配** `onHighlightCreate` 时，`handleHighlightCreated`
-     *   依然会清选区 → 行为一致。
-     */,
+     * → 宿主在 `onHighlight` 里存一次 → 不会重复保存。
+     */
     onHighlight,
+    clearSelectionAfterHighlight,
   ]);
 
   /** 合并后的动作列表（宿主覆盖 + 追加） */
@@ -1875,10 +1888,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         return;
       }
 
-      // 触发宿主的高亮回调（带颜色 key）
-      handleHighlightCreated({
-        selectedText: currentSelection.text,
+      /*
+       * ⚠️ **走 `onHighlight`**（和"高亮"主按钮**同一个**回调）。
+       *
+       * → 宿主只在一个地方存高亮 → 不会重复保存。
+       */
+      onHighlight?.({
+        text: currentSelection.text,
         position: currentSelection.norm,
+        event: undefined as never,
         color: key,
       });
 
@@ -1886,7 +1904,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       clearSelectionAfterHighlight();
       handlePopoverClose();
     },
-    [currentSelection, handleHighlightCreated, handlePopoverClose, clearSelectionAfterHighlight],
+    [currentSelection, onHighlight, handlePopoverClose, clearSelectionAfterHighlight],
   );
 
   /**
@@ -2254,8 +2272,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
   const className = [
     'scpdf-root',
-    theme === 'dark' ? 'scpdf-root--dark' : '',
-    theme === 'auto' ? 'scpdf-root--auto' : '',
+    // ⚠️ 主题 + 外观 → class 名（见 `core/theme` 的 `themeClasses`）
+    ...themeClasses(theme, appearance),
     // ⚠️ "只打印原 PDF"模式（不带高亮）
     printMode === 'original' ? 'scpdf-root--print-original' : '',
   ]
@@ -2265,7 +2283,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   return (
     <div className={className} data-testid="pdf-viewer">
       <Toolbar
-        toolbar={toolbar}
+        toolbar={{
+          ...toolbar,
+          /*
+           * ⚠️ **`appearance` 的结构开关覆盖 `toolbar` 的配置**。
+           *
+           * 优先级：`appearance` > `toolbar`（appearance 更"上层"）。
+           * → 宿主用 `appearance` 统一控制，用 `toolbar` 做细调。
+           */
+          showSearch: appearance?.showSearch ?? toolbar?.showSearch,
+          showThumbnails: appearance?.showThumbnails ?? toolbar?.showThumbnails,
+          showOutline: appearance?.showOutline ?? toolbar?.showOutline,
+        }}
         page={page}
         totalPages={numPages}
         scale={scale}

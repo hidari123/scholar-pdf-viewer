@@ -17,6 +17,7 @@ export * from './search';
 export * from './selection';
 export * from './store';
 export * from './text-layer';
+export * from './theme';
 export * from './thumbnail';
 export type * from './types';
 export * from './virtualization';

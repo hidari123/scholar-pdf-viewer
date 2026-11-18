@@ -5,23 +5,15 @@
  * 包的 `@media print` 只管**包内部**的元素（工具栏 / 侧栏 / 浮层 / 文本层）。
  * 宿主自己的 header / 提示条要**自己**处理。
  *
- * ⚠️ **`display` 必须写在 CSS 里，不能写 inline style**！
- * → inline style 的优先级**高于**样式表里的普通规则
- * → 打印时 `display: none` 会被 inline 的 `display: flex` 盖掉
- * → header 就还是被打印出来了（实测踩过）。
+ * ⚠️⚠️ **inline style 的优先级高于样式表**（实测踩过的坑）。
+ *
+ * demo 的 header 用 inline style 设了 `display: flex`
+ * → 样式表里的 `display: none` **盖不住**它 → 打印时 header 还在。
+ *
+ * → 解法：**加 `!important`**（inline style 没有 `!important` → 样式表的能赢）。
+ *    ⚠️ biome 的 `noImportantStyles` 规则默认会把它去掉
+ *    → 已在 `biome.json` 里把该规则**关掉**（并说明了原因）。
  */
-
-/* ---------- 布局 ---------- */
-
-.demo-root {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-}
-
-.demo-header {
-  display: flex;
-}
 
 /* ---------- 打印时藏起 demo 自己的界面 ---------- */
 
@@ -31,7 +23,7 @@
    * → 宿主自己的 UI，宿主自己负责（包的 print CSS 管不到）。
    */
   .demo-header {
-    display: none;
+    display: none !important;
   }
 
   /*
@@ -39,8 +31,8 @@
    * → 否则打印时只有一屏（和包里的滚动容器同一个坑）。
    */
   .demo-root {
-    height: auto;
-    min-height: 0;
-    overflow: visible;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
   }
 }

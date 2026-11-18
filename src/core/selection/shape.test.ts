@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSelectionShapes, mergeOverlappingRects } from './shape';
+import { buildSelectionShapes, clipToBaseline, mergeOverlappingRects } from './shape';
 
 describe('buildSelectionShapes', () => {
   /** 两页的页框（容器内容坐标） */
@@ -100,6 +100,46 @@ describe('buildSelectionShapes', () => {
     );
 
     expect(shapes.map((s) => s.pageNumber)).toEqual([1, 2]);
+  });
+});
+
+describe('clipToBaseline —— 旋转文字（页边戳）', () => {
+  /*
+   * ⚠️⚠️ **实测踩过的坑**（真实 arXiv PDF）。
+   *
+   * 页边戳是 `transform: rotate(-90deg)` 的**竖排文字**：
+   * ```
+   * 选区矩形   x=175（正文那一行）
+   * 竖排戳     x=1217, top≈250   ← **垂直距离几乎为 0**
+   * ```
+   * → 只按垂直距离挑候选 → **竖排戳赢了**
+   * → 选区框跳到页的右边缘（实测 Δ左 = 1050px）。
+   *
+   * → 候选必须和矩形**有水平重叠**。
+   */
+  const baselines = [
+    // 正文那一行（和选区水平重叠）
+    { top: 250, height: 20, baseline: 266, left: 100, width: 300 },
+    // 页边戳（旋转 90° → 在页的右边缘，垂直位置恰好也在 250 附近）
+    { top: 240, height: 20, baseline: 250, left: 1217, width: 13 },
+  ];
+
+  it('水平不重叠的候选（旋转戳）不会被选中', () => {
+    const rect = { x: 100, y: 246, width: 200, height: 28 };
+    const clipped = clipToBaseline(rect, baselines);
+
+    // 应该贴着正文那一行（top=250），不是竖排戳
+    expect(clipped.y).toBe(250);
+    expect(clipped.height).toBe(20);
+  });
+
+  it('只有旋转戳时 → 不裁剪（保持原样，而不是跳到戳那里）', () => {
+    const rect = { x: 100, y: 246, width: 200, height: 28 };
+    const clipped = clipToBaseline(rect, [baselines[1] as (typeof baselines)[number]]);
+
+    // 不裁剪 → 和原矩形一样
+    expect(clipped.y).toBe(246);
+    expect(clipped.height).toBe(28);
   });
 });
 

@@ -1,0 +1,130 @@
+/**
+ * 按**拖动范围**过滤选区矩形（纯计算，零 DOM）。
+ *
+ * ## 问题（实测，真实 arXiv PDF）
+ *
+ * PDF 的页边戳是**逐字符竖排**的（`left=1231`，每行一个字符）：
+ *
+ * ```
+ * 正文   x = 175 ~ 445
+ * 页边戳 x = 1231        ← 和正文**同一行**（top 相同）
+ * ```
+ *
+ * 浏览器按**视觉行**选中同一行的所有 inline box →
+ * 页边戳的字符虽然离正文 **1000px**，却被**一起选中**。
+ *
+ * 实测（拖选正文 175~445）：
+ *
+ * ```
+ * clientRects = [
+ *   { l: 175.4,  t: 222.5, w: 45.1, h: 15.6 },   ← 正文
+ *   { l: 220.5,  t: 222.5, w:  4.6, h: 15.6 },   ← 正文
+ *   { l: 366.0,  t: 222.5, w: 79.0, h: 15.6 },   ← 正文
+ *   { l: 1225.9, t: 210.9, w:  9.9, h: 16.9 },   ← 页边戳（离正文 1000px）
+ * ]
+ * ```
+ *
+ * → 自绘层把页边戳也画出来 → **选区横跨整页**（Δ左 = 1050px）。
+ *
+ * ## 修法
+ *
+ * 用**水平连续性**把矩形分成"列"，只保留**和用户拖动范围重叠**的列：
+ *
+ * 1. 把所有矩形按水平区间排序，**相邻且间隙 ≤ MAX_COLUMN_GAP** 的归为同一列
+ * 2. 拖动范围 = `[min(起点x, 终点x), max(起点x, 终点x)]`
+ * 3. 保留**和拖动范围有重叠**的列
+ *
+ * - 页边戳（1226）和拖动范围（278~432）**不重叠** → 丢掉 ✓
+ * - 正文（175~445）和拖动范围**重叠** → 保留 ✓
+ * - 两栏排版 → 拖左栏只选左栏 ✓
+ *
+ * ⚠️ **不能只看起点**（实测踩过的坑）：
+ * 只看起点会丢掉拖动范围**右边**的文字（用户明明拖过去了）。
+ */
+
+/** 一个矩形（视口坐标） */
+export interface ClientRectLike {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * 两列之间的**最大间隙**（px）。
+ *
+ * ⚠️ 必须**远大于**一个字符的宽度（~10px），
+ *    但**小于**两栏之间的典型间距（~50px+）。
+ *
+ * → 100px：
+ *   - 能容忍**选中的文字里的空格**（实测正文里有个 89px 的空隙！）
+ *   - 又能把"另一列"（几百 px）分开（实测页边戳离正文 780px）
+ */
+export const MAX_COLUMN_GAP = 100;
+
+/**
+ * 按**拖动范围**过滤矩形。
+ *
+ * @param rects 浏览器给的 client rects
+ * @param drag 拖动范围（起点 + 终点，视口坐标）；没有则原样返回
+ * @returns 过滤后的矩形
+ */
+export function filterByDragOrigin(
+  rects: ClientRectLike[],
+  drag: { startX: number; endX: number } | null,
+): ClientRectLike[] {
+  // 没有拖动范围 → 不过滤（保守：宁可多画，也不要画不出来）
+  if (!drag || rects.length <= 1) {
+    return rects;
+  }
+
+  // 拖动的水平范围（用户从左往右拖，或从右往左拖）
+  const from = Math.min(drag.startX, drag.endX);
+  const to = Math.max(drag.startX, drag.endX);
+
+  /*
+   * ⚠️ **范围要往外扩一点**（实测踩过的坑）。
+   *
+   * 浏览器会把选区**扩展到词边界**：
+   * ```
+   * 拖动:  x=278 → 432
+   * 选区:  x=175 → 445    ← 浏览器扩展了（词的边界）
+   * ```
+   * → 扩展出来的部分**也是用户想要的**（他拖过了那段）
+   * → 但页边戳（1226）离得很远 → 不会误伤。
+   *
+   * → 扩 200px：足以覆盖"一个词"的扩展，又不会跨到另一列。
+   */
+  const padding = 200;
+  const rangeFrom = from - padding;
+  const rangeTo = to + padding;
+
+  // 按水平位置排序
+  const sorted = [...rects].sort((a, b) => a.left - b.left);
+
+  // 合并成"列"（水平连续）
+  const columns: { left: number; right: number; rects: ClientRectLike[] }[] = [];
+  for (const rect of sorted) {
+    const right = rect.left + rect.width;
+    const last = columns[columns.length - 1];
+    if (last && rect.left - last.right <= MAX_COLUMN_GAP) {
+      // 和上一列相连（容差内）→ 合并
+      last.right = Math.max(last.right, right);
+      last.rects.push(rect);
+    } else {
+      columns.push({ left: rect.left, right, rects: [rect] });
+    }
+  }
+
+  /*
+   * 保留**和拖动范围有重叠**的列。
+   *
+   * ⚠️ 不能只看"起点所在的那一列"（实测踩过的坑）：
+   * 只看起点会丢掉拖动范围**右边**的文字
+   * （用户明明拖过去了 → 选区却不完整）。
+   */
+  return rects.filter((rect) => {
+    const rectRight = rect.left + rect.width;
+    return rect.left < rangeTo && rectRight > rangeFrom;
+  });
+}

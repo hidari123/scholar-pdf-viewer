@@ -106,6 +106,48 @@ export interface LayoutOptions {
   fontMap?: Record<string, FontInfo>;
   /** 默认字体族（没有 fontMap 时用它） */
   defaultFontFamily?: string;
+  /**
+   * **跳过旋转的文字**（默认 true）。
+   *
+   * ## 为什么（实测踩过的坑）
+   *
+   * 真实 PDF（arXiv 论文）的页边戳是 `transform: rotate(-90deg)` 的**竖排文字**：
+   * ```
+   * 拖选正文（x=175~445）→ 浏览器的选区却宽达 1060px！
+   * clientRects 里多出：
+   *   { l: 1225.9, t: 210.9, w: 9.9, h: 16.9 }   ← 页边戳
+   * ```
+   * → 旋转文字在 DOM 里**夹在正文中间** → 浏览器的 Range 把它也包进来了
+   * → 选区**横跨整页** → 自绘层画出 5 个矩形，其中一个在页的右边缘
+   * → 用户看到"选区乱飞"。
+   *
+   * → **旋转文字不进文本层** → 浏览器根本选不到它 → 选区干净。
+   *
+   * ⚠️ **代价**：旋转的文字**不能被选中**（正文没问题）。
+   *    这是可接受的取舍（旋转文字本来也很难精确选中）。
+   */
+  skipRotated?: boolean;
+}
+
+/**
+ * 判定一个 item 是否是**旋转文字**。
+ *
+ * ⚠️ 阈值：角度偏离水平超过 **1°** 就算旋转。
+ * （真实 PDF 里可能有极小的角度误差。）
+ *
+ * @param angle 角度（弧度，来自复合矩阵）
+ * @returns 是旋转文字则返回 true
+ */
+export function isRotatedAngle(angle: number): boolean {
+  // 归一化到 (-π, π]
+  let normalized = angle % (Math.PI * 2);
+  if (normalized > Math.PI) {
+    normalized -= Math.PI * 2;
+  }
+  if (normalized <= -Math.PI) {
+    normalized += Math.PI * 2;
+  }
+  return Math.abs(normalized) > Math.PI / 180;
 }
 
 /** 排好版的文本片段（按行合并的旧形态，仅用于不需要精确位置的场景） */
@@ -298,6 +340,8 @@ export function layoutTextItems(
   options: LayoutOptions = {},
 ): PositionedTextItem[] {
   const positioned: PositionedTextItem[] = [];
+  /** 是否跳过旋转文字（默认 true） */
+  const skipRotated = options.skipRotated !== false;
 
   for (const item of content.items) {
     if (item.str.length === 0) {
@@ -306,6 +350,15 @@ export function layoutTextItems(
 
     const result = positionTextItem(item, viewport, options);
     if (!result) {
+      continue;
+    }
+
+    /*
+     * ⚠️ **跳过旋转文字**（见 `LayoutOptions.skipRotated` 的说明）。
+     *
+     * → 旋转文字不进文本层 → 浏览器选不到它 → 选区不会横跨整页。
+     */
+    if (skipRotated && isRotatedAngle(result.angle)) {
       continue;
     }
 
