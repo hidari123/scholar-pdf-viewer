@@ -6,12 +6,28 @@
  * Copyright (c) 2026 by hidari, All Rights Reserved.
  */
 
-import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-/** 包根目录（demo 是 workspace 成员 → 父目录就是包本体） */
-const packageRoot = fileURLToPath(new URL('..', import.meta.url));
+/**
+ * 包根目录（demo 是 workspace 成员 → 父目录就是包本体）。
+ *
+ * ⚠️ **不能用 `import.meta.url` 直接算**：Vite 把配置文件打成 bundle 再执行
+ * → `import.meta.url` 指向的是**临时 bundle 文件**，不是原文件
+ * → 算出来的路径是错的 → alias 指向不存在的文件
+ * → 报 "Failed to resolve import @scholar-club/pdf-viewer/styles.css"。
+ *
+ * ⚠️ **也不能用相对路径当 alias 的值**：Vite 的 alias 必须是**绝对路径**
+ * → `'../dist/styles.css'` 解析不到。
+ *
+ * → 用 `import.meta.dirname`（Node 20.11+ / 本机 Node 24 有）：
+ *   它指向**原文件**所在目录，不受打包影响。
+ *
+ * ⚠️ **不能用 `node:path` 之外的东西**：demo 的 tsconfig 没装 `@types/node`
+ * → `pnpm demo:typecheck` 会报 "Cannot find module 'node:path'"。
+ * → 所以这里用 `import.meta.dirname` + 字符串拼接，避开 `node:path`。
+ */
+const packageRoot = import.meta.dirname ? `${import.meta.dirname}/..` : '..';
 
 export default defineConfig({
   plugins: [react()],
@@ -63,7 +79,8 @@ export default defineConfig({
      * 直接 alias 到**文件路径** → Vite 按普通 CSS 文件处理，不走 exports 解析。
      */
     alias: {
-      '@scholar-club/pdf-viewer/styles.css': `${packageRoot}dist/styles.css`,
+      // ⚠️ **必须是绝对路径**（相对路径解析不到）
+      '@scholar-club/pdf-viewer/styles.css': `${packageRoot}/dist/styles.css`,
     },
   },
   /*

@@ -10,6 +10,7 @@ import type {
   HighlightRecord,
   NewHighlight,
   OutlineItemLike,
+  PdfViewerHandle,
   SelectionData,
 } from '@scholar-club/pdf-viewer';
 import { PdfSearch, PdfViewer } from '@scholar-club/pdf-viewer';
@@ -44,6 +45,14 @@ let highlightSeq = 0;
 export default function App() {
   /** pdf.js 文档（宿主持有） */
   const docRef = useRef<PDFDocumentProxy | null>(null);
+  /**
+   * 查看器的**命令式句柄**。
+   *
+   * ⚠️ demo 的工具栏插槽有**自己的"高亮"按钮**（不走包的浮层动作）
+   * → 做完之后要调 `viewerRef.current?.clearSelection()`
+   * → 让包清掉选区（否则蓝色选区块一直浮在高亮上 —— 用户反馈"无法取消选中状态"）。
+   */
+  const viewerRef = useRef<PdfViewerHandle>(null);
 
   /** 高亮（受控状态 —— 宿主的数据） */
   const [highlights, setHighlights] = useState<HighlightRecord[]>([]);
@@ -475,6 +484,35 @@ export default function App() {
     ]);
   }, []);
 
+  /**
+   * 宿主自己创建高亮的**统一入口**（工具栏插槽按钮用）。
+   *
+   * ⚠️ 走 `onHighlightCreate` → **包会顺带清掉选区**
+   *    （否则蓝色选区块一直浮在高亮上 —— 用户反馈"无法取消选中状态"）。
+   */
+  const createHighlight = useCallback(
+    (color: string, selectedText: string, position: unknown) => {
+      handleHighlightCreate({
+        color,
+        selectedText,
+        position: position as never,
+      });
+    },
+    [handleHighlightCreate],
+  );
+
+  /** 换高亮的颜色（宿主实现 —— 包只抛事件） */
+  const handleHighlightColorChange = useCallback((id: string, color: string) => {
+    setHighlights((prev) => prev.map((h) => (h.id === id ? { ...h, color } : h)));
+    setHint(`已换色（${color}）`);
+  }, []);
+
+  /** 删除高亮（宿主实现） */
+  const handleHighlightRemove = useCallback((id: string) => {
+    setHighlights((prev) => prev.filter((h) => h.id !== id));
+    setHint('已删除高亮');
+  }, []);
+
   /** 工具栏插槽（宿主塞自己的按钮 —— 证明包不需要业务入口） */
   const toolbarSlot = useMemo(
     () => (
@@ -486,12 +524,21 @@ export default function App() {
             setHint('请先在页面里选中一段文字');
             return;
           }
-          handleHighlightCreate({
-            color: highlightColor,
-            selectedText: selection.text,
-            position: selection.norm,
-          });
+          /*
+           * ⚠️ **走 `onHighlightCreate`** → 包会顺带清掉选区。
+           *
+           * 直接调 `handleHighlightCreate` 的话，包不知道"高亮做完了"
+           * → 选区的蓝色块一直浮在新高亮上（用户反馈"无法取消选中状态"）。
+           */
+          createHighlight(highlightColor, selection.text, selection.norm);
           setHint('已添加高亮（宿主自存，包不碰后端）');
+          /*
+           * ⚠️ **告诉包"高亮做完了"** → 包清掉选区。
+           *
+           * 不清的话：选区的蓝色块一直浮在新高亮上
+           *（用户反馈"点击高亮之后 无法取消选中状态 一直都有外边框"）。
+           */
+          viewerRef.current?.clearSelection();
         }}
         title="添加高亮"
         aria-label="添加高亮"
@@ -499,7 +546,7 @@ export default function App() {
         +
       </button>
     ),
-    [selection, handleHighlightCreate, highlightColor],
+    [selection, highlightColor, createHighlight],
   );
 
   return (
@@ -546,6 +593,7 @@ export default function App() {
 
       <div style={{ flex: 1, minHeight: 0 }}>
         <PdfViewer
+          ref={viewerRef}
           file={sampleUrl}
           highlights={highlights}
           highlightPalette={highlightPalette}
@@ -560,9 +608,22 @@ export default function App() {
           searchEngine={searchEngine}
           onDocumentLoad={handleDocumentLoad}
           onSelectionChange={handleSelection}
-          onHighlightCreate={handleHighlightCreate}
-          onHighlightClick={(h) => setHint(`点击高亮：${h.selectedText.slice(0, 20)}`)}
-          /*
+          onHighlightCreate={(h) => {
+            /*
+             * ⚠️ **包的统一入口** → 存高亮。
+             *
+             * 包在调这个之前/之后会清掉选区（"清选区"是 UI 行为，属于包）。
+             *
+             * ⚠️ **提示语放这里**（而不是 `onHighlight`）：
+             *   - 颜色下拉那条路径走的是 `onHighlightCreate`，**不走** `onHighlight`
+             *   - 提示放 `onHighlight` → 选色后提示不更新（实测：提示被覆盖成"选中 N 字"）
+             */
+            handleHighlightCreate(h);
+            setHint(`已高亮（${h.color ?? '默认'}）`);
+          }}
+          onHighlightColorChange={handleHighlightColorChange}
+          onHighlightRemove={handleHighlightRemove}
+          onHighlightClick={(h) => setHint(`点击高亮：${h.selectedText.slice(0, 20)}`)} /*
            * 选区浮层的动作 —— **宿主注入**（证明包不需要业务入口）。
            *
            * 翻译/提问/笔记由宿主实现；不传就不会显示对应按钮。
@@ -570,13 +631,16 @@ export default function App() {
           onTranslate={({ text }) => setHint(`【翻译】${text.slice(0, 20)}…（宿主实现）`)}
           onAsk={({ text }) => setHint(`【提问】${text.slice(0, 20)}…（宿主实现）`)}
           onNote={({ text }) => setHint(`【笔记】${text.slice(0, 20)}…（宿主实现）`)}
-          onHighlight={({ text, color }) => {
-            handleHighlightCreate({
-              color: color ?? highlightColor,
-              selectedText: text,
-              position: selection?.norm as never,
-            });
-            setHint(`已高亮（${color ?? highlightColor}）`);
+          onHighlight={({ text, color, position }) => {
+            /*
+             * ⚠️ **走 `onHighlightCreate`（包的统一入口）** → 包会顺带清掉选区。
+             *
+             * 直接调 `handleHighlightCreate` 的话，包不知道"高亮做完了"
+             * → 选区的蓝色块一直浮在新高亮上（用户反馈"无法取消选中状态"）。
+             *
+             * ⚠️ **提示语在 `onHighlightCreate` 里设**（统一入口）→ 这里不用再设。
+             */
+            createHighlight(color ?? highlightColor, text, position);
           }}
           onExternalLink={(url) => {
             // 宿主决定怎么开外链（新窗口 / 应用内 WebView）

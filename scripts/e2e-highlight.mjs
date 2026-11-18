@@ -282,15 +282,33 @@ try {
     hl ? `transform = ${hl.hlRects[0]?.transform}` : '',
   );
 
-  // ---- 断言 4：高亮可点击 ----
-  const clickable = await page.evaluate(() => {
+  // ---- 断言 4：高亮块**不拦鼠标**（pointer-events: none）----
+  /*
+   * ⚠️ 旧断言是"elementFromPoint 命中高亮本身"（要求能点到）。
+   *
+   * 那个行为是**错的**（实测踩过的坑）：
+   * 高亮块**正好盖在文字上** → `pointer-events: auto`
+   * → 用户在那一块**框选不了字**（拖动起点落在 `BUTTON.scpdf-annotation` 上）
+   * → 用户反馈"点击高亮之后 发现无法取消选中状态"。
+   *
+   * → 现在高亮块是 `pointer-events: none`
+   * → 点击走**容器级事件委托**（按坐标命中）
+   * → **不挡文字选择** ✅
+   */
+  const pointerEvents = await page.evaluate(() => {
     const h = document.querySelector('.scpdf-annotation--mine');
     if (!h) return null;
-    const r = h.getBoundingClientRect();
-    const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return el === h || h.contains(el);
+    return {
+      pointerEvents: getComputedStyle(h).pointerEvents,
+      hasId: h.getAttribute('data-highlight-id') !== null,
+    };
   });
-  check('高亮块可点击（elementFromPoint 命中高亮本身）', clickable === true);
+  check(
+    '高亮块不拦鼠标（pointer-events: none，避免挡住文字选择）',
+    pointerEvents?.pointerEvents === 'none',
+    `pointer-events = ${pointerEvents?.pointerEvents}`,
+  );
+  check('高亮块带 data-highlight-id（供事件委托按 id 定位）', pointerEvents?.hasId === true);
 
   // ---- 截图 ----
   const clip = await page.evaluate(() => {

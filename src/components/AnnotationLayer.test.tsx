@@ -122,14 +122,37 @@ describe('AnnotationLayer', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('点击高亮 → onHighlightClick', async () => {
+  /*
+   * ⚠️ **高亮块不再自己处理点击**（实测踩过的坑）。
+   *
+   * 旧实现：高亮块是 `<button>` + `pointer-events: auto`
+   * → 高亮块**正好盖在文字上** → 用户在那一块**框选不了字**
+   *   （实测：拖动起点落在 `BUTTON.scpdf-annotation` 上 → 选不中）。
+   *
+   * → 现在高亮块是 `pointer-events: none`
+   * → 点击由**容器级事件委托**处理（`PdfViewer.handleHighlightContainerClick`）
+   * → 高亮块自己**不响应** click。
+   */
+  it('高亮块不自己响应点击（改由容器事件委托）', async () => {
     const onHighlightClick = vi.fn();
     setup({ onHighlightClick });
 
     await userEvent.click(screen.getByRole('button'));
 
-    expect(onHighlightClick).toHaveBeenCalledTimes(1);
-    expect(onHighlightClick.mock.calls[0]?.[0]?.id).toBe('h1');
+    expect(onHighlightClick).not.toHaveBeenCalled();
+  });
+
+  it('高亮块带 data-highlight-id（供事件委托按 id 定位）', () => {
+    setup();
+
+    expect(screen.getByRole('button').getAttribute('data-highlight-id')).toBe('h1');
+  });
+
+  it('高亮块不拦截鼠标（pointer-events: none，避免挡住文字选择）', () => {
+    setup();
+
+    // CSS 类名由样式表控制，这里验证元素确实带上了标注层类
+    expect(screen.getByRole('button').className).toContain('scpdf-annotation');
   });
 
   it('激活态加 active class', () => {

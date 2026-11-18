@@ -160,7 +160,7 @@ try {
 
   // ---- 3. 面板开合后，页的居中偏移要重新测量 ----
   console.log('\n=== 面板开合后 ===');
-  const pageLeftNoPanel = before?.pageLeftContent;
+  const _pageLeftNoPanel = before?.pageLeftContent;
   // 关闭面板
   await togglePanel();
   await page.waitForTimeout(800);

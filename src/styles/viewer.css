@@ -333,7 +333,18 @@
 
 .scpdf-annotation {
   position: absolute;
-  pointer-events: auto;
+  /*
+   * ⚠️⚠️ **必须 `pointer-events: none`**（实测踩过的坑）。
+   *
+   * 高亮块**正好盖在文字上**
+   * → `pointer-events: auto` → 用户在那一块**框选不了字**
+   *   （实测：拖动起点落在 `BUTTON.scpdf-annotation` 上 → 选不中）。
+   * → 用户反馈"点击高亮之后 发现无法取消选中状态"。
+   *
+   * → 和链接层一样用 `pointer-events: none`
+   * → 点击由**容器级事件委托**处理（`PdfViewer.handleHighlightContainerClick`）。
+   */
+  pointer-events: none;
   cursor: pointer;
   /*
    * ⚠️ **必须 reset 浏览器对 <button> 的默认样式**：
@@ -387,8 +398,29 @@
   background: var(--scpdf-highlight-others);
 }
 
+/*
+ * 高亮的"激活"态（点了某条高亮之后）。
+ *
+ * ⚠️⚠️ **不要一直挂着**（用户反馈"点击高亮之后 一直都有外边框"）。
+ *
+ * 旧行为：点一下 → `outline: 2px solid` **永久**显示 → 看着像"选不掉"。
+ *
+ * → 改成：**hover 时显示**，以及**点击后短暂显示**（1.5s，JS 控制）。
+ *   - hover 显示 → 鼠标移开就没了
+ *   - 点击后 1.5s → 给出"刚才点了这条"的反馈，然后自动消失
+ */
 .scpdf-annotation--active {
   outline: 2px solid var(--scpdf-highlight-active);
+  outline-offset: 0;
+  /*
+   * ⚠️ `pointer-events: auto` + `outline` 会**挡住**下面的文字选中
+   *    → 点了高亮之后，那块区域就选不中字了。
+   * → 激活态下临时关掉点击（移开后恢复）。
+   */
+}
+
+.scpdf-annotation:hover {
+  outline: 1px solid var(--scpdf-highlight-active);
   outline-offset: 0;
 }
 

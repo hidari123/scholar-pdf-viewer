@@ -3,6 +3,7 @@
  */
 export * from './actions';
 export * from './extract';
+export * from './highlight-actions';
 export * from './optimize-rects';
 export * from './popover-position';
 export * from './shape';

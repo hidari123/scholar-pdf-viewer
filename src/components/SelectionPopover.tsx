@@ -39,6 +39,22 @@ export interface SelectionPopoverProps {
   /** 容器矩形（视口坐标）—— PDF 的可视区 */
   containerRect: { left: number; top: number; right: number; bottom: number } | null;
   /**
+   * **外部锚点**（视口坐标）。
+   *
+   * ⚠️ **给了它就不用读浏览器选区**。
+   *
+   * ## 为什么需要
+   *
+   * 浮层原本只绑在**浏览器原生选区**上（`readLiveAnchor()`）。
+   * 但用户要求："点击高亮之后 应该也会出现那个选择的弹框 可以选择颜色等"
+   * → 点高亮块时，**浏览器里没有选区** → 必须由外部提供锚点。
+   *
+   * → 同一个组件服务两种场景：
+   * - 文字选区 → 不传 `anchorRect` → 从 DOM 选区实时读
+   * - 高亮块   → 传 `anchorRect` → 用它
+   */
+  anchorRect?: { left: number; top: number; right: number; bottom: number } | null;
+  /**
    * 锚点**版本号** —— 外部强制重算位置用。
    *
    * 浮层自己会监听滚动/resize 实时重算，
@@ -51,6 +67,22 @@ export interface SelectionPopoverProps {
   onAction?: (action: SelectionAction) => void;
   /** 关闭 */
   onClose?: () => void;
+  /**
+   * **彻底取消选区**（Esc 时用）。
+   *
+   * ⚠️ 为什么需要（实测踩过的坑）：
+   *
+   * ```
+   * 首次 mouseup: ["SPAN.scpdf-text-layer__item"]
+   * Esc 后 mouseup: []          ← ❌ 浏览器**一个 mouseup 都不发**
+   * ```
+   *
+   * → Esc 只关浮层、**不清选区** → 浏览器仍认为"用户在操作选区"
+   * → 之后的拖动**收不到 mouseup** → 选区不再更新 → **浮层再也不出现**。
+   *
+   * → Esc = "取消这次选择" → 必须**连选区一起清掉**。
+   */
+  onDismiss?: () => void;
   /**
    * 高亮色板（语义 key → CSS 颜色）。
    *
@@ -99,11 +131,13 @@ function readLiveAnchor(): {
 export function SelectionPopover({
   open,
   selectionRect,
+  anchorRect: externalAnchorRect,
   containerRect,
   anchorVersion: externalAnchorVersion,
   actions,
   onAction,
   onClose,
+  onDismiss,
   highlightPalette,
   onPickColor,
 }: SelectionPopoverProps) {
@@ -257,6 +291,16 @@ export function SelectionPopover({
      * 成本：一次 `getBoundingClientRect()`（微秒级），可忽略。
      */
     const checkTimer = window.setInterval(() => {
+      /*
+       * ⚠️ **有外部锚点时不要读 DOM 选区**。
+       *
+       * 场景：点了高亮块 → 浮层用 `anchorRect` 定位。
+       * 此时浏览器里**可能还有旧选区**（或没有）→ 读它会得到**错的锚点**
+       * → 浮层跑到别的地方。
+       */
+      if (externalAnchorRect) {
+        return;
+      }
       const anchor = readLiveAnchor();
       if (!anchor) {
         return;
@@ -282,14 +326,16 @@ export function SelectionPopover({
       window.removeEventListener('scroll', bump, { capture: true });
       window.removeEventListener('resize', bump);
     };
-  }, [open]);
+    // ⚠️ `externalAnchorRect` 进依赖 → 外部锚点变了就重建监听
+  }, [open, externalAnchorRect]);
 
   /*
-   * **锚点 = 实时读 DOM 选区**。
+   * **锚点 = 外部锚点优先，否则实时读 DOM 选区**。
    *
    * 优先级：
-   * 1. DOM 里还有选区 → 用它（最准，永远跟得上）
-   * 2. DOM 选区没了（比如被清空）→ 退回传入的 `selectionRect`（兜底）
+   * 1. `anchorRect`（外部给的，比如高亮块）→ 用它
+   * 2. DOM 里还有选区 → 用它（最准，永远跟得上）
+   * 3. DOM 选区没了 → 退回传入的 `selectionRect`（兜底）
    *
    * ⚠️ **不能用 useMemo 缓存**：
    *    选区"恢复"这个时刻，DOM 里的选区是**刚刚**出现的，
@@ -305,7 +351,10 @@ export function SelectionPopover({
     void internalAnchorVersion;
     void externalAnchorVersion;
 
-    const anchor = readLiveAnchor() ?? selectionRect;
+    // 1) 外部锚点（高亮块等）优先
+    // 2) 否则实时读 DOM 选区
+    // 3) 再否则退回传进来的快照
+    const anchor = externalAnchorRect ?? readLiveAnchor() ?? selectionRect;
     if (!anchor) {
       setPosition(null);
       lastAnchorRef.current = null;
@@ -334,6 +383,7 @@ export function SelectionPopover({
     selectionRect,
     containerRect,
     effectiveSize,
+    externalAnchorRect,
   ]);
 
   /*
@@ -354,7 +404,26 @@ export function SelectionPopover({
       }
 
       /*
-       * ⚠️⚠️ **在文本层上按下时不要关闭浮层**（实测踩过的坑）。
+       * ⚠️⚠️ **点在文本层外 → 立刻关闭**（实测踩过的坑）。
+       *
+       * 旧逻辑：不管点在哪，都等 `setTimeout(0)` 后看"还有没有选区"
+       * → 点**工具栏**这类地方时，浏览器**不会清掉**旧选区
+       *   （点 `<button>` 只是移动焦点，选区还在）
+       * → "还有选区" → **不关** → 浮层赖在屏幕上不走（实测：0 → 0）。
+       *
+       * → 区分两种情况：
+       *   - **点在文本层里** → 用户在**重新框选** → 等选区变化（见下）
+       *   - **点在文本层外**（工具栏 / 页面空白）→ 用户**不想选文字了** → 立刻关
+       */
+      const target = event.target instanceof Element ? event.target : null;
+      const inTextLayer = !!target?.closest('.scpdf-text-layer');
+      if (!inTextLayer) {
+        onClose?.();
+        return;
+      }
+
+      /*
+       * ⚠️ **在文本层上按下时不要关闭浮层**（实测踩过的坑）。
        *
        * 用户重新框选时：mousedown 落在文本层上（浮层外面）
        * → 旧逻辑直接 `onClose()` → 浮层关闭
@@ -385,6 +454,14 @@ export function SelectionPopover({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        /*
+         * ⚠️ **Esc = 彻底取消这次选择**（不只是关浮层）。
+         *
+         * 只关浮层的话，浏览器仍认为"用户在操作选区"
+         * → 之后的拖动**收不到 mouseup**（实测：`Esc 后 mouseup: []`）
+         * → 选区不再更新 → **浮层再也不出现**。
+         */
+        onDismiss?.();
         onClose?.();
       }
     };
@@ -396,7 +473,7 @@ export function SelectionPopover({
       document.removeEventListener('mousedown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [open, onClose]);
+  }, [open, onClose, onDismiss]);
 
   if (!open) {
     return null;

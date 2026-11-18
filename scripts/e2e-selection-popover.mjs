@@ -194,15 +194,39 @@ try {
     `${beforeOutside} → ${afterOutside}`,
   );
 
-  // ---- 5. 滚动时隐藏 ----
+  // ---- 5. 滚动时**跟随**（不是隐藏）----
+  /*
+   * ⚠️ **行为已按用户要求改过**（第九轮决策）：
+   * 用户明确选了 **A. 跟随滚动**（像 Word 那样），不是"滚动就隐藏"。
+   * → 滚动后浮层应该**还在**，而且**位置要跟着变**。
+   */
   await selectText();
   await page.waitForTimeout(300);
+  const beforeScrollRect = await page.evaluate(() => {
+    const el = document.querySelector('.scpdf-selection-popover');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { top: Math.round(r.top), left: Math.round(r.left) };
+  });
   await page.evaluate(() => {
     document.querySelector('.scpdf-container')?.scrollBy(0, 200);
   });
   await page.waitForTimeout(400);
   const afterScroll = await page.locator('.scpdf-selection-popover').count();
-  check('滚动时隐藏浮层', afterScroll === 0);
+  const afterScrollRect = await page.evaluate(() => {
+    const el = document.querySelector('.scpdf-selection-popover');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { top: Math.round(r.top), left: Math.round(r.left) };
+  });
+  check('滚动时浮层跟随（不隐藏）', afterScroll === 1, `${afterScroll} 个`);
+  check(
+    '滚动时浮层位置跟着移动',
+    afterScrollRect !== null &&
+      beforeScrollRect !== null &&
+      Math.abs(afterScrollRect.top - beforeScrollRect.top) > 20,
+    `top ${beforeScrollRect?.top} → ${afterScrollRect?.top}`,
+  );
 
   // ---- 6. 翻转到上方 ----
   await page.evaluate(() => {

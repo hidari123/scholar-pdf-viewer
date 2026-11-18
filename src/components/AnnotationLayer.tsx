@@ -24,7 +24,13 @@ export interface AnnotationLayerProps {
   highlights: HighlightRecord[];
   /** 当前视口尺寸（归一化坐标的参考） */
   viewport: { width: number; height: number };
-  /** 点击高亮 */
+  /**
+   * 点击高亮。
+   *
+   * @deprecated 高亮块是 `pointer-events: none`（不能挡文字选择）
+   * → 点击由**容器级事件委托**处理（`PdfViewer.handleHighlightContainerClick`）。
+   * 这个 prop 不再使用，保留是为了不破坏外部类型。
+   */
   onHighlightClick?: (highlight: HighlightRecord) => void;
   /** 激活的高亮 id */
   activeHighlightId?: string | null;
@@ -56,7 +62,6 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
     pageNumber,
     highlights,
     viewport,
-    onHighlightClick,
     activeHighlightId,
     searchRects = [],
     activeSearchRectIndex = null,
@@ -167,6 +172,19 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
         const isMine = highlight.source !== 'others';
 
         return (
+          /*
+           * ⚠️⚠️ **高亮块不能挡住文本选择**（实测踩过的坑）。
+           *
+           * 旧实现：高亮渲染成 `<button>` + `pointer-events: auto`
+           * → 高亮块**正好盖在文字上** → 用户在那一块**框选不了字**
+           *   （实测：拖动起点落在 `BUTTON.scpdf-annotation` 上 → 选不中）。
+           * → 用户反馈"点了高亮之后 无法取消选中状态"。
+           *
+           * 修法（和链接层一致）：
+           * - 元素保留 `<button>`（a11y：能被读屏识别、能被键盘访问）
+           * - 但 `pointer-events: none` → **不拦鼠标** → 能正常框选文字
+           * - 点击由**容器级事件委托**处理（见 `PdfViewer` 的 `handleContainerClick`）
+           */
           <button
             key={`${highlight.id}-${rect.left}-${rect.top}`}
             type="button"
@@ -190,15 +208,23 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
               // 颜色：语义 key → CSS 变量（宿主可自定义色板）
               background: colorOf(highlight),
             }}
-            onClick={
-              onHighlightClick
-                ? (event) => {
-                    event.stopPropagation();
-                    onHighlightClick(highlight);
-                  }
-                : undefined
-            }
+            /*
+             * ⚠️ **不挂 onClick**。
+             *
+             * 点击走**容器级事件委托**（`PdfViewer.handleContainerClick`），
+             * 因为 `<button>` 上的 `pointer-events: none` 会让点击落到下层，
+             * 但 `event.target` 仍会指向它（浏览器在合成事件时保留原 target）。
+             */
             aria-label={highlight.selectedText}
+            /*
+             * ⚠️ **必须带 `data-highlight-id`**。
+             *
+             * 点高亮块要弹出操作条（用户要求）→ 需要按 id 找到高亮的 DOM 元素，
+             * 才能算出它的视口矩形（浮层锚点）。
+             *
+             * → `aria-label` 是**文字内容**（可能重复、可能超长）→ 不能用来定位。
+             */
+            data-highlight-id={highlight.id}
           />
         );
       })}

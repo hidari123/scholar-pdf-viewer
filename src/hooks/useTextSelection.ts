@@ -81,6 +81,28 @@ export interface UseTextSelectionResult {
   clearSelection: () => void;
   /** 只清包内部状态（**不通知宿主**） */
   clearState: () => void;
+  /**
+   * 清掉**浏览器原生选区**。
+   *
+   * ## 为什么需要
+   *
+   * `clearState()` 只清包内的引用 → **浏览器里的选区还在**
+   * → `selectionchange` 还会触发 → 浮层又会被打开。
+   *
+   * 实测（用户反馈"点击高亮之后无法取消选中状态，一直都有外边框"）：
+   * ```
+   * 选中后:   nativeSelLen=11  selectionLayer=1  popover=true
+   * 点高亮后: nativeSelLen=11  selectionLayer=1  popover=true   ← ❌ 全都没清
+   * ```
+   *
+   * ## ⚠️ 什么时候**不能**调
+   *
+   * **绝不能在 mousedown / click 处理器里直接调** `removeAllRanges()`
+   * → 那会**永久破坏后续的文本选择**（用户再也选不中字）。
+   *
+   * → 只在**动作完成之后**调（如"高亮已保存"）。
+   */
+  clearNativeSelection: () => void;
 }
 
 /**
@@ -108,6 +130,9 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
    * 拖动时 `selectionchange` 高频触发 → 合并到下一帧。
    */
   const geometryRafRef = useRef(0);
+
+  /** 清原生选区的 rAF 句柄（延迟清除，见 `clearNativeSelection`） */
+  const clearRafRef = useRef(0);
 
   /**
    * **span 按页分组的缓存**（`collectPages` 用）。
@@ -139,6 +164,85 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
   const clearState = useCallback(() => {
     selectionRef.current = null;
   }, []);
+
+  /**
+   * 清掉浏览器原生选区。
+   *
+   * ⚠️⚠️ **绝不能用 `removeAllRanges()`**（实测踩过的坑）。
+   *
+   * ### 现象
+   *
+   * ```
+   * 首次: 38 字符
+   * 点高亮后重选: 0 字符      ← ❌ 之后再也选不中字了
+   * selectionchange 事件: []  ← 浏览器**一个事件都没发**
+   * ```
+   *
+   * ### 根因
+   *
+   * `removeAllRanges()` 把浏览器推进"**选区被程序改过**"的状态
+   * → 浏览器认为"用户正在操作选区" → **后续的拖动被吞掉**
+   *   （mousedown / mouseup 都触发，但**没有 selectionchange**）。
+   *
+   * ### 实测：清选的**方式**不重要，**时机**才重要
+   *
+   * ```
+   * 在页面里直接调（不点按钮）:   removeAllRanges / collapseToStart → 重选 = 38  ✅
+   * 在 click 处理器里调:          removeAllRanges / collapseToStart → 重选 = 0   ❌
+   * ```
+   *
+   * → 差别是**点击那一刻**：点击会**移动焦点**（`<button>` 拿到焦点）
+   * → 焦点在按钮上时，用户在正文里**无法开始新的文本选择**
+   * → 所以必须**把焦点还给容器**。
+   *
+   * ### 修法（三件事一起做）
+   *
+   * 1. **下一帧**再清（rAF）→ 浏览器的事件循环回到"空闲"状态
+   * 2. **用 `collapseToStart()`** 而不是 `removeAllRanges()`
+   *    → 视觉上"没选中"（`toString()` 为空），但**不破坏浏览器的选区控制器**
+   * 3. **把焦点还给容器**（容器有 `tabIndex={0}`）→ 后续能正常框选
+   */
+  const clearNativeSelection = useCallback(() => {
+    if (clearRafRef.current !== 0) {
+      cancelAnimationFrame(clearRafRef.current);
+    }
+    clearRafRef.current = requestAnimationFrame(() => {
+      clearRafRef.current = 0;
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) {
+        return;
+      }
+
+      /*
+       * ⚠️ **用 `collapseToStart()` 而不是 `removeAllRanges()`**。
+       *
+       * `removeAllRanges()` → 浏览器进入"选区被程序改过"状态
+       * → **后续再也选不中字**（实测：重选 = 0，且没有 selectionchange 事件）。
+       */
+      try {
+        selection.collapseToStart();
+      } catch {
+        // 某些浏览器在选区跨节点时可能抛错 → 退回 removeAllRanges
+        selection.removeAllRanges();
+      }
+
+      /*
+       * ⚠️⚠️ **把焦点还给容器**（关键！）。
+       *
+       * 点了"高亮"按钮 → 浏览器把焦点给了 `<button>`
+       * → 焦点在按钮上时**无法开始新的文本选择**（实测：重选 = 0 字符）
+       * → 把焦点移回容器 → 一切正常（实测：重选 = 38 字符）。
+       *
+       * ⚠️ 只在"焦点确实在按钮/输入框上"时才抢焦点
+       *    → 否则会把用户正在用的输入框焦点抢走。
+       */
+      const active = document.activeElement;
+      const activeTag = active?.tagName ?? '';
+      if (activeTag === 'BUTTON' || activeTag === 'INPUT' || activeTag === 'TEXTAREA') {
+        containerRef.current?.focus({ preventScroll: true });
+      }
+    });
+  }, [containerRef.current?.focus]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -345,7 +449,19 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         text,
         rects: rects.map((rect) => ({
           top: toContentCoords(rect.top),
-          left: rect.left - containerRect.left + container.scrollLeft,
+          /*
+           * ⚠️⚠️ **水平不要加 `scrollLeft`**（实测踩过的坑）。
+           *
+           * `pageFrames.left`（= `pageLeft`）是**视口相对**的 X
+           * → 这里也必须是**同一个坐标空间** → **不加 scrollLeft**
+           *
+           * 垂直**要加** `scrollTop`（`toContentCoords` 里加了）
+           * → 因为 `pageFrames.top` 是**滚动内容坐标**（页在文档里的位置）。
+           *
+           * → 水平和垂直的坐标空间**本来就不一样**（一个是视口相对，一个是内容相对）
+           *    → 各自和 `pageLeft` / `pageTop` 对齐即可。
+           */
+          left: rect.left - containerRect.left,
           width: rect.width,
           height: rect.height,
         })),
@@ -516,6 +632,17 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         cancelAnimationFrame(geometryRafRef.current);
         geometryRafRef.current = 0;
       }
+      /*
+       * ⚠️ **不要在这里取消 `clearRafRef`**！
+       *
+       * 这个 effect 的依赖里有 `pageFrames` / `onSelectionChange` / `onClientRects`
+       * → 任何一次重渲染都可能让 effect **重跑** → cleanup 执行。
+       *
+       * 而"清原生选区"的 rAF 是在**动作完成时**排的，紧接着 `setState` 就会重渲染
+       * → cleanup 把它取消掉 → **原生选区永远清不掉**（实测：len 一直是 38）。
+       *
+       * → rAF 的取消放到**卸载时**单独处理（见下面的 `useEffect`）。
+       */
     };
   }, [
     containerRef,
@@ -528,5 +655,25 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     clearSelection,
   ]);
 
-  return { clearSelection, clearState };
+  /*
+   * **卸载时**才取消"清原生选区"的 rAF。
+   *
+   * ⚠️ 不能放在上面那个 effect 的 cleanup 里：
+   *    那个 effect 的依赖（`pageFrames` / `onSelectionChange` / …）会随重渲染变化
+   *    → cleanup 会把**还没执行**的清除操作取消掉
+   *    → 原生选区永远清不掉（实测：len 一直是 38）。
+   *
+   * → 单独一个 `[]` 依赖的 effect → **只在真正卸载时**跑。
+   */
+  useEffect(
+    () => () => {
+      if (clearRafRef.current !== 0) {
+        cancelAnimationFrame(clearRafRef.current);
+        clearRafRef.current = 0;
+      }
+    },
+    [],
+  );
+
+  return { clearSelection, clearState, clearNativeSelection };
 }

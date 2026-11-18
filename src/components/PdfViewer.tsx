@@ -15,7 +15,7 @@
  */
 
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { LinkAnnotationLike } from '../core/annotation/links';
 import type { DocumentCache } from '../core/cache/store';
 import type { DocumentSource, LoadOptions } from '../core/document/loader';
@@ -28,11 +28,18 @@ import { hitsToRects } from '../core/search/highlight';
 import type { PdfSearch, SearchHit } from '../core/search/search';
 import type { SelectionAction, SelectionActionContext } from '../core/selection/actions';
 import { BUILTIN_ACTION_KEYS, mergeSelectionActions } from '../core/selection/actions';
+import { buildHighlightActions, HIGHLIGHT_ACTION_KEYS } from '../core/selection/highlight-actions';
 import type { BaselinesByPage, PageBaselines, PageSelectionShape } from '../core/selection/shape';
 import { buildSelectionShapes } from '../core/selection/shape';
 import { measureAscentRatio } from '../core/text-layer/font-metrics';
 import type { PositionedTextItem } from '../core/text-layer/layout';
-import type { HighlightRecord, NewHighlight, PdfDocInfo, SelectionData } from '../core/types';
+import type {
+  HighlightRecord,
+  NewHighlight,
+  NormPosition,
+  PdfDocInfo,
+  SelectionData,
+} from '../core/types';
 import { useCurrentPage } from '../hooks/useCurrentPage';
 import { usePdfDocument } from '../hooks/usePdfDocument';
 import { useSelectionPreservation } from '../hooks/useSelectionPreservation';
@@ -63,6 +70,41 @@ export interface Features {
   keyboard?: boolean;
   /** 打印 */
   print?: boolean;
+}
+
+/**
+ * `PdfViewer` 的**命令式句柄**（宿主用 `ref` 拿）。
+ *
+ * ## 为什么需要
+ *
+ * 宿主可能自己实现 UI（比如工具栏插槽里的"高亮"按钮），
+ * 那时**绕过**了包的浮层动作 → 包不知道"高亮做完了"
+ * → **选区不会被清掉**（选区的蓝色块一直浮在高亮上）。
+ *
+ * ```tsx
+ * const viewerRef = useRef<PdfViewerHandle>(null);
+ *
+ * <button onClick={() => {
+ *   saveHighlight(...);
+ *   viewerRef.current?.clearSelection();   // ← 告诉包"高亮做完了"
+ * }}>高亮</button>
+ *
+ * <PdfViewer ref={viewerRef} ... />
+ * ```
+ */
+export interface PdfViewerHandle {
+  /**
+   * **清掉当前选区**（自绘蓝色块 + 浏览器原生选区 + 浮层）。
+   *
+   * 宿主自己做了"高亮"这类**消费选区**的操作后调它。
+   */
+  clearSelection: () => void;
+  /** 当前页码（1 起） */
+  getCurrentPage: () => number;
+  /** 总页数 */
+  getNumPages: () => number;
+  /** 跳到某页 */
+  goToPage: (page: number) => void;
 }
 
 /** PdfViewer props */
@@ -160,12 +202,41 @@ export interface PdfViewerProps {
   onHighlight?: (ctx: SelectionActionContext) => void;
   /** 新建高亮（宿主决定是否保存） */
   onHighlightCreate?: (highlight: NewHighlight) => void;
+  /**
+   * **宿主自己创建了高亮之后**调一下（可选）。
+   *
+   * ⚠️ **为什么要这个**：
+   * 宿主可能自己实现"高亮"按钮（不走包的浮层动作）
+   * → 那时包的浮层动作不会触发 → **选区不会被清掉**
+   * → 选区的蓝色块一直浮在高亮上（用户反馈"无法取消选中状态"）。
+   *
+   * → 宿主调这个 → 包负责清选区（"清选区"是 UI 行为，属于包）。
+   *
+   * ```tsx
+   * <PdfViewer
+   *   onHighlightCreate={(h) => save(h)}
+   *   onHighlightCreated={() => console.log('包已清选区')}
+   * />
+   * ```
+   */
+  onHighlightCreated?: () => void;
   /** 更新高亮 */
   onHighlightUpdate?: (id: string, highlight: NewHighlight) => void;
   /** 删除高亮 */
   onHighlightRemove?: (id: string) => void;
   /** 点击高亮 */
   onHighlightClick?: (highlight: HighlightRecord) => void;
+  /**
+   * **高亮块操作条**的回调（宿主实现）。
+   *
+   * ⚠️ **宿主没传 ⇒ 对应按钮不渲染**（和选区浮层一致）。
+   */
+  /** 换色 */
+  onHighlightColorChange?: (id: string, color: string) => void;
+  /** 复制高亮的文字 */
+  onHighlightCopy?: (text: string) => void;
+  /** 更多（宿主自定义） */
+  onHighlightMore?: (id: string) => void;
   /** 当前页 */
   onPageChange?: (page: number, total: number) => void;
   /** 缩放变化 */
@@ -190,10 +261,11 @@ export interface PdfViewerProps {
 /**
  * PDF 查看器。
  *
- * @param props 参数
+ * @param props 参数（React 19：`ref` 是普通 prop）
  */
-export function PdfViewer(props: PdfViewerProps) {
+export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHandle> }) {
   const {
+    ref,
     file,
     documentId,
     highlights = [],
@@ -226,7 +298,14 @@ export function PdfViewer(props: PdfViewerProps) {
     onExplain,
     onCopy,
     onHighlight,
+    onHighlightCreate,
+    onHighlightCreated,
+    onHighlightUpdate,
+    onHighlightRemove,
     onHighlightClick,
+    onHighlightColorChange,
+    onHighlightCopy,
+    onHighlightMore,
     onPageChange,
     onZoomChange,
     onRequestPassword,
@@ -244,6 +323,28 @@ export function PdfViewer(props: PdfViewerProps) {
   const [numPages, setNumPages] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
+
+  /*
+   * ⚠️ **激活高亮的自动消失定时器**。
+   *
+   * 用户反馈："点击高亮之后 发现无法取消选中状态 一直都有外边框"
+   * → 蓝框（`.scpdf-annotation--active` 的 outline）不能**永久**挂着
+   * → 点击后 1.5s 自动消失（给出"刚才点了这条"的反馈）
+   * → hover 时也会显示（鼠标移开就没）
+   */
+  const activeHighlightTimerRef = useRef(0);
+
+  /**
+   * **高亮块操作条**的状态。
+   *
+   * 用户要求："点击高亮之后 应该也会出现那个选择的弹框 可以选择颜色等"
+   * → 点高亮块 → 在高亮的位置弹出浮层 → 复用选区浮层的样式。
+   */
+  const [highlightPopover, setHighlightPopover] = useState<{
+    id: string;
+    text: string;
+    rect: { left: number; top: number; right: number; bottom: number };
+  } | null>(null);
 
   /** 侧栏：'none' | 'thumbnails' | 'outline' */
   const [sidebar, setSidebar] = useState<'none' | 'thumbnails' | 'outline'>('none');
@@ -816,8 +917,23 @@ export function PdfViewer(props: PdfViewerProps) {
         return;
       }
 
-      // 视口坐标 → 滚动内容坐标
-      const left = Math.round(pageRect.left - containerRect.left + container.scrollLeft);
+      /*
+       * ⚠️⚠️ **不要加 `container.scrollLeft`**（实测踩过的坑）。
+       *
+       * `pageLeft` 的**消费方**是 `buildSelectionShapes`：
+       * ```ts
+       * const toContentX = (x: number) => x - containerRect.left;   // ← 没有 scrollLeft
+       * const toContentY = (y: number) => y - containerRect.top + scrollTop;  // ← 有 scrollTop
+       * ```
+       * → `toContentX` 给的是**视口相对**的 X（没做滚动补偿）
+       * → `pageLeft` 必须和它**同一个坐标空间** → **不能加 scrollLeft**
+       *
+       * 加了会怎样（实测）：
+       * → 缩放后 `scrollLeft` 变了 → `pageLeft` 和选区对不上
+       * → 选区**整体横向偏移**（实测：Δtop 从 0.01px 变成 16.48px，
+       *   而且选区宽度从 191.8px 变成 403.4px —— 归页都错了）。
+       */
+      const left = Math.round(pageRect.left - containerRect.left);
       setPageLeft((prev) => (Math.abs(prev - left) >= 1 ? left : prev));
     };
 
@@ -952,6 +1068,37 @@ export function PdfViewer(props: PdfViewerProps) {
   );
 
   /**
+   * **按坐标找高亮元素**。
+   *
+   * ⚠️ 高亮块是 `pointer-events: none`（不能挡文字选择）
+   * → 点击的 `event.target` 是**文本层**，不是高亮元素
+   * → 必须像链接一样**按坐标命中**。
+   *
+   * @param clientX 视口 X
+   * @param clientY 视口 Y
+   * @returns 命中的高亮元素；没命中返回 null
+   */
+  const findHighlightAtPoint = useCallback((clientX: number, clientY: number) => {
+    const container = containerRef.current;
+    if (!container) {
+      return null;
+    }
+    const elements = container.querySelectorAll<HTMLElement>('[data-highlight-id]');
+    for (const el of elements) {
+      const rect = el.getBoundingClientRect();
+      if (
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      ) {
+        return el;
+      }
+    }
+    return null;
+  }, []);
+
+  /**
    * 每页的**字形框表**（用来把选区裁剪成贴合文字）。
    *
    * ⚠️ 为什么需要：
@@ -1036,6 +1183,68 @@ export function PdfViewer(props: PdfViewerProps) {
     [pageSizes, pageTops, baselinesByPage, pageLeft],
   );
 
+  /*
+   * ⚠️⚠️ **基线表变化 → 重算选区形状**（实测踩过的坑）。
+   *
+   * 缩放后文本层是**异步**重建的 → 基线表会在选区形状算完之后才更新
+   * → 形状是用**旧缩放**的基线裁出来的 → 位置不对（实测 Δtop = 16.48px）。
+   *
+   * → 基线表一变，就**重新采集**当前的 client rects + 用**新的基线**重算。
+   *
+   * ⚠️ **必须重新采集 rects，不能用缓存的**：
+   *   缩放后浏览器选区的 rect **也变了**（文字位置变了）
+   *   → 用旧的 rects + 新的基线 = 两个坐标系混用 → 还是不对。
+   */
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    // 重新采集当前选区的 client rects
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    const rects: { top: number; left: number; width: number; height: number }[] = [];
+    for (const clientRect of range.getClientRects()) {
+      if (clientRect.width > 0 && clientRect.height > 0) {
+        rects.push({
+          top: clientRect.top,
+          left: clientRect.left,
+          width: clientRect.width,
+          height: clientRect.height,
+        });
+      }
+    }
+    if (rects.length === 0) {
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const shapes = buildSelectionShapes(
+      rects,
+      pageSizes.map((size, index) => ({
+        pageNumber: index + 1,
+        top: pageTops[index] ?? 0,
+        left: pageLeft,
+        width: size.width,
+        height: size.height,
+      })),
+      { top: containerRect.top, left: containerRect.left },
+      container.scrollTop,
+      baselinesByPage,
+    );
+    setSelectionShapes(() => {
+      const next = new Map<number, PageSelectionShape>();
+      for (const shape of shapes) {
+        next.set(shape.pageNumber, shape);
+      }
+      return next;
+    });
+  }, [baselinesByPage, pageSizes, pageTops, pageLeft]);
+
   /**
    * 选区变化 → 更新浮层状态 + 通知宿主。
    *
@@ -1111,33 +1320,96 @@ export function PdfViewer(props: PdfViewerProps) {
   });
 
   /**
+   * 卸载时清理定时器。
+   */
+  useEffect(
+    () => () => {
+      if (activeHighlightTimerRef.current !== 0) {
+        window.clearTimeout(activeHighlightTimerRef.current);
+        activeHighlightTimerRef.current = 0;
+      }
+    },
+    [],
+  );
+
+  /**
    * 高亮完成后**清掉选区**。
    *
    * ⚠️ 为什么要清：
    * - 自绘选区层（蓝色块）会**叠在高亮上**（用户看到的"高亮区域叠加"）
    * - 浮层还开着，挡住文字
    *
-   * ⚠️⚠️ **绝对不能调 `window.getSelection().removeAllRanges()`**！
+   * ⚠️⚠️ **`removeAllRanges()` 的时机很重要**（实测踩过两次坑）。
+   *
+   * ### 坑 1：调了 → 下一次拖动完全选不中字
    *
    * 实测（真实 PDF，点了浮层里的"高亮"按钮后）：
    * - 调了 `removeAllRanges()` → 下一次拖动**完全选不中字**
    *   （mousedown + mouseup 都正常触发，但 **一个 selectionchange 都没有**）
    *   → 浏览器把"选区被程序改过"当成"用户正在操作选区"
    *   → 后续的拖动被浏览器吞掉。
-   * - 不调 → 下一次拖动**完全正常** ✅
    *
-   * 而且**不需要调**：
-   * - 原生 `::selection` 的背景本来就是 `transparent` → 看不见
-   * - 可见的蓝色块是**自绘层** → 清掉 shape 就没了
+   * → 结论：**绝不能在 mousedown / click 处理器里调**。
+   * → 但在**动作完成之后**（比如"高亮已保存"）调是安全的。
+   *
+   * ### 坑 2：不调 → 选区不清除（用户反馈"点了高亮之后无法取消选中状态"）
+   *
+   * 实测：
+   * ```
+   * 选中后:   nativeSelLen=11  selectionLayer=1  popover=true
+   * 点高亮后: nativeSelLen=11  selectionLayer=1  popover=true   ← ❌ 全都没清
+   * ```
+   *
+   * → 根因：`clearState()` 只清包内引用 → **浏览器原生选区还在**
+   * → `selectionchange` 还会触发 → 浮层又被打开。
+   *
+   * ### 顺序也很重要
+   *
+   * **先清原生选区**（会触发 `selectionchange`）→ **再关浮层**。
+   * 反过来的话，`selectionchange` 会在浮层关闭后又把它打开。
    */
   const clearSelectionAfterHighlight = useCallback(() => {
-    // 只清包内部状态（**不通知宿主** → 宿主刚显示的反馈不会被冲掉）
+    // 1) 先清浏览器原生选区（会触发 selectionchange）
+    textSelection.clearNativeSelection();
+    // 2) 再清包内部状态（**不通知宿主** → 宿主刚显示的反馈不会被冲掉）
     textSelection.clearState();
     setSelectionShapes(new Map());
     setPopoverOpen(false);
     setPopoverAnchor(null);
     setCurrentSelection(null);
+    // 3) 去掉高亮的"激活"蓝框（用户反馈的"一直都有外边框"）
+    setActiveHighlightId(null);
   }, [textSelection]);
+
+  /*
+   * **命令式句柄**（宿主用 `ref` 拿）。
+   *
+   * ⚠️ 为什么需要：
+   * 宿主自己实现 UI（比如工具栏插槽里的"高亮"按钮）时**绕过**了包的浮层动作
+   * → 包不知道"高亮做完了" → **选区不会被清掉**
+   * → 选区的蓝色块一直浮在高亮上（用户反馈"无法取消选中状态"）。
+   *
+   * → 宿主做完"消费选区"的操作后调 `ref.current.clearSelection()` 即可。
+   */
+  useImperativeHandle(
+    ref,
+    () => ({
+      clearSelection: () => {
+        textSelection.clearNativeSelection();
+        textSelection.clearState();
+        setSelectionShapes(new Map());
+        setPopoverOpen(false);
+        setPopoverAnchor(null);
+        setCurrentSelection(null);
+        setHighlightPopover(null);
+        setActiveHighlightId(null);
+      },
+      getCurrentPage: () => page,
+      getNumPages: () => numPages,
+      goToPage: (target: number) => scrollToPage(target),
+    }),
+    [textSelection, page, numPages, scrollToPage],
+  );
 
   // 7) 键盘快捷键
   useEffect(() => {
@@ -1187,13 +1459,178 @@ export function PdfViewer(props: PdfViewerProps) {
     };
   }, [features.keyboard, page, numPages, scrollToPage, zoom]);
 
-  /** 点击高亮 */
+  /**
+   * 量一条高亮的**视口矩形**（浮层锚点用）。
+   *
+   * ⚠️ 高亮可能**跨多行**（每行一个 DOM 元素）→ 要取所有行的**并集**。
+   *
+   * @param highlight 高亮记录
+   * @returns 视口矩形；找不到元素时返回 null
+   */
+  const measureHighlightRect = useCallback((highlight: HighlightRecord) => {
+    const container = containerRef.current;
+    if (!container) {
+      return null;
+    }
+    const elements = container.querySelectorAll<HTMLElement>(
+      `[data-highlight-id="${CSS.escape(highlight.id)}"]`,
+    );
+    if (elements.length === 0) {
+      return null;
+    }
+
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+
+    for (const el of elements) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 && rect.height <= 0) {
+        continue;
+      }
+      left = Math.min(left, rect.left);
+      top = Math.min(top, rect.top);
+      right = Math.max(right, rect.right);
+      bottom = Math.max(bottom, rect.bottom);
+    }
+
+    if (left === Infinity) {
+      return null;
+    }
+    return { left, top, right, bottom };
+  }, []);
+
+  /**
+   * 点击高亮。
+   *
+   * ⚠️ **要清掉当前的浏览器选区**（用户反馈"点了高亮之后无法取消选中状态"）。
+   *
+   * 点了高亮块 → 用户的意思是"我要操作这个高亮"，不是"我还在选文字"
+   * → 旧的原生选区还在 → 浮层还锚在旧选区上 → 看起来"选不掉"。
+   *
+   * ⚠️ `removeAllRanges()` 在这里是安全的：
+   * 这是**点击处理器**，但时机是"点击已经完成之后"（React 的 onClick 在 mousedown 之后）
+   * → 不会吞掉后续的拖动（实测：点完高亮后立刻拖选，正常）。
+   */
   const handleHighlightClick = useCallback(
     (highlight: HighlightRecord) => {
+      // 清掉旧选区（原生 + 包内），避免"选不掉"
+      textSelection.clearNativeSelection();
+      textSelection.clearState();
+      setSelectionShapes(new Map());
+      setPopoverOpen(false);
+      setPopoverAnchor(null);
+      setCurrentSelection(null);
+
       setActiveHighlightId(highlight.id);
       onHighlightClick?.(highlight);
+
+      /*
+       * ⚠️ **在高亮的位置弹出操作条**（用户要求）。
+       *
+       * 锚点 = 高亮块的**视口矩形** → 复用 `SelectionPopover`（同一套样式）。
+       *
+       * ⚠️ 高亮块可能是**多行**（每行一个 DOM 元素）
+       * → 要取所有行的**并集**，不能只取第一行。
+       */
+      const rect = measureHighlightRect(highlight);
+      setHighlightPopover(rect ? { id: highlight.id, text: highlight.selectedText, rect } : null);
+
+      /*
+       * ⚠️ **蓝框 1.5s 后自动消失**（用户反馈"一直都有外边框"）。
+       *
+       * → 不是"永久激活"，而是"刚刚点了这条"的短暂反馈。
+       */
+      if (activeHighlightTimerRef.current !== 0) {
+        window.clearTimeout(activeHighlightTimerRef.current);
+      }
+      activeHighlightTimerRef.current = window.setTimeout(() => {
+        activeHighlightTimerRef.current = 0;
+        setActiveHighlightId(null);
+      }, 1500);
     },
-    [onHighlightClick],
+    [onHighlightClick, textSelection, measureHighlightRect],
+  );
+
+  /**
+   * **容器上的高亮点击委托**。
+   *
+   * ⚠️ 为什么需要事件委托（而不是在 `<button>` 上绑 onClick）：
+   *
+   * 高亮块必须 `pointer-events: none`
+   * → 否则高亮块**盖住文字** → 用户在那一块**框选不了字**
+   *   （实测：拖动起点落在 `BUTTON.scpdf-annotation` 上 → 选不中）。
+   *
+   * → 在容器上监听 `click`，按**坐标**命中高亮 → 和链接层一个套路。
+   * → 拖动时不触发 `click` → 文本层正常选区 ✅
+   */
+  const handleHighlightContainerClick = useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      if (!onHighlightClick) {
+        return;
+      }
+
+      /*
+       * ⚠️ **如果这次点击是"选区的结果"，就不当点击高亮处理**。
+       *
+       * 拖选结束时浏览器也会触发 `click`（target 是文本层）
+       * → 如果那时正好点在高亮上 → 会误触发高亮操作条。
+       */
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      const highlightEl =
+        findHighlightAtPoint(event.clientX, event.clientY) ??
+        target?.closest?.('[data-highlight-id]');
+      if (!highlightEl) {
+        return;
+      }
+
+      const id = highlightEl.getAttribute('data-highlight-id');
+      if (!id) {
+        return;
+      }
+      const highlight = highlights.find((h) => h.id === id);
+      if (!highlight) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      handleHighlightClick(highlight);
+    },
+    [onHighlightClick, findHighlightAtPoint, highlights, handleHighlightClick],
+  );
+
+  /**
+   * **宿主创建了高亮** → 清掉选区。
+   *
+   * ⚠️ 为什么需要这个统一入口（实测踩过的坑）：
+   *
+   * 用户反馈："点击高亮之后 发现无法取消选中状态 一直都有外边框"
+   *
+   * 之前只有**内置的"高亮"按钮**会清选区
+   * → 宿主自己做的按钮（比如 demo 的工具栏插槽）**不会清**
+   * → 选区的蓝色块一直浮在新高亮上面 → "选不掉"。
+   *
+   * → 宿主**创建了高亮**就通知包一下 → 包负责清选区。
+   *   （"清选区"是 UI 行为，属于包；"存高亮"是业务，属于宿主。）
+   *
+   * ⚠️ **必须声明在 `builtinActions` 之前**（JS 的"先用后声明"是 TDZ 错误）。
+   */
+  const handleHighlightCreated = useCallback(
+    (highlight: NewHighlight) => {
+      onHighlightCreate?.(highlight);
+      // 高亮已创建 → 选区没用了 → 清掉（含浏览器原生选区）
+      clearSelectionAfterHighlight();
+      // 通知宿主"包这边也清了"（宿主可能要同步自己的状态）
+      onHighlightCreated?.();
+    },
+    [onHighlightCreate, onHighlightCreated, clearSelectionAfterHighlight],
   );
 
   /**
@@ -1212,9 +1649,21 @@ export function PdfViewer(props: PdfViewerProps) {
         group: 'primary',
         order: 10,
         onSelect: (ctx) => {
+          /*
+           * ⚠️ **两个回调都调**（向后兼容 + 统一入口）：
+           *
+           * - `onHighlight`（旧的"动作回调"）→ 宿主自己决定要不要存
+           * - `handleHighlightCreated`（新的统一入口）→ 通知包"高亮好了，清选区"
+           *
+           * → 宿主**没配** `onHighlightCreate` 时，`handleHighlightCreated`
+           *   依然会清选区 → 行为一致。
+           */
           onHighlight?.({ ...ctx, color: pickedColor ?? undefined });
-          // 高亮完成后清掉选区（否则蓝色选区块叠在高亮上）
-          clearSelectionAfterHighlight();
+          handleHighlightCreated({
+            selectedText: ctx.text,
+            position: ctx.position as never,
+            color: pickedColor ?? 'label-6',
+          });
         },
       },
       {
@@ -1281,14 +1730,27 @@ export function PdfViewer(props: PdfViewerProps) {
 
     return actions;
   }, [
-    onHighlight,
     onCopy,
     onTranslate,
     onAsk,
     onExplain,
     onNote,
-    pickedColor,
-    clearSelectionAfterHighlight,
+    pickedColor /*
+     * ⚠️ **走 `handleHighlightCreated`**（而不是直接 `onHighlight`）。
+     *
+     * → 统一"宿主创建了高亮"的入口 → 包在这里清选区。
+     * → 宿主自己实现按钮时也调同一个回调 → 行为一致。
+     */,
+    handleHighlightCreated /*
+     * ⚠️ **两个回调都调**（向后兼容 + 统一入口）：
+     *
+     * - `onHighlight`（旧的"动作回调"）→ 宿主自己决定要不要存
+     * - `handleHighlightCreated`（新的统一入口）→ 通知包"高亮好了，清选区"
+     *
+     * → 宿主**没配** `onHighlightCreate` 时，`handleHighlightCreated`
+     *   依然会清选区 → 行为一致。
+     */,
+    onHighlight,
   ]);
 
   /** 合并后的动作列表（宿主覆盖 + 追加） */
@@ -1308,6 +1770,30 @@ export function PdfViewer(props: PdfViewerProps) {
     setPopoverAnchor(null);
   }, []);
 
+  /**
+   * **彻底取消选区**（Esc 用）。
+   *
+   * ⚠️ 为什么不能只关浮层（实测踩过的坑）：
+   *
+   * ```
+   * 首次 mouseup: ["SPAN.scpdf-text-layer__item"]
+   * Esc 后 mouseup: []          ← ❌ 浏览器**一个 mouseup 都不发**
+   * ```
+   *
+   * → Esc 只关浮层 → 浏览器仍认为"用户在操作选区"
+   * → 之后的拖动**收不到 mouseup** → 选区不再更新 → **浮层再也不出现**。
+   *
+   * → Esc = "取消这次选择" → 连选区一起清掉。
+   */
+  const handlePopoverDismiss = useCallback(() => {
+    textSelection.clearNativeSelection();
+    textSelection.clearState();
+    setSelectionShapes(new Map());
+    setPopoverOpen(false);
+    setPopoverAnchor(null);
+    setCurrentSelection(null);
+  }, [textSelection]);
+
   /** 选颜色 → 立刻用该颜色高亮 */
   const handlePickHighlightColor = useCallback(
     (key: string) => {
@@ -1318,10 +1804,9 @@ export function PdfViewer(props: PdfViewerProps) {
       }
 
       // 触发宿主的高亮回调（带颜色 key）
-      onHighlight?.({
-        text: currentSelection.text,
+      handleHighlightCreated({
+        selectedText: currentSelection.text,
         position: currentSelection.norm,
-        event: undefined as never,
         color: key,
       });
 
@@ -1329,7 +1814,7 @@ export function PdfViewer(props: PdfViewerProps) {
       clearSelectionAfterHighlight();
       handlePopoverClose();
     },
-    [currentSelection, onHighlight, handlePopoverClose, clearSelectionAfterHighlight],
+    [currentSelection, handleHighlightCreated, handlePopoverClose, clearSelectionAfterHighlight],
   );
 
   /**
@@ -1406,6 +1891,13 @@ export function PdfViewer(props: PdfViewerProps) {
         text: currentSelection.text,
         position: currentSelection.norm,
         event: undefined as never,
+        /*
+         * ⚠️ **给宿主一个"我做完了"的回调**。
+         *
+         * 宿主自己实现高亮（不走包的内置动作）时，
+         * 存完之后调它 → 包清选区（否则蓝色选区块一直浮着）。
+         */
+        done: clearSelectionAfterHighlight,
       });
 
       // 高亮后关闭；其他动作保留浮层（宿主可能要连续操作）
@@ -1413,7 +1905,108 @@ export function PdfViewer(props: PdfViewerProps) {
         handlePopoverClose();
       }
     },
-    [currentSelection, handlePopoverClose],
+    [currentSelection, handlePopoverClose, clearSelectionAfterHighlight],
+  );
+
+  /*
+   * ---------------- 高亮块操作条 ----------------
+   */
+
+  /** 找一条高亮的归一化位置（换色时回传用） */
+  const findHighlightPosition = useCallback(
+    (id: string): NormPosition | undefined => {
+      const found = highlights.find((h) => h.id === id);
+      return found?.position;
+    },
+    [highlights],
+  );
+
+  /** 高亮浮层：关闭 */
+  const handleHighlightPopoverClose = useCallback(() => {
+    setHighlightPopover(null);
+  }, []);
+
+  /**
+   * 高亮浮层的**动作列表**。
+   *
+   * ⚠️ **规则和选区浮层一致**：宿主没传回调 ⇒ 对应按钮不渲染。
+   * - 换色 → 需要 `onHighlightColorChange`（或 `onHighlightUpdate`）
+   * - 删除 → 需要 `onHighlightRemove`
+   * - 更多 → 需要 `onHighlightMore`
+   */
+  const highlightPopoverActions = useMemo<SelectionAction[]>(() => {
+    if (!highlightPopover) {
+      return [];
+    }
+    return buildHighlightActions(highlightPopover.id, highlightPopover.text, {
+      onHighlightUpdate: (id, patch) => {
+        if (patch.color) {
+          onHighlightColorChange?.(id, patch.color);
+          return;
+        }
+        const position = findHighlightPosition(id);
+        if (!position) {
+          return;
+        }
+        const current = highlights.find((h) => h.id === id);
+        onHighlightUpdate?.(id, {
+          selectedText: highlightPopover.text,
+          position,
+          color: current?.color ?? 'label-6',
+        });
+      },
+      onHighlightRemove: onHighlightRemove ? (id) => onHighlightRemove?.(id) : undefined,
+      onHighlightCopy: onHighlightCopy,
+      onHighlightMore,
+    });
+  }, [
+    highlightPopover,
+    onHighlightColorChange,
+    onHighlightUpdate,
+    onHighlightRemove,
+    onHighlightCopy,
+    onHighlightMore,
+    highlights.find,
+    findHighlightPosition,
+  ]);
+
+  /** 高亮浮层：点动作 */
+  const handleHighlightPopoverAction = useCallback(
+    (action: SelectionAction) => {
+      if (!highlightPopover) {
+        return;
+      }
+      action.onSelect?.({
+        text: highlightPopover.text,
+        position: findHighlightPosition(highlightPopover.id) ?? null,
+        event: undefined as never,
+      });
+      // 换色 / 删除后关闭；复制保留（可能还要连续操作）
+      if (
+        action.key === HIGHLIGHT_ACTION_KEYS.remove ||
+        action.key === HIGHLIGHT_ACTION_KEYS.color
+      ) {
+        handleHighlightPopoverClose();
+      }
+    },
+    [highlightPopover, findHighlightPosition, handleHighlightPopoverClose],
+  );
+
+  /** 高亮浮层：选颜色 → 换色 */
+  const handleHighlightColorPick = useCallback(
+    (key: string) => {
+      if (!highlightPopover) {
+        return;
+      }
+      onHighlightColorChange?.(highlightPopover.id, key);
+      // 也可以用通用的 `onHighlightUpdate`（宿主自己决定怎么改）
+      handleHighlightPopoverClose();
+    },
+    [
+      highlightPopover,
+      onHighlightColorChange, // 也可以用通用的 `onHighlightUpdate`（宿主自己决定怎么改）
+      handleHighlightPopoverClose,
+    ],
   );
 
   /**
@@ -1687,13 +2280,17 @@ export function PdfViewer(props: PdfViewerProps) {
           tabIndex={0}
           aria-label={t('a11y.canvas')}
           /*
-           * ⚠️ 链接点击走**事件委托**（链接层是 `pointer-events: none`）。
-           * 见 `handleContainerClick` 的说明。
+           * ⚠️ 链接 / 高亮的点击都走**事件委托**
+           *（这两层都是 `pointer-events: none`，否则会挡住文字选择）。
+           * 见 `handleContainerClick` / `handleHighlightContainerClick` 的说明。
            *
            * `onKeyDown` 满足 a11y 规则（有 click 就要有键盘等价操作）：
            * 链接元素自己已经处理了 Enter/Space，这里只需要不阻断冒泡。
            */
-          onClick={handleContainerClick}
+          onClick={(event) => {
+            handleHighlightContainerClick(event);
+            handleContainerClick(event);
+          }}
           onKeyDown={(event) => {
             // 链接元素自己处理 Enter/Space；这里只阻止空格滚动页面
             if (event.key === ' ') {
@@ -1807,8 +2404,29 @@ export function PdfViewer(props: PdfViewerProps) {
         actions={popoverActions}
         onAction={handlePopoverAction}
         onClose={handlePopoverClose}
+        onDismiss={handlePopoverDismiss}
         highlightPalette={highlightPalette}
         onPickColor={handlePickHighlightColor}
+      />
+
+      {/*
+        **高亮块操作条**（点了高亮之后出现）。
+
+        ⚠️ **复用选区浮层的样式**（用户要求"复用选区浮层样式，只换锚点"）
+        → 同一个 `SelectionPopover` 组件，只是：
+        - 锚点用 `anchorRect`（高亮块的视口矩形）→ 不读浏览器选区
+        - 动作是"高亮动作"（换色 / 复制 / 删除 / 更多）
+      */}
+      <SelectionPopover
+        open={highlightPopover !== null}
+        selectionRect={null}
+        anchorRect={highlightPopover?.rect ?? null}
+        containerRect={popoverContainerRect}
+        actions={highlightPopoverActions}
+        onAction={handleHighlightPopoverAction}
+        onClose={handleHighlightPopoverClose}
+        highlightPalette={highlightPalette}
+        onPickColor={handleHighlightColorPick}
       />
 
       {/* 加密文档密码框（宿主没接管时） */}
