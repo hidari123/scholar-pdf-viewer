@@ -10,7 +10,7 @@
 
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import type { Locale, Messages } from '../i18n/messages';
+import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
@@ -47,6 +47,12 @@ export interface ToolbarProps {
   locale: Locale;
   /** 文案覆盖 */
   messages?: Parameters<typeof resolveMessage>[2];
+  /**
+   * **宿主注册的语言表**（可添加任意语言）。
+   *
+   * → 内置 zh / en；宿主用这个加别的语言 ✅
+   */
+  locales?: LocaleTable;
   /** 翻页 */
   onPageChange: (page: number) => void;
   /** 缩放 */
@@ -83,6 +89,7 @@ export function Toolbar(props: ToolbarProps) {
     scale,
     locale,
     messages,
+    locales,
     onPageChange,
     onZoomIn,
     onZoomOut,
@@ -97,7 +104,7 @@ export function Toolbar(props: ToolbarProps) {
 
   /** 文案解析（key → 文案） */
   const t = (key: keyof Messages, vars?: Record<string, string | number>) =>
-    resolveMessage(locale, key, messages, vars);
+    resolveMessage(locale, key, messages, vars, locales);
 
   const showPageNav = toolbar.showPageNav !== false;
   const showZoom = toolbar.showZoom !== false;

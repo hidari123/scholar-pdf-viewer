@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { planThumbnails, ThumbnailCache, thumbnailSpec } from '../core/thumbnail/plan';
-import type { Locale, Messages } from '../i18n/messages';
+import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 
 /** 渲染缩略图的函数（宿主注入） */
@@ -39,6 +39,12 @@ export interface ThumbnailPanelProps {
   locale?: Locale;
   /** 文案覆盖 */
   messages?: Partial<Messages>;
+  /**
+   * **宿主注册的语言表**（可添加任意语言）。
+   *
+   * → 内置 zh / en；宿主用这个加别的语言 ✅
+   */
+  locales?: LocaleTable;
 }
 
 /**
@@ -58,6 +64,7 @@ export function ThumbnailPanel(props: ThumbnailPanelProps) {
     onPageSelect,
     locale = 'zh',
     messages,
+    locales,
   } = props;
 
   /**
@@ -72,8 +79,8 @@ export function ThumbnailPanel(props: ThumbnailPanelProps) {
   const generatingRef = useRef(new Set<number>());
 
   const t = useCallback(
-    (key: keyof Messages) => resolveMessage(locale, key, messages),
-    [locale, messages],
+    (key: keyof Messages) => resolveMessage(locale, key, messages, undefined, locales),
+    [locale, messages, locales],
   );
 
   /**

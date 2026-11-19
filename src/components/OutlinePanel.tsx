@@ -8,7 +8,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { OutlineItemLike } from '../core/outline/outline';
 import { flattenOutline, visibleOutlineItems } from '../core/outline/outline';
-import type { Locale, Messages } from '../i18n/messages';
+import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 
 /** OutlinePanel 参数 */
@@ -33,6 +33,12 @@ export interface OutlinePanelProps {
   locale?: Locale;
   /** 文案覆盖 */
   messages?: Partial<Messages>;
+  /**
+   * **宿主注册的语言表**（可添加任意语言）。
+   *
+   * → 内置 zh / en；宿主用这个加别的语言 ✅
+   */
+  locales?: LocaleTable;
 }
 
 /**
@@ -49,14 +55,15 @@ export function OutlinePanel(props: OutlinePanelProps) {
     onPageSelect,
     locale = 'zh',
     messages,
+    locales,
   } = props;
 
   /** 折叠的项 id */
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
 
   const t = useCallback(
-    (key: keyof Messages) => resolveMessage(locale, key, messages),
-    [locale, messages],
+    (key: keyof Messages) => resolveMessage(locale, key, messages, undefined, locales),
+    [locale, messages, locales],
   );
 
   /**

@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PdfSearch, SearchHit } from '../core/search/search';
-import type { Locale, Messages } from '../i18n/messages';
+import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 
 /** SearchPanel 参数 */
@@ -30,6 +30,12 @@ export interface SearchPanelProps {
   locale?: Locale;
   /** 文案覆盖 */
   messages?: Partial<Messages>;
+  /**
+   * **宿主注册的语言表**（可添加任意语言）。
+   *
+   * → 内置 zh / en；宿主用这个加别的语言 ✅
+   */
+  locales?: LocaleTable;
 }
 
 /**
@@ -38,7 +44,7 @@ export interface SearchPanelProps {
  * @param props 参数
  */
 export function SearchPanel(props: SearchPanelProps) {
-  const { search, onClose, onNavigate, onHitsChange, locale = 'zh', messages } = props;
+  const { search, onClose, onNavigate, onHitsChange, locale = 'zh', messages, locales } = props;
 
   const [keyword, setKeyword] = useState('');
   const [hits, setHits] = useState<SearchHit[]>([]);
@@ -50,8 +56,8 @@ export function SearchPanel(props: SearchPanelProps) {
 
   const t = useCallback(
     (key: keyof Messages, vars?: Record<string, string | number>) =>
-      resolveMessage(locale, key, messages, vars),
-    [locale, messages],
+      resolveMessage(locale, key, messages, vars, locales),
+    [locale, messages, locales],
   );
 
   /**

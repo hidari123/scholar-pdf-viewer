@@ -1,11 +1,50 @@
 /**
- * i18n —— 内置 zh/en 文案，宿主可覆盖。
+ * i18n —— 内置 zh/en 文案，宿主可**添加任意语言**。
  *
- * 为什么包内自带文案：包是"开箱即用"的阅读器，空状态/加载中/密码框这些
- * 基础文案必须有（宿主可以覆盖，但不该被迫提供）。
+ * ## 用户的诉求
+ *
+ * "页面要支持多种语言，先配置中英文，这个可以宿主通过固定json进行添加 要给出接口"
+ *
+ * → **中英文内置**（开箱即用）
+ * → **宿主能通过 JSON 添加语言**（比如日文、韩文、法文…）
+ * → **要有明确的接口**（不是"你随便改源码"）
+ *
+ * ## 三层文案（优先级从高到低）
+ *
+ * ```
+ * ① messages  prop   —— 单个 locale 的覆盖（最细粒度）
+ * ② locales  prop    —— 宿主注册的语言表（JSON）
+ * ③ 内置 MESSAGES     —— zh / en 的内置文案
+ * ```
+ *
+ * → **缺哪条就回退到下一层** → 宿主只写自己关心的文案即可 ✅
+ *
+ * ## 宿主的用法
+ *
+ * ```tsx
+ * // ① 注册一个语言（JSON）
+ * const ja = {
+ *   'load.loading': 'ドキュメントを読み込み中…',
+ *   'page.of': '{page} / {total} ページ',
+ *   // …不写全也行，缺的会回退到内置英文
+ * };
+ *
+ * <PdfViewer locale="ja" locales={{ ja }} />
+ * ```
+ *
+ * ⚠️ **只提供文案，不碰业务** → 包不知道"翻译"是干什么的（那是宿主的事）。
  */
 
-export type Locale = 'zh' | 'en';
+/** 内置语言 */
+export type BuiltinLocale = 'zh' | 'en';
+
+/**
+ * 语言标识（**可以是任意字符串**）。
+ *
+ * ⚠️ 之前是 `'zh' | 'en'` 的固定联合类型 → 宿主加语言要改源码 ❌
+ * → 现在放宽成 `string` → 宿主传 `'ja'` / `'ko-FR'` 都行 ✅
+ */
+export type Locale = BuiltinLocale | (string & {});
 
 /** 文案 key 清单 */
 export interface Messages {
@@ -39,6 +78,29 @@ export interface Messages {
   'a11y.canvas': string;
   'a11y.page': string;
 }
+
+/** 文案 key（字符串联合） */
+export type MessageKey = keyof Messages;
+
+/**
+ * **宿主的语言表**（locale → 文案）。
+ *
+ * ⚠️ **必须是"部分"的** —— 宿主只想写自己关心的文案，
+ *    缺的会自动回退到内置文案 ✅
+ */
+export type LocaleMessages = Partial<Messages>;
+
+/**
+ * **语言表**（宿主注册的所有语言）。
+ *
+ * ```ts
+ * const locales = {
+ *   ja: { 'load.loading': '…', 'page.of': '…' },
+ *   ko: { 'load.loading': '…' },
+ * };
+ * ```
+ */
+export type LocaleTable = Record<string, LocaleMessages>;
 
 /** 中文文案（默认） */
 export const ZH_MESSAGES: Messages = {
@@ -107,19 +169,48 @@ export const EN_MESSAGES: Messages = {
 };
 
 /** 内置文案表 */
-export const MESSAGES: Record<Locale, Messages> = {
+export const MESSAGES: Record<BuiltinLocale, Messages> = {
   zh: ZH_MESSAGES,
   en: EN_MESSAGES,
 };
 
-/** 解析文案（支持 {占位符} 替换） */
+/**
+ * 解析文案（支持 {占位符} 替换）。
+ *
+ * ## 回退链
+ *
+ * ```
+ * ① overrides[key]                     —— 当前 locale 的覆盖（messages prop）
+ * ② locales[locale][key]              —— 宿主注册的语言表
+ * ③ MESSAGES[locale][key]              —— 内置（zh / en）
+ * ④ MESSAGES.en[key]                   —— 内置英文（宿主语言没写全时的兜底）
+ * ⑤ key 本身                            —— 最后兜底（不会返回 undefined）
+ * ```
+ *
+ * ⚠️ **为什么最后兜底到英文而不是中文**：
+ * → 一个没配置全的语言，用中文兜底会"中英混杂"，更糟
+ * → 用英文兜底至少是**一致的一种语言** ✅
+ *
+ * @param locale 语言（可以是宿主的任意语言）
+ * @param key 文案 key
+ * @param overrides 当前 locale 的覆盖
+ * @param vars 占位符变量
+ * @param locales 宿主注册的语言表
+ * @returns 文案
+ */
 export function resolveMessage(
   locale: Locale,
-  key: keyof Messages,
-  overrides?: Partial<Messages>,
+  key: MessageKey,
+  overrides?: LocaleMessages,
   vars?: Record<string, string | number>,
+  locales?: LocaleTable,
 ): string {
-  const template = overrides?.[key] ?? MESSAGES[locale][key] ?? key;
+  const template =
+    overrides?.[key] ??
+    locales?.[locale]?.[key] ??
+    MESSAGES[locale as BuiltinLocale]?.[key] ??
+    MESSAGES.en[key] ??
+    key;
 
   if (!vars) {
     return template;
@@ -129,4 +220,30 @@ export function resolveMessage(
     const value = vars[name];
     return value === undefined ? match : String(value);
   });
+}
+
+/**
+ * **注册语言表**（把宿主的 JSON 和内置语言合并）。
+ *
+ * ⚠️ **这是一个纯函数** → 宿主可以在运行时动态切换语言表。
+ *
+ * @param locales 宿主注册的语言表
+ * @returns 合并后的语言表（内置 + 宿主）
+ */
+export function buildLocaleTable(locales?: LocaleTable): LocaleTable {
+  return { ...MESSAGES, ...(locales ?? {}) };
+}
+
+/**
+ * **判断某个语言是否可用**。
+ *
+ * @param locale 语言
+ * @param locales 宿主注册的语言表
+ * @returns 可用则 true
+ */
+export function isLocaleSupported(locale: Locale, locales?: LocaleTable): boolean {
+  if (locale in MESSAGES) {
+    return true;
+  }
+  return !!locales && locale in locales;
 }

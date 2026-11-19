@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Locale, Messages } from '../i18n/messages';
+import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 
 /** PasswordDialog 参数 */
@@ -26,6 +26,12 @@ export interface PasswordDialogProps {
   locale?: Locale;
   /** 文案覆盖 */
   messages?: Partial<Messages>;
+  /**
+   * **宿主注册的语言表**（可添加任意语言）。
+   *
+   * → 内置 zh / en；宿主用这个加别的语言 ✅
+   */
+  locales?: LocaleTable;
 }
 
 /**
@@ -34,7 +40,15 @@ export interface PasswordDialogProps {
  * @param props 参数
  */
 export function PasswordDialog(props: PasswordDialogProps) {
-  const { open, onSubmit, onCancel, wrongPassword = false, locale = 'zh', messages } = props;
+  const {
+    open,
+    onSubmit,
+    onCancel,
+    wrongPassword = false,
+    locale = 'zh',
+    messages,
+    locales,
+  } = props;
 
   const [password, setPassword] = useState('');
 
@@ -42,8 +56,8 @@ export function PasswordDialog(props: PasswordDialogProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const t = useCallback(
-    (key: keyof Messages) => resolveMessage(locale, key, messages),
-    [locale, messages],
+    (key: keyof Messages) => resolveMessage(locale, key, messages, undefined, locales),
+    [locale, messages, locales],
   );
 
   // 打开时聚焦 + 清空

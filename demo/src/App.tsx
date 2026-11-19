@@ -158,6 +158,38 @@ export default function App() {
   /** 当前选中的高亮颜色 key（宿主的 UI 状态） */
   const [highlightColor, setHighlightColor] = useState('yellow');
 
+  /**
+   * **语言（宿主可切换）**。
+   *
+   * ⚠️ 内置 zh / en；宿主还能通过 JSON **加**别的语言。
+   */
+  const [locale, setLocale] = useState<'zh' | 'en' | 'ja'>('zh');
+
+  /**
+   * **宿主注册的语言表**（JSON）。
+   *
+   * → 这就是"宿主通过固定 json 添加语言"的接口 ✅
+   * → 不用写全 → 缺的自动回退到内置文案
+   */
+  const HOST_LOCALES = useMemo(
+    () => ({
+      ja: {
+        'load.loading': 'ドキュメントを読み込み中…',
+        'page.of': '{page} / {total} ページ',
+        'search.placeholder': 'ドキュメントを検索',
+        'search.count': '{count} 件',
+        'outline.title': '目次',
+        'thumbnails.title': 'サムネイル',
+        'print.title': '印刷',
+        'zoom.in': '拡大',
+        'zoom.out': '縮小',
+        'zoom.fitWidth': '幅に合わせる',
+        'zoom.fitPage': 'ページ全体',
+      },
+    }),
+    [],
+  );
+
   /** 主题（宿主可切换） */
   const [theme, setTheme] = useState<PdfViewerTheme>('light');
 
@@ -1029,6 +1061,17 @@ export default function App() {
               </option>
             ))}
           </select>
+          <span style={{ opacity: 0.7, marginLeft: 12 }}>语言：</span>
+          <select
+            value={locale}
+            onChange={(e) => setLocale(e.target.value as 'zh' | 'en' | 'ja')}
+            aria-label="语言"
+          >
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+            {/* 宿主通过 JSON 加的语言 */}
+            <option value="ja">日本語</option>
+          </select>
           <span style={{ opacity: 0.7, marginLeft: 12 }}>密度：</span>
           <select
             value={density}
@@ -1060,6 +1103,8 @@ export default function App() {
       <div style={{ flex: 1, minHeight: 0 }}>
         <PdfViewer
           ref={viewerRef}
+          locale={locale}
+          locales={HOST_LOCALES}
           file={sampleUrl}
           documentId={documentId}
           theme={theme}

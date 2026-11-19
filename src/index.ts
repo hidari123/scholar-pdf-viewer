@@ -98,7 +98,22 @@ export type {
 export { appearanceStyles, THEME_LABELS, THEMES, themeClasses } from './core/theme';
 export type * from './core/types';
 export * from './hooks';
-export type { Locale, Messages } from './i18n/messages';
-export { EN_MESSAGES, MESSAGES, ZH_MESSAGES } from './i18n/messages';
+/* ---------- i18n（宿主可通过 JSON 添加语言） ---------- */
+export type {
+  BuiltinLocale,
+  Locale,
+  LocaleMessages,
+  LocaleTable,
+  MessageKey,
+  Messages,
+} from './i18n/messages';
+export {
+  buildLocaleTable,
+  EN_MESSAGES,
+  isLocaleSupported,
+  MESSAGES,
+  resolveMessage,
+  ZH_MESSAGES,
+} from './i18n/messages';
 
 export const VERSION = '0.1.0';

@@ -52,7 +52,7 @@ import { useSelectionPreservation } from '../hooks/useSelectionPreservation';
 import { useTextSelection } from '../hooks/useTextSelection';
 import { useVisiblePages } from '../hooks/useVisiblePages';
 import { useZoom } from '../hooks/useZoom';
-import type { Locale, Messages } from '../i18n/messages';
+import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { OutlinePanel } from './OutlinePanel';
@@ -172,8 +172,26 @@ export interface PdfViewerProps {
   features?: Partial<Features>;
   /** 语言 */
   locale?: Locale;
-  /** 文案覆盖 */
+  /** 文案覆盖（当前 locale） */
   messages?: Partial<Messages>;
+  /**
+   * **宿主注册的语言表**（可添加任意语言）。
+   *
+   * ⚠️ 用户的诉求："页面要支持多种语言，先配置中英文，
+   *    这个可以宿主通过固定json进行添加 要给出接口"
+   *
+   * → 内置 zh / en；宿主用这个 prop **加**别的语言 ✅
+   *
+   * ```tsx
+   * const locales = {
+   *   ja: { 'load.loading': '読み込み中…', 'page.of': '{page} / {total} ページ' },
+   * };
+   * <PdfViewer locale="ja" locales={locales} />
+   * ```
+   *
+   * → **不用写全** → 缺的自动回退到内置文案
+   */
+  locales?: LocaleTable;
   /** 主题 */
   theme?: PdfViewerTheme;
   /**
@@ -395,6 +413,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     features = {},
     locale = 'zh',
     messages,
+    locales,
     theme = 'auto',
     appearance,
     printMode = 'with-highlights',
@@ -547,8 +566,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
   const t = useCallback(
     (key: keyof Messages, vars?: Record<string, string | number>) =>
-      resolveMessage(locale, key, messages, vars),
-    [locale, messages],
+      resolveMessage(locale, key, messages, vars, locales),
+    [locale, messages, locales],
   );
 
   // 1) 加载文档
@@ -2704,6 +2723,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           totalPages={numPages}
           scale={scale}
           locale={locale}
+          locales={locales}
           messages={messages}
           onPageChange={(next) => scrollToPage(next)}
           onZoomIn={zoom.zoomIn}
@@ -2741,6 +2761,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           onHitsChange={handleSearchHitsChange}
           onNavigate={handleSearchNavigate}
           locale={locale}
+          locales={locales}
           messages={messages}
         />
       ) : null}
@@ -2770,6 +2791,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                 renderThumbnail={renderThumbnail}
                 onPageSelect={(target) => scrollToPage(target)}
                 locale={locale}
+                locales={locales}
                 messages={messages}
               />
             ) : null}
@@ -2782,6 +2804,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                 currentPage={page}
                 onPageSelect={(target) => scrollToPage(target)}
                 locale={locale}
+                locales={locales}
                 messages={messages}
               />
             ) : null}
@@ -2976,6 +2999,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
             setPasswordOpen(false);
           }}
           locale={locale}
+          locales={locales}
           messages={messages}
         />
       ) : null}
