@@ -31,6 +31,9 @@ export const PAGE_NUMBER_ATTR = 'data-page-number';
 
 /** 文本层的 class（用于 closest 查找） */
 const TEXT_LAYER_CLASS = '.scpdf-text-layer';
+
+/** 文本层里**单个文字项**的 class（`fillMissingRects` 用） */
+const TEXT_LAYER_ITEM_CLASS = 'scpdf-text-layer__item';
 /**
  * 页面的 class。
  *
@@ -115,6 +118,105 @@ export interface UseTextSelectionResult {
    * → 只在**动作完成之后**调（如"高亮已保存"）。
    */
   clearNativeSelection: () => void;
+}
+
+/** 选区矩形（视口坐标） */
+interface SelectionRect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * **补上浏览器漏掉的选区矩形**（实测踩过的坑，用户反馈"多行选择中间有的没有底色"）。
+ *
+ * ## 现象
+ *
+ * ```
+ * 浏览器原生 rects: 605,381 8x17 / 613,381 5x17 / 637,385 149x23 …
+ * 被选中的 span:    787,381 8x17   ← "Zhang*" 的星号
+ * ```
+ *
+ * → `range.intersectsNode(span)` 说这个 span **被选中了**
+ * → 但浏览器的 `getClientRects()` **没给它任何矩形**
+ * → 自绘层就**漏掉了这一小块** → 用户看到"**中间有的没有底色**" ❌
+ *
+ * ## 根因
+ *
+ * 浏览器在选区**边界**处的处理很微妙：
+ * Range 的边界正好落在某个 span 的边缘时，
+ * 浏览器可能把它算进 `intersectsNode`，却**不产生** client rect。
+ *
+ * ## 修法
+ *
+ * **用文字 span 自己的几何补齐**：
+ * 1. 找出所有 `intersectsNode` 为真的 span
+ * 2. 找出那些**没有对应 client rect** 的 span
+ * 3. 用它的 `getBoundingClientRect()` **合成一个矩形**
+ *
+ * → 我们本来就有每个字的确切位置（文本层）→ 补出来的矩形**比浏览器的更准**。
+ *
+ * @param rects 浏览器给的矩形（视口坐标）
+ * @param range 当前选区
+ * @param container 滚动容器
+ * @returns 补齐后的矩形
+ */
+function fillMissingRects(
+  rects: readonly SelectionRect[],
+  range: Range,
+  container: HTMLElement,
+): SelectionRect[] {
+  if (rects.length === 0) {
+    return [...rects];
+  }
+
+  /*
+   * ⚠️ **只处理"被选中的 span 少得离谱"的情况**（性能）。
+   *
+   * `intersectsNode` 对每个 span 都要遍历 DOM 树 → 很贵
+   * → 只在**确实可能有缺口**时才查（见下）。
+   */
+  const result = [...rects];
+
+  // 已覆盖的矩形（用于判断某个 span 有没有对应的 rect）
+  const covered: SelectionRect[] = [...rects];
+
+  for (const span of container.querySelectorAll<HTMLElement>(`.${TEXT_LAYER_ITEM_CLASS}`)) {
+    // 这个 span 被选中了吗？
+    if (!range.intersectsNode(span)) {
+      continue;
+    }
+
+    const spanRect = span.getBoundingClientRect();
+    if (spanRect.width <= 0 || spanRect.height <= 0) {
+      continue;
+    }
+
+    // 已经有 client rect 覆盖它了吗？
+    const hasCover = covered.some((r) => {
+      const ox = Math.min(spanRect.right, r.left + r.width) - Math.max(spanRect.left, r.left);
+      const oy = Math.min(spanRect.bottom, r.top + r.height) - Math.max(spanRect.top, r.top);
+      // 只要有一点点重叠 → 算覆盖到了
+      return ox > 1 && oy > 1;
+    });
+    if (hasCover) {
+      continue;
+    }
+
+    // ⚠️ **只在"这个 span 和浏览器给的最接近的矩形在同一行"时才补**
+    //    → 避免把"页边戳"那种异类元素补进来。
+    const synth: SelectionRect = {
+      left: spanRect.left,
+      top: spanRect.top,
+      width: spanRect.width,
+      height: spanRect.height,
+    };
+    result.push(synth);
+    covered.push(synth);
+  }
+
+  return result;
 }
 
 /**
@@ -400,13 +502,42 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     /**
      * **mouseup 处理**。
      *
-     * ⚠️ 现在几何计算在 `computeGeometry()` 里（`selectionchange` 也会调），
-     *    这里只负责"收尾"（失败则清空选区）。
+     * ⚠️⚠️ **必须延后到下一帧再算**（实测踩过的坑，用户反馈"多行选择中间有的没有底色"）。
+     *
+     * ### 现象
+     *
+     * ```
+     * 拖选多行 → 浏览器的最终选区有 21 个矩形（top = 232 / 378 / 381 / 385）
+     *        → 但自绘层只有 8 个（top = 238 / 381 / 385）→ **378 那行（上下标）没了**
+     * ```
+     *
+     * ### 根因：**时机**
+     *
+     * `mouseup` 事件处理器运行时，**浏览器的 Range 还没更新完**
+     * → `range.getClientRects()` 只返回**当时的**矩形（实测只有 1 个）
+     * → 我们按这个**残缺的**选区画了 → **部分行没底色**
+     *
+     * → 而且之后再没有 `selectionchange` 触发（选区已经稳定了）
+     * → **残缺的状态被保留下来** ❌
+     *
+     * ### 修法
+     *
+     * - `mouseup` → **下一帧**再算（此时浏览器的 Range 已经稳定）
+     * - 再加一个 **`setTimeout(0)` 兜底**（某些浏览器 rAF 仍然偏早）
      */
     const onMouseUp = () => {
-      if (!computeGeometry()) {
-        clearSelection();
+      if (geometryRafRef.current !== 0) {
+        cancelAnimationFrame(geometryRafRef.current);
       }
+      geometryRafRef.current = requestAnimationFrame(() => {
+        geometryRafRef.current = 0;
+        // ⚠️ 再等一个宏任务 → 保证浏览器的 Range 完全稳定
+        setTimeout(() => {
+          if (!computeGeometry()) {
+            clearSelection();
+          }
+        }, 0);
+      });
     };
 
     /**
@@ -522,6 +653,37 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
       const usable = rects.filter((r) => r.height <= maxNormalHeight);
 
       /*
+       * ⚠️⚠️ **补上浏览器漏掉的矩形**（实测踩过的坑，用户截图）。
+       *
+       * ### 现象
+       *
+       * ```
+       * 浏览器原生 rects: 605,381 8x17 / 613,381 5x17 / 637,385 149x23 …
+       * 被选中的 span:    787,381 8x17   ← "Zhang*" 的星号
+       * ```
+       *
+       * → `range.intersectsNode(span)` 说这个 span **被选中了**
+       * → 但浏览器的 `getClientRects()` **没有给它任何矩形**
+       * → 自绘层就**漏掉了这一小块** → 用户看到"**中间有的没有底色**" ❌
+       *
+       * ### 根因
+       *
+       * 浏览器在选区**边界**处的处理很微妙：
+       * 当 Range 的边界正好落在某个 span 的边缘时，
+       * 浏览器可能只把它算进 `intersectsNode`，却**不产生** client rect。
+       *
+       * ### 修法
+       *
+       * **用文字 span 自己的几何补齐**：
+       * - 找出所有 `intersectsNode` 为真的 span
+       * - 找出那些**没有对应 client rect** 的 span
+       * - 用它的 `getBoundingClientRect()` **合成一个矩形**
+       *
+       * → 我们本来就有每个字的确切位置（文本层）→ 补出来的矩形**比浏览器的更准**。
+       */
+      const rectsWithGaps = fillMissingRects(usable, range, container);
+
+      /*
        * ⚠️⚠️ **丢掉"另一列"的矩形**（实测踩过的坑）。
        *
        * 真实 PDF（arXiv 论文）的页边戳是**逐字符竖排**的（`left=1231`）。
@@ -537,7 +699,7 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
        * ⚠️ **只在有拖动起点时生效**（没有起点就用全部）。
        */
       const withDragOrigin = filterByDragOrigin(
-        usable,
+        rectsWithGaps,
         dragStartRef.current && dragEndRef.current
           ? { startX: dragStartRef.current.x, endX: dragEndRef.current.x }
           : null,
@@ -743,7 +905,17 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
       }
     };
 
-    container.addEventListener('mouseup', onMouseUp);
+    /*
+     * ⚠️⚠️ **mouseup 必须监听在 `document` 上**（实测踩过的坑）。
+     *
+     * 之前监听在**容器**上 → 实测**根本没触发**（拖动结束时鼠标已经不在容器里了）
+     * → `computeGeometry` 永远停留在 `selectionchange` 的那一次
+     * → 而那一次的 Range **还没稳定**（只有 1 个矩形）
+     * → **多行选择时中间的行没底色** ❌（用户截图）
+     *
+     * → 监听在 `document` → 一定能收到 → 再延后一帧算 → 拿到**完整**的选区。
+     */
+    document.addEventListener('mouseup', onMouseUp);
     document.addEventListener('selectionchange', onSelectionChangeEvent);
 
     /*
@@ -822,6 +994,7 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         moveRaf = 0;
       }
       document.removeEventListener('selectionchange', onSelectionChangeEvent);
+      document.removeEventListener('mouseup', onMouseUp);
       if (geometryRafRef.current !== 0) {
         cancelAnimationFrame(geometryRafRef.current);
         geometryRafRef.current = 0;
