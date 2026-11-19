@@ -422,6 +422,98 @@
   pointer-events: auto;
 }
 
+/*
+ * ⚠️ **鼠标移到便签内容上，框不能消失**（用户反馈：
+ * "我现在移动鼠标到批注的文字上面 框就消失了"）。
+ *
+ * → 原因：hover 状态绑在**图标**的 `onMouseLeave` 上
+ *   → 鼠标从图标移到**内容框**（它在图标右边）→ 图标触发 mouseleave → 框隐藏 ❌
+ * → 修法：内容框**自己**也接管 hover（鼠标进来时不隐藏，出去时才隐藏）✅
+ */
+.scpdf-sticky-note__content:hover,
+.scpdf-sticky-note__content:focus-within {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* ---------- 批注预览里的富文本 ---------- */
+
+/*
+ * ⚠️ **富文本正文**（用户需求："展示的时候要展示富文本形式的"）。
+ *
+ * → 之前直接渲染 HTML 字符串 → 用户看到 `<p>...</p>` ❌
+ * → 现在渲染成**排版好的富文本** ✅
+ */
+.scpdf-sticky-note__text {
+  display: block;
+}
+
+/* 富文本里的段落/列表：去掉默认缩进，让预览更紧凑 */
+.scpdf-sticky-note__text p {
+  margin: 0 0 4px;
+}
+
+.scpdf-sticky-note__text p:last-child {
+  margin-bottom: 0;
+}
+
+.scpdf-sticky-note__text ul,
+.scpdf-sticky-note__text ol {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.scpdf-sticky-note__text blockquote {
+  margin: 4px 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--scpdf-border, #d9dde3);
+  color: var(--scpdf-text-secondary, #5b6570);
+}
+
+/* ---------- 批注预览的操作按钮 ---------- */
+
+/*
+ * **hover 后出现的"编辑 / 展开"按钮**（用户需求）。
+ *
+ * → 放在内容框的**右上角**（不遮挡正文）✅
+ * → 平时隐藏，hover 内容框时显示 ✅
+ */
+.scpdf-sticky-note__actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.scpdf-sticky-note__content:hover .scpdf-sticky-note__actions,
+.scpdf-sticky-note__content:focus-within .scpdf-sticky-note__actions {
+  opacity: 1;
+}
+
+.scpdf-sticky-note__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--scpdf-border, #d9dde3);
+  border-radius: 4px;
+  background: var(--scpdf-surface, #fff);
+  color: var(--scpdf-text-secondary, #5b6570);
+  cursor: pointer;
+}
+
+.scpdf-sticky-note__action:hover {
+  background: var(--scpdf-surface-hover, #f2f4f7);
+  color: var(--scpdf-text, #1f2328);
+}
+
 /* ---------- 合并批注（同一行的多个批注 → 一个图标） ---------- */
 
 /*

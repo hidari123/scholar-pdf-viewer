@@ -495,6 +495,20 @@ export interface PdfViewerProps {
    */
   onAnnotationClick?: (annotation: AnnotationRecord) => void;
   /**
+   * **点批注上的"编辑"按钮**（宿主实现：打开编辑框）。
+   *
+   * → 用户需求："hover之后会出现编辑按钮，点击可以进行编辑" ✅
+   * → **不传 ⇒ 不渲染编辑按钮** ✅
+   */
+  onAnnotationEdit?: (annotation: AnnotationRecord) => void;
+  /**
+   * **点批注上的"展开"按钮**（宿主实现：打开详情）。
+   *
+   * → 用户需求："也可以点击展开，查看批注详情" ✅
+   * → **不传 ⇒ 不渲染展开按钮** ✅
+   */
+  onAnnotationExpand?: (annotation: AnnotationRecord) => void;
+  /**
    * **批注内容变化**（富文本 HTML + 纯文本）。
    *
    * ⚠️ **不传 → 包只读展示**（不显示编辑框）。
@@ -612,6 +626,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onHighlightComment,
     stickyNotes,
     onAnnotationClick,
+    onAnnotationEdit,
+    onAnnotationExpand,
     onAnnotationChange,
     onAnnotationSave,
     onAnnotationCreate,
@@ -3679,6 +3695,24 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                          */
                         setActiveAnnotationId(annotation.id);
                         onAnnotationClick?.(annotation);
+                      }}
+                      onAnnotationEdit={(annotation) => {
+                        /*
+                         * ⚠️ **点"编辑" → 打开便利贴面板**（宿主也可以自己处理）。
+                         *
+                         * → 用户需求："hover之后会出现编辑按钮，点击可以进行编辑" ✅
+                         */
+                        setActiveAnnotationId(annotation.id);
+                        onAnnotationEdit?.(annotation);
+                      }}
+                      onAnnotationExpand={(annotation) => {
+                        /*
+                         * ⚠️ **点"展开" → 打开便利贴面板**（看完整内容）。
+                         *
+                         * → 用户需求："也可以点击展开，查看批注详情" ✅
+                         */
+                        setActiveAnnotationId(annotation.id);
+                        onAnnotationExpand?.(annotation);
                       }}
                       selectionShape={selectionShapes.get(pageNumber)}
                       onHighlightClick={handleHighlightClick}

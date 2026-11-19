@@ -19,6 +19,7 @@ export * from './Page';
 export * from './PageCanvas';
 export * from './PasswordDialog';
 export * from './PdfViewer';
+export * from './RichTextPreview';
 export * from './SearchPanel';
 export * from './SelectionActionIcons';
 export * from './SelectionLayer';

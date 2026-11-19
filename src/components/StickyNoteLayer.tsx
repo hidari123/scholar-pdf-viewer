@@ -30,6 +30,7 @@ import { STICKY_NOTE_SIZE, stickyNotePosition } from '../core/annotation/sticky-
 import type { HighlightRecord, ViewRect } from '../core/types';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
+import { RichTextPreview } from './RichTextPreview';
 
 /** StickyNoteLayer 参数 */
 export interface StickyNoteLayerProps {
@@ -45,6 +46,18 @@ export interface StickyNoteLayerProps {
   onAnnotationClick?: (annotation: AnnotationRecord) => void;
   /** 鼠标进入便签 */
   onAnnotationHover?: (annotation: AnnotationRecord | null) => void;
+  /**
+   * **点"编辑"**（宿主实现：打开编辑框）。
+   *
+   * → 宿主没传 → **不显示编辑按钮** ✅（"宿主没配就不渲染"）
+   */
+  onAnnotationEdit?: (annotation: AnnotationRecord) => void;
+  /**
+   * **点"展开"**（宿主实现：打开详情）。
+   *
+   * → 宿主没传 → **不显示展开按钮** ✅
+   */
+  onAnnotationExpand?: (annotation: AnnotationRecord) => void;
   /** 图标覆盖 */
   icons?: Partial<Record<IconName, ReactNode>>;
 }
@@ -62,6 +75,8 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
     viewport,
     onAnnotationClick,
     onAnnotationHover,
+    onAnnotationEdit,
+    onAnnotationExpand,
     icons,
   } = props;
 
@@ -200,7 +215,22 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                   onAnnotationHover?.(firstRecord);
                 }
               }}
-              onMouseLeave={() => {
+              onMouseLeave={(event) => {
+                /*
+                 * ⚠️⚠️ **鼠标移到内容框上时不能清掉 hover 状态**（用户反馈：
+                 * "我现在移动鼠标到批注的文字上面 框就消失了"）。
+                 *
+                 * → 内容框是图标的**兄弟节点**（position: absolute，图标右边）
+                 * → 鼠标从图标移到内容框 → 图标触发 mouseleave
+                 * → 如果这时清状态 → **内容框立刻消失** → 用户根本点不到里面的按钮 ❌
+                 *
+                 * → 修法：判断"鼠标是不是移到相关的兄弟节点上" → 是就不清 ✅
+                 * → （用 `relatedTarget` 判断，比 `contains` 更准）
+                 */
+                const related = event.relatedTarget as Node | null;
+                if (related && event.currentTarget.parentElement?.contains(related)) {
+                  return;
+                }
                 setHoveredGroupKey(null);
                 setHoveredId(null);
                 onAnnotationHover?.(null);
@@ -238,14 +268,75 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
 
               ⚠️ 用 `aria-hidden` + `visibility` 而不是 `display:none`
               → 保留在无障碍树里（读屏软件能读到）。
+
+              ⚠️ **内容要按富文本渲染**（用户需求：
+              "展示的时候要展示富文本形式的 不要带上标签 翻译成html展示出来"）。
+              → 之前直接渲染 `content`（HTML 字符串）→ 用户看到 `<p>...</p>` ❌
+              → 现在用 `<RichTextPreview>` → **排版好的富文本** ✅
             */}
             {!isGroup ? (
               <span
                 className="scpdf-sticky-note__content"
                 data-visible={hoveredId === first.id ? 'true' : 'false'}
                 role="note"
+                /*
+                 * ⚠️ **鼠标进入内容框 → 保持 hover 状态**（用户反馈：
+                 * "移动鼠标到批注的文字上面 框就消失了"）。
+                 *
+                 * → 鼠标从图标移过来时，图标已经触发 mouseleave
+                 * → 这里再把它设回来 → **框不会消失** ✅
+                 * → 用户能点里面的"编辑 / 展开"按钮 ✅
+                 */
+                onMouseEnter={() => {
+                  setHoveredGroupKey(group.key);
+                  setHoveredId(first.id);
+                }}
+                onMouseLeave={(event) => {
+                  const related = event.relatedTarget as Node | null;
+                  if (related && event.currentTarget.parentElement?.contains(related)) {
+                    return;
+                  }
+                  setHoveredGroupKey(null);
+                  setHoveredId(null);
+                  onAnnotationHover?.(null);
+                }}
               >
-                {firstRecord.content}
+                {/* 富文本正文：渲染成 HTML，不是标签（用户需求） */}
+                <RichTextPreview className="scpdf-sticky-note__text" html={firstRecord.content} />
+
+                {/* 操作按钮：宿主没传回调就不渲染 */}
+                {onAnnotationEdit || onAnnotationExpand ? (
+                  <span className="scpdf-sticky-note__actions">
+                    {onAnnotationEdit ? (
+                      <button
+                        type="button"
+                        className="scpdf-sticky-note__action"
+                        aria-label="编辑批注"
+                        title="编辑批注"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onAnnotationEdit(firstRecord);
+                        }}
+                      >
+                        <Icon name="edit" size={13} overrides={icons} />
+                      </button>
+                    ) : null}
+                    {onAnnotationExpand ? (
+                      <button
+                        type="button"
+                        className="scpdf-sticky-note__action"
+                        aria-label="展开批注"
+                        title="展开批注"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onAnnotationExpand(firstRecord);
+                        }}
+                      >
+                        <Icon name="more" size={13} overrides={icons} />
+                      </button>
+                    ) : null}
+                  </span>
+                ) : null}
               </span>
             ) : null}
 

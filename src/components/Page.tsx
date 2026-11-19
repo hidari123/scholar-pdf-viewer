@@ -107,6 +107,10 @@ export interface PageProps {
   stickyNotes?: AnnotationRecord[];
   /** 点击批注 */
   onAnnotationClick?: (annotation: AnnotationRecord) => void;
+  /** 点"编辑"按钮（宿主实现：打开编辑框） */
+  onAnnotationEdit?: (annotation: AnnotationRecord) => void;
+  /** 点"展开"按钮（宿主实现：打开详情） */
+  onAnnotationExpand?: (annotation: AnnotationRecord) => void;
   /** 无障碍标签 */
   ariaLabel?: string;
 }
@@ -140,6 +144,8 @@ export function PageInner(props: PageProps) {
     indexItemTexts,
     stickyNotes,
     onAnnotationClick,
+    onAnnotationEdit,
+    onAnnotationExpand,
     ariaLabel,
   } = props;
 
@@ -325,6 +331,8 @@ export function PageInner(props: PageProps) {
           highlights={highlights}
           viewport={viewportSize}
           onAnnotationClick={onAnnotationClick}
+          onAnnotationEdit={onAnnotationEdit}
+          onAnnotationExpand={onAnnotationExpand}
         />
       ) : null}
     </>
