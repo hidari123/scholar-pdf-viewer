@@ -28,6 +28,7 @@ import {
   THEMES,
   themeLabel,
 } from '@scholar-club/pdf-viewer';
+import { AnnotationDialog } from '@scholar-club/pdf-viewer/dialog';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import * as pdfjs from 'pdfjs-dist';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -103,6 +104,14 @@ export default function App() {
    * ⚠️ **包不存数据** → 宿主传进来 → 换后端只改宿主。
    */
   const [stickyNotes, setStickyNotes] = useState<AnnotationRecord[]>([]);
+
+  /**
+   * **待写的批注草稿**（demo 侧的富文本弹窗）。
+   *
+   * → 选区浮层的"加批注"用的是**包自带**的弹窗
+   * → 点高亮块上的批注按钮 → 用这个（demo 自己挂的）
+   */
+  const [noteDraft, setNoteDraft] = useState<{ highlightId: string; initial: string } | null>(null);
 
   /**
    * **文档切换 → 从持久化里加载对应文档的高亮**。
@@ -772,7 +781,7 @@ export default function App() {
 
   /** 新建高亮（宿主保存） */
   const handleHighlightCreate = useCallback(
-    (highlight: NewHighlight) => {
+    (highlight: NewHighlight): string => {
       /*
        * ⚠️⚠️ **ID 必须在 updater 外面生成**（实测踩过的坑）。
        *
@@ -800,6 +809,11 @@ export default function App() {
           createdAt: Date.now(),
         },
       ]);
+      /*
+       * ⚠️ **返回新建的高亮 id** → "加批注"流程要用它（批注挂在高亮上）。
+       * → 不返回 → 包只能自己造 id → 便签找不到对应的高亮 → **不显示** ❌
+       */
+      return id;
     },
     [setHighlights],
   );
@@ -811,8 +825,8 @@ export default function App() {
    *    （否则蓝色选区块一直浮在高亮上 —— 用户反馈"无法取消选中状态"）。
    */
   const createHighlight = useCallback(
-    (color: string, selectedText: string, position: unknown) => {
-      handleHighlightCreate({
+    (color: string, selectedText: string, position: unknown): string => {
+      return handleHighlightCreate({
         color,
         selectedText,
         position: position as never,
@@ -844,18 +858,27 @@ export default function App() {
    *
    * ⚠️ **宿主实现**：包只负责按钮 + 抛事件 + 渲染小便签。
    * → 批注内容怎么编辑、怎么存 → 宿主的事（换后端也不用改包）。
+   *
+   * ⚠️ **不再用 `window.prompt`**（用户需求）：
+   * > "写批注的时候不要用系统默认的alert，设计一个富文本弹窗来写批注"
+   *
+   * → 选区浮层里的"加批注" → **包自带的富文本弹窗**（`onNote` 不传时）
+   * → 这里的 `onHighlightComment` 是**点高亮块上的批注按钮** → 同样走富文本弹窗
    */
-  const handleHighlightComment = useCallback((id: string) => {
-    const content = window.prompt('批注内容：', '这是一条批注');
-    if (content === null) {
-      return;
-    }
-    setStickyNotes((prev) => [
-      ...prev.filter((n) => n.highlightId !== id),
-      { id: `note-${id}`, highlightId: id, content, createdAt: Date.now() },
-    ]);
-    setHint('已添加批注');
-  }, []);
+  const handleHighlightComment = useCallback(
+    (id: string) => {
+      const highlight = highlights.find((h) => h.id === id);
+      if (!highlight) {
+        return;
+      }
+      // 复用包的富文本弹窗（demo 侧的一个 state）
+      setNoteDraft({
+        highlightId: id,
+        initial: '',
+      });
+    },
+    [highlights],
+  );
 
   /**
    * **导出高亮**（JSON 文件）。
@@ -1234,6 +1257,25 @@ export default function App() {
           onHighlightComment={handleHighlightComment}
           stickyNotes={stickyNotes}
           onAnnotationClick={(note) => setHint(`【批注】${note.content.slice(0, 30)}`)}
+          onAnnotationCreate={(id, html, _plain, highlightId, selectedText) => {
+            /*
+             * **新建批注**（从选区浮层的"加批注"触发）。
+             *
+             * → 包已经把**高亮**建好了（用默认颜色）
+             * → 这里只需要挂一个便签 ✅
+             */
+            setStickyNotes((prev) => [
+              ...prev.filter((n) => n.id !== id),
+              {
+                id,
+                highlightId,
+                content: html,
+                createdAt: Date.now(),
+                text: selectedText,
+              },
+            ]);
+            setHint(t('demo.savedNote'));
+          }}
           onAnnotationSave={(id, html) => {
             setStickyNotes((prev) =>
               prev.map((note) => (note.id === id ? { ...note, content: html } : note)),
@@ -1251,7 +1293,11 @@ export default function App() {
            */
           onTranslate={({ text }) => setHint(`【翻译】${text.slice(0, 20)}…（宿主实现）`)}
           onAsk={({ text }) => setHint(`【提问】${text.slice(0, 20)}…（宿主实现）`)}
-          onNote={({ text }) => setHint(`【笔记】${text.slice(0, 20)}…（宿主实现）`)}
+          /*
+           * ⚠️ **不传 `onNote`** → 用**包自带的**"加批注"按钮 + 富文本弹窗
+           * → 用户需求："需要在框选的时候工具栏弹窗就要有加批注这个"
+           * → 宿主想自己实现弹窗 → 传 `onNote` 即可（会覆盖内置的）
+           */
           onHighlight={({ text, color, position }) => {
             /*
              * ⚠️ **包内置的"高亮"按钮** → 走 `onHighlight`。
@@ -1262,8 +1308,10 @@ export default function App() {
              * ⚠️ **不要**在这里再调 `onHighlightCreate` / `createHighlight` 的
              *    包的入口 → 会**保存两次**（实测：点一次生成 3 条）。
              */
-            createHighlight(color ?? highlightColor, text, position);
+            const id = createHighlight(color ?? highlightColor, text, position);
             setHint(`已高亮（${color ?? highlightColor}）`);
+            // 返回 id → "加批注"流程用它（批注挂在高亮上）
+            return id;
           }}
           onExternalLink={(url) => {
             // 宿主决定怎么开外链（新窗口 / 应用内 WebView）
@@ -1272,6 +1320,39 @@ export default function App() {
           }}
           onPageChange={(p) => setCurrentPage(p)}
           onZoomChange={(s) => setScale(s)}
+        />
+
+        {/*
+          **demo 自己的批注弹窗**（点高亮块上的批注按钮时用）。
+
+          → 选区浮层的"加批注"用的是**包自带**的那个
+          → 这个是 demo 挂在**高亮块**上的（demo 自己加的按钮）
+          → 两个入口 → 同一个弹窗组件（`AnnotationDialog`）
+        */}
+        <AnnotationDialog
+          open={noteDraft !== null}
+          initialContent={noteDraft?.initial ?? ''}
+          onClose={() => {
+            setNoteDraft(null);
+          }}
+          onSubmit={(html) => {
+            const draft = noteDraft;
+            setNoteDraft(null);
+            if (!draft) {
+              return;
+            }
+            setStickyNotes((prev) => [
+              ...prev.filter((n) => n.highlightId !== draft.highlightId),
+              {
+                id: `note-${draft.highlightId}`,
+                highlightId: draft.highlightId,
+                content: html,
+                createdAt: Date.now(),
+              },
+            ]);
+            setHint(t('demo.savedNote'));
+          }}
+          locale={locale}
         />
       </div>
     </div>

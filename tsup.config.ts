@@ -21,6 +21,15 @@ export default defineConfig({
      * → 覆盖图标时再 `import { getIconShape } from '@scholar-club/pdf-viewer/icons'`
      */
     icons: 'src/core/icons/entry.ts',
+    /**
+     * **批注弹窗**（独立入口）。
+     *
+     * ⚠️ 为什么独立（实测踩过的坑：体积超预算）：
+     * → 弹窗 + 富文本编辑器约 1.4 kB（brotli 后）
+     * → 静态 export → 每个宿主都要背 ❌
+     * → 独立入口 → **要用才装** ✅
+     */
+    dialog: 'src/components/AnnotationDialog.tsx',
   },
   format: ['esm', 'cjs'],
   dts: true,

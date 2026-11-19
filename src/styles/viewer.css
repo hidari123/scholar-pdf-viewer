@@ -603,6 +603,151 @@
   font-size: 11px;
 }
 
+/* ---------- 写批注的弹窗（替代 window.prompt） ---------- */
+
+/*
+ * ⚠️ **为什么不用 `window.prompt`**：
+ * → `prompt` 只能写纯文本（写不了加粗 / 高亮 / 链接）❌
+ * → 外观由操作系统决定（和包的 UI 不搭）❌
+ * → 阻塞整个页面 ❌
+ */
+
+.scpdf-annotation-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 28%);
+  /* 动画 */
+  animation: scpdf-fade-in 120ms ease-out;
+}
+
+/*
+ * ⚠️ **遮罩单独一个 `<button>`**（不是给 backdrop 绑 onClick）。
+ * → 点遮罩 → 关闭弹窗 ✅
+ * → 点弹窗本体 → 不关（因为是兄弟节点，不会冒泡到遮罩）✅
+ */
+.scpdf-annotation-dialog__scrim {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.scpdf-annotation-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: min(480px, 100%);
+  max-height: min(560px, 100%);
+  border-radius: 12px;
+  border: 1px solid var(--scpdf-border, #d9dde3);
+  background: var(--scpdf-surface, #fff);
+  color: var(--scpdf-text, #1f2933);
+  box-shadow: 0 18px 48px rgb(15 23 42 / 22%);
+  overflow: hidden;
+  animation: scpdf-dialog-in 140ms ease-out;
+}
+
+.scpdf-annotation-dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--scpdf-border, #d9dde3);
+  background: var(--scpdf-surface-alt, #f7f8fa);
+}
+
+.scpdf-annotation-dialog__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scpdf-annotation-dialog__body {
+  padding: 12px;
+  overflow: auto;
+}
+
+.scpdf-annotation-dialog__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--scpdf-border, #d9dde3);
+  background: var(--scpdf-surface-alt, #f7f8fa);
+}
+
+.scpdf-annotation-dialog__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--scpdf-border, #d9dde3);
+  border-radius: 7px;
+  background: var(--scpdf-surface, #fff);
+  color: var(--scpdf-text, #1f2933);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.scpdf-annotation-dialog__btn:hover {
+  background: var(--scpdf-surface-alt, #f7f8fa);
+}
+
+.scpdf-annotation-dialog__btn--primary {
+  background: var(--scpdf-accent, #2f6feb);
+  border-color: var(--scpdf-accent, #2f6feb);
+  color: #fff;
+  font-weight: 500;
+}
+
+.scpdf-annotation-dialog__btn--primary:hover {
+  filter: brightness(1.06);
+}
+
+.scpdf-annotation-dialog__btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--scpdf-text-muted, #6b7280);
+}
+
+@keyframes scpdf-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scpdf-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ---------- 富文本编辑器 ---------- */
 
 .scpdf-rich-text {

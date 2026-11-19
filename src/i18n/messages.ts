@@ -97,6 +97,8 @@ export interface Messages {
   'annotation.cancel': string;
   'annotation.placeholder': string;
   'annotation.pick': string;
+  'annotation.new': string;
+  'selection.addNote': string;
   /* —— 富文本工具栏 —— */
   'richtext.bold': string;
   'richtext.italic': string;
@@ -179,6 +181,8 @@ export const ZH_MESSAGES: Messages = {
   'annotation.cancel': '取消',
   'annotation.placeholder': '写点什么…',
   'annotation.pick': '选择批注（{count}）',
+  'annotation.new': '新建批注',
+  'selection.addNote': '加批注',
   'richtext.bold': '加粗',
   'richtext.italic': '斜体',
   'richtext.underline': '下划线',
@@ -237,6 +241,8 @@ export const EN_MESSAGES: Messages = {
   'annotation.cancel': 'Cancel',
   'annotation.placeholder': 'Write something…',
   'annotation.pick': 'Select annotation ({count})',
+  'annotation.new': 'New annotation',
+  'selection.addNote': 'Add note',
   'richtext.bold': 'Bold',
   'richtext.italic': 'Italic',
   'richtext.underline': 'Underline',

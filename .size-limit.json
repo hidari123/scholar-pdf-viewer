@@ -1,8 +1,8 @@
-[
+﻿[
   {
     "name": "主入口（组件 + hooks）",
     "path": "dist/index.js",
-    "limit": "25 kB",
+    "limit": "26 kB",
     "import": "{ PdfViewer }",
     "entry": "index"
   },
@@ -29,5 +29,11 @@
     "path": "dist/icons.js",
     "limit": "8 kB",
     "import": "{ getIconShape }"
+  },
+  {
+    "name": "dialog 子路径（写批注的富文本弹窗）",
+    "path": "dist/dialog.js",
+    "limit": "8 kB",
+    "import": "{ AnnotationDialog }"
   }
 ]
