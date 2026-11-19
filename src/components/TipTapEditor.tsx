@@ -129,6 +129,10 @@ export function TipTapEditor(props: TipTapEditorProps) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
+  /** 最新的 placeholder（编辑器只创建一次 -> 用 ref 拿最新的） */
+  const placeholderRef = useRef(placeholder);
+  placeholderRef.current = placeholder;
+
   /**
    * **编辑器最后一次发出的 HTML**。
    *
@@ -147,6 +151,7 @@ export function TipTapEditor(props: TipTapEditorProps) {
         if (cancelled) return;
         const created = mod.createTipTapEditor(hostRef.current, {
           content: value,
+          placeholder: placeholderRef.current ?? '',
           onChange: (html: string) => {
             lastHtmlRef.current = html;
             onChangeRef.current?.(html, richTextToPlain(html));
@@ -186,15 +191,21 @@ export function TipTapEditor(props: TipTapEditorProps) {
       return;
     }
     /*
-     * ⚠️⚠️ **只在"外部真的改了内容"时才 setContent**。
+     * ⚠️⚠️ **绝不能无条件 setContent**（实测踩过的坑）。
      *
      * → 用户打字 → `onChange` → 父组件 `value` 变 → 这个 effect 跑
-     * → 但编辑器里的内容**已经是对的**（就是用户刚打的）
-     * → 如果这时 `setContent` → **光标跳到开头 / 输入被打断** ❌
+     * → 但 `value` 是**受控的异步状态** → 这一刻可能还差一个字符
+     * → `setContent` → **光标跳到开头 / 输入被打断** ❌
+     *   （实测：12 个字只打进去 1 个 "这"）
      *
-     * → 判据：编辑器的 HTML 和 `value` 不同才同步 ✅
-     * → 用户打字时，编辑器 HTML **本来就等于** value → 不会重复 setContent ✅
+     * → 判据：用 `lastHtmlRef` 记住"编辑器最后一次发出的内容"
+     *   → 外部改的 → 和它不同 → 同步 ✅
+     *   → 用户打的 → 它已经是新的 → **不碰** ✅
      */
+    if (lastHtmlRef.current === value) {
+      return;
+    }
+    lastHtmlRef.current = value;
     e.commands?.setContent?.(value);
   }, [editor, value]);
 
@@ -272,11 +283,7 @@ export function TipTapEditor(props: TipTapEditorProps) {
   return (
     <div className="scpdf-rich-text">
       <TipTapToolbar hostRef={hostRef} items={items} icons={icons} t={t} />
-      <div
-        ref={hostRef}
-        className="scpdf-rich-text__editor scpdf-tiptap__editor"
-        data-placeholder={placeholder}
-      />
+      <div ref={hostRef} className="scpdf-rich-text__editor scpdf-tiptap__editor" />
     </div>
   );
 }

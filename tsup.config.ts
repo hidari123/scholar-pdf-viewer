@@ -66,5 +66,6 @@ export default defineConfig({
     '@tiptap/extension-color',
     '@tiptap/extension-link',
     '@tiptap/extension-underline',
+    '@tiptap/extension-placeholder',
   ],
 });

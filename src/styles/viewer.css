@@ -747,6 +747,32 @@
   animation: scpdf-dialog-in 140ms ease-out;
 }
 
+/*
+ * ⚠️⚠️ **贴着锚点显示的模式**（用户需求：
+ * "这个富文本编辑框没有定位到批注旁边啊
+ *  你这个编辑框定位到文档最上面谁看得到啊"）。
+ *
+ * → 有锚点 → **不要遮罩**（不然整页变暗，更看不到批注）✅
+ * → 弹窗改成 `position: fixed`（由 JS 算好视口坐标）✅
+ * → 没有锚点 → 保持原来的"居中 + 遮罩" ✅
+ */
+.scpdf-annotation-dialog__backdrop[data-anchored="true"] {
+  background: transparent;
+  padding: 0;
+  display: block;
+  /* 锚点模式下不需要居中 */
+  align-items: initial;
+  justify-content: initial;
+  pointer-events: none;
+  animation: none;
+}
+
+.scpdf-annotation-dialog__backdrop[data-anchored="true"] .scpdf-annotation-dialog {
+  pointer-events: auto;
+  /* 贴着锚点时阴影轻一点，别太重 */
+  box-shadow: 0 10px 30px rgb(15 23 42 / 18%);
+}
+
 .scpdf-annotation-dialog__head {
   display: flex;
   align-items: center;
@@ -1104,6 +1130,76 @@
 }
 
 .scpdf-rich-text__editor mark {
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/*
+ * ⚠️⚠️ **TipTap：外层和内层不能各画一个框**（用户反馈：
+ * "这个富文本编辑框 上面输入文字之后第一带黑框 很丑"）。
+ *
+ * ### 之前
+ *
+ * ```
+ * .scpdf-rich-text__editor   <- 有边框（外层）
+ *   └─ .ProseMirror          <- 也有边框（TipTap 自己加的）❌
+ * ```
+ *
+ * → 用户看到**两层框**（外面一层浅的，里面一层黑的）→ 很丑 ❌
+ * → 而且**占位符在外层**、**文字在内层** → 看起来像"两个输入框" ❌
+ *
+ * ### 现在
+ *
+ * → 外层只负责**布局**（无边框）✅
+ * → **边框只画在内层**（真正可编辑的那个）✅
+ * → 占位符也挂到内层 ✅
+ */
+.scpdf-tiptap__editor {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  min-height: 0;
+}
+
+.scpdf-tiptap__editor .ProseMirror {
+  min-height: 96px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--scpdf-border, #d9dde3);
+  background: var(--scpdf-surface, #fff);
+  color: var(--scpdf-text, #1f2328);
+  font-size: 13px;
+  line-height: 1.6;
+  outline: none;
+}
+
+.scpdf-tiptap__editor .ProseMirror:focus {
+  border-color: var(--scpdf-primary, #2f6feb);
+  box-shadow: 0 0 0 3px rgb(47 111 235 / 14%);
+}
+
+/*
+ * ⚠️ **ProseMirror 的占位符**（TipTap 用 `data-placeholder` + `is-editor-empty`）。
+ *
+ * → 之前占位符挂在外层 -> **和内层的编辑区是两个东西** -> 看起来像两个输入框 ❌
+ * → 现在挂到内层 -> 只有一个框 ✅
+ */
+.scpdf-tiptap__editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--scpdf-text-muted, #9aa1ac);
+  pointer-events: none;
+}
+
+/* TipTap 的段落间距（和内置编辑器一致） */
+.scpdf-tiptap__editor .ProseMirror p {
+  margin: 0 0 6px;
+}
+
+.scpdf-tiptap__editor .ProseMirror mark {
   padding: 0 2px;
   border-radius: 2px;
 }

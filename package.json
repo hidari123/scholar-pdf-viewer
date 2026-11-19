@@ -116,6 +116,7 @@
     "@tiptap/extension-color": "^3.34.0",
     "@tiptap/extension-highlight": "^3.34.0",
     "@tiptap/extension-link": "^3.34.0",
+    "@tiptap/extension-placeholder": "^3.34.0",
     "@tiptap/extension-underline": "^3.34.0",
     "@tiptap/react": "^3.34.0",
     "@tiptap/starter-kit": "^3.34.0",
@@ -139,6 +140,7 @@
     "@tiptap/extension-color": ">=3.0.0",
     "@tiptap/extension-highlight": ">=3.0.0",
     "@tiptap/extension-link": ">=3.0.0",
+    "@tiptap/extension-placeholder": ">=3.0.0",
     "@tiptap/extension-underline": ">=3.0.0",
     "@tiptap/react": ">=3.0.0",
     "@tiptap/starter-kit": ">=3.0.0",
@@ -157,6 +159,9 @@
       "optional": true
     },
     "@tiptap/extension-link": {
+      "optional": true
+    },
+    "@tiptap/extension-placeholder": {
       "optional": true
     },
     "@tiptap/extension-underline": {

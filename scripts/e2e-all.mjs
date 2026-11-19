@@ -56,6 +56,7 @@ const suites = [
   { name: '目录的异步页码解析', file: 'e2e-outline-resolve.mjs' },
   { name: '退格删高亮', file: 'e2e-highlight-delete-key.mjs' },
   { name: '批注 hover 的操作按钮 + 富文本预览', file: 'e2e-annotation-hover.mjs' },
+  { name: '批注弹窗的定位 + 编辑器的样子', file: 'e2e-annotation-dialog-anchor.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

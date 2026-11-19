@@ -32,6 +32,7 @@ import { Editor as TiptapEditorCore } from '@tiptap/core';
 import { Color } from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Link from '@tiptap/extension-link';
+import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
 import StarterKit from '@tiptap/starter-kit';
 
@@ -41,6 +42,14 @@ export interface CreateTipTapOptions {
   content: string;
   /** 内容变化 */
   onChange: (html: string) => void;
+  /**
+   * **占位符**（空的时候显示）。
+   *
+   * ⚠️ **用 TipTap 的 `Placeholder` 扩展**（官方做法）✅
+   * → 占位符挂在**真正可编辑的那个元素**（`.ProseMirror`）上 ✅
+   * → 不会和外层容器分离 → 不会看起来像"两个输入框" ✅
+   */
+  placeholder?: string;
 }
 
 /**
@@ -53,6 +62,34 @@ export interface CreateTipTapOptions {
 export function createTipTapEditor(host: HTMLElement | null, options: CreateTipTapOptions): Editor {
   if (!host) {
     throw new Error('TipTap: 宿主元素还没准备好');
+  }
+
+  const h = host as HTMLElement & { __scpdfEditor?: Editor };
+
+  /*
+   * ⚠️⚠️ **同一个 host 复用已有的编辑器**（实测踩过的坑）。
+   *
+   * → `createTipTapEditor` 会对同一个 host 调用**多次**
+   *   （React StrictMode 双挂载 + 动态 import resolve 后重渲染）
+   * → 每次都新建 → **多个编辑器抢同一个 DOM** → 输入只进第一个 ❌
+   *   （实测：12 个字只打进去 1 个）
+   *
+   * → 解法：**把编辑器缓存到 host 上** → 复用 ✅
+   * → 复用时：更新 `onUpdate`（宿主的回调可能变了）+ 同步内容 ✅
+   */
+  if (h.__scpdfEditor) {
+    const existing = h.__scpdfEditor;
+    (existing.options as unknown as { onUpdate?: (p: { editor: Editor }) => void }).onUpdate = ({
+      editor: e,
+    }: {
+      editor: Editor;
+    }) => {
+      options.onChange(e.getHTML());
+    };
+    if (existing.getHTML() !== options.content) {
+      existing.commands.setContent(options.content);
+    }
+    return existing;
   }
 
   const editor = new TiptapEditorCore({
@@ -82,6 +119,14 @@ export function createTipTapEditor(host: HTMLElement | null, options: CreateTipT
       Highlight.configure({ multicolor: true }),
       Color,
       Link.configure({ openOnClick: false, autolink: true }),
+      /*
+       * ⚠️ **占位符用 TipTap 官方扩展**。
+       *
+       * → 占位符挂在 `.ProseMirror` 上（真正可编辑的元素）✅
+       * → 之前挂在外层容器 → 占位符和编辑区**分离** → 看着像"两个输入框" ❌
+       *   （用户反馈："上面输入文字之后第一带黑框 很丑"）
+       */
+      Placeholder.configure({ placeholder: options.placeholder ?? '' }),
     ],
     content: options.content,
     onUpdate: ({ editor: e }) => {
@@ -90,12 +135,33 @@ export function createTipTapEditor(host: HTMLElement | null, options: CreateTipT
   });
 
   /*
+   * ⚠️⚠️ **同一个 host 上只挂一个编辑器**（实测踩过的坑）。
+   *
+   * → `editor.mount(host)` 会往 host 里**插一个 `.ProseMirror`**
+   * → 如果对同一个 host 调了多次 → **插了好几个** ❌
+   *   （实测：`.ProseMirror` 有 **9 个** → 用户看到"下面又冒出来一条输入框"
+   *    → 用户反馈："每写一个东西下面就会展示出来一条" ❌）
+   *
+   * → 为什么会对同一个 host 调多次：
+   *   - React StrictMode（开发模式）双挂载
+   *   - 动态 import resolve 之后组件可能已经重渲染过
+   *
+   * → 修法：**挂之前先清掉旧的** ✅
+   */
+  const existing = host.querySelectorAll('.ProseMirror');
+  for (const el of existing) {
+    el.remove();
+  }
+
+  /*
    * ⚠️ **用 `editor.mount()` 而不是 `<EditorContent />`**。
    * → `EditorContent` 是 React 组件 → 需要在容器上 `createRoot`
    * → 而容器**已经是 React 管理的** → 抢 DOM → 各种诡异问题（实测）❌
    * → `editor.mount(host)` 是**纯 DOM** → 不碰 React ✅
    */
+  (editor as Editor & { __scpdfHost?: HTMLElement }).__scpdfHost = host;
   editor.mount(host);
+  h.__scpdfEditor = editor;
 
   return editor;
 }
@@ -107,4 +173,8 @@ export function createTipTapEditor(host: HTMLElement | null, options: CreateTipT
  */
 export function destroyTipTapEditor(editor: Editor): void {
   editor.destroy?.();
+  const host = (editor as Editor & { __scpdfHost?: HTMLElement }).__scpdfHost;
+  if (host) {
+    (host as HTMLElement & { __scpdfEditor?: Editor }).__scpdfEditor = undefined;
+  }
 }

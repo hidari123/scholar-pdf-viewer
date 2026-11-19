@@ -754,6 +754,21 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    */
   const [pendingNote, setPendingNote] = useState<SelectionActionContext | null>(null);
 
+  /**
+   * **批注弹窗的锚点**（视口坐标）。
+   *
+   * ⚠️ 用户反馈："这个富文本编辑框没有定位到批注旁边啊
+   *   你这个编辑框定位到文档最上面谁看得到啊"
+   *
+   * → 打开弹窗时记下**选区的视口矩形** → 弹窗贴着它显示 ✅
+   */
+  const [noteAnchor, setNoteAnchor] = useState<{
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  } | null>(null);
+
   /*
    * **toast**（antd 风格）。
    *
@@ -2575,6 +2590,27 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           onNote(ctx);
           return;
         }
+        /*
+         * ⚠️ **记下选区的视口矩形**（弹窗的锚点）。
+         *
+         * → 用户反馈："这个富文本编辑框没有定位到批注旁边啊" ❌
+         * → 记下锚点 → 弹窗**贴着选区**显示 ✅
+         */
+        const selection = window.getSelection();
+        const rect =
+          selection && selection.rangeCount > 0
+            ? selection.getRangeAt(0).getBoundingClientRect()
+            : null;
+        setNoteAnchor(
+          rect && rect.width > 0
+            ? {
+                left: rect.left,
+                top: rect.top,
+                right: rect.right,
+                bottom: rect.bottom,
+              }
+            : null,
+        );
         // 打开包自带的富文本弹窗
         setPendingNote(ctx);
       },
@@ -3578,12 +3614,19 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           <Suspense fallback={null}>
             <AnnotationDialog
               open={pendingNote !== null}
+              /*
+               * ⚠️ **锚点**（选区的视口矩形）→ 弹窗贴着批注显示。
+               * → 用户需求："这个富文本编辑框没有定位到批注旁边啊" ✅
+               */
+              anchorRect={noteAnchor}
               onClose={() => {
                 setPendingNote(null);
+                setNoteAnchor(null);
               }}
               onSubmit={(html, plain) => {
                 const note = pendingNote;
                 setPendingNote(null);
+                setNoteAnchor(null);
                 if (!note) {
                   return;
                 }
