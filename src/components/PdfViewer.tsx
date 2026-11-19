@@ -24,6 +24,8 @@ import type { PdfViewerError } from '../core/errors';
 import { pdfViewerError } from '../core/errors';
 import type { HighlightPalette } from '../core/highlight/palette';
 import type { OutlineItemLike } from '../core/outline/outline';
+import type { IndexOffset } from '../core/search/align';
+import { alignRenderedToIndex } from '../core/search/align';
 import type { SearchHitRect } from '../core/search/highlight';
 import { hitsToRects } from '../core/search/highlight';
 import type { PdfSearch, SearchHit } from '../core/search/search';
@@ -2370,13 +2372,100 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * 所以渲染用的 items 顺序必须与索引时完全一致。
    * 包从 `Page` 的文本层拿 items（`Page` 渲染时用的是宿主的 getTextContent）。
    */
+  /**
+   * **搜索索引的版本号**（索引建好/变大时 +1）。
+   *
+   * ⚠️ **搜索高亮定位的关键**（实测踩过的坑：高亮定位不准）。
+   *
+   * → 索引是**异步**建的 → 第一次渲染时索引可能还是空的
+   * → 渲染侧要用"索引的项文本"算对齐偏移 → 索引好了要重算
+   * → 订阅 `searchEngine` 的索引变化 → 变了就重渲染 ✅
+   */
+  const [_searchIndexVersion, setSearchIndexVersion] = useState(0);
+
+  useEffect(() => {
+    if (!searchEngine || typeof searchEngine.subscribeIndexChange !== 'function') {
+      return;
+    }
+    return searchEngine.subscribeIndexChange(() => {
+      setSearchIndexVersion((v) => v + 1);
+    });
+  }, [searchEngine]);
+
+  /**
+   * **索引用的项文本**（页码 → 项文本数组）。
+   *
+   * ⚠️ **搜索命中定位的关键**（实测踩过的坑：高亮定位不准）。
+   *
+   * → 索引那次 `getTextContent()` 和渲染那次 **item 边界可能不同**
+   *   （pdf.js 按 `fontName`/`height` 合并 item）
+   * → 实测：索引 161 项 / 渲染 112 项 → 直接累加字符数会错 49 项
+   * → 渲染时用这份数据**按内容对齐** ✅
+   */
+  const searchIndexItemTexts = useMemo(() => {
+    const map = new Map<number, string[]>();
+    if (!searchEngine || typeof searchEngine.getPageItemTexts !== 'function') {
+      return map;
+    }
+    for (const pageNumber of pageSizesByPage.keys()) {
+      const texts = searchEngine.getPageItemTexts(pageNumber);
+      if (texts.length > 0) {
+        map.set(pageNumber, texts);
+      }
+    }
+    return map;
+  }, [searchEngine, pageSizesByPage]);
+
+  /**
+   * **搜索用的索引偏移**（页码 → 每个渲染项在索引里的字符偏移）。
+   *
+   * ⚠️⚠️ **必须先按"内容"对齐索引和渲染的项**（实测踩过的坑：搜索高亮定位不准）。
+   *
+   * → 索引那次 `getTextContent()` 和渲染那次 **item 边界可能不同**
+   *   （pdf.js 按 `fontName`/`height` 合并 item）
+   * → 实测：索引 161 项（更细）/ 渲染 112 项（更粗）→ 差 49 项
+   * → 直接累加字符数 → 偏移错位 → **高亮跑到别的字上** ❌
+   *
+   * → 所以：**在搜索的时候**（索引已经建好了）按内容对齐 → 再算偏移 ✅
+   */
+  const searchOffsetsByPage = useMemo(() => {
+    const offsetsByPage = new Map<number, IndexOffset[]>();
+
+    for (const [pageNumber, renderedItems] of textItemsByPage) {
+      const indexTexts = searchIndexItemTexts.get(pageNumber);
+      if (!indexTexts || indexTexts.length === 0) {
+        continue;
+      }
+      const aligned = alignRenderedToIndex(
+        indexTexts,
+        renderedItems.map((i) => i.text),
+      );
+      // 换算成字符偏移
+      const starts: number[] = [];
+      let cursor = 0;
+      for (const t of indexTexts) {
+        starts.push(cursor);
+        cursor += t.length;
+      }
+      offsetsByPage.set(
+        pageNumber,
+        aligned.map((index) => ({
+          start: index >= 0 ? (starts[index] ?? -1) : -1,
+          length: index >= 0 ? (indexTexts[index]?.length ?? 0) : 0,
+        })),
+      );
+    }
+
+    return offsetsByPage;
+  }, [textItemsByPage, searchIndexItemTexts]);
+
   const searchRectsByPage = useMemo(() => {
     if (searchHits.length === 0) {
       return new Map<number, SearchHitRect[]>();
     }
 
-    return hitsToRects(searchHits, textItemsByPage, pageSizesByPage);
-  }, [searchHits, textItemsByPage, pageSizesByPage]);
+    return hitsToRects(searchHits, textItemsByPage, pageSizesByPage, searchOffsetsByPage);
+  }, [searchHits, textItemsByPage, pageSizesByPage, searchOffsetsByPage]);
 
   /**
    * 滚到搜索命中（精确到命中所在的行）。
@@ -2536,15 +2625,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         if (!earlier || earlier.pageNumber !== pageNumber) {
           continue;
         }
-        const earlierRects = hitsToRects([earlier], textItemsByPage, pageSizesByPage).get(
-          pageNumber,
-        );
+        const earlierRects = hitsToRects(
+          [earlier],
+          textItemsByPage,
+          pageSizesByPage,
+          searchOffsetsByPage,
+        ).get(pageNumber);
         pageOffset += earlierRects?.length ?? 0;
       }
 
       return pageOffset;
     },
-    [searchHits, activeSearchIndex, textItemsByPage, pageSizesByPage],
+    [searchHits, activeSearchIndex, textItemsByPage, pageSizesByPage, searchOffsetsByPage],
   );
 
   const className = [
@@ -2787,6 +2879,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                       onExternalLink={onExternalLink}
                       onInternalLink={onInternalLink}
                       onTextItems={handleTextItems}
+                      indexItemTexts={searchIndexItemTexts.get(pageNumber)}
                       ariaLabel={t('a11y.page', { page: pageNumber })}
                       onRenderError={handlePageRenderError}
                     />

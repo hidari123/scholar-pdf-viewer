@@ -19,6 +19,8 @@
  * - scaleX = PDF 宽度 / 浏览器实测宽度（**选区精准的关键**）
  */
 
+import type { IndexOffset } from '../search/align';
+import { alignRenderedToIndex } from '../search/align';
 import { guessFontFamily, measureAscentRatio, measureTextWidth } from './font-metrics';
 
 export * from './font-metrics';
@@ -127,6 +129,28 @@ export interface LayoutOptions {
    *    这是可接受的取舍（旋转文字本来也很难精确选中）。
    */
   skipRotated?: boolean;
+  /**
+   * **保持 PDF 的原始顺序**（不按屏幕坐标排序）。
+   *
+   * ⚠️ **搜索高亮必须用这个**（实测踩过的坑：高亮定位不准）。
+   *
+   * → 搜索索引的文本 = `items.map(i => i.str).join('')`（**PDF 原始顺序**）
+   * → 用排序后的项去映射偏移 → **偏移和项对不上** → 高亮跑到别的字上 ❌
+   * → 保持原始顺序 → **下标一一对应** ✅
+   *
+   * ⚠️ 文本层**渲染**不用这个（视觉顺序更重要 → 保持默认的排序）。
+   */
+  preserveOrder?: boolean;
+  /**
+   * **索引用的项文本**（顺序 = 索引顺序）。
+   *
+   * ⚠️ **给了它才能算出正确的索引偏移**（实测踩过的坑：高亮定位不准）。
+   *
+   * → 索引那次 `getTextContent()` 和渲染这次 **item 的边界可能不同**
+   *   （pdf.js 按 `fontName`/`height` 合并 item）
+   * → 直接累加字符数会错位 → 要靠**内容对齐**（见 `alignRenderedToIndex`）
+   */
+  indexItemTexts?: readonly string[];
 }
 
 /**
@@ -365,6 +389,26 @@ export function layoutTextItems(
     positioned.push(result);
   }
 
+  /*
+   * ⚠️⚠️ **默认按屏幕坐标排序**（实测踩过的坑：搜索高亮定位不准）。
+   *
+   * 为什么要排序：PDF 的 item 顺序 ≠ 视觉顺序
+   * → 比如页边戳（竖排）在 PDF 里排在正文**前面**
+   * → 不排序的话，文本层的 DOM 顺序和视觉顺序不一致
+   * → 浏览器选区 / 无障碍朗读的顺序会乱
+   *
+   * ### ⚠️ **但搜索不能用排序后的结果**
+   *
+   * → 搜索索引的文本 = `items.map(i => i.str).join('')`（**PDF 原始顺序**）
+   * → 用排序后的项去映射偏移 → **偏移和项对不上** → 高亮跑到别的字上 ❌
+   *
+   * → 所以：**搜索用的项必须保持 PDF 原始顺序**（`options.preserveOrder`）
+   * → 文本层渲染仍然用排序后的（视觉顺序更重要）
+   */
+  if (options.preserveOrder) {
+    return positioned;
+  }
+
   // 按屏幕坐标排序（同一行的 item 靠 top 分组，组内按 left）
   positioned.sort((a, b) => {
     // 同一行判定：top 差值小于半个字号
@@ -375,6 +419,110 @@ export function layoutTextItems(
   });
 
   return positioned;
+}
+
+/**
+ * 排版文本项 **+ 算出每个项在"搜索索引"里的偏移**。
+ *
+ * ## 为什么需要（实测踩过的坑：搜索高亮定位不准）
+ *
+ * ```
+ * 渲染的项: 112 个      （跳过空项 / 定位失败 / 旋转文字）
+ * 索引的项: 161 个      （只跳过空项）
+ * 第一个不同的位置: #74
+ *   渲染: "(a) Unified adapter "
+ *   索引: "REASONING"            ← 图里的旋转标签
+ * ```
+ *
+ * → 渲染和索引的项**不是同一批** → 从第 74 项开始**下标全错位**
+ * → 高亮跑到别的字上 ❌
+ *
+ * ## 修法
+ *
+ * **渲染的时候顺便算出"我这一项在索引里的偏移"** ——
+ * 因为它遍历的就是**同一份** `content.items`，
+ * 累加字符数就能知道索引里的位置。
+ *
+ * → 搜索侧用这个偏移精确对齐 ✅
+ *
+ * @param content 文本内容（和索引用的是同一份）
+ * @param viewport 视口
+ * @param options 选项
+ * @returns 排版后的项 + 每个项的索引偏移
+ */
+export function layoutTextItemsWithIndexOffsets(
+  content: TextContentLike,
+  viewport: TextViewportLike,
+  options: LayoutOptions = {},
+): { items: PositionedTextItem[]; indexOffsets: IndexOffset[] } {
+  const items: PositionedTextItem[] = [];
+
+  /** 是否跳过旋转文字（默认 true） */
+  const skipRotated = options.skipRotated !== false;
+
+  for (const item of content.items) {
+    const str = item.str ?? '';
+
+    // 空项 → 不进文本层
+    if (str.length === 0) {
+      continue;
+    }
+
+    const result = positionTextItem(item, viewport, options);
+    if (!result) {
+      // ⚠️ **定位失败** → 不进文本层
+      continue;
+    }
+
+    if (skipRotated && isRotatedAngle(result.angle)) {
+      // ⚠️ **旋转文字** → 不进文本层
+      continue;
+    }
+
+    items.push(result);
+  }
+
+  /*
+   * ⚠️⚠️ **索引偏移要靠"内容对齐"算**（实测踩过的坑：搜索高亮定位不准）。
+   *
+   * → 不能直接累加字符数：索引那次 `getTextContent()` 和渲染这次
+   *   **item 的边界可能不同**（pdf.js 会按 `fontName`/`height` 合并 item）
+   * → 实测：索引 161 项（更细）/ 渲染 112 项（更粗）→ 直接累加会错 49 项 ❌
+   *
+   * → 所以：拿到**索引的项文本**后，用 `alignRenderedToIndex` **按内容对齐**
+   * → 再把对齐结果换算成字符偏移
+   */
+  const indexItemTexts = options.indexItemTexts;
+  const indexOffsets: IndexOffset[] = [];
+
+  if (!indexItemTexts || indexItemTexts.length === 0) {
+    // 没有索引信息 → 偏移全空（搜索会退回"按顺序"的老行为）
+    return { items, indexOffsets: items.map(() => ({ start: -1, length: 0 })) };
+  }
+
+  const renderedTexts = items.map((i) => i.text);
+  const aligned = alignRenderedToIndex(indexItemTexts, renderedTexts);
+
+  // 索引项的起始偏移
+  const indexStarts: number[] = [];
+  let cursor = 0;
+  for (const text of indexItemTexts) {
+    indexStarts.push(cursor);
+    cursor += text.length;
+  }
+
+  for (let r = 0; r < items.length; r += 1) {
+    const index = aligned[r];
+    if (index === undefined || index < 0) {
+      indexOffsets.push({ start: -1, length: 0 });
+      continue;
+    }
+    const start = indexStarts[index] ?? -1;
+    const length = indexItemTexts[index]?.length ?? 0;
+    indexOffsets.push({ start, length });
+  }
+
+  return { items, indexOffsets };
 }
 
 /**

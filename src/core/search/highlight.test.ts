@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PositionedTextItem } from '../text-layer/layout';
-import { hitsToRects, hitToRects, mapRangeToItems } from './highlight';
+import { hitsToRects, hitToRects, mapRangeToItems, mapRangeToItemsByText } from './highlight';
 import type { SearchHit } from './search';
 
 /**
@@ -155,5 +155,89 @@ describe('hitsToRects', () => {
     const hits: SearchHit[] = [{ pageNumber: 99, text: 'x', start: 0, length: 1 }];
 
     expect(hitsToRects(hits, itemsByPage, sizes).size).toBe(0);
+  });
+});
+
+/**
+ * ⚠️⚠️ **索引与渲染的项边界不同**（实测踩过的坑：搜索高亮定位不准）。
+ *
+ * ### 实测（真实 arXiv PDF，第 1 页）
+ *
+ * ```
+ * 索引的项（161 个，更细）: ["—", "--", " ", "上海人工智能实验室", …]
+ * 渲染的项（112 个，更粗）: ["--", "—", " ", "上海人工智能实验室", …]
+ * ```
+ *
+ * → **边界不同**（pdf.js 的 `getTextContent()` 会按 `fontName`/`height` 合并 item）
+ * → 但**拼起来的文本完全一样**
+ * → 所以：**按字符位置**在渲染侧找 → 不依赖项的边界 ✅
+ */
+describe('命中定位的"项对齐"（搜索高亮定位不准的修复）', () => {
+  /*
+   * 渲染侧的项（**顺序 = 视觉顺序**，和索引的顺序可能不同）：
+   * ```
+   * [0] "Hello "   → 字符 0..6
+   * [1] "World"    → 字符 6..11
+   * ```
+   */
+  const rendered = [item('Hello ', 0, 0, 60), item('World', 60, 0, 50)];
+
+  it('**按字符位置对齐**（索引的项更细也不影响）', () => {
+    // 命中 "World"（偏移 6）
+    const mapped = mapRangeToItemsByText(rendered, 6, 5);
+
+    expect(mapped).toHaveLength(1);
+    expect(mapped[0]?.item.text).toBe('World');
+    expect(mapped[0]?.offsetInItem).toBe(0);
+  });
+
+  it('**索引的项更细（161 vs 112）也能对上**', () => {
+    /*
+     * 索引: ["Hello", " ", "World"]   （3 项）
+     * 渲染: ["Hello World"]            （1 项，合并了）
+     * → 两边**拼起来的文本一样** → 字符位置一样 → 对得上 ✅
+     */
+    const indexTexts = ['Hello', ' ', 'World'];
+    const renderedTexts = ['Hello World'];
+
+    expect(indexTexts.join('')).toBe(renderedTexts.join(''));
+
+    // 命中 "World"（偏移 6）→ 落到合并后的那一个项，项内偏移 6
+    const merged = [item('Hello World', 0, 0, 110)];
+    const mapped = mapRangeToItemsByText(merged, 6, 5);
+
+    expect(mapped).toHaveLength(1);
+    expect(mapped[0]?.item.text).toBe('Hello World');
+    expect(mapped[0]?.offsetInItem).toBe(6);
+  });
+
+  it('**命中跨两个项**', () => {
+    const mapped = mapRangeToItemsByText(rendered, 4, 5);
+
+    expect(mapped).toHaveLength(2);
+    expect(mapped[0]?.item.text).toBe('Hello ');
+    expect(mapped[1]?.item.text).toBe('World');
+  });
+
+  it('**命中部分项 → 按比例裁剪**', () => {
+    const mapped = mapRangeToItemsByText(rendered, 7, 3);
+
+    expect(mapped).toHaveLength(1);
+    expect(mapped[0]?.item.text).toBe('World');
+    expect(mapped[0]?.offsetInItem).toBe(1);
+    expect(mapped[0]?.charsInItem).toBe(3);
+  });
+
+  it('**超出范围 → 空**', () => {
+    expect(mapRangeToItemsByText(rendered, 100, 5)).toHaveLength(0);
+  });
+
+  it('**hitToRects 落在正确的位置**', () => {
+    const hit: SearchHit = { pageNumber: 1, text: 'World', start: 6, length: 5 };
+
+    const rects = hitToRects(hit, rendered, PAGE_WIDTH, PAGE_HEIGHT);
+
+    expect(rects).toHaveLength(1);
+    expect(rects[0]?.x).toBeCloseTo(60 / PAGE_WIDTH, 5);
   });
 });

@@ -389,6 +389,8 @@ export default function App() {
       const page = await doc.getPage(i);
       const viewport = page.getViewport({ scale: 1 });
       sizes.push({ width: viewport.width, height: viewport.height });
+      // ⚠️ **缓存各页的尺寸**（搜索索引用它算视口 → 判断旋转文字）
+      pageSizesPtRef.current.set(i, { width: viewport.width, height: viewport.height });
     }
     return sizes;
   }, []);
@@ -573,6 +575,21 @@ export default function App() {
    */
   const searchEngine = useMemo(() => new PdfSearch(), []);
 
+  /**
+   * **搜索索引的版本号**（索引变大时 +1）。
+   *
+   * ⚠️ 用来触发重渲染 → 让"索引的项文本"重新计算 → 搜索高亮定位准确。
+   */
+  const [_searchIndexVersion, setSearchIndexVersion] = useState(0);
+
+  /**
+   * **各页的尺寸（pt）**（搜索索引用它算视口 → 判断旋转文字）。
+   *
+   * ⚠️ 搜索高亮定位的关键（实测踩过的坑）：
+   * → 旋转文字在渲染时不存在 → 索引也必须跳过 → 否则偏移错位
+   */
+  const pageSizesPtRef = useRef(new Map<number, { width: number; height: number }>());
+
   /** 文档就绪后给搜索引擎装上取页函数 */
   useEffect(() => {
     const doc = docRef.current;
@@ -606,6 +623,42 @@ export default function App() {
         }
       },
       numPages > 0 ? doc.numPages : 0,
+      {
+        /*
+         * ⚠️ **索引变大时要通知**（搜索高亮定位的关键）。
+         *
+         * → 索引是**异步**建的 → 页面渲染时索引可能还没建好
+         * → 渲染侧要用"索引的项文本"算对齐偏移 → 索引好了要重算
+         */
+        onProgress: () => {
+          setSearchIndexVersion((v) => v + 1);
+        },
+        /**
+         * ⚠️⚠️ **必须传视口**（搜索高亮定位的关键，实测踩过的坑）。
+         *
+         * → 有了视口，索引才能判断"哪些是旋转文字"
+         * → 旋转文字在**渲染时不存在** → 索引也必须跳过
+         * → 否则索引文本多 457 字符 → **偏移全错位** → 高亮跑到别的字上 ❌
+         */
+        viewport: (pageNumber: number) => {
+          const doc = docRef.current;
+          if (!doc) {
+            return undefined;
+          }
+          const size = pageSizesPtRef.current.get(pageNumber);
+          if (!size) {
+            return undefined;
+          }
+          // ⚠️ 用 pdf.js 的标准视口（和渲染一致 → 旋转判定一致）
+          //    pdf.js 的默认视口：scale=1 → [w, 0, 0, -h, 0, h]
+          return {
+            width: size.width,
+            height: size.height,
+            scale: 1,
+            transform: [size.width, 0, 0, -size.height, 0, size.height],
+          };
+        },
+      },
     );
     // numPages 是"文档已就绪"的信号（getDocInfo 里设置）
   }, [searchEngine, numPages]);

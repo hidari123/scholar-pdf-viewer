@@ -8,18 +8,23 @@
  *
  * ## 字符偏移 ↔ 文本项 的映射
  *
- * 索引里的整页文本是 `items.map(i => i.str).join('')`（见 `search.ts`），
- * 所以：
- * - 字符偏移 → 文本项：逐项累加字符数，找到覆盖该区间的项
- * - 文本项 → 矩形：用该项自己的 left/top/width/fontSize
+ * ⚠️⚠️ **不能假设"索引的项"和"渲染的项"是同一批**（实测踩过的坑：高亮定位不准）。
  *
- * ⚠️ **前提：索引与渲染必须用同一份 items**。
- * 宿主若在搜索与渲染时分别调 `getTextContent()`，两次结果的 items 顺序
- * 可能不同 → 偏移错位 → 高亮跑到别的字上。
- * 所以宿主应**缓存每页的 textContent**，两边共用。
+ * ```
+ * 索引的项（161 个）: ["—", "--", " ", "上海人工智能实验室", …]
+ * 渲染的项（112 个）: ["--", "—", " ", "上海人工智能实验室", …]
+ * ```
+ *
+ * → **边界不同**（pdf.js 的 `getTextContent()` 会按 `fontName`/`height` 合并 item）
+ * → 但**拼起来的文本完全一样**
+ * → 所以：**按字符位置**在渲染侧找 → 不依赖项的边界 ✅
+ *
+ * @see `align.ts` 的 `mapOffsetToRenderedByText`
  */
 
 import type { PositionedTextItem } from '../text-layer/layout';
+import type { IndexOffset } from './align';
+import { mapOffsetToRenderedByText } from './align';
 import type { SearchHit } from './search';
 
 /** 命中对应的矩形（归一化 0~1，相对页面） */
@@ -35,12 +40,9 @@ export interface SearchHitRect {
 }
 
 /**
- * 把字符区间映射到文本项列表。
+ * 把字符区间映射到文本项列表（**按顺序累加**）。
  *
- * 与 pdf.js 的 `_convertMatches` 同思路：
- * 逐项累加字符数，找到与 `[start, start+length)` 相交的项。
- *
- * @param items 该页的文本项（**顺序必须与索引时一致**）
+ * @param items 该页的文本项
  * @param start 起始字符偏移
  * @param length 字符数
  * @returns 命中的项及其在区间内的相对位置
@@ -50,31 +52,42 @@ export function mapRangeToItems(
   start: number,
   length: number,
 ): { item: PositionedTextItem; offsetInItem: number; charsInItem: number }[] {
+  return mapRangeToItemsByText(items, start, length);
+}
+
+export function mapRangeToItemsByText(
+  items: PositionedTextItem[],
+  start: number,
+  length: number,
+  _indexOffsets?: readonly IndexOffset[],
+): { item: PositionedTextItem; offsetInItem: number; charsInItem: number }[] {
+  /*
+   * ⚠️⚠️ **按"渲染项自己的文本"累加**（实测踩过的坑：搜索高亮定位不准）。
+   *
+   * → 索引的项和渲染的项**边界不同**（pdf.js 按 `fontName`/`height` 合并 item）
+   *   实测：索引 161 项 / 渲染 112 项 → 差 49 项
+   * → 但**拼起来的文本完全一样** → 所以只要按**字符位置**找就行
+   * → 不依赖索引的项边界 → 两边切分不同也不影响 ✅
+   */
+  const mapped = mapOffsetToRenderedByText(
+    items.map((i) => i.text),
+    start,
+    length,
+  );
   const result: { item: PositionedTextItem; offsetInItem: number; charsInItem: number }[] = [];
 
-  const rangeStart = start;
-  const rangeEnd = start + length;
-
-  let cursor = 0;
-
-  for (const item of items) {
-    const itemStart = cursor;
-    const itemEnd = cursor + item.text.length;
-    cursor = itemEnd;
-
-    // 不相交
-    if (itemEnd <= rangeStart || itemStart >= rangeEnd) {
+  for (const { index, offsetInItem, charsInItem } of mapped) {
+    const item = items[index];
+    if (!item) {
       continue;
     }
 
-    // 相交部分
-    const from = Math.max(rangeStart, itemStart);
-    const to = Math.min(rangeEnd, itemEnd);
+    const itemTextLength = item.text.length;
 
     result.push({
       item,
-      offsetInItem: from - itemStart,
-      charsInItem: to - from,
+      offsetInItem: Math.min(itemTextLength, offsetInItem),
+      charsInItem: Math.min(itemTextLength - offsetInItem, charsInItem),
     });
   }
 
@@ -93,6 +106,8 @@ export function mapRangeToItems(
  * @param items 该页的文本项（视口 px）
  * @param viewportWidth 视口宽（px，当前缩放）
  * @param viewportHeight 视口高（px，当前缩放）
+ * @param indexOffsets **每个渲染项在索引里的字符偏移**
+ *   → 不传则按顺序兜底（可能偏）
  * @returns 归一化矩形（0~1）；无法定位时返回空数组
  */
 export function hitToRects(
@@ -100,12 +115,13 @@ export function hitToRects(
   items: PositionedTextItem[],
   viewportWidth: number,
   viewportHeight: number,
+  indexOffsets?: readonly IndexOffset[],
 ): SearchHitRect[] {
   if (viewportWidth <= 0 || viewportHeight <= 0 || items.length === 0) {
     return [];
   }
 
-  const mapped = mapRangeToItems(items, hit.start, hit.length);
+  const mapped = mapRangeToItemsByText(items, hit.start, hit.length, indexOffsets);
   const rects: SearchHitRect[] = [];
 
   for (const { item, offsetInItem, charsInItem } of mapped) {
@@ -144,12 +160,14 @@ export function hitToRects(
  * @param hits 命中列表
  * @param itemsByPage 页码 → 文本项（视口 px）
  * @param viewportSizeByPage 页码 → 视口尺寸（px，当前缩放）
+ * @param indexOffsetsByPage 页码 → **每个渲染项的索引偏移**（对齐用）
  * @returns 页码 → 矩形列表
  */
 export function hitsToRects(
   hits: SearchHit[],
   itemsByPage: Map<number, PositionedTextItem[]>,
   viewportSizeByPage: Map<number, { width: number; height: number }>,
+  indexOffsetsByPage?: Map<number, IndexOffset[]>,
 ): Map<number, SearchHitRect[]> {
   const result = new Map<number, SearchHitRect[]>();
 
@@ -160,10 +178,13 @@ export function hitsToRects(
       continue;
     }
 
-    const rects = hitToRects(hit, items, size.width, size.height);
-    if (rects.length === 0) {
-      continue;
-    }
+    const rects = hitToRects(
+      hit,
+      items,
+      size.width,
+      size.height,
+      indexOffsetsByPage?.get(hit.pageNumber),
+    );
 
     const existing = result.get(hit.pageNumber);
     if (existing) {

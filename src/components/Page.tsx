@@ -14,10 +14,11 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import type { LinkAnnotationLike } from '../core/annotation/links';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import type { HighlightPalette } from '../core/highlight/palette';
+import type { IndexOffset } from '../core/search/align';
 import type { SearchHitRect } from '../core/search/highlight';
 import type { PageSelectionShape } from '../core/selection/shape';
 import type { PositionedTextItem } from '../core/text-layer/layout';
-import { layoutTextItems } from '../core/text-layer/layout';
+import { layoutTextItemsWithIndexOffsets } from '../core/text-layer/layout';
 import type { HighlightRecord } from '../core/types';
 import { AnnotationLayer } from './AnnotationLayer';
 import { LinkLayer } from './LinkLayer';
@@ -89,6 +90,19 @@ export interface PageProps {
    * ⚠️ 必须与**搜索索引**用的是同一份 items，否则偏移错位。
    */
   onTextItems?: (pageNumber: number, items: PositionedTextItem[]) => void;
+  /**
+   * **索引偏移**（搜索命中定位用）。
+   *
+   * ⚠️ 每个渲染项在**搜索索引文本**里的字符偏移
+   * → 用来把"命中的字符偏移"精确映射到"渲染的项"
+   */
+  onIndexOffsets?: (pageNumber: number, offsets: IndexOffset[]) => void;
+  /**
+   * **索引用的项文本**（顺序 = 索引顺序）。
+   *
+   * ⚠️ 用来算"每个渲染项在索引里的偏移"（搜索命中定位用）。
+   */
+  indexItemTexts?: readonly string[];
   /** 批注（小便签，受控） */
   stickyNotes?: AnnotationRecord[];
   /** 点击批注 */
@@ -122,6 +136,8 @@ export function PageInner(props: PageProps) {
     onInternalLink,
     onRenderError,
     onTextItems,
+    onIndexOffsets,
+    indexItemTexts,
     stickyNotes,
     onAnnotationClick,
     ariaLabel,
@@ -205,20 +221,40 @@ export function PageInner(props: PageProps) {
   /**
    * 排版文本项 → 报告给父组件（搜索高亮用）。
    *
-   * ⚠️ **必须与搜索索引用同一份 items**：
-   * 索引文本 = `items.map(i => i.str).join('')`，
-   * 这里的 `layoutTextItems` 用的就是同一份 `textContent.items`（顺序不变）
-   * → 字符偏移能准确映射到矩形。
+   * ⚠️⚠️ **必须带"索引偏移"**（实测踩过的坑：高亮定位不准）。
+   *
+   * ```
+   * 渲染的项: 112 个      （跳过空项 / 定位失败 / 旋转文字）
+   * 索引的项: 161 个      （只跳过空项）
+   * 第一个不同的位置: #74
+   *   渲染: "(a) Unified adapter "
+   *   索引: "REASONING"            ← 图里的旋转标签
+   * ```
+   *
+   * → 渲染和索引的项**不是同一批** → 从第 74 项开始**下标全错位**
+   * → 高亮跑到别的字上 ❌
+   *
+   * → 所以渲染时要**顺便报上"我这一项在索引里的偏移"** → 搜索侧精确对齐 ✅
    */
   useEffect(() => {
     if (!textContent || !viewport) {
       onTextItems?.(pageNumber, []);
+      onIndexOffsets?.(pageNumber, []);
       return;
     }
 
-    const items = layoutTextItems(textContent, viewport);
+    /*
+     * ⚠️ **必须传"索引用的项文本"**（实测踩过的坑：高亮定位不准）。
+     *
+     * → 索引那次 `getTextContent()` 和渲染这次 **item 边界可能不同**
+     * → 要靠**内容对齐**才能算出正确的偏移
+     */
+    const { items, indexOffsets } = layoutTextItemsWithIndexOffsets(textContent, viewport, {
+      indexItemTexts,
+    });
     onTextItems?.(pageNumber, items);
-  }, [textContent, viewport, pageNumber, onTextItems]);
+    onIndexOffsets?.(pageNumber, indexOffsets);
+  }, [textContent, viewport, pageNumber, onTextItems, onIndexOffsets, indexItemTexts]);
 
   /**
    * 视口尺寸（给链接层 / 标注层用）。

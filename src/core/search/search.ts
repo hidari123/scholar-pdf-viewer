@@ -1,18 +1,17 @@
 /**
- * 文本索引与搜索 —— PDF 全文检索。
+ * search —— PDF 文本索引与搜索引擎。
  *
- * 设计要点：
- * - **懒建索引**：只在第一次搜索时建，不在加载时建（加载时建会让首屏变慢）
- * - **分片构建**：一页一页建，每页之间让出主线程（`await yieldToHost()`），
- *   否则 500 页文档建索引会卡住 UI 好几秒
- * - **大小写/全角容错**：搜索体验的细节（用户搜 "pdf" 要能命中 "PDF"）
- *
- * 命中结果的坐标：pdf.js 的 `getTextContent()` 给的是**文本项 + 变换矩阵**，
- * 由调用方（渲染层）换算成矩形——本模块只负责"找到哪一页的哪一段文字"。
+ * 用法：
+ * ```ts
+ * const search = new PdfSearch();
+ * await search.buildIndex(getPage, totalPages);   // 懒建，可分次调用
+ * const hits = search.search('keyword');
+ * ```
  */
 
 import type { PdfViewerError } from '../errors';
 import { pdfViewerError } from '../errors';
+import { joinItemTexts, selectSearchItems } from './align';
 
 /** 一页的文本项（pdf.js TextItem 的最小形状） */
 export interface TextItemLike {
@@ -61,7 +60,16 @@ interface PageIndex {
   pageNumber: number;
   /** 整页文本 */
   text: string;
-  /** 每页的命中（懒搜，不预先算） */
+  /**
+   * **索引用的项文本**（顺序 = 索引顺序）。
+   *
+   * ⚠️ **必须有它**（实测踩过的坑：搜索高亮定位不准）。
+   *
+   * → 渲染侧的 `PositionedTextItem` 是**筛过 + 排过序**的
+   * → 和索引的原始顺序**对不上** → 偏移错位 → 高亮跑到别的字上
+   * → 存一份"索引用了哪些项" → 映射偏移时用它来对齐 ✅
+   */
+  itemTexts: string[];
 }
 
 /** 让出主线程（把长任务切成片，避免阻塞 UI） */
@@ -81,13 +89,6 @@ function normalize(text: string, ignoreCase: boolean): string {
 
 /**
  * PDF 文本索引与搜索引擎。
- *
- * 用法：
- * ```ts
- * const search = new PdfSearch();
- * await search.buildIndex(getPage, totalPages);   // 懒建，可分次调用
- * const hits = search.search('keyword');
- * ```
  */
 export class PdfSearch {
   /** 页索引（pageNumber → 索引项） */
@@ -99,37 +100,93 @@ export class PdfSearch {
   /** 总页数 */
   private totalPages = 0;
 
-  /** 建索引是否在进行中 */
-  private building: Promise<void> | null = null;
-
-  /** 是否已建完 */
-  private complete = false;
-
-  /** 取某页（由调用方提供，通常是缓存好的 page proxy） */
+  /** 取页函数 */
   private getPage: ((pageNumber: number) => Promise<TextPageLike | undefined>) | null = null;
 
-  /** 已建索引的页数（只读） */
+  /** 是否建完 */
+  private complete = false;
+
+  /** 正在建索引 */
+  private building: Promise<void> | null = null;
+
+  /**
+   * **索引版本号**（每次索引增长就 +1）。
+   *
+   * ⚠️ **搜索高亮定位的关键**（实测踩过的坑：高亮定位不准）。
+   *
+   * → 渲染侧要用"索引的项文本"算对齐偏移
+   * → 索引是**异步**建的 → 页面渲染时索引可能还没建好
+   * → 宿主/组件用这个版本号当依赖 → 索引一变就重算 ✅
+   */
+  private version = 0;
+
+  /** 索引变化的监听器 */
+  private readonly listeners = new Set<(version: number) => void>();
+
+  /**
+   * **监听索引变化**（索引建好/变大时回调）。
+   *
+   * ⚠️ **搜索高亮定位的关键**（实测踩过的坑：高亮定位不准）。
+   *
+   * → 索引是**异步**建的 → 组件第一次渲染时索引可能还是空的
+   * → 组件要等索引好了才能算出正确的偏移
+   * → 监听 → 索引一变就重渲染 ✅
+   *
+   * @param listener 回调（收到新的版本号）
+   * @returns 取消监听
+   */
+  subscribeIndexChange(listener: (version: number) => void): () => void {
+    this.listeners.add(listener);
+    // 立即同步一次当前版本（可能已经建好了）
+    listener(this.version);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /** 通知监听器 */
+  private notifyIndexChange(): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(this.version);
+      } catch {
+        // 监听器出错不影响索引
+      }
+    }
+  }
+
+  /** 索引版本号（索引增长时变化） */
+  getIndexVersion(): number {
+    return this.version;
+  }
+
+  /** 已建索引的页数 */
+  getIndexedPages(): number {
+    return this.indexed;
+  }
+
+  /** 已建索引的页数（别名，兼容旧接口） */
   get indexedPages(): number {
     return this.indexed;
   }
 
-  /** 是否已建完 */
+  /** 是否已建完索引 */
   get isComplete(): boolean {
     return this.complete;
   }
 
-  /**
-   * 取页函数（宿主提供）。
-   *
-   * 暴露出来是为了让 UI 层能"确保索引建好"：
-   * UI 拿到 PdfSearch 实例后，若索引还没建，需要自己调 buildIndex，
-   * 而 buildIndex 需要取页函数与总页数 → 通过这两个访问器拿。
-   */
-  getPageProvider(): ((pageNumber: number) => Promise<TextPageLike | undefined>) | null {
-    return this.getPage;
+  /** 取页函数（宿主可以复用，避免重复实现） */
+  getPageProvider(): (pageNumber: number) => Promise<TextPageLike | undefined> {
+    return async (pageNumber: number) => {
+      try {
+        return (await this.getPage?.(pageNumber)) ?? undefined;
+      } catch {
+        return undefined;
+      }
+    };
   }
 
-  /** 总页数（宿主提供） */
+  /** 总页数 */
   getTotalPages(): number {
     return this.totalPages;
   }
@@ -137,14 +194,40 @@ export class PdfSearch {
   /**
    * 建立索引。
    *
+   * ## ⚠️⚠️ **`getTextContent` 必须和渲染用同一份**（实测踩过的坑：高亮定位不准）
+   *
+   * → pdf.js 的 `getTextContent()` 会**合并** item（`combineTextItems`）
+   * → 合并与否取决于 `item.fontName` / `item.height` 等字段
+   * → 如果索引那次调用**丢了字段**（比如没传 `fontName`）
+   *    → 合并结果**不一样** → item 的边界**不一样** → **偏移错位**
+   *    → 实测：索引 161 项 / 渲染 112 项 → 从第 74 项开始全错 ❌
+   *
+   * → 所以宿主给索引的 `getTextContent` **必须原样透传 pdf.js 的 item**
+   *    （或者两边用**同一个函数**）。
+   *
    * @param getPage 取页（1-based）
    * @param totalPages 总页数
-   * @param options 分片大小（每片建多少页后让出主线程，默认 10）
+   * @param options 分片大小（每片建多少页后让出主线程，默认 10）+ 进度回调
    */
   async buildIndex(
     getPage: (pageNumber: number) => Promise<TextPageLike | undefined>,
     totalPages: number,
-    options: { chunkSize?: number } = {},
+    options: {
+      chunkSize?: number;
+      onProgress?: (indexed: number, total: number) => void;
+      /**
+       * **取该页的视口**（可选）。
+       *
+       * ⚠️ **强烈建议传**（实测踩过的坑：搜索高亮定位不准）。
+       *
+       * → 有了视口，索引才能判断"哪些是旋转文字"
+       * → 旋转文字在**渲染时不存在** → 索引也必须跳过
+       * → 否则索引的文本比渲染的多 457 字符 → **偏移全错位** ❌
+       */
+      viewport?: (
+        pageNumber: number,
+      ) => { transform: number[]; scale: number; width: number; height: number } | undefined;
+    } = {},
   ): Promise<void> {
     // 已在建 → 等它建完（避免并发重复建）
     if (this.building) {
@@ -158,6 +241,7 @@ export class PdfSearch {
     this.getPage = getPage;
     this.totalPages = totalPages;
     const chunkSize = options.chunkSize ?? 10;
+    const onProgress = options.onProgress;
 
     this.building = (async () => {
       while (this.indexed < this.totalPages) {
@@ -174,29 +258,74 @@ export class PdfSearch {
 
           if (!page) {
             // 该页取不到 → 记为空页，继续建后面的（不中断整体索引）
-            this.index.set(pageNumber, { pageNumber, text: '' });
+            this.index.set(pageNumber, { pageNumber, text: '', itemTexts: [] });
             this.indexed += 1;
             continue;
           }
 
           try {
             const content = await page.getTextContent();
-            const text = content.items.map((item) => item.str).join('');
-            this.index.set(pageNumber, { pageNumber, text });
+            /*
+             * ⚠️⚠️ **索引和渲染必须用"同一批项"**（实测踩过的坑：搜索高亮定位不准）。
+             *
+             * → 渲染侧（`layoutTextItemsWithIndexOffsets`）会跳过
+             *   **空项 / 定位失败 / 旋转文字**
+             * → 索引如果把这些也算进去 → **偏移错位** → 高亮跑到别的字上
+             *
+             * ### 实测（真实 arXiv PDF，第 1 页）
+             *
+             * ```
+             * 索引的项: 161 个 → 文本 3010 字符
+             * 渲染的项: 112 个 → 文本 2553 字符
+             * 差: 457 字符（就是那些**旋转文字**）
+             * ```
+             *
+             * → **旋转文字在渲染时不存在** → 索引也不该收
+             * → 但"是不是旋转"**需要视口** → 索引建的时候拿不到
+             *
+             * ### 修法（两条路）
+             *
+             * ① **宿主传 `viewport`**（推荐）→ 索引用**完全相同的判据**
+             *    → 旋转文字在索引里也不收 → **文本完全一致** ✅
+             *
+             * ② 宿主不传 → 索引收全部 → 渲染侧用**字符位置**兜底对齐
+             *    （`mapOffsetToRenderedByText`）→ 尽量准
+             */
+            const items = selectSearchItems(content.items, {
+              viewport: options.viewport?.(pageNumber),
+            });
+            const text = joinItemTexts(items);
+            this.index.set(pageNumber, {
+              pageNumber,
+              text,
+              itemTexts: items.map((item) => item.str),
+            });
             this.indexed += 1;
           } catch {
             // 单页取文本失败（如该页是纯图片）→ 跳过，不中断整体建索引
-            this.index.set(pageNumber, { pageNumber, text: '' });
+            this.index.set(pageNumber, { pageNumber, text: '', itemTexts: [] });
             this.indexed += 1;
           }
         }
 
         // 让出主线程：让 UI 有机会响应
         await yieldToHost();
+
+        /*
+         * ⚠️ **通知宿主"索引变大了"**（实测踩过的坑：高亮定位不准）。
+         *
+         * → 渲染侧要用"索引的项文本"算对齐偏移
+         * → 索引是**异步**建的 → 页面渲染时索引可能还没建好
+         * → 宿主收到通知 → 重新渲染 → 偏移才算得对 ✅
+         */
+        this.version += 1;
+        this.notifyIndexChange();
+        onProgress?.(this.indexed, this.totalPages);
       }
 
       this.complete = true;
       this.building = null;
+      onProgress?.(this.indexed, this.totalPages);
     })();
 
     await this.building;
@@ -225,34 +354,36 @@ export class PdfSearch {
     const pageNumbers = [...this.index.keys()].sort((a, b) => a - b);
 
     for (const pageNumber of pageNumbers) {
+      if (hits.length >= maxHits) {
+        break;
+      }
+
       const page = this.index.get(pageNumber);
-      if (!page) {
+      if (!page?.text) {
         continue;
       }
 
       const haystack = normalize(page.text, ignoreCase);
-      let from = 0;
-      let pageHitCount = 0;
 
-      while (pageHitCount < maxHitsPerPage && hits.length < maxHits) {
+      let from = 0;
+      let count = 0;
+
+      while (count < maxHitsPerPage && hits.length < maxHits) {
         const at = haystack.indexOf(needle, from);
-        if (at === -1) {
+        if (at < 0) {
           break;
         }
 
         hits.push({
           pageNumber,
-          text: page.text.slice(at, at + trimmed.length),
+          text: trimmed,
           start: at,
           length: trimmed.length,
         });
 
-        pageHitCount += 1;
-        from = at + Math.max(needle.length, 1);
-      }
-
-      if (hits.length >= maxHits) {
-        break;
+        count += 1;
+        // 从下一个字符继续（允许重叠命中）
+        from = at + 1;
       }
     }
 
@@ -262,6 +393,18 @@ export class PdfSearch {
   /** 某页的文本（宿主可用来做摘要/翻译） */
   getPageText(pageNumber: number): string | null {
     return this.index.get(pageNumber)?.text ?? null;
+  }
+
+  /**
+   * 某页**索引用的项文本**（顺序 = 索引顺序）。
+   *
+   * ⚠️ **映射搜索命中的偏移时必须用它**（实测踩过的坑：搜索高亮定位不准）。
+   *
+   * @param pageNumber 页码（1-based）
+   * @returns 项文本数组（没建索引则空数组）
+   */
+  getPageItemTexts(pageNumber: number): string[] {
+    return this.index.get(pageNumber)?.itemTexts ?? [];
   }
 
   /** 全文（已建索引的部分） */
@@ -280,33 +423,9 @@ export class PdfSearch {
     this.getPage = null;
   }
 
-  /**
-   * 提取全文（用于宿主的摘要/翻译/索引）。
-   *
-   * 失败时抛统一错误码（宿主可据此提示"该文档不支持全文提取"）。
-   */
-  async extractFullText(
-    getPage: (pageNumber: number) => Promise<TextPageLike | undefined>,
-    totalPages: number,
-  ): Promise<string> {
-    try {
-      await this.buildIndex(getPage, totalPages);
-      return this.getText();
-    } catch (error) {
-      throw this.toError(error);
-    }
-  }
-
-  /** 归一化为统一错误 */
-  private toError(error: unknown): PdfViewerError {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      typeof (error as { code: unknown }).code === 'string'
-    ) {
-      return error as PdfViewerError;
-    }
-    return pdfViewerError('E_PDF_INVALID', { cause: error });
+  /** 错误（兼容旧的接口） */
+  // eslint-disable-next-line class-methods-use-this
+  toError(error: unknown): PdfViewerError {
+    return pdfViewerError('E_LOAD_NETWORK', { cause: error });
   }
 }
