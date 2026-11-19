@@ -25,19 +25,36 @@
  */
 
 import type { Locale, LocaleMessages, LocaleTable } from '../../i18n/messages';
+import { MESSAGES } from '../../i18n/messages';
 import type { HighlightPalette } from '../highlight/palette';
 import { DEFAULT_HIGHLIGHT_PALETTE } from '../highlight/palette';
 
 /**
- * **内置的语言表**（扩展语言）。
+ * **内置的语言表**。
  *
  * ⚠️ **只包含"包自己的 UI 文案"** → 宿主自己的文案宿主自己管 ✅
  *
- * → `zh` / `en` 是**内置语言**（在 `MESSAGES` 里）
- * → 这里放**扩展语言**（`ja` / `fr`）→ 宿主**不用再写一整套** ✅
- * → 宿主想加 `ko` / `de` / `es` → 传 `locales` 注册 ✅
+ * ### 内置哪些语言
+ *
+ * - **中文（`zh`）** —— 内置 ✅
+ * - **英文（`en`）** —— 内置 ✅
+ * - 日文（`ja`）/ 法文（`fr`）—— 也内置了（宿主不用再写一整套）✅
+ * - 宿主想加 `ko` / `de` / `es` → 传 `locales` 注册 ✅
+ *
+ * ### 为什么把 `zh` / `en` 也放进这张表
+ *
+ * → 之前 `zh` / `en` 在 `MESSAGES` 里，`ja` / `fr` 在这里 → **两套地方** ❌
+ * → 宿主想覆盖中文里的**某一句**时，得知道去改哪里 ❌
+ * → 现在**统一成一张表** → 宿主传 `locales={{ zh: {...} }}` 就能覆盖 ✅
+ *
+ * ⚠️ `zh` / `en` 的**权威来源**仍然是 `MESSAGES`（`resolveMessage` 的最后兜底）✅
+ * → 这里只是**再抄一份** → 让"内置语言"和"扩展语言"的处理方式**完全一致** ✅
  */
 export const BUILTIN_LOCALES: LocaleTable = {
+  /** 中文（内置） */
+  zh: { ...MESSAGES.zh },
+  /** 英文（内置） */
+  en: { ...MESSAGES.en },
   ja: {
     'load.loading': 'ドキュメントを読み込み中…',
     'load.retry': '再試行',

@@ -14,19 +14,44 @@
 export type HighlightPalette = Record<string, string>;
 
 /**
- * 内置默认色板。
+ * **内置默认色板**（宿主不传也能用）。
  *
- * 取自常见编辑器的高亮笔配色（黄/绿/蓝/粉/紫/橙），
- * 颜色本身是**中性偏亮**的 —— 配合 `mix-blend-mode: multiply`
- * 叠在黑字上时，文字仍然清晰可读。
+ * ## 为什么内置（用户需求）
+ *
+ * > "语言和高亮色都是包需要内置的 但是有接口宿主可以配置"
+ *
+ * → 之前宿主**必须**传 `highlightPalette` → 不传就**没有颜色选择器** ❌
+ * → 现在内置一套 → **开箱即用** ✅
+ * → 宿主传了 → **完全覆盖**（不是合并，见 `mergeConfig`）✅
+ *
+ * ## 颜色说明
+ *
+ * 取自常见编辑器（WPS / Word / Notion）的高亮笔配色。
+ * 颜色是**中性偏亮**的 → 配合 `mix-blend-mode: multiply`
+ * 叠在黑字上时，文字仍然清晰可读 ✅
+ *
+ * ## 语义 key
+ *
+ * → key 是**语义名**（`yellow` / `green` / …）→ 宿主可以按 key 存"用户选的颜色" ✅
+ * → 宿主想换配色 → 传自己的 `highlightPalette`（key 可以自己定）✅
  */
 export const DEFAULT_HIGHLIGHT_PALETTE: HighlightPalette = {
+  /** 黄（最常用） */
   yellow: '#ffd54a',
+  /** 绿 */
   green: '#a5d6a7',
+  /** 蓝 */
   blue: '#90caf9',
+  /** 粉 */
   pink: '#f48fb1',
+  /** 紫 */
   purple: '#ce93d8',
+  /** 橙 */
   orange: '#ffcc80',
+  /** 青（蓝绿） */
+  cyan: '#80deea',
+  /** 红（醒目） */
+  red: '#ef9a9a',
 };
 
 /**

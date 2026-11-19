@@ -53,6 +53,7 @@ const suites = [
   { name: '搜索高亮（像素级精度）', file: 'e2e-search-exact.mjs' },
   { name: 'TipTap 富文本编辑器', file: 'e2e-tiptap.mjs' },
   { name: '内置的语言和高亮色', file: 'e2e-builtin-defaults.mjs' },
+  { name: '内置配置（色板 + 语言）可被宿主覆盖', file: 'e2e-builtin-config.mjs' },
   { name: '目录的异步页码解析', file: 'e2e-outline-resolve.mjs' },
   { name: '退格删高亮', file: 'e2e-highlight-delete-key.mjs' },
   { name: '批注 hover 的操作按钮 + 富文本预览', file: 'e2e-annotation-hover.mjs' },

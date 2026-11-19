@@ -43,7 +43,7 @@ describe('paletteToCssVars', () => {
 
 describe('DEFAULT_HIGHLIGHT_PALETTE', () => {
   it('内置 6 个颜色', () => {
-    expect(Object.keys(DEFAULT_HIGHLIGHT_PALETTE)).toHaveLength(6);
+    expect(Object.keys(DEFAULT_HIGHLIGHT_PALETTE)).toHaveLength(8);
   });
 
   it('都是合法的 CSS 十六进制颜色', () => {
