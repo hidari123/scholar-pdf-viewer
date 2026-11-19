@@ -101,7 +101,8 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
     // 下一帧聚焦（等编辑器渲染出来）
     const timer = window.setTimeout(() => {
       const editor = dialogRef.current?.querySelector<HTMLElement>('.scpdf-rich-text__editor');
-      editor?.focus();
+      // ⚠️ `preventScroll: true` → 聚焦**不要滚动页面**（用户反馈）
+      editor?.focus({ preventScroll: true });
     }, 0);
     return () => {
       window.clearTimeout(timer);

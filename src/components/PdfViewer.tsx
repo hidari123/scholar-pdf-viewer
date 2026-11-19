@@ -34,6 +34,8 @@ import type { DocumentSource, LoadOptions } from '../core/document/loader';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
 import type { PdfViewerError } from '../core/errors';
 import { pdfViewerError } from '../core/errors';
+import type { HighlightRect as HitRect } from '../core/highlight/hit-test';
+import { pickHighlightAtPoint } from '../core/highlight/hit-test';
 import type { HighlightPalette } from '../core/highlight/palette';
 import type { OutlineItemLike } from '../core/outline/outline';
 import type { IndexOffset } from '../core/search/align';
@@ -1475,25 +1477,96 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * @param clientY 视口 Y
    * @returns 命中的高亮元素；没命中返回 null
    */
-  const findHighlightAtPoint = useCallback((clientX: number, clientY: number) => {
+  /**
+   * **收集所有高亮的矩形**（用于重叠命中判定）。
+   *
+   * ⚠️ 用户需求："如果两个高亮叠加在一起 删除的话两个都一起删掉了 逻辑不对"
+   * → 需要知道**所有**高亮的位置，才能判断"点在重叠区还是独有区" ✅
+   */
+  const collectHighlightRects = useCallback((): HitRect[] => {
     const container = containerRef.current;
     if (!container) {
-      return null;
+      return [];
     }
-    const elements = container.querySelectorAll<HTMLElement>('[data-highlight-id]');
+    const elements = [...container.querySelectorAll<HTMLElement>('[data-highlight-id]')];
+    const rects: HitRect[] = [];
+    const seen = new Map<string, number>();
+
     for (const el of elements) {
-      const rect = el.getBoundingClientRect();
-      if (
-        clientX >= rect.left &&
-        clientX <= rect.right &&
-        clientY >= rect.top &&
-        clientY <= rect.bottom
-      ) {
-        return el;
+      const id = el.getAttribute('data-highlight-id');
+      if (!id) {
+        continue;
       }
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) {
+        continue;
+      }
+      /*
+       * ⚠️ **同一个高亮可能有多行**（多个 DOM 元素）
+       * → 层级用"第一次出现"的顺序 → 保持稳定 ✅
+       */
+      if (!seen.has(id)) {
+        seen.set(id, seen.size);
+      }
+      rects.push({
+        id,
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: r.height,
+        zIndex: seen.get(id) ?? 0,
+      });
     }
-    return null;
+
+    return rects;
   }, []);
+
+  /**
+   * **按坐标找高亮元素**（重叠时选**最上面**的那个）。
+   *
+   * ⚠️ 高亮块是 `pointer-events: none`（不能挡文字选择）
+   * → 点击的 `event.target` 是**文本层**，不是高亮元素
+   * → 必须像链接一样**按坐标命中**。
+   *
+   * ⚠️⚠️ **重叠时要选"最上面"的**（用户需求）。
+   *
+   * ```
+   *    aaaaaaa
+   *  bbbbbbbbbbb     ← 部分重叠（重叠部分 = c）
+   * ```
+   *
+   * → 点 a 的独有部分 → 选 **a** ✅
+   * → 点 b 的独有部分 → 选 **b** ✅
+   * → 点重叠部分 c → 选**在上面那个** ✅
+   * → 完全重叠 → 下面的永远选不到 ✅
+   *
+   * @param clientX 视口 X
+   * @param clientY 视口 Y
+   * @returns 命中的高亮元素；没命中返回 null
+   */
+  const findHighlightAtPoint = useCallback(
+    (clientX: number, clientY: number) => {
+      const container = containerRef.current;
+      if (!container) {
+        return null;
+      }
+
+      // ⚠️ **用统一的命中判定**（处理重叠）
+      const hit = pickHighlightAtPoint(clientX, clientY, collectHighlightRects());
+      if (!hit) {
+        return null;
+      }
+
+      const elements = container.querySelectorAll<HTMLElement>('[data-highlight-id]');
+      for (const el of elements) {
+        if (el.getAttribute('data-highlight-id') === hit.id) {
+          return el;
+        }
+      }
+      return null;
+    },
+    [collectHighlightRects],
+  );
 
   /**
    * 每页的**字形框表**（用来把选区裁剪成贴合文字）。
@@ -2079,10 +2152,6 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    */
   const handleHighlightContainerClick = useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
-      if (!onHighlightClick) {
-        return;
-      }
-
       /*
        * ⚠️ **如果这次点击是"选区的结果"，就不当点击高亮处理**。
        *
@@ -2098,7 +2167,34 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       const highlightEl =
         findHighlightAtPoint(event.clientX, event.clientY) ??
         target?.closest?.('[data-highlight-id]');
+
+      /*
+       * ⚠️⚠️ **点到空白处 → 取消选中**（用户反馈：
+       * "选中高亮部分再点击高亮外的地方 不能一次就取消选中状态
+       *  点击好多次才会取消选中状态"）。
+       *
+       * ### 之前为什么要点好几次
+       *
+       * → 点空白 → `highlightEl` 是 null → **直接 return**（什么都不做）❌
+       * → 浮层还开着 → 用户再点 → 还是 null → 再点 …
+       * → 要点很多次才"碰巧"关掉 ❌
+       *
+       * ### 现在的行为
+       *
+       * → 点空白 → **立刻**关掉高亮浮层 + 取消激活 ✅
+       * → 一次就取消 ✅
+       */
       if (!highlightEl) {
+        if (highlightPopover || activeHighlightId) {
+          event.preventDefault();
+          event.stopPropagation();
+          setHighlightPopover(null);
+          setActiveHighlightId(null);
+        }
+        return;
+      }
+
+      if (!onHighlightClick) {
         return;
       }
 
@@ -2115,7 +2211,58 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       event.stopPropagation();
       handleHighlightClick(highlight);
     },
-    [onHighlightClick, findHighlightAtPoint, highlights, handleHighlightClick],
+    [
+      onHighlightClick,
+      findHighlightAtPoint,
+      highlights,
+      handleHighlightClick,
+      highlightPopover,
+      activeHighlightId,
+    ],
+  );
+
+  /**
+   * **选区是否被已有高亮"完全覆盖"**。
+   *
+   * ⚠️ 用户需求："如果是全部重叠 则不能进行再次高亮，
+   *   各种操作还是在原有高亮进行"
+   *
+   * ### 判据
+   *
+   * → 选区的**文字**和某条高亮的**文字完全一样**
+   * → 且选区的**归一化位置**和那条高亮**完全重合**
+   *
+   * → 只是文字一样但位置不同（比如同一句话在别处）→ **不算** ✅
+   *
+   * @param text 选中的文字
+   * @returns 被完全覆盖则 true
+   */
+  const isFullyCoveredByExistingHighlight = useCallback(
+    (text: string): boolean => {
+      const trimmed = text.trim();
+      if (!trimmed || !currentSelection) {
+        return false;
+      }
+      const norm = currentSelection.norm;
+      return highlights.some((h) => {
+        if (h.selectedText.trim() !== trimmed) {
+          return false;
+        }
+        // 位置也要一样（归一化坐标）
+        const p = h.position;
+        if (!p) {
+          return false;
+        }
+        return (
+          p.pageNumber === norm.pageNumber &&
+          Math.abs(p.boundingRect.x1 - norm.boundingRect.x1) < 0.001 &&
+          Math.abs(p.boundingRect.y1 - norm.boundingRect.y1) < 0.001 &&
+          Math.abs(p.boundingRect.x2 - norm.boundingRect.x2) < 0.001 &&
+          Math.abs(p.boundingRect.y2 - norm.boundingRect.y2) < 0.001
+        );
+      });
+    },
+    [highlights, currentSelection],
   );
 
   /**
@@ -2146,6 +2293,22 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
            *
            * → 包自己清选区（不用宿主再通知一次）。
            */
+          /*
+           * ⚠️⚠️ **完全重叠 → 不允许再次高亮**（用户需求）。
+           *
+           * > "如果是全部重叠 则不能进行再次高亮，各种操作还是在原有高亮进行"
+           *
+           * → 新选区和某条已有高亮**完全重合** → 跳过（不新建）✅
+           * → 操作仍然在**原有高亮**上进行 ✅
+           *
+           * → **部分重叠**是允许的（用户要的就是这个场景）✅
+           */
+          if (isFullyCoveredByExistingHighlight(ctx.text)) {
+            toast.info(t('highlight.fullyCovered'));
+            clearSelectionAfterHighlight();
+            return;
+          }
+
           onHighlight?.({ ...ctx, color: pickedColor ?? undefined });
           // 包自己清选区（"清选区"是 UI 行为，属于包）
           clearSelectionAfterHighlight();
@@ -2260,6 +2423,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     toast.success,
     toast.error,
     t,
+    toast.info,
+    isFullyCoveredByExistingHighlight,
   ]);
 
   /** 合并后的动作列表（宿主覆盖 + 追加） */

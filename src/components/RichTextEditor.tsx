@@ -149,7 +149,15 @@ export function RichTextEditor(props: RichTextEditorProps) {
   // 自动聚焦
   useEffect(() => {
     if (autoFocus) {
-      editorRef.current?.focus();
+      /*
+       * ⚠️⚠️ **必须用 `focus({ preventScroll: true })`**（用户反馈：
+       * "编辑批注的时候现在页面会自动滚到最上方 还定位在原来的地方不要动页面啊"）。
+       *
+       * → 普通的 `focus()` 会让浏览器**把元素滚动到可视区**
+       * → 编辑器在"页面中间偏右" → 浏览器会滚动容器 → **页面跳走** ❌
+       * → `preventScroll: true` → **只聚焦，不滚动** ✅
+       */
+      editorRef.current?.focus({ preventScroll: true });
     }
   }, [autoFocus]);
 
@@ -173,7 +181,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
         return;
       }
       // ⚠️ **必须先聚焦编辑区** → 否则 execCommand 作用在错误的位置
-      el.focus();
+      // ⚠️ `preventScroll: true` → 点了工具栏**不要滚动页面**（用户反馈）
+      el.focus({ preventScroll: true });
       execRichTextCommand(command, commandValue);
       emit();
     },
