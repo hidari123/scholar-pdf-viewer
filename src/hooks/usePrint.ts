@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   computePrintScale,
+  computePrintScaleForRender,
   DEFAULT_PRINT_MARGIN,
   PAPER_SIZES,
   type PaperSize,
@@ -40,6 +41,12 @@ export interface UsePrintOptions {
   margin?: Partial<PrintMargin>;
   /** 目标元素（默认找 `.scpdf-root`） */
   root?: HTMLElement | null;
+  /**
+   * **页数**。
+   *
+   * ⚠️ 用来在"页数变化"时重算每页的高度（打印 CSS 依赖它）。
+   */
+  pageCount?: number;
   /** 打印完的回调 */
   onAfterPrint?: () => void;
 }
@@ -59,13 +66,10 @@ export interface UsePrintResult {
  * @returns 打印函数 + 准备状态
  */
 export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
-  const { pageSizePt, paper = 'A4', margin, root, onAfterPrint } = options;
+  const { pageSizePt, paper = 'A4', margin, root, pageCount, onAfterPrint } = options;
 
   /** 正在准备 */
   const [preparing, setPreparing] = useState(false);
-
-  /** 恢复用的旧值 */
-  const restoreRef = useRef<{ scale: string; page: string } | null>(null);
 
   /**
    * ⚠️ **把 margin 拆成 4 个 number**（避免每次渲染都是新对象）。
@@ -89,6 +93,163 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
     onAfterPrintRef.current = onAfterPrint;
   }, [onAfterPrint]);
 
+  /*
+   * ⚠️ **打印用的 CSS 变量要"一直"在**（不是只在点打印按钮时才写）。
+   *
+   * ### 为什么要一直写（用户反馈"目前的打印预览效果还是不对"）
+   *
+   * 打印 CSS 依赖两个变量：
+   * ```
+   * --scpdf-print-scale        ← 页面按纸张的缩放
+   * --scpdf-print-page-height  ← 每页的原高度（用来把布局盒也缩掉）
+   * ```
+   *
+   * → 之前**只在 `print()` 里写**（点工具栏的打印按钮）
+   * → 但用户按 **Ctrl+P**（浏览器的打印预览）**不会走 `print()`**
+   * → 变量是空的 → `scale(1)` + `height: 0`
+   * → **打印预览里页被裁掉 / 消失** ❌（用户看到的就是这个）
+   *
+   * ### 修法
+   *
+   * **用一个 effect 把变量一直写好**（页尺寸变化时更新）：
+   * → 任何打印路径（按钮 / Ctrl+P / 宿主自己的按钮）都能拿到正确的缩放 ✅
+   *
+   * ⚠️ 打印**结束后**不用恢复（因为它本来就该是"打印时的正确值"）
+   *    → 屏幕上的显示**不受影响**（这些变量只在 `@media print` 里用）。
+   */
+  useEffect(() => {
+    const target = root ?? document.querySelector<HTMLElement>('.scpdf-root');
+    if (!target) {
+      return;
+    }
+
+    const paperSize = typeof paper === 'string' ? PAPER_SIZES[paper] : paper;
+    const fullMargin: PrintMargin = {
+      top: marginTop,
+      right: marginRight,
+      bottom: marginBottom,
+      left: marginLeft,
+    };
+
+    /*
+     * ⚠️⚠️ **缩放要按"渲染后的像素尺寸"算**（实测踩过的坑）。
+     *
+     * ```
+     * 屏幕上的页: 1408 × 1821.6 px   ← "适合宽度"的缩放（2.3×）
+     * A4 可打印区: 703 × 1032 px
+     *
+     * 旧做法（物理比例 0.861）: 1213 × 1569 px = 322 × 415 mm
+     *   → 远超 A4 → **18 页的 PDF 打印成 36 页**（每页溢出到第二张纸）❌
+     *
+     * 正确做法: min(703/1408, 1032/1821.6) = 0.499
+     *   → 703 × 909 px = 186 × 240 mm → **正好落在 A4 可打印区里** ✅
+     */
+    const applyPrintScale = () => {
+      const firstPage = target.querySelector<HTMLElement>('.scpdf-page');
+      if (!firstPage) {
+        // 还没有页 → 先用物理比例兜底（页渲染出来后会再算）
+        const fallback = pageSizePt ? computePrintScale(pageSizePt, paperSize, fullMargin) : 1;
+        target.style.setProperty('--scpdf-print-scale', String(fallback));
+        return;
+      }
+
+      // ⚠️ 用**内联**的宽高（不受打印 CSS 的 `calc()` 影响）
+      const rawWidth = Number.parseFloat(firstPage.style.width);
+      const rawHeight = Number.parseFloat(firstPage.style.height);
+      const renderedWidth =
+        Number.isFinite(rawWidth) && rawWidth > 0 ? rawWidth : firstPage.offsetWidth;
+      const renderedHeight =
+        Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : firstPage.offsetHeight;
+
+      const scale = computePrintScaleForRender(
+        { width: renderedWidth, height: renderedHeight },
+        paperSize,
+        fullMargin,
+      );
+      target.style.setProperty('--scpdf-print-scale', String(scale));
+    };
+
+    applyPrintScale();
+
+    /*
+     * ⚠️ **逐页写高度**（历史遗留的变量）。
+     *
+     * ⚠️ 现在打印 CSS 用的是 **`zoom`**（同时改布局盒和视觉）
+     *    → 不再**必须**有 `--scpdf-print-page-height` / `--scpdf-print-page-width`
+     *    → 但**保留写入**（万一宿主的 CSS 依赖它们）。
+     *
+     * ⚠️ **页可能还没渲染出来**（首帧 / 虚拟滚动）
+     * → 用 `ResizeObserver` 盯着第一页 → 尺寸变了就重算。
+     */
+    const applyPageHeights = () => {
+      const pages = target.querySelectorAll<HTMLElement>('.scpdf-page');
+      for (const pageEl of pages) {
+        /*
+         * ⚠️⚠️ **必须量"未缩放"的高度**（实测踩过的坑）。
+         *
+         * ```
+         * 用 getBoundingClientRect().height:
+         *   → 打印态下 height 已经被 `calc(原高 × scale)` 缩过了
+         *   → 量到 0.013px → 再写回变量 → 下一帧更小 → **高度塌成 0** ❌
+         *   → 页全部消失
+         * ```
+         *
+         * → **用内联的 `style.height`**（那才是"原始高度"，不受打印 CSS 影响）。
+         * → 拿不到就退回 `offsetHeight`（也是布局盒高度，不含 transform）。
+         */
+        const rawHeight = Number.parseFloat(pageEl.style.height);
+        const height =
+          Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : pageEl.offsetHeight;
+
+        if (height > 0) {
+          pageEl.style.setProperty('--scpdf-print-page-height', `${height}px`);
+        }
+
+        /*
+         * ⚠️ **宽度也要写**（打印时按纸张缩放）。
+         *
+         * → 同样要用**内联**的宽度（不受打印 CSS 影响）。
+         */
+        const rawWidth = Number.parseFloat(pageEl.style.width);
+        const width = Number.isFinite(rawWidth) && rawWidth > 0 ? rawWidth : pageEl.offsetWidth;
+
+        if (width > 0) {
+          pageEl.style.setProperty('--scpdf-print-page-width', `${width}px`);
+        }
+      }
+      // ⚠️ **页数对不上 → 再等下一帧**（页可能正在渲染）
+      // → `pageCount` 是宿主给的页数（用来触发这个 effect 重跑）
+      if (pageCount !== undefined && pages.length !== pageCount) {
+        requestAnimationFrame(() => {
+          applyPageHeights();
+        });
+      }
+    };
+
+    applyPageHeights();
+
+    const firstPage = target.querySelector<HTMLElement>('.scpdf-page');
+    if (!firstPage || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    /*
+     * ⚠️ **页的尺寸变了 → 缩放也要重算**。
+     *
+     * → 用户改缩放 / 窗口大小变 → 渲染像素变了 → 打印缩放跟着变。
+     */
+    const observer = new ResizeObserver(() => {
+      applyPrintScale();
+      applyPageHeights();
+    });
+    observer.observe(firstPage);
+
+    return () => {
+      observer.disconnect();
+    };
+    // ⚠️ `pageCount` 在依赖里 → 页数变了 → 重新写每页的高度
+  }, [pageSizePt, paper, marginTop, marginRight, marginBottom, marginLeft, root, pageCount]);
+
   const print = useCallback(() => {
     const target = root ?? document.querySelector<HTMLElement>('.scpdf-root');
     if (!target) {
@@ -104,35 +265,60 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
       left: marginLeft,
     };
 
-    // 算打印缩放（按纸张）
-    const scale = pageSizePt ? computePrintScale(pageSizePt, paperSize, fullMargin) : 1;
-
-    // 记住旧值（打印完要恢复）
-    restoreRef.current = {
-      scale: target.style.getPropertyValue('--scpdf-print-scale'),
-      page: target.style.getPropertyValue('--scpdf-print-page-height'),
-    };
-
-    target.style.setProperty('--scpdf-print-scale', String(scale));
+    const pages = target.querySelectorAll<HTMLElement>('.scpdf-page');
 
     /*
-     * ⚠️ **写每页的高度**（配合打印 CSS 的 `height: calc(...)`）。
+     * ⚠️⚠️ **缩放要按"渲染后的像素尺寸"算**（实测踩过的坑）。
      *
-     * 打印时页要：
-     * 1. 绝对定位 → 静态流（否则重叠 / 丢页）
-     * 2. 按纸张缩放 → 但 `transform: scale()` **不改变布局盒**
-     *    → 页在流里仍占**原高度** → 每页后面多一截空白 → **空白页**
+     * ```
+     * 屏幕上的页: 1408 × 1821.6 px   ← "适合宽度"的缩放（2.3×）
+     * A4 可打印区: 703 × 1032 px
      *
-     * → 所以要把 `height` 也缩掉 → 需要知道"原高度" → 写进 CSS 变量。
+     * 旧做法（物理比例 0.861）: 1213 × 1569 px = 322 × 415 mm
+     *   → 远超 A4 → **18 页的 PDF 打印成 36 页**（每页溢出到第二张纸）❌
      *
-     * ⚠️ 所有页的高度一样吗？**不一定**（PDF 每页可以不同尺寸）
-     *    → 所以要**逐页写**（用 `--scpdf-print-page-height` + 页的 index）。
+     * 正确做法: min(703/1408, 1032/1821.6) = 0.499
+     *   → 703 × 909 px = 186 × 240 mm → **正好落在 A4 可打印区里** ✅
      */
-    const pages = target.querySelectorAll<HTMLElement>('.scpdf-page');
+    const firstPage = pages[0];
+    if (firstPage) {
+      // ⚠️ 用**内联**的宽高（不受打印 CSS 的 `calc()` 影响）
+      const rawWidth = Number.parseFloat(firstPage.style.width);
+      const rawHeight = Number.parseFloat(firstPage.style.height);
+      const renderedWidth =
+        Number.isFinite(rawWidth) && rawWidth > 0 ? rawWidth : firstPage.offsetWidth;
+      const renderedHeight =
+        Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : firstPage.offsetHeight;
+
+      const scale = computePrintScaleForRender(
+        { width: renderedWidth, height: renderedHeight },
+        paperSize,
+        fullMargin,
+      );
+      target.style.setProperty('--scpdf-print-scale', String(scale));
+    } else {
+      // 还没有页 → 用物理比例兜底
+      const fallback = pageSizePt ? computePrintScale(pageSizePt, paperSize, fullMargin) : 1;
+      target.style.setProperty('--scpdf-print-scale', String(fallback));
+    }
+
+    /*
+     * ⚠️ **写每页的宽高**（配合打印 CSS 的 `height/width: calc(...)`）。
+     *
+     * ⚠️ 所有页的尺寸一样吗？**不一定**（PDF 每页可以不同尺寸）
+     *    → 所以要**逐页写**（写在页元素上）。
+     */
     for (const pageEl of pages) {
-      const height = pageEl.getBoundingClientRect().height;
+      // ⚠️ 用**内联**的宽高（不受打印 CSS 的 `calc()` 影响）
+      const rawHeight = Number.parseFloat(pageEl.style.height);
+      const height = Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : pageEl.offsetHeight;
       if (height > 0) {
         pageEl.style.setProperty('--scpdf-print-page-height', `${height}px`);
+      }
+      const rawWidth = Number.parseFloat(pageEl.style.width);
+      const width = Number.isFinite(rawWidth) && rawWidth > 0 ? rawWidth : pageEl.offsetWidth;
+      if (width > 0) {
+        pageEl.style.setProperty('--scpdf-print-page-width', `${width}px`);
       }
     }
 
@@ -152,10 +338,18 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
         globalThis.print?.();
 
         /*
-         * ⚠️ **恢复只能执行一次**（实测踩过的坑）。
+         * ⚠️⚠️ **不要恢复打印变量**（实测踩过的坑，用户反馈"打印预览效果还是不对"）。
          *
-         * 两条恢复路径：`afterprint` 事件 + `setTimeout` 兜底
-         * → 谁先触发都行 → **但只能恢复一次**（否则 `onAfterPrint` 会调两次）。
+         * ```
+         * 旧行为: 打印完 → removeProperty('--scpdf-print-scale')
+         *        → 变量没了 → **再按 Ctrl+P 就是坏的**
+         * ```
+         *
+         * → 现在变量由 **effect 一直维护**（见上面）
+         * → 打印变量只在 `@media print` 里用 → **屏幕显示不受影响**
+         * → 所以**不需要恢复**。
+         *
+         * ⚠️ 只保留 `onAfterPrint` 的回调（宿主可能要刷新统计等）。
          */
         let restored = false;
         const restore = () => {
@@ -163,27 +357,6 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
             return;
           }
           restored = true;
-
-          const saved = restoreRef.current;
-          if (saved) {
-            if (saved.scale) {
-              target.style.setProperty('--scpdf-print-scale', saved.scale);
-            } else {
-              target.style.removeProperty('--scpdf-print-scale');
-            }
-            if (saved.page) {
-              target.style.setProperty('--scpdf-print-page-height', saved.page);
-            } else {
-              target.style.removeProperty('--scpdf-print-page-height');
-            }
-          }
-          restoreRef.current = null;
-
-          // 逐页清掉高度变量
-          for (const pageEl of pages) {
-            pageEl.style.removeProperty('--scpdf-print-page-height');
-          }
-
           onAfterPrintRef.current?.();
         };
 

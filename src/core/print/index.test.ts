@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   computePrintPageSize,
   computePrintScale,
+  computePrintScaleForRender,
   DEFAULT_PRINT_MARGIN,
   MM_TO_PX,
   PAPER_SIZES,
@@ -82,6 +83,71 @@ describe('computePrintPageSize', () => {
     expect(size.width).toBeCloseTo(186 * MM_TO_PX, 1);
     // 297 - 12 - 12 = 273 mm
     expect(size.height).toBeCloseTo(273 * MM_TO_PX, 1);
+  });
+});
+
+describe('computePrintScaleForRender', () => {
+  /*
+   * ⚠️ **实测数据**（真实 arXiv PDF，18 页）。
+   *
+   * ```
+   * 屏幕上的页: 1407.6 × 1821.6 px   ← "适合宽度"的缩放（2.3×）
+   * A4 可打印区: (210-24) × (297-24) mm = 186 × 273 mm = 703 × 1032 px
+   * ```
+   */
+  const rendered = { width: 1407.6, height: 1821.6 };
+
+  it('**按"渲染后的像素"算缩放**（实测 0.499）', () => {
+    const scale = computePrintScaleForRender(rendered, PAPER_SIZES.A4);
+
+    // min(703/1407.6, 1032/1821.6) = min(0.4994, 0.5665) = 0.4994
+    expect(scale).toBeCloseTo(0.4994, 3);
+  });
+
+  it('**缩完正好落在 A4 可打印区里**（不会溢出到第二张纸）', () => {
+    const a4 = PAPER_SIZES.A4;
+    if (!a4) {
+      throw new Error('没有 A4 纸张规格');
+    }
+    const scale = computePrintScaleForRender(rendered, a4);
+    const printableWidthPx = (a4.width - 24) * MM_TO_PX;
+    const printableHeightPx = (a4.height - 24) * MM_TO_PX;
+
+    expect(rendered.width * scale).toBeLessThanOrEqual(printableWidthPx + 1);
+    expect(rendered.height * scale).toBeLessThanOrEqual(printableHeightPx + 1);
+  });
+
+  it('⚠️ **和"物理比例"不同**（别用错函数）', () => {
+    const a4 = PAPER_SIZES.A4;
+    if (!a4) {
+      throw new Error('没有 A4 纸张规格');
+    }
+    // 物理比例：216mm 的页放到 186mm 的可打印区 → 0.861
+    const physical = computePrintScale({ width: 612, height: 792 }, a4);
+    const forRender = computePrintScaleForRender(rendered, a4);
+
+    expect(physical).toBeCloseTo(0.8615, 3);
+    expect(forRender).toBeCloseTo(0.499, 3);
+    // ⚠️ 用物理比例去缩屏幕像素 → **会溢出**（实测 18 页印成 33 页）
+    expect(rendered.width * physical).toBeGreaterThan((a4.width - 24) * MM_TO_PX);
+  });
+
+  it('**不放大超过 1 倍**', () => {
+    const scale = computePrintScaleForRender({ width: 100, height: 100 }, PAPER_SIZES.A4);
+
+    expect(scale).toBeLessThanOrEqual(1);
+  });
+
+  it('**尺寸无效 → 1**', () => {
+    expect(computePrintScaleForRender({ width: 0, height: 0 })).toBe(1);
+    expect(computePrintScaleForRender({ width: -1, height: 100 })).toBe(1);
+  });
+
+  it('**A3 纸 → 缩放更大**（纸更大 → 缩得更少）', () => {
+    const a4 = computePrintScaleForRender(rendered, PAPER_SIZES.A4);
+    const a3 = computePrintScaleForRender(rendered, PAPER_SIZES.A3);
+
+    expect(a3).toBeGreaterThan(a4);
   });
 });
 

@@ -1083,9 +1083,36 @@
   }
 
   .scpdf-pages {
-    height: auto;
+    /*
+     * ⚠️⚠️ **必须 `!important`**（实测踩过的坑，用户反馈"打印预览效果还是不对"）。
+     *
+     * `.scpdf-pages` 的高度是**内联样式**（`style={{ height: pageTops.at(-1) }}`）
+     * → 内联样式**盖过**普通 CSS 规则 → `height: auto` **没生效** ❌
+     * → 容器仍占 **33093px**（18 页的**未缩放**总高）
+     * → 打印机按 1033px 一页切 → **18 页印成 33 页**（大半是空白）❌
+     *
+     * → 必须 `!important` 才能让高度回到"由内容决定"。
+     */
+    height: auto !important;
     display: block;
     margin: 0;
+
+    /*
+     * ⚠️⚠️ **缩放必须加在"容器"上，不能加在"页"上**（实测踩过的坑）。
+     *
+     * ```
+     * zoom 加在 .scpdf-page 上:
+     *   → 页的布局盒 = 1408 × 0.5 = 703px
+     *   → 但 canvas 是页的**后代** → 又被继承了一次 zoom
+     *   → canvas = 1408 × 0.5 × 0.5 = 351px？实测反了：
+     *      页 351px / canvas 703px  → **canvas 比页还宽** → 右边被裁掉 ❌
+     *
+     * zoom 加在 .scpdf-pages 上:
+     *   → 整个内容树只缩一次 ✅
+     *   → 页 = 1408 × 0.5 = 703px，canvas 也 = 703px ✅
+     * ```
+     */
+    zoom: var(--scpdf-print-scale, 1);
   }
 
   /* ---------- 每页一张纸 ---------- */
@@ -1128,41 +1155,9 @@
     break-inside: avoid;
     page-break-inside: avoid;
     /*
-     * ⚠️ **按纸张缩放**（`--scpdf-print-scale` 由 JS 在打印前算好）。
-     *
-     * 屏幕上缩放是"适合窗口"，打印时必须"适合**纸张**"
-     * → 不算的话要么超出纸张被裁掉，要么缩得极小。
-     *
-     * ⚠️ `transform-origin: top left` + `transform: scale()`
-     *    → 页的左上角对齐纸张左上角。
-     *
-     * ⚠️ **`transform` 不改变布局盒** → 缩小后页在流里仍占原高度
-     *    → 每页后面会多出一截空白 → **用负 margin 把它收回来**。
-     *
-     *    负 margin 的量 = `(原高 - 缩放后高) = 原高 × (1 - scale)`
-     *    → `margin-bottom: calc(-1 * (1 - scale) * 100%)`？
-     *    → 不行：`margin` 的百分比是**相对宽度**的，不是高度。
-     *    → 正确做法：用 `height` 一起缩（见下）。
+     * ⚠️ **缩放在 `.scpdf-pages` 上做**（见上面的说明）。
+     * → 这里**不要**再写 `zoom` / `transform`（会缩两次）。
      */
-    transform: scale(var(--scpdf-print-scale, 1));
-    transform-origin: top left;
-  }
-
-  /*
-   * ⚠️ **`transform: scale()` 不改变布局盒** → 缩小后页在流里仍占原高度
-   * → 每页后面多出一截空白 → 打印出来是"一页纸 + 一页空白"（实测）。
-   *
-   * → 解法：**同时把 `height` 缩掉**（`height` 是内联样式 → 要 `!important` 覆盖）。
-   *
-   * ```css
-   * height: calc(var(--scpdf-page-height, 0) * var(--scpdf-print-scale, 1));
-   * ```
-   *
-   * ⚠️ `--scpdf-page-height` 由 JS 在打印前按页写好（见 `usePrint` / PdfViewer 的 onPrint）。
-   *    没写（0）时 → `height: 0` → **页不见了** → 所以要有兜底。
-   */
-  .scpdf-page {
-    height: calc(var(--scpdf-page-height, 100%) * var(--scpdf-print-scale, 1));
   }
 
   /* 最后一页：不要多余的空白页 + 不要间距 */

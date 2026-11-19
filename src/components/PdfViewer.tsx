@@ -957,6 +957,12 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   const { print: printDocument } = usePrint({
     pageSizePt: pageSizesPt[0],
     paper: 'A4',
+    /*
+     * ⚠️ **传页数** → 打印用的 CSS 变量会**一直**保持正确
+     * → 用户按 **Ctrl+P**（不经过我们的按钮）也能得到正确的缩放
+     * → 修掉"打印预览效果不对"（用户反馈）。
+     */
+    pageCount: pageSizesPt.length,
   });
 
   /**

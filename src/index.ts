@@ -66,6 +66,7 @@ export type { PaperSize, PrintMargin } from './core/print';
 export {
   computePrintPageSize,
   computePrintScale,
+  computePrintScaleForRender,
   DEFAULT_PRINT_MARGIN,
   MM_TO_PX,
   PAPER_SIZES,
