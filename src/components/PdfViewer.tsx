@@ -74,6 +74,8 @@ import { PasswordDialog } from './PasswordDialog';
 import { SearchPanel } from './SearchPanel';
 import { SelectionPopover } from './SelectionPopover';
 import { ThumbnailPanel } from './ThumbnailPanel';
+import type { ToastContent, ToastController } from './Toast';
+import { Toast, useToastController } from './Toast';
 import type { ToolbarConfig } from './Toolbar';
 import { Toolbar } from './Toolbar';
 
@@ -230,6 +232,15 @@ export interface PdfViewerProps {
    * → **不用写全** → 缺的自动回退到内置文案
    */
   locales?: LocaleTable;
+  /**
+   * **toast 提示**（宿主接管）。
+   *
+   * ⚠️ 用户需求："需要设计一套toast 失败成功这种 具体照着antd设计"
+   *
+   * → 包**内置**一套（antd 风格）→ 宿主不干预也能用 ✅
+   * → 宿主传了 `onToast` → **完全接管**（用自己的 toast 组件）✅
+   */
+  onToast?: (toast: ToastController) => void;
   /**
    * **统一配置对象**（"万物可配置"）。
    *
@@ -543,6 +554,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onAnnotationChange,
     onAnnotationSave,
     onAnnotationCreate,
+    onToast,
     onAnnotationDelete,
     onHighlightColorChange,
     onHighlightCopy,
@@ -651,6 +663,22 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * → 提交时直接丢给 `onHighlight` → 宿主拿到的和高亮按钮**完全一致** ✅
    */
   const [pendingNote, setPendingNote] = useState<SelectionActionContext | null>(null);
+
+  /*
+   * **toast**（antd 风格）。
+   *
+   * → 包内置一套 → 宿主不干预也能用 ✅
+   * → 宿主传 `onToast` → **完全接管** ✅
+   */
+  const [toastItems, setToastItems] = useState<ToastContent[]>([]);
+  const toast = useToastController(setToastItems, merged.locale, merged.locales, merged.messages);
+
+  // 宿主接管 → 把控制器交给它（宿主自己决定怎么弹）
+  useEffect(() => {
+    if (onToast) {
+      onToast(toast);
+    }
+  }, [onToast, toast]);
 
   /** 当前激活的搜索命中下标 */
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
@@ -2134,8 +2162,25 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
             onCopy(ctx);
             return;
           }
-          // 内置实现：写剪贴板（失败不打扰用户）
-          void navigator.clipboard?.writeText(ctx.text).catch(() => undefined);
+          /*
+           * 内置实现：写剪贴板 + **toast 提示**。
+           *
+           * ⚠️ 用户需求："复制之后需要toast提示用户复制成功"
+           */
+          const text = ctx.text;
+          const clipboard = navigator.clipboard;
+          if (!clipboard?.writeText) {
+            toast.error(t('toast.copyFailed'));
+            return;
+          }
+          void clipboard.writeText(text).then(
+            () => {
+              toast.success(t('toast.copied'));
+            },
+            () => {
+              toast.error(t('toast.copyFailed'));
+            },
+          );
         },
       },
     ];
@@ -2212,6 +2257,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
      */
     onHighlight,
     clearSelectionAfterHighlight,
+    toast.success,
+    toast.error,
+    t,
   ]);
 
   /** 合并后的动作列表（宿主覆盖 + 追加） */
@@ -3158,6 +3206,24 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
             ⚠️ **懒加载**（`Suspense`）→ 不打开批注就不加载这 1.5 kB
           */}
+          {/*
+            **toast**（antd 风格）。
+
+            ⚠️ 宿主传了 `onToast` → **完全接管** → 包不渲染自己的 ✅
+          */}
+          {onToast ? null : (
+            <Toast
+              items={toastItems}
+              onClose={(key) => {
+                toast.close(key);
+              }}
+              icons={merged.icons}
+              locale={merged.locale ?? 'zh'}
+              locales={merged.locales}
+              messages={merged.messages}
+            />
+          )}
+
           {/*
             **写批注的富文本弹窗**（替代 `window.prompt`）。
             → 用户需求："写批注的时候不要用系统默认的alert，

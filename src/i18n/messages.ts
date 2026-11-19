@@ -98,6 +98,12 @@ export interface Messages {
   'annotation.placeholder': string;
   'annotation.pick': string;
   'annotation.new': string;
+  'toast.region': string;
+  'toast.close': string;
+  'toast.copied': string;
+  'toast.copyFailed': string;
+  'toast.exportSuccess': string;
+  'toast.exportFailed': string;
   'selection.addNote': string;
   /* —— 富文本工具栏 —— */
   'richtext.bold': string;
@@ -182,6 +188,12 @@ export const ZH_MESSAGES: Messages = {
   'annotation.placeholder': '写点什么…',
   'annotation.pick': '选择批注（{count}）',
   'annotation.new': '新建批注',
+  'toast.region': '通知',
+  'toast.close': '关闭',
+  'toast.copied': '已复制到剪贴板',
+  'toast.copyFailed': '复制失败，请手动复制',
+  'toast.exportSuccess': '导出成功',
+  'toast.exportFailed': '导出失败',
   'selection.addNote': '加批注',
   'richtext.bold': '加粗',
   'richtext.italic': '斜体',
@@ -242,6 +254,12 @@ export const EN_MESSAGES: Messages = {
   'annotation.placeholder': 'Write something…',
   'annotation.pick': 'Select annotation ({count})',
   'annotation.new': 'New annotation',
+  'toast.region': 'Notifications',
+  'toast.close': 'Close',
+  'toast.copied': 'Copied to clipboard',
+  'toast.copyFailed': 'Copy failed, please copy manually',
+  'toast.exportSuccess': 'Exported successfully',
+  'toast.exportFailed': 'Export failed',
   'selection.addNote': 'Add note',
   'richtext.bold': 'Bold',
   'richtext.italic': 'Italic',

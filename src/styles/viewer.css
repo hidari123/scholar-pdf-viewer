@@ -748,6 +748,145 @@
   }
 }
 
+/* ---------- Toast（照着 antd 的设计） ---------- */
+
+/*
+ * ⚠️ **antd 的关键设计**（用户要求"照着antd设计"）：
+ * → 顶部居中，浮在内容上方
+ * → 图标 + 文案 + 描述 + 操作按钮 + 关闭按钮
+ * → 多个 toast **堆叠**（新的在下面）
+ * → 淡入 + 轻微上移
+ * → 3 秒自动消失
+ */
+
+.scpdf-toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.scpdf-toast__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--scpdf-border, #d9dde3);
+  background: var(--scpdf-surface, #fff);
+  color: var(--scpdf-text, #1f2933);
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 6px 20px rgb(15 23 42 / 14%);
+  pointer-events: auto;
+  animation: scpdf-toast-in 200ms ease-out;
+}
+
+.scpdf-toast__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--scpdf-accent, #2f6feb);
+}
+
+.scpdf-toast__icon--spin {
+  animation: scpdf-toast-spin 900ms linear infinite;
+}
+
+.scpdf-toast__item--success .scpdf-toast__icon {
+  background: #22a06b;
+}
+
+.scpdf-toast__item--error .scpdf-toast__icon {
+  background: #d4380d;
+}
+
+.scpdf-toast__item--warning .scpdf-toast__icon {
+  background: #d89614;
+}
+
+.scpdf-toast__item--info .scpdf-toast__icon {
+  background: var(--scpdf-accent, #2f6feb);
+}
+
+.scpdf-toast__item--loading .scpdf-toast__icon {
+  background: var(--scpdf-text-muted, #6b7280);
+}
+
+.scpdf-toast__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.scpdf-toast__message {
+  font-weight: 500;
+}
+
+.scpdf-toast__description {
+  color: var(--scpdf-text-muted, #6b7280);
+  font-size: 12px;
+}
+
+.scpdf-toast__action {
+  flex: none;
+  margin-left: 4px;
+}
+
+.scpdf-toast__close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--scpdf-text-muted, #6b7280);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.scpdf-toast__close:hover {
+  background: var(--scpdf-surface-alt, #f7f8fa);
+}
+
+@keyframes scpdf-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scpdf-toast-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ---------- 富文本编辑器 ---------- */
 
 .scpdf-rich-text {
