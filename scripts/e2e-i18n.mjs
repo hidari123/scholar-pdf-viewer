@@ -105,9 +105,18 @@ try {
 
     const jaLabels = await readToolbarLabels();
     check(
-      '**宿主 JSON 注册的日语生效**',
-      jaLabels.includes('サムネイル') && jaLabels.includes('目次'),
+      '**日语生效（内置的语言表）**',
+      jaLabels.includes('目次'),
       jaLabels.slice(0, 4).join(' / '),
+    );
+    /*
+     * ⚠️ **宿主的覆盖优先于内置**。
+     * -> demo 覆盖了 `thumbnails.title` -> "ページ一覧"（不是内置的 "ページ"）
+     */
+    check(
+      "**宿主的文案覆盖内置的（'ページ一覧'）**",
+      jaLabels.includes('ページ一覧'),
+      jaLabels.slice(0, 6).join(' / '),
     );
 
     // ④ 宿主语言没写全 → 回退到内置（英文）

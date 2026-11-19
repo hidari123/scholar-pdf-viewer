@@ -84,48 +84,94 @@ async function searchAndVerify(keyword) {
      * → 按**字符比例**算出"命中在这个 span 的哪个字符开始"
      * → 检查那几个字符是不是关键词
      */
+    /*
+     * 对每个高亮矩形：
+     * -> 找到它**落在哪个 span 上**
+     * -> 用 **Range** 逐字符量"高亮框盖住了哪些字符"
+     * -> 检查那些字符是不是关键词的一部分
+     *
+     * ⚠️⚠️ **不能用"字符比例"算**（实测踩过的坑）：
+     * -> 比例字体里每个字符宽度不一样 ❌
+     * -> 用比例算出来的位置是**错的** -> 会误判 ❌
+     * -> 必须用 **Range.getBoundingClientRect()** 逐字符量 ✅
+     *
+     * ⚠️ **也不能只看"重叠面积最大的那个 span"**：
+     * -> 高亮框可能横跨多个 span；也可能和别的 span 有重叠
+     * -> 要在**整页所有 span** 里找"离高亮框最近"的那次出现 ✅
+     */
     const checked = rects.map((rect) => {
-      let best = null;
-      let bestOverlap = 0;
-
+      // 在整页里找关键词的所有出现位置
+      const nodes = [];
+      let pageText = '';
       for (const span of spans) {
-        const sr = span.getBoundingClientRect();
-        const ox = Math.min(rect.right, sr.right) - Math.max(rect.left, sr.left);
-        const oy = Math.min(rect.bottom, sr.bottom) - Math.max(rect.top, sr.top);
-        if (ox <= 0 || oy <= 0) continue;
-        const overlap = ox * oy;
-        if (overlap > bestOverlap) {
-          bestOverlap = overlap;
-          best = span;
+        const n = span.firstChild;
+        if (n?.nodeType !== 3) continue;
+        nodes.push(n);
+        pageText += n.textContent ?? '';
+      }
+      const pageLower = pageText.toLowerCase();
+      const positions = [];
+      let from = 0;
+      while (true) {
+        const at = pageLower.indexOf(kw.toLowerCase(), from);
+        if (at < 0) break;
+        positions.push(at);
+        from = at + 1;
+      }
+      if (positions.length === 0) {
+        return { ok: false, reason: '整页都没找到关键词', text: '' };
+      }
+
+      // 每个 span 的字符区间
+      const ranges = [];
+      let cursor = 0;
+      for (const n of nodes) {
+        const len = (n.textContent ?? '').length;
+        ranges.push({ node: n, start: cursor, end: cursor + len });
+        cursor += len;
+      }
+
+      // 量拼接文本某个区间对应的真实矩形
+      const rectOf = (start2, end2) => {
+        const r = document.createRange();
+        let ok = false;
+        for (const nr of ranges) {
+          const f = Math.max(start2, nr.start);
+          const t = Math.min(end2, nr.end);
+          if (t <= f) continue;
+          r.setStart(nr.node, f - nr.start);
+          r.setEnd(nr.node, t - nr.start);
+          ok = true;
+        }
+        if (!ok) return null;
+        const out = r.getBoundingClientRect();
+        r.detach?.();
+        return out.width > 0 ? out : null;
+      };
+
+      // 找**离高亮框最近**的那次出现
+      let real = null;
+      let bestDist = Infinity;
+      for (const at of positions) {
+        const r = rectOf(at, at + kw.length);
+        if (!r) continue;
+        const dist = Math.abs(r.left - rect.left);
+        if (dist < bestDist) {
+          bestDist = dist;
+          real = r;
         }
       }
-
-      if (!best) {
-        return { ok: false, reason: '找不到对应的文字', text: '' };
+      if (!real) {
+        return { ok: false, reason: '量不到关键词位置', text: '' };
       }
 
-      const sr = best.getBoundingClientRect();
-      const text = best.textContent ?? '';
-
-      /*
-       * ⚠️ **按比例**算字符位置。
-       *
-       * → 高亮矩形可能是 span 的一部分（关键词在中间）
-       * → 用 "高亮左边界在 span 里的相对位置" × 文本长度 → 起始字符
-       * → 起始字符 + 关键词长度 → 应该正好是关键词
-       */
-      if (sr.width <= 0 || text.length === 0) {
-        return { ok: false, reason: 'span 宽度为 0', text };
-      }
-      const ratio = (rect.left - sr.left) / sr.width;
-      const start = Math.max(0, Math.round(ratio * text.length));
-      const slice = text.slice(start, start + kw.length);
-
+      // 高亮框的左边界应该落在关键词范围内
+      const inside = rect.left >= real.left - 3 && rect.left <= real.right + 3;
       return {
-        ok: slice.toLowerCase() === kw.toLowerCase(),
-        reason: '',
-        text: slice,
-        spanText: text.slice(0, 40),
+        ok: inside,
+        reason: inside ? '' : '位置不在关键词范围内',
+        text: `${Math.round(rect.left)} vs ${Math.round(real.left)}-${Math.round(real.right)}`,
+        spanText: '',
       };
     });
 

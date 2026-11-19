@@ -134,27 +134,44 @@ try {
   check('**没有用 window.prompt / alert**', promptCount === 0, `调了 ${promptCount} 次`);
 
   // ④ 富文本能真的格式化
-  const html = await page.evaluate(() => {
-    const editor = document.querySelector('.scpdf-annotation-dialog .scpdf-rich-text__editor');
-    if (!editor) return null;
-    editor.focus();
-    editor.textContent = '测试批注内容';
-    const range = document.createRange();
-    range.selectNodeContents(editor);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-    const bold = [...document.querySelectorAll('.scpdf-rich-text__btn')].find((b) =>
-      (b.getAttribute('aria-label') ?? '').includes('加粗'),
-    );
-    bold?.click();
-    return editor.innerHTML;
-  });
+  /*
+   * ⚠️ **两种编辑器都要支持**：
+   * -> 包内置的轻量编辑器（contenteditable）
+   * -> TipTap（ProseMirror）
+   * -> 所以**用真实输入**（keyboard.type）而不是 `textContent = ...`
+   *    （后者不触发 React onChange，也不触发 ProseMirror 的输入）❌
+   */
+  const editorSel = '.scpdf-annotation-dialog .scpdf-rich-text__editor';
+  const isTipTap = (await page.locator(`${editorSel} .ProseMirror`).count()) > 0;
+  const pmSel = isTipTap ? `${editorSel} .ProseMirror` : editorSel;
+
+  await page.locator(pmSel).click();
+  await page.keyboard.type('测试批注内容', { delay: 30 });
   await page.waitForTimeout(400);
 
+  // 选中全部文字（用 TreeWalker 找到文本节点，兼容 ProseMirror）
+  await page.evaluate((sel) => {
+    const root = document.querySelector(sel);
+    if (!root) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const first = walker.nextNode();
+    if (!first) return;
+    const range = document.createRange();
+    range.selectNodeContents(root);
+    const s = window.getSelection();
+    s.removeAllRanges();
+    s.addRange(range);
+    root.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  }, pmSel);
+  await page.waitForTimeout(300);
+
+  await page.locator('.scpdf-annotation-dialog .scpdf-rich-text__btn[aria-label="加粗"]').click();
+  await page.waitForTimeout(500);
+
+  const html = await page.evaluate((sel) => document.querySelector(sel)?.innerHTML ?? '', pmSel);
   check(
     '**富文本的"加粗"能真的生效**',
-    typeof html === 'string' && /<(b|strong)>/i.test(html),
+    /<(b|strong)>/i.test(html),
     String(html ?? '').slice(0, 60),
   );
 
