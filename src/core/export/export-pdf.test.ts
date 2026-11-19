@@ -3,7 +3,7 @@ import type { ExportHighlightLike, PdfLibLike } from './export-pdf';
 import { colorToRgb, exportHighlightedPdf } from './export-pdf';
 
 /** 一条高亮（覆盖 2 行） */
-function makeHighlight(): ExportHighlightLike {
+function makeHighlight(overrides: Partial<ExportHighlightLike> = {}): ExportHighlightLike {
   return {
     id: 'h1',
     color: 'yellow',
@@ -24,6 +24,7 @@ function makeHighlight(): ExportHighlightLike {
         { x1: 10, y1: 40, x2: 90, y2: 60, width: 600, height: 800, pageNumber: 1 },
       ],
     },
+    ...overrides,
   };
 }
 
@@ -215,5 +216,58 @@ describe('exportHighlightedPdf（真 pdf-lib）', async () => {
     expect(r[1]).toBeCloseTo(740);
     expect(r[2]).toBeCloseTo(110);
     expect(r[3]).toBeCloseTo(780);
+  });
+
+  /*
+   * ⚠️ **批注文字的编码**（用户反馈"导出后 hover 出现乱码批注"）。
+   *
+   * ```
+   * PDFHexString.of('中文')      → <中文>        ← ❌ 乱码（当原始字节写）
+   * PDFHexString.fromText('中文') → <FEFF4E2D6587…> ← ✅ UTF-16BE + BOM
+   * ```
+   *
+   * → 阅读器按 PDFDocEncoding 解码裸字节 → 中文全乱码
+   * → `fromText` 会做 UTF-16BE + BOM → 阅读器能正确识别 ✅
+   */
+  it('**批注文字用 UTF-16BE + BOM 编码**（中文不乱码）', async () => {
+    const doc = await pdfLib.PDFDocument.create();
+    const page = doc.addPage([600, 800]);
+    page.drawText('Hello', { x: 10, y: 760, size: 12 });
+    const original = await doc.save();
+
+    const chinese = makeHighlight({ selectedText: '中文测试 Hello' });
+
+    const result = await exportHighlightedPdf({
+      pdfBytes: original,
+      highlights: [chinese],
+      pageSizesPt,
+      pdfLib: pdfLib as unknown as PdfLibLike,
+    });
+
+    const reloaded = await pdfLib.PDFDocument.load(
+      result.buffer.slice(result.byteOffset, result.byteOffset + result.byteLength) as ArrayBuffer,
+    );
+    const reloadedPage = reloaded.getPages()[0];
+    if (!reloadedPage) {
+      throw new Error('重新加载后没有页');
+    }
+    const annotsArray = reloadedPage.node.get(pdfLib.PDFName.of('Annots')) as
+      | { asArray?: () => unknown[] }
+      | undefined;
+    const refs = (annotsArray?.asArray?.() ?? []) as Parameters<
+      typeof reloaded.context.lookup
+    >[0][];
+    const annot = reloaded.context.lookup(refs[0] as never) as unknown as {
+      dict: { get: (key: unknown) => unknown };
+    };
+
+    const contents = String(annot.dict.get(pdfLib.PDFName.of('Contents')));
+
+    // ⚠️ **必须是 FEFF 开头**（UTF-16BE 的 BOM）
+    expect(contents.startsWith('<FEFF')).toBe(true);
+    // ⚠️ **不能有裸的中文字符**（那是被当原始字节写进去的乱码源）
+    expect(/[一-龥]/.test(contents)).toBe(false);
+    // ✅ "中" = U+4E2D → UTF-16BE 是 4E2D
+    expect(contents).toContain('4E2D');
   });
 });

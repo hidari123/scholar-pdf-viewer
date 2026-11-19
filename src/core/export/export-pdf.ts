@@ -88,7 +88,19 @@ export interface PdfLibLike {
   PDFName: { of(name: string): unknown };
   PDFNumber: { of(value: number): unknown };
   PDFArray: { withContext(context: unknown): PdfArrayLike };
-  PDFHexString: { of(value: string): unknown };
+  /**
+   * ⚠️ **必须用 `fromText`，不能用 `of`**（实测踩过的坑：hover 出现乱码批注）。
+   *
+   * ```
+   * PDFHexString.of('中文测试')      → <中文测试>        ← ❌ 乱码
+   * PDFHexString.fromText('中文测试') → <FEFF4E2D65876D…>  ← ✅ UTF-16BE + BOM
+   * ```
+   *
+   * → `of` 把字符串**当原始字节**写进 PDF
+   * → 阅读器按 **PDFDocEncoding** 解码 → 中文全变乱码
+   * → `fromText` 会做 **UTF-16BE + BOM** 编码 → 阅读器能正确识别 ✅
+   */
+  PDFHexString: { of(value: string): unknown; fromText?(value: string): unknown };
   PDFString: { of(value: string): unknown };
   PDFDict: { withContext(context: unknown): PdfDictLike };
 }
@@ -339,7 +351,25 @@ export async function exportHighlightedPdf(
     // 批注文字（/Contents）
     const contents = (first?.text ?? '').slice(0, 2000);
     if (contents) {
-      dict.set(pdfLib.PDFName.of('Contents'), pdfLib.PDFHexString.of(contents));
+      /*
+       * ⚠️⚠️ **必须用 `fromText`**（实测踩过的坑：用户反馈"导出带高亮的 PDF 后
+       * hover 上去会出来乱码批注 明明没有批注"）。
+       *
+       * ```
+       * PDFHexString.of('中文测试')      → <中文测试>        ← ❌ 乱码
+       * PDFHexString.fromText('中文测试') → <FEFF4E2D65876D…>  ← ✅
+       * ```
+       *
+       * → `of` 把字符串**当原始字节**写进 PDF
+       * → 阅读器按 **PDFDocEncoding** 解码 → 中文全变乱码
+       * → `fromText` 做 **UTF-16BE + BOM** 编码 → 阅读器能正确识别 ✅
+       *
+       * ⚠️ 老版本 pdf-lib 没有 `fromText` → 退回 `of`（至少英文是对的）。
+       */
+      const hex = pdfLib.PDFHexString.fromText
+        ? pdfLib.PDFHexString.fromText(contents)
+        : pdfLib.PDFHexString.of(contents);
+      dict.set(pdfLib.PDFName.of('Contents'), hex);
     }
 
     /*

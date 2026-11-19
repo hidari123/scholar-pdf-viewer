@@ -1,0 +1,58 @@
+fix(export): 修复导出 PDF 的批注文字乱码（hover 弹乱码）
+
+用户反馈："导出带高亮的pdf之后 hover到pdf的高亮上会出来乱码批注 明明没有批注"
+
+## 根因：`PDFHexString.of()` 把字符串当**原始字节**写进 PDF
+
+```ts
+dict.set(PDFName.of('Contents'), PDFHexString.of(contents));   // ❌
+```
+
+实测（pdf-lib）：
+
+```
+PDFHexString.of('中文测试 Hello')       → <中文测试 Hello>          ← ❌
+PDFHexString.fromText('中文测试 Hello') → <FEFF4E2D65876D4B8BD5002…>  ← ✅
+```
+
+- `of()` 把 JS 字符串**当成字节序列**直接写进 PDF
+- 阅读器按 **PDFDocEncoding** 解码 → 中文全部变成乱码
+- 用户 hover 高亮 → 弹出的批注提示就是乱码
+
+（`PDFString.of()` 也不行 —— 那是 literal string，同样按 PDFDocEncoding 解码。）
+
+## 修法
+
+```ts
+const hex = pdfLib.PDFHexString.fromText
+  ? pdfLib.PDFHexString.fromText(contents)   // ✅ UTF-16BE + BOM
+  : pdfLib.PDFHexString.of(contents);         // 老版本兜底
+dict.set(PDFName.of('Contents'), hex);
+```
+
+`fromText` 会做 **UTF-16BE + BOM（FEFF）** 编码 → 阅读器能正确识别中文。
+
+## 测试
+
+**单测**（`src/core/export/export-pdf.test.ts`，10 项）
+
+- **批注文字用 UTF-16BE + BOM 编码**（中文不乱码）
+  - `/Contents` 以 `<FEFF` 开头
+  - **没有裸的中文字符**（那是被当原始字节写进去的乱码源）
+  - 含 `4E2D`（"中" 的 UTF-16BE 编码）
+
+**E2E**（`scripts/e2e-export-pdf-encoding.mjs`，7 项，全绿）
+
+```
+/Contents 原始值: <FEFF006E00200045006E0064002D0074006F002D0045006E0064>
+PASS **批注里有 /Contents**（hover 会显示的文字）
+PASS **是 UTF-16BE + BOM**（FEFF 开头 → 阅读器能正确识别中文）
+PASS **没有裸的中文字符**（`of` 写出来的就是乱码源）
+PASS **解码出来是原文**（不是乱码）
+```
+
+## 验证
+
+- `pnpm verify`: **8/8 全绿**
+- `pnpm test`: **420 passed**
+- E2E: **318/318 —— 0 个套件失败**
