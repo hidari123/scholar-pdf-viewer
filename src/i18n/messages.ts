@@ -77,6 +77,39 @@ export interface Messages {
   'print.title': string;
   'a11y.canvas': string;
   'a11y.page': string;
+  /*
+   * —— 工具栏 / 浮层 ——
+   *
+   * ⚠️ **这些之前是硬编码的中文**（用户反馈："语言切换了 但是切换之后
+   *    实际上 title 啊什么东西都没切换语言呢"）→ 全部收进文案表 ✅
+   */
+  'page.prev': string;
+  'page.next': string;
+  'selection.actions': string;
+  'selection.color': string;
+  'selection.expandColor': string;
+  /* —— 批注面板 / 富文本 —— */
+  'annotation.title': string;
+  'annotation.delete': string;
+  'annotation.close': string;
+  'annotation.content': string;
+  'annotation.save': string;
+  'annotation.cancel': string;
+  'annotation.placeholder': string;
+  'annotation.pick': string;
+  /* —— 富文本工具栏 —— */
+  'richtext.bold': string;
+  'richtext.italic': string;
+  'richtext.underline': string;
+  'richtext.highlight': string;
+  'richtext.textColor': string;
+  'richtext.link': string;
+  'richtext.orderedList': string;
+  'richtext.unorderedList': string;
+  'richtext.quote': string;
+  'richtext.clearFormat': string;
+  'richtext.undo': string;
+  'richtext.redo': string;
 }
 
 /** 文案 key（字符串联合） */
@@ -133,6 +166,31 @@ export const ZH_MESSAGES: Messages = {
   'print.title': '打印',
   'a11y.canvas': 'PDF 页面',
   'a11y.page': '第 {page} 页',
+  'page.prev': '上一页',
+  'page.next': '下一页',
+  'selection.actions': '选区操作',
+  'selection.color': '选择颜色',
+  'selection.expandColor': '展开颜色下拉',
+  'annotation.title': '批注',
+  'annotation.delete': '删除',
+  'annotation.close': '关闭',
+  'annotation.content': '批注内容',
+  'annotation.save': '保存',
+  'annotation.cancel': '取消',
+  'annotation.placeholder': '写点什么…',
+  'annotation.pick': '选择批注（{count}）',
+  'richtext.bold': '加粗',
+  'richtext.italic': '斜体',
+  'richtext.underline': '下划线',
+  'richtext.highlight': '高亮',
+  'richtext.textColor': '文字颜色',
+  'richtext.link': '链接',
+  'richtext.orderedList': '有序列表',
+  'richtext.unorderedList': '无序列表',
+  'richtext.quote': '引用',
+  'richtext.clearFormat': '清除格式',
+  'richtext.undo': '撤销',
+  'richtext.redo': '重做',
 };
 
 /** 英文文案 */
@@ -166,6 +224,31 @@ export const EN_MESSAGES: Messages = {
   'print.title': 'Print',
   'a11y.canvas': 'PDF page',
   'a11y.page': 'Page {page}',
+  'page.prev': 'Previous page',
+  'page.next': 'Next page',
+  'selection.actions': 'Selection actions',
+  'selection.color': 'Select color',
+  'selection.expandColor': 'Expand color dropdown',
+  'annotation.title': 'Annotation',
+  'annotation.delete': 'Delete',
+  'annotation.close': 'Close',
+  'annotation.content': 'Annotation content',
+  'annotation.save': 'Save',
+  'annotation.cancel': 'Cancel',
+  'annotation.placeholder': 'Write something…',
+  'annotation.pick': 'Select annotation ({count})',
+  'richtext.bold': 'Bold',
+  'richtext.italic': 'Italic',
+  'richtext.underline': 'Underline',
+  'richtext.highlight': 'Highlight',
+  'richtext.textColor': 'Text color',
+  'richtext.link': 'Link',
+  'richtext.orderedList': 'Ordered list',
+  'richtext.unorderedList': 'Unordered list',
+  'richtext.quote': 'Quote',
+  'richtext.clearFormat': 'Clear formatting',
+  'richtext.undo': 'Undo',
+  'richtext.redo': 'Redo',
 };
 
 /** 内置文案表 */

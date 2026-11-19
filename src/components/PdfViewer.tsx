@@ -20,6 +20,7 @@ import type { LinkAnnotationLike } from '../core/annotation/links';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import type { DocumentCache } from '../core/cache/store';
 import type { DocumentSource, LoadOptions } from '../core/document/loader';
+import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
 import type { PdfViewerError } from '../core/errors';
 import { pdfViewerError } from '../core/errors';
 import type { HighlightPalette } from '../core/highlight/palette';
@@ -54,6 +55,7 @@ import { useVisiblePages } from '../hooks/useVisiblePages';
 import { useZoom } from '../hooks/useZoom';
 import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
+import { AnnotationPanel } from './AnnotationPanel';
 import type { IconName } from './Icon';
 import { OutlinePanel } from './OutlinePanel';
 import { Page } from './Page';
@@ -365,6 +367,30 @@ export interface PdfViewerProps {
    * **点击批注**（宿主实现：打开编辑框 / 弹详情）。
    */
   onAnnotationClick?: (annotation: AnnotationRecord) => void;
+  /**
+   * **批注内容变化**（富文本 HTML + 纯文本）。
+   *
+   * ⚠️ **不传 → 包只读展示**（不显示编辑框）。
+   */
+  onAnnotationChange?: (id: string, html: string, plain: string) => void;
+  /**
+   * **保存批注**（富文本 HTML + 纯文本）。
+   *
+   * ⚠️ HTML 已经过 `sanitizeRichText` 清洗（防 XSS）✅
+   */
+  onAnnotationSave?: (id: string, html: string, plain: string) => void;
+  /**
+   * **删除批注**。
+   */
+  onAnnotationDelete?: (id: string) => void;
+  /**
+   * **批注面板的富文本工具栏**（宿主可配）。
+   *
+   * → 不传 → 用默认的（高亮 / 加粗 / 颜色 / 链接 …）
+   */
+  annotationToolbar?: RichTextToolbarItem[];
+  /** 批注面板的高亮色板 */
+  annotationPalette?: RichTextPalette;
   /** 换色 */
   onHighlightColorChange?: (id: string, color: string) => void;
   /** 复制高亮的文字 */
@@ -445,6 +471,11 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onHighlightComment,
     stickyNotes,
     onAnnotationClick,
+    onAnnotationChange,
+    onAnnotationSave,
+    onAnnotationDelete,
+    annotationToolbar,
+    annotationPalette,
     onHighlightColorChange,
     onHighlightCopy,
     onHighlightMore,
@@ -2674,6 +2705,60 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     [searchHits, activeSearchIndex, textItemsByPage, pageSizesByPage, searchOffsetsByPage],
   );
 
+  /**
+   * **容器的可视尺寸**（便利贴面板用来算"中间偏右"的位置）。
+   *
+   * ⚠️ **用 state 而不是每次 render 去读 DOM**：
+   * → 读 DOM 会触发重排 → 性能差
+   * → 用 ResizeObserver → 尺寸变了才更新 ✅
+   */
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const update = () => {
+      setContainerSize({ width: container.clientWidth, height: container.clientHeight });
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  /**
+   * **当前打开的批注**（便利贴面板）。
+   *
+   * ⚠️ **包不自己存批注** → 这里只存"哪个批注正在编辑"这个 UI 状态。
+   */
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+
+  /** 当前打开的批注记录 */
+  const activeAnnotation = useMemo(() => {
+    if (!activeAnnotationId) {
+      return null;
+    }
+    return stickyNotes?.find((a) => a.id === activeAnnotationId) ?? null;
+  }, [activeAnnotationId, stickyNotes]);
+
+  /** 批注的删除（宿主实现） */
+  const handleAnnotationDelete = useCallback(
+    (id: string) => {
+      setActiveAnnotationId(null);
+      onAnnotationDelete?.(id);
+    },
+    [onAnnotationDelete],
+  );
+
+  /** 关掉面板 */
+  const handleAnnotationClose = useCallback(() => {
+    setActiveAnnotationId(null);
+  }, []);
+
   const className = [
     'scpdf-root',
     // ⚠️ 主题 + 外观 → class 名（见 `core/theme` 的 `themeClasses`）
@@ -2871,6 +2956,28 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           ) : null}
 
           {/*
+            **便利贴面板**（批注的编辑 / 查看 UI）。
+
+            ⚠️ **位置在"页面中间偏右"**（用户明确要求）
+            → 用户反馈："目前都没展示完整 在最右边被挡住了"
+            → 之前贴在便签图标旁边（页面最右）→ 被裁掉 ❌
+          */}
+          <AnnotationPanel
+            annotation={activeAnnotation}
+            container={{ width: containerSize.width, height: containerSize.height }}
+            onChange={onAnnotationChange}
+            onSubmit={onAnnotationSave}
+            onDelete={onAnnotationDelete ? handleAnnotationDelete : undefined}
+            onClose={handleAnnotationClose}
+            toolbar={annotationToolbar}
+            palette={annotationPalette}
+            icons={icons}
+            locale={locale}
+            locales={locales}
+            messages={messages}
+          />
+
+          {/*
           页面区高度 = 最后一项页顶边（即文档总高）。
           末项已含顶部留白 + 每页高度 + 间距 → 直接用作总高即可。
         */}
@@ -2913,7 +3020,16 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                       activeHighlightId={activeHighlightId}
                       palette={highlightPalette}
                       stickyNotes={stickyNotes}
-                      onAnnotationClick={onAnnotationClick}
+                      onAnnotationClick={(annotation) => {
+                        /*
+                         * ⚠️ **点便签 → 打开便利贴面板**（用户需求）。
+                         *
+                         * → "点击批注的时候展开的是一个便利贴一样的ui"
+                         * → 同时**通知宿主**（宿主可以自己做别的事）
+                         */
+                        setActiveAnnotationId(annotation.id);
+                        onAnnotationClick?.(annotation);
+                      }}
                       selectionShape={selectionShapes.get(pageNumber)}
                       onHighlightClick={handleHighlightClick}
                       onExternalLink={onExternalLink}
@@ -2950,6 +3066,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         浮层是 `position: fixed` → 不受任何祖先的 transform/overflow 影响。
       */}
       <SelectionPopover
+        locale={locale}
+        locales={locales}
+        messages={messages}
         icons={icons}
         open={popoverOpen}
         selectionRect={popoverAnchor}
@@ -2972,6 +3091,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         - 动作是"高亮动作"（换色 / 复制 / 删除 / 更多）
       */}
       <SelectionPopover
+        locale={locale}
+        locales={locales}
+        messages={messages}
         icons={icons}
         open={highlightPopover !== null}
         selectionRect={null}

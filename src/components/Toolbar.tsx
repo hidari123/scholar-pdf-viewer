@@ -169,7 +169,8 @@ export function Toolbar(props: ToolbarProps) {
             className="scpdf-toolbar__btn"
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1}
-            aria-label="上一页"
+            aria-label={t('page.prev')}
+            title={t('page.prev')}
           >
             <Icon name={'chevronLeft'} overrides={icons} />
           </button>
@@ -210,7 +211,8 @@ export function Toolbar(props: ToolbarProps) {
             className="scpdf-toolbar__btn"
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages}
-            aria-label="下一页"
+            aria-label={t('page.next')}
+            title={t('page.next')}
           >
             <Icon name={'chevronRight'} overrides={icons} />
           </button>

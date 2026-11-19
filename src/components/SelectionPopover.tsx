@@ -20,6 +20,8 @@ import { BUILTIN_ACTION_KEYS, isBuiltinIcon } from '../core/selection/actions';
 import { HIGHLIGHT_ACTION_KEYS } from '../core/selection/highlight-actions';
 import type { PopoverPosition } from '../core/selection/popover-position';
 import { computePopoverPosition } from '../core/selection/popover-position';
+import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { SelectionActionIconView } from './SelectionActionIcons';
 
@@ -94,6 +96,20 @@ export interface SelectionPopoverProps {
   highlightPalette?: HighlightPalette;
   /** 选颜色（key） */
   onPickColor?: (key: string) => void;
+  /** 语言 */
+  locale?: Locale;
+  /**
+   * **宿主注册的语言表**（可添加任意语言）。
+   */
+  locales?: LocaleTable;
+  /**
+   * **文案覆盖**（当前 locale）。
+   *
+   * ⚠️ 用户反馈："语言切换了 但是切换之后实际上 title 啊什么东西都没切换语言呢"
+   * → 之前浮层的 title / aria-label 是**硬编码中文** → 切语言不变 ❌
+   * → 现在全部走文案表 → 跟着语言走 ✅
+   */
+  messages?: Partial<Messages>;
   /**
    * **图标覆盖**（宿主 → 包）。
    *
@@ -149,8 +165,22 @@ export function SelectionPopover({
   onDismiss,
   highlightPalette,
   onPickColor,
+  messages,
+  locale = 'zh',
+  locales,
   icons,
 }: SelectionPopoverProps) {
+  /**
+   * 文案解析（支持宿主的语言表）。
+   *
+   * ⚠️ 用户反馈："语言切换了 但是切换之后实际上 title 啊什么东西都没切换语言呢"
+   * → 之前浮层的 title 是**硬编码中文** → 现在全走文案表 ✅
+   */
+  const t = useCallback(
+    (key: keyof Messages) => resolveMessage(locale, key, messages, undefined, locales),
+    [locale, messages, locales],
+  );
+
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState<PopoverPosition | null>(null);
   /** 颜色下拉是否展开 */
@@ -512,7 +542,7 @@ export function SelectionPopover({
       ref={rootRef}
       className="scpdf-selection-popover"
       role="toolbar"
-      aria-label="选区操作"
+      aria-label={t('selection.actions')}
       style={{
         /*
          * 位置还没算出来时（第一帧）：先渲染到 0,0 但**不可见**。
@@ -600,8 +630,8 @@ export function SelectionPopover({
                 <button
                   type="button"
                   className="scpdf-selection-popover__btn scpdf-selection-popover__btn--split"
-                  title="选择颜色"
-                  aria-label="展开颜色下拉"
+                  title={t('selection.color')}
+                  aria-label={t('selection.expandColor')}
                   aria-expanded={paletteOpen}
                   onClick={(event) => {
                     event.stopPropagation();

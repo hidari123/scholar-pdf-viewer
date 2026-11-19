@@ -1,0 +1,255 @@
+/**
+ * **富文本** —— 轻量的富文本模型 + HTML 序列化。
+ *
+ * ## 用户需求
+ *
+ * > "而且输入框不要用默认的 你设计一个好看点的富文本输入框
+ * >  调研一个好用的富文本插件 可以自主控制展示哪些富文本内容
+ * >  通过宿主接口配置 提供默认的一些 比如高亮 加粗 颜色 链接"
+ *
+ * ## 调研：富文本插件选型
+ *
+ * | 方案                | 优点                       | 否决原因                                       |
+ * | ------------------- | -------------------------- | ---------------------------------------------- |
+ * | `@tiptap/react` + `starter-kit` | headless、模块化、**工具栏完全宿主可控**、恰好有 高亮/加粗/颜色/链接 | **体积远超 25 kB 预算**（tiptap core + starter-kit + 5 个扩展 ≈ 100+ kB gzip）❌ |
+ * | `lexical`           | 性能好                     | 同样超预算，且**必须**配合 React 插件一起用      |
+ * | `quill` / `react-quill` | 成熟、API 友好        | 同样超预算；`quill` 还会**接管** DOM（宿主不好控制样式） |
+ *
+ * **→ 折中：包内自研一个"够用"的富文本**（`contenteditable` + `document.execCommand`）
+ * + **工具栏完全由宿主配置**（和 `selectionActions` 一个思路）。
+ *
+ * ## 为什么 `document.execCommand` 够用
+ *
+ * - 它是**浏览器原生**的富文本命令接口（`bold` / `hiliteColor` / `createLink` …）
+ * - 零依赖、零体积
+ * - 输出的 HTML 是**标准富文本 HTML**（`<b>` / `<mark style="background-color:…">` / `<a href>`）
+ * - ⚠️ 已废弃但**所有主流浏览器仍支持**，且是 contenteditable 场景的**事实标准**
+ *
+ * ## 包的边界
+ *
+ * → 包只给**编辑区 + 工具栏 UI + 命令执行**
+ * → **存什么、存哪、怎么存** → 宿主的事（和批注一样）
+ */
+
+/** 富文本的**命令**（工具栏的一个按钮） */
+export type RichTextCommand =
+  /** 加粗 */
+  | 'bold'
+  /** 斜体 */
+  | 'italic'
+  /** 下划线 */
+  | 'underline'
+  /** 删除线 */
+  | 'strikeThrough'
+  /** 高亮（背景色） */
+  | 'hiliteColor'
+  /** 文字颜色 */
+  | 'foreColor'
+  /** 链接 */
+  | 'createLink'
+  /** 无序列表 */
+  | 'insertUnorderedList'
+  /** 有序列表 */
+  | 'insertOrderedList'
+  /** 引用 */
+  | 'formatBlock'
+  /** 清除格式 */
+  | 'removeFormat'
+  /** 撤销 */
+  | 'undo'
+  /** 重做 */
+  | 'redo';
+
+/** 高亮的预设颜色 */
+export interface RichTextPalette {
+  /** 语义 key → 颜色 */
+  [key: string]: string;
+}
+
+/**
+ * 工具栏按钮的**默认配置**。
+ *
+ * ⚠️ **宿主可以完全覆盖**（通过 `toolbar` prop）→ 只显示想展示的 ✅
+ *
+ * ⚠️ **label 支持 i18n 占位符**：传 `{key}` 形式 → 由 `RichTextEditor` 解析。
+ *    不传 label → 用命令名（英文，可用但不是本地化的）
+ *
+ * @param palette 高亮色板（用于 `hiliteColor`）
+ * @returns 默认工具栏项
+ */
+export function defaultRichTextToolbar(palette?: RichTextPalette): RichTextToolbarItem[] {
+  const items: RichTextToolbarItem[] = [
+    { command: 'bold', label: '{richtext.bold}', icon: 'bold' },
+    { command: 'italic', label: '{richtext.italic}', icon: 'italic' },
+    { command: 'underline', label: '{richtext.underline}', icon: 'underline' },
+  ];
+
+  if (palette) {
+    items.push({
+      command: 'hiliteColor',
+      label: '{richtext.highlight}',
+      icon: 'highlightColor',
+      palette,
+    });
+  }
+
+  items.push(
+    { command: 'foreColor', label: '{richtext.textColor}', icon: 'textColor', palette },
+    { command: 'createLink', label: '{richtext.link}', icon: 'link' },
+  );
+
+  return items;
+}
+
+/** 工具栏的一项 */
+export interface RichTextToolbarItem {
+  /** 命令 */
+  command: RichTextCommand;
+  /** 提示文案（也用作 aria-label） */
+  label: string;
+  /** 图标名（内置图标集） */
+  icon?: string;
+  /** 颜色面板（`hiliteColor` / `foreColor` 用） */
+  palette?: RichTextPalette;
+  /** 分组（同组的相邻，组间有分隔线） */
+  group?: string;
+  /** 排序 */
+  order?: number;
+}
+
+/**
+ * 执行一个富文本命令。
+ *
+ * ⚠️ **必须在用户手势里调用**（`execCommand` 的限制）。
+ *
+ * @param command 命令
+ * @param value 命令的值（颜色 / 链接地址 / 块类型）
+ */
+export function execRichTextCommand(command: RichTextCommand, value?: string): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  switch (command) {
+    case 'formatBlock':
+      document.execCommand(command, false, value ?? 'blockquote');
+      break;
+    case 'hiliteColor':
+    case 'foreColor':
+      document.execCommand(command, false, value ?? '#ffff00');
+      break;
+    case 'createLink':
+      document.execCommand(command, false, value ?? '');
+      break;
+    default:
+      document.execCommand(command, false, value);
+  }
+}
+
+/**
+ * **取纯文本**（去掉所有标签）。
+ *
+ * ⚠️ 批注列表 / 搜索索引用这个（不关心格式）。
+ *
+ * @param html 富文本 HTML
+ * @returns 纯文本
+ */
+export function richTextToPlain(html: string): string {
+  if (typeof document === 'undefined') {
+    // SSR / Node → 粗暴去标签
+    return html.replace(/<[^>]*>/g, '');
+  }
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  return (holder.textContent ?? '').replace(/ /g, ' ').trim();
+}
+
+/**
+ * **清洗 HTML**（只保留安全的标签）。
+ *
+ * ⚠️ 批注内容会存到宿主的后端 → **可能 XSS** → 必须清洗 ✅
+ *
+ * 保留的标签：`b` `i` `u` `s` `mark` `a` `ul` `ol` `li` `blockquote` `br` `span` `code`
+ *
+ * @param html 原始 HTML
+ * @returns 清洗后的 HTML
+ */
+export function sanitizeRichText(html: string): string {
+  if (typeof document === 'undefined') {
+    return html;
+  }
+
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+
+  const ALLOWED = new Set([
+    'B',
+    'STRONG',
+    'I',
+    'EM',
+    'U',
+    'S',
+    'STRIKE',
+    'MARK',
+    'A',
+    'UL',
+    'OL',
+    'LI',
+    'BLOCKQUOTE',
+    'BR',
+    'SPAN',
+    'CODE',
+    'P',
+    'DIV',
+  ]);
+
+  // 递归清洗
+  const walk = (node: Element) => {
+    for (const child of [...node.children]) {
+      if (!ALLOWED.has(child.tagName)) {
+        // 不允许的标签 → **只保留文字**，丢掉标签本身
+        const text = document.createTextNode(child.textContent ?? '');
+        child.replaceWith(text);
+        continue;
+      }
+      walk(child);
+    }
+  };
+  walk(holder);
+
+  // 去掉所有属性（除了 `<a href>` 和 `<span style>` 的颜色）
+  for (const el of holder.querySelectorAll('*')) {
+    const tag = el.tagName;
+
+    if (tag === 'A') {
+      const href = el.getAttribute('href') ?? '';
+      // ⚠️ 只允许 http/https/mailto（防 javascript: 伪协议）
+      if (!/^(https?:|mailto:)/i.test(href)) {
+        el.removeAttribute('href');
+      } else {
+        el.setAttribute('rel', 'noopener noreferrer');
+        el.setAttribute('target', '_blank');
+      }
+      continue;
+    }
+
+    if (tag === 'SPAN' || tag === 'MARK') {
+      // 只保留颜色相关的 style
+      const style = el.getAttribute('style') ?? '';
+      const color = /(^|;)\s*(background-color|color)\s*:\s*([^;]+)/i.exec(style);
+      if (color) {
+        el.setAttribute('style', color[0].trim());
+      } else {
+        el.removeAttribute('style');
+      }
+      continue;
+    }
+
+    // 其他标签 → 清空所有属性
+    for (const attr of [...el.attributes]) {
+      el.removeAttribute(attr.name);
+    }
+  }
+
+  return holder.innerHTML;
+}
