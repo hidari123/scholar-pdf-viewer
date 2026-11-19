@@ -12,6 +12,7 @@ export * from './SearchPanel';
 export * from './SelectionActionIcons';
 export * from './SelectionLayer';
 export * from './SelectionPopover';
+export * from './StickyNoteLayer';
 export * from './TextLayer';
 export * from './ThumbnailPanel';
 export * from './Toolbar';

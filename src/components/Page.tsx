@@ -12,6 +12,7 @@
 
 import { memo, useEffect, useMemo, useState } from 'react';
 import type { LinkAnnotationLike } from '../core/annotation/links';
+import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import type { HighlightPalette } from '../core/highlight/palette';
 import type { SearchHitRect } from '../core/search/highlight';
 import type { PageSelectionShape } from '../core/selection/shape';
@@ -23,6 +24,7 @@ import { LinkLayer } from './LinkLayer';
 import type { PageProxyLike, TextContentLike } from './PageCanvas';
 import { PageCanvas } from './PageCanvas';
 import { SelectionLayer } from './SelectionLayer';
+import { StickyNoteLayer } from './StickyNoteLayer';
 import { TextLayer } from './TextLayer';
 
 /** Page 参数 */
@@ -87,6 +89,10 @@ export interface PageProps {
    * ⚠️ 必须与**搜索索引**用的是同一份 items，否则偏移错位。
    */
   onTextItems?: (pageNumber: number, items: PositionedTextItem[]) => void;
+  /** 批注（小便签，受控） */
+  stickyNotes?: AnnotationRecord[];
+  /** 点击批注 */
+  onAnnotationClick?: (annotation: AnnotationRecord) => void;
   /** 无障碍标签 */
   ariaLabel?: string;
 }
@@ -116,6 +122,8 @@ export function PageInner(props: PageProps) {
     onInternalLink,
     onRenderError,
     onTextItems,
+    stickyNotes,
+    onAnnotationClick,
     ariaLabel,
   } = props;
 
@@ -268,6 +276,21 @@ export function PageInner(props: PageProps) {
         activeSearchRectIndex={activeSearchRectIndex}
         palette={palette}
       />
+
+      {/*
+        批注层（WPS 式小便签）。
+
+        ⚠️ **必须在标注层之上** → 便签才能 hover / 点击。
+      */}
+      {stickyNotes && stickyNotes.length > 0 ? (
+        <StickyNoteLayer
+          pageNumber={pageNumber}
+          annotations={stickyNotes}
+          highlights={highlights}
+          viewport={viewportSize}
+          onAnnotationClick={onAnnotationClick}
+        />
+      ) : null}
     </>
   );
 }

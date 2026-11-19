@@ -17,6 +17,7 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { LinkAnnotationLike } from '../core/annotation/links';
+import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import type { DocumentCache } from '../core/cache/store';
 import type { DocumentSource, LoadOptions } from '../core/document/loader';
 import type { PdfViewerError } from '../core/errors';
@@ -310,6 +311,25 @@ export interface PdfViewerProps {
    *
    * ⚠️ **宿主没传 ⇒ 对应按钮不渲染**（和选区浮层一致）。
    */
+  /**
+   * **添加批注**（WPS 式小便签）。
+   *
+   * ⚠️ **宿主没传 ⇒ "添加批注"按钮不渲染**。
+   *
+   * → 包只负责：按钮 + 抛事件 + 渲染小便签
+   * → 批注**内容怎么存、怎么编辑** → 宿主的事
+   */
+  onHighlightComment?: (id: string) => void;
+  /**
+   * **批注列表**（受控）。
+   *
+   * ⚠️ **不传 ⇒ 不渲染任何批注**（包不自己存数据）。
+   */
+  stickyNotes?: AnnotationRecord[];
+  /**
+   * **点击批注**（宿主实现：打开编辑框 / 弹详情）。
+   */
+  onAnnotationClick?: (annotation: AnnotationRecord) => void;
   /** 换色 */
   onHighlightColorChange?: (id: string, color: string) => void;
   /** 复制高亮的文字 */
@@ -385,6 +405,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onHighlightUpdate,
     onHighlightRemove,
     onHighlightClick,
+    onHighlightComment,
+    stickyNotes,
+    onAnnotationClick,
     onHighlightColorChange,
     onHighlightCopy,
     onHighlightMore,
@@ -2233,6 +2256,12 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       return [];
     }
     return buildHighlightActions(highlightPopover.id, highlightPopover.text, {
+      /*
+       * 添加批注 → 直接抛给宿主（宿主负责弹编辑框 + 存）。
+       *
+       * ⚠️ 宿主没传 `onHighlightComment` ⇒ 这个按钮**不渲染**。
+       */
+      onHighlightComment,
       onHighlightUpdate: (id, patch) => {
         if (patch.color) {
           onHighlightColorChange?.(id, patch.color);
@@ -2255,6 +2284,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     });
   }, [
     highlightPopover,
+    onHighlightComment,
     onHighlightColorChange,
     onHighlightUpdate,
     onHighlightRemove,
@@ -2744,6 +2774,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                       highlights={highlights}
                       activeHighlightId={activeHighlightId}
                       palette={highlightPalette}
+                      stickyNotes={stickyNotes}
+                      onAnnotationClick={onAnnotationClick}
                       selectionShape={selectionShapes.get(pageNumber)}
                       onHighlightClick={handleHighlightClick}
                       onExternalLink={onExternalLink}

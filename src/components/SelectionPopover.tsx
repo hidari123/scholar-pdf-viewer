@@ -16,6 +16,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { HighlightPalette } from '../core/highlight/palette';
 import type { SelectionAction } from '../core/selection/actions';
 import { BUILTIN_ACTION_KEYS, isBuiltinIcon } from '../core/selection/actions';
+import { HIGHLIGHT_ACTION_KEYS } from '../core/selection/highlight-actions';
 import type { PopoverPosition } from '../core/selection/popover-position';
 import { computePopoverPosition } from '../core/selection/popover-position';
 import { SelectionActionIconView } from './SelectionActionIcons';
@@ -199,7 +200,12 @@ export function SelectionPopover({
   const estimatedSize = useMemo(() => {
     let buttons = visibleActions.length;
     // 🖍 高亮是分裂按钮（多一个 16px 的下拉箭头）
-    if (visibleActions.some((a) => a.key === BUILTIN_ACTION_KEYS.highlight)) {
+    // ⚠️ **高亮浮层的"选择高亮颜色"也是分裂按钮**（用户要求的第 2 个按钮）
+    if (
+      visibleActions.some(
+        (a) => a.key === BUILTIN_ACTION_KEYS.highlight || a.key === HIGHLIGHT_ACTION_KEYS.color,
+      )
+    ) {
       buttons += 1;
     }
     const buttonWidth = (visibleActions.length - (buttons - visibleActions.length)) * 28;
@@ -534,8 +540,16 @@ export function SelectionPopover({
            *
            * （原 scholar-club 也是这个交互，但它新高亮/编辑高亮用了**两套 UI**，
            *   我们统一成一个。）
+           *
+           * ⚠️ **高亮浮层里的"选择高亮颜色"也要能展开下拉**
+           *    （用户反馈"第一个是高亮 但是没有什么效果"）。
+           * → 判断条件要覆盖**两个** key：
+           *    - `BUILTIN_ACTION_KEYS.highlight`（选区浮层的 🖍）
+           *    - `HIGHLIGHT_ACTION_KEYS.color`（高亮浮层的 🖍）
            */
-          const isHighlight = action.key === BUILTIN_ACTION_KEYS.highlight;
+          const isHighlight =
+            action.key === BUILTIN_ACTION_KEYS.highlight ||
+            action.key === HIGHLIGHT_ACTION_KEYS.color;
           const showPalette = isHighlight && highlightPalette && onPickColor;
 
           return (
@@ -550,6 +564,17 @@ export function SelectionPopover({
                 aria-label={action.label ?? action.key}
                 onClick={(event) => {
                   event.stopPropagation();
+                  /*
+                   * ⚠️ **"选择高亮颜色"按钮本身也要能展开下拉**
+                   *    （用户反馈"第一个是高亮 但是没有什么效果"）。
+                   *
+                   * → 主按钮 = **打开颜色下拉**（而不是"用当前颜色高亮"）
+                   * → 旁边的箭头 = 同样打开下拉（保持一致）
+                   */
+                  if (showPalette) {
+                    setPaletteOpen((v) => !v);
+                    return;
+                  }
                   onAction?.(action);
                 }}
               >
@@ -567,7 +592,7 @@ export function SelectionPopover({
                   type="button"
                   className="scpdf-selection-popover__btn scpdf-selection-popover__btn--split"
                   title="选择颜色"
-                  aria-label="选择高亮颜色"
+                  aria-label="展开颜色下拉"
                   aria-expanded={paletteOpen}
                   onClick={(event) => {
                     event.stopPropagation();

@@ -169,7 +169,8 @@ try {
     const popBefore = await page.locator('.scpdf-selection-popover').count();
     check('选中后浮层出现', popBefore > 0);
 
-    await page.locator('button[aria-label="选择高亮颜色"]').click();
+    // ⚠️ 用 **class** 定位箭头按钮（aria-label 改成了"展开颜色下拉"）
+    await page.locator('.scpdf-selection-popover__btn--split').first().click();
     await page.waitForTimeout(300);
     await page.locator('.scpdf-selection-popover__swatch').nth(3).click();
     await page.waitForTimeout(700);

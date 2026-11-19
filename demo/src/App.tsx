@@ -7,6 +7,7 @@
  */
 
 import type {
+  AnnotationRecord,
   HighlightRecord,
   NewHighlight,
   OutlineItemLike,
@@ -93,6 +94,13 @@ export default function App() {
    * ⚠️ **持久化也在宿主**（包不碰存储）→ 见 `highlight-store.ts`。
    */
   const [highlightsByDoc, setHighlightsByDoc] = useState<Record<string, HighlightRecord[]>>({});
+
+  /**
+   * **批注（小便签）列表**（宿主持有）。
+   *
+   * ⚠️ **包不存数据** → 宿主传进来 → 换后端只改宿主。
+   */
+  const [stickyNotes, setStickyNotes] = useState<AnnotationRecord[]>([]);
 
   /**
    * **文档切换 → 从持久化里加载对应文档的高亮**。
@@ -701,6 +709,24 @@ export default function App() {
   );
 
   /**
+   * **添加批注**（WPS 式小便签）。
+   *
+   * ⚠️ **宿主实现**：包只负责按钮 + 抛事件 + 渲染小便签。
+   * → 批注内容怎么编辑、怎么存 → 宿主的事（换后端也不用改包）。
+   */
+  const handleHighlightComment = useCallback((id: string) => {
+    const content = window.prompt('批注内容：', '这是一条批注');
+    if (content === null) {
+      return;
+    }
+    setStickyNotes((prev) => [
+      ...prev.filter((n) => n.highlightId !== id),
+      { id: `note-${id}`, highlightId: id, content, createdAt: Date.now() },
+    ]);
+    setHint('已添加批注');
+  }, []);
+
+  /**
    * **导出高亮**（JSON 文件）。
    *
    * ⚠️ **包只给格式，存储是宿主的事** → 换后端不用改包。
@@ -1012,6 +1038,9 @@ export default function App() {
           }}
           onHighlightColorChange={handleHighlightColorChange}
           onHighlightRemove={handleHighlightRemove}
+          onHighlightComment={handleHighlightComment}
+          stickyNotes={stickyNotes}
+          onAnnotationClick={(note) => setHint(`【批注】${note.content.slice(0, 30)}`)}
           onHighlightClick={(h) => setHint(`点击高亮：${h.selectedText.slice(0, 20)}`)} /*
            * 选区浮层的动作 —— **宿主注入**（证明包不需要业务入口）。
            *

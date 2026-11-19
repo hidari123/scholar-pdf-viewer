@@ -17,6 +17,13 @@
  */
 
 export * from './components';
+/* ---------- 批注（小便签） ---------- */
+export type { AnnotationRecord } from './core/annotation/sticky-note';
+export {
+  STICKY_NOTE_OFFSET,
+  STICKY_NOTE_SIZE,
+  stickyNotePosition,
+} from './core/annotation/sticky-note';
 /* ---------- 下载（纯 DOM，无网络依赖） ---------- */
 export { downloadFile } from './core/document/download';
 export type { PdfViewerError, PdfViewerErrorCode } from './core/errors';

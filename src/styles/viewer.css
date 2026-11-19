@@ -327,6 +327,101 @@
   pointer-events: none;
 }
 
+/* ---------- 批注层（WPS 式小便签） ---------- */
+
+/*
+ * ⚠️ 批注层**要能交互**（hover / click）
+ * → `pointer-events: auto`（和标注层相反 —— 标注层是纯高亮，不能挡文字选择）
+ */
+.scpdf-sticky-notes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* 便签（图标 + 内容） */
+.scpdf-sticky-note {
+  position: absolute;
+  display: inline-flex;
+  align-items: flex-start;
+  pointer-events: auto;
+}
+
+/*
+ * ⚠️ **便签图标必须能点** → `pointer-events: auto`
+ * ⚠️ **图标本身很小** → 加一圈"透明的热区"，方便鼠标命中（用户不好点 22px）
+ */
+.scpdf-sticky-note__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--scpdf-annotation-color, #f5a623);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 22%);
+  transition:
+    transform 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.scpdf-sticky-note__icon:hover {
+  transform: scale(1.12);
+  background-color: rgb(255 255 255 / 55%);
+}
+
+.scpdf-sticky-note__icon:focus-visible {
+  outline: 2px solid var(--scpdf-primary, #2f6feb);
+  outline-offset: 1px;
+}
+
+/*
+ * **便签内容**（hover 才显示）。
+ *
+ * ⚠️ 用 `visibility` 而不是 `display:none`
+ * → 保留在无障碍树里（读屏软件读得到）
+ * → 但 `visibility: hidden` 时**不接收鼠标事件** → 不会挡住下面的文字 ✅
+ */
+.scpdf-sticky-note__content {
+  position: absolute;
+  left: 26px;
+  top: 0;
+  z-index: 5;
+  min-width: 120px;
+  max-width: 260px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--scpdf-border, #d9dde3);
+  background: var(--scpdf-surface, #fffdf3);
+  color: var(--scpdf-text, #1f2328);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 18%);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease,
+    visibility 0.12s;
+  pointer-events: none;
+}
+
+/* hover 显示 */
+.scpdf-sticky-note__content[data-visible="true"] {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
 .scpdf-annotation {
   position: absolute;
   /*

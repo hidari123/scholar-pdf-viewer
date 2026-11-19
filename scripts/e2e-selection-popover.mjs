@@ -136,7 +136,13 @@ try {
   );
 
   // ---- 2. 颜色下拉 ----
-  await page.locator('button[aria-label="选择高亮颜色"]').click();
+  /*
+   * ⚠️ 用 **class** 定位，不要用 aria-label。
+   * → 箭头按钮的 aria-label 改成了"展开颜色下拉"（和主按钮区分开）
+   * → 但**主按钮**的 aria-label 仍然是"选择高亮颜色"
+   * → 两者都能展开下拉 → 用 class 定位最稳。
+   */
+  await page.locator('.scpdf-selection-popover__btn--split').first().click();
   await page.waitForTimeout(400);
 
   const palette = await page.evaluate(() => {

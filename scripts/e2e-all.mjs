@@ -36,6 +36,7 @@ const suites = [
   { name: '跨页选择', file: 'e2e-cross-page-selection.mjs' },
   { name: '导出带高亮的 PDF', file: 'e2e-export-pdf.mjs' },
   { name: '导出 PDF 的批注编码', file: 'e2e-export-pdf-encoding.mjs' },
+  { name: '高亮浮层的 4 个按钮 + 小便签批注', file: 'e2e-highlight-actions4.mjs' },
   { name: '插槽（方案 D）', file: 'e2e-slots.mjs' },
   { name: '高亮的持久化', file: 'e2e-highlight-persist.mjs' },
   { name: '缩放矩阵（选区/高亮/性能）', file: 'e2e-zoom-matrix.mjs' },
