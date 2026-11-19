@@ -89,15 +89,33 @@ export function collectOutlineRefs(items: OutlineItemLike[] | undefined | null):
   /** 递归收集 */
   const walk = (list: OutlineItemLike[]) => {
     for (const item of list) {
-      if (Array.isArray(item.dest) && item.dest[0]) {
-        const ref = item.dest[0];
+      const dest = item.dest;
+
+      /*
+       * ⚠️⚠️ **两种 dest 形态都要收集**（实测踩过的坑）。
+       *
+       * 1. **数组**：`[pageRef, '/XYZ', left, top, zoom]` → 第一个元素是页引用
+       * 2. **字符串**：命名目标（如 `"section.1"`）→ 也要收集
+       *
+       * → 之前**只收集数组** → 命名目标**永远解析不出来**
+       *   → 那些目录项点了没反应 ❌（用户反馈："目录还是无法点击跳转"）
+       */
+      let ref: unknown = null;
+      if (Array.isArray(dest) && dest[0]) {
+        ref = dest[0];
+      } else if (typeof dest === 'string' && dest) {
+        ref = dest;
+      }
+
+      if (ref) {
         // 用对象身份去重（同一个页引用在多个目录项里出现）
-        const key = `${(ref as { num?: number })?.num ?? ''}`;
+        const key = `${(ref as { num?: number })?.num ?? ''}:${String(ref)}`;
         if (!seen.has(key)) {
           seen.add(key);
           refs.push(ref);
         }
       }
+
       if (item.items && item.items.length > 0) {
         walk(item.items);
       }

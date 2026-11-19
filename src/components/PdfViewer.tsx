@@ -38,6 +38,7 @@ import type { HighlightRect as HitRect } from '../core/highlight/hit-test';
 import { pickHighlightAtPoint } from '../core/highlight/hit-test';
 import type { HighlightPalette } from '../core/highlight/palette';
 import type { OutlineItemLike } from '../core/outline/outline';
+import { resolveOutlinePageNumbers } from '../core/outline/resolve';
 import type { IndexOffset } from '../core/search/align';
 import { alignRenderedToIndex } from '../core/search/align';
 import type { SearchHitRect } from '../core/search/highlight';
@@ -357,6 +358,28 @@ export interface PdfViewerProps {
   getDocInfo?: (data: Uint8Array) => Promise<PdfDocInfo>;
   /** 取目录（宿主注入 pdf.js 的 getOutline） */
   getOutline?: () => Promise<OutlineItemLike[] | null>;
+  /**
+   * **异步**解析页引用 → 页码（推荐用这个）。
+   *
+   * ## 为什么加这个（用户反馈："目录还是无法点击跳转"）
+   *
+   * → pdf.js 的 `getPageIndex(ref)` 是**异步**的
+   * → 之前只有**同步**的 `pageRefToNumber` → 宿主得自己：
+   *   收集页引用 → 异步解析 → 建 Map → 再通知包（`outlineResolveToken`）
+   * → **宿主漏了最后一步 → 目录点了没反应** ❌（用户看到的现象）
+   *
+   * → 现在：**包自己解析** → 宿主只要给一个 async 函数就行 ✅
+   *
+   * ```tsx
+   * <PdfViewer
+   *   getOutline={() => doc.getOutline()}
+   *   resolvePageRef={(ref) => doc.getPageIndex(ref).then((i) => i + 1)}
+   * />
+   * ```
+   *
+   * ⚠️ **优先级**：`pageRefToNumber`（同步）> `resolvePageRef`（异步）> 都不给（跳不了）
+   */
+  resolvePageRef?: (ref: unknown) => Promise<number | null>;
   /** 页引用 → 页码的映射（解析目录目标用） */
   pageRefToNumber?: (ref: unknown) => number | null;
   /**
@@ -567,6 +590,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     getPageSizes,
     getDocInfo,
     getOutline,
+    resolvePageRef,
     pageRefToNumber,
     outlineResolveToken,
     renderThumbnail,
@@ -686,6 +710,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
   /** 目录数据（宿主注入） */
   const [outline, setOutline] = useState<OutlineItemLike[] | null>(null);
+
+  /**
+   * **包自己解析出来的页码映射**（用 `resolvePageRef` 时）。
+   *
+   * → 宿主没给 `pageRefToNumber` 时用它 ✅
+   */
+  const [outlinePageMapper, setOutlinePageMapper] = useState<
+    ((ref: unknown) => number | null) | null
+  >(null);
+
+  /** 解析完成标记（每次解析完 +1 → 触发目录重渲染） */
+  const [internalResolveToken, setInternalResolveToken] = useState(0);
 
   /** 搜索命中（由 SearchPanel 回调） */
   const [searchHits, setSearchHits] = useState<SearchHit[]>([]);
@@ -979,9 +1015,49 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     let cancelled = false;
 
     void getOutline()
-      .then((items) => {
+      .then(async (items) => {
+        if (cancelled) {
+          return;
+        }
+        const tree = items ?? [];
+
+        /*
+         * ⚠️⚠️ **包自己解析页码**（用户反馈："目录还是无法点击跳转"）。
+         *
+         * → 之前只有**同步**的 `pageRefToNumber` → 宿主得自己写：
+         *   收集页引用 → 异步 `getPageIndex` → 建 Map → 再 `outlineResolveToken` +1
+         * → 宿主漏了最后一步 → **目录点了没反应** ❌
+         *
+         * → 现在：宿主给一个**异步**的 `resolvePageRef` → 包自己解析 ✅
+         * → 宿主的同步 `pageRefToNumber` **优先**（可能是同步的，更快）✅
+         */
+        if (!pageRefToNumber && resolvePageRef) {
+          const mapper = await resolveOutlinePageNumbers(tree, resolvePageRef);
+          if (!cancelled) {
+            /*
+             * ⚠️⚠️ **必须先 `setOutline(tree)`**（实测踩过的坑）。
+             *
+             * → 只 `setOutlinePageMapper` 的话 → \`outline\` 一直是 null
+             *   → 面板渲染不出来（目录**空的**）❌
+             * → 而且 effect 的依赖里有 \`outline\` → 它是 null 时 effect 会**重跑**
+             *   → 又调一次 \`getOutline\` → 死循环 ❌
+             */
+            setOutline(tree);
+            /*
+             * ⚠️⚠️ **必须用函数包一层**！
+             * -> \setOutlinePageMapper(mapper)\ -> mapper **是个函数**
+             * -> React 会把它当成**惰性初始化器**调用 -> 返回 mapper(...) 的结果 -> null ❌
+             * -> 所以要 \() => mapper\ ✅
+             */
+            setOutlinePageMapper(() => mapper);
+            // 解析完 → 触发一次重渲染（目录项从"解析中"变成"可跳转"）
+            setInternalResolveToken((n) => n + 1);
+          }
+          return;
+        }
+
         if (!cancelled) {
-          setOutline(items ?? []);
+          setOutline(tree);
         }
       })
       .catch(() => {
@@ -993,7 +1069,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     return () => {
       cancelled = true;
     };
-  }, [getOutline, sidebar, outline]);
+  }, [getOutline, sidebar, outline, pageRefToNumber, resolvePageRef]);
 
   /** 取各页尺寸（宿主注入；失败则用 A4 兜底） */
   useEffect(() => {
@@ -3327,8 +3403,12 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
             {sidebar === 'outline' && getOutline ? (
               <OutlinePanel
                 outline={outline}
-                pageRefToNumber={pageRefToNumber ?? (() => null)}
-                resolveToken={outlineResolveToken}
+                /*
+                 * ⚠️ **宿主的同步映射优先** → 宿主的**异步映射**（包解析的）兜底 ✅
+                 * → 都不给 → 目录项显示"解析中"，点了会记下意图（等映射好了自动跳）
+                 */
+                pageRefToNumber={pageRefToNumber ?? outlinePageMapper ?? (() => null)}
+                resolveToken={internalResolveToken + (outlineResolveToken ?? 0)}
                 currentPage={page}
                 onPageSelect={(target) => scrollToPage(target)}
                 locale={merged.locale ?? 'zh'}

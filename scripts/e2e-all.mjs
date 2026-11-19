@@ -53,6 +53,7 @@ const suites = [
   { name: '搜索高亮（像素级精度）', file: 'e2e-search-exact.mjs' },
   { name: 'TipTap 富文本编辑器', file: 'e2e-tiptap.mjs' },
   { name: '内置的语言和高亮色', file: 'e2e-builtin-defaults.mjs' },
+  { name: '目录的异步页码解析', file: 'e2e-outline-resolve.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

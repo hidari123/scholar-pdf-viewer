@@ -10,7 +10,6 @@ import type {
   AnnotationRecord,
   HighlightRecord,
   NewHighlight,
-  OutlineItemLike,
   PdfViewerDensity,
   PdfViewerHandle,
   PdfViewerTheme,
@@ -299,7 +298,8 @@ export default function App() {
   const [numPages, setNumPages] = useState(0);
 
   /** 目录页码映射就绪标记（解析完 +1 → 包重新解析目录） */
-  const [outlineResolveToken, setOutlineResolveToken] = useState(0);
+  /** 宿主的目录解析标记（现在包自己解析，宿主不用管了） */
+  const [_outlineResolveToken] = useState(0);
 
   /** 缩放（宿主展示用） */
   const [scale, setScale] = useState(1);
@@ -446,128 +446,51 @@ export default function App() {
   }, []);
 
   /**
-   * 页引用 → 页码的映射。
+   * **异步**解析页引用 → 页码（pdf.js 的 `getPageIndex`）。
    *
-   * pdf.js 的 outline 目标里是**页对象的内部引用**，
-   * 包拿不到页码 → 必须由宿主提供映射。
+   * ## 为什么只要这一个函数（之前要 100+ 行）
    *
-   * 实现要点：pdf.js v6 的 `doc.getPageIndex(ref)` 是**异步**的，
-   * 而包的 `pageRefToNumber` 是**同步**回调 →
-   * 所以这里在拿到目录时**一次性把所有引用的页码解析好**，存进 Map。
+   * → 之前 demo 要自己：收集页引用 → 异步解析 → 建 Map → 通知包
+   * → 现在：**包自己解析**（`resolvePageRef`）✅
+   * → 命名目标（"section.1"）也由宿主在这里先 `getDestination` 展开 ✅
    */
-  const pageRefMapRef = useRef(new Map<string, number>());
-
-  /**
-   * 解析目录里出现的所有目标 → 页码。
-   *
-   * **dest 有两种形态**（真实 PDF 两种都有）：
-   * 1. 数组：[pageRef, '/XYZ', left, top, zoom] → 直接有页引用
-   * 2. 字符串：命名目标（如 "section.1"）→ 要先用 `doc.getDestination(name)`
-   *    解析成数组才能拿到页引用
-   *
-   * 真实案例：本机的 A²E 论文用的就是命名目标（不处理的话目录全点不动）。
-   */
-  const resolveOutlinePages = useCallback(
-    async (doc: PDFDocumentProxy, outline: OutlineItemLike[] | null) => {
-      const map = new Map<string, number>();
-
-      /** 递归收集所有 dest（数组或命名） */
-      const collect = (items: OutlineItemLike[]): unknown[] => {
-        const dests: unknown[] = [];
-        for (const item of items) {
-          if (item.dest) {
-            dests.push(item.dest);
-          }
-          if (item.items?.length) {
-            dests.push(...collect(item.items));
-          }
+  const resolvePageRef = useCallback(async (ref: unknown): Promise<number | null> => {
+    const doc = docRef.current;
+    if (!doc) {
+      return null;
+    }
+    try {
+      // 命名目标 → 先展开成数组（pdf.js 的 getDestination）
+      let target: unknown = ref;
+      if (typeof ref === 'string') {
+        const resolved = await doc.getDestination(ref);
+        if (!resolved || !Array.isArray(resolved)) {
+          return null;
         }
-        return dests;
-      };
-
-      for (const dest of collect(outline ?? [])) {
-        try {
-          // 命名目标 → 先解析成数组
-          const resolved = typeof dest === 'string' ? await doc.getDestination(dest) : dest;
-          if (!resolved || !Array.isArray(resolved)) {
-            console.warn('[demo] 目标无法解析:', dest, resolved);
-            continue;
-          }
-
-          const ref = resolved[0];
-          if (!ref) {
-            continue;
-          }
-
-          const pageIndex = await doc.getPageIndex(ref as never);
-          if (pageIndex < 0) {
-            continue;
-          }
-
-          const target = ref as { num?: number; gen?: number };
-          if (typeof target.num === 'number') {
-            const pageNumber = pageIndex + 1;
-            // 两种键都存：页引用形态 + 命名目标形态
-            map.set(`${target.num}R${target.gen ?? 0}`, pageNumber);
-            if (typeof dest === 'string') {
-              map.set(dest, pageNumber);
-            }
-          }
-        } catch (error) {
-          // 解析不了的引用跳过（该项在 UI 上禁用）
-          console.warn('[demo] 目录目标解析失败:', error, dest);
-        }
+        target = resolved[0];
       }
-
-      console.log('[demo] 映射结果:', map.size, '条');
-
-      pageRefMapRef.current = map;
-
-      // 告诉包"映射好了，重新解析目录"
-      setOutlineResolveToken((token) => token + 1);
-    },
-    [],
-  );
-
-  /**
-   * 页引用 / 命名目标 → 页码。
-   *
-   * 两种键：
-   * - 页引用对象：`{num, gen}` → "330R0"
-   * - 命名目标字符串："section.1" → 原样
-   */
-  const pageRefToNumber = useCallback((ref: unknown): number | null => {
-    if (typeof ref === 'string') {
-      return pageRefMapRef.current.get(ref) ?? null;
-    }
-    if (!ref || typeof ref !== 'object') {
+      if (!target || typeof target !== 'object') {
+        return null;
+      }
+      const index = await doc.getPageIndex(target as never);
+      return index < 0 ? null : index + 1;
+    } catch {
       return null;
     }
-    const target = ref as { num?: number; gen?: number };
-    if (typeof target.num !== 'number') {
-      return null;
-    }
-    return pageRefMapRef.current.get(`${target.num}R${target.gen ?? 0}`) ?? null;
   }, []);
 
   /**
    * 取目录（宿主注入）。
    *
-   * pdf.js 的 dest 里第一个元素是**页对象的内部引用**，
-   * 包拿不到页码 → 必须由宿主提供映射（pageRefToNumber）。
+   * → 只要给 `getOutline` + `resolvePageRef`，包就能自己解析页码 ✅
    */
   const getOutline = useCallback(async () => {
     const doc = docRef.current;
     if (!doc) {
       return null;
     }
-    const outline = await doc.getOutline();
-
-    // 解析目录目标 → 页码（包的 pageRefToNumber 回调是同步的，这里先备好）
-    void resolveOutlinePages(doc, outline);
-
-    return outline;
-  }, [resolveOutlinePages]);
+    return doc.getOutline();
+  }, []);
 
   /**
    * 渲染缩略图（宿主注入）。
@@ -1229,8 +1152,11 @@ export default function App() {
           getPageSizes={getPageSizes}
           getDocInfo={getDocInfo}
           getOutline={getOutline}
-          pageRefToNumber={pageRefToNumber}
-          outlineResolveToken={outlineResolveToken}
+          /*
+           * ⚠️ **用包的异步解析器**（不用自己收集页引用 + 建 Map + 通知包）。
+           * -> pdf.js 的 `getPageIndex` 是异步的 -> 包自己处理 ✅
+           */
+          resolvePageRef={resolvePageRef}
           renderThumbnail={renderThumbnail}
           searchEngine={searchEngine}
           onDocumentLoad={handleDocumentLoad}
