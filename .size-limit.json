@@ -1,8 +1,8 @@
-﻿[
+[
   {
     "name": "主入口（组件 + hooks）",
     "path": "dist/index.js",
-    "limit": "26 kB",
+    "limit": "28 kB",
     "import": "{ PdfViewer }",
     "entry": "index"
   },
@@ -29,6 +29,12 @@
     "path": "dist/icons.js",
     "limit": "8 kB",
     "import": "{ getIconShape }"
+  },
+  {
+    "name": "editor 子路径（TipTap 富文本，可选 peer）",
+    "path": "dist/editor.js",
+    "limit": "12 kB",
+    "import": "{ TipTapEditor }"
   },
   {
     "name": "dialog 子路径（写批注的富文本弹窗）",

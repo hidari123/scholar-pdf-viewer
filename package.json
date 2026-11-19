@@ -32,6 +32,16 @@
         "default": "./dist/core.cjs"
       }
     },
+    "./editor": {
+      "import": {
+        "types": "./dist/editor.d.ts",
+        "default": "./dist/editor.js"
+      },
+      "require": {
+        "types": "./dist/editor.d.cts",
+        "default": "./dist/editor.cjs"
+      }
+    },
     "./dialog": {
       "import": {
         "types": "./dist/dialog.d.ts",
@@ -102,6 +112,13 @@
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.10",
+    "@tiptap/core": "^3.34.0",
+    "@tiptap/extension-color": "^3.34.0",
+    "@tiptap/extension-highlight": "^3.34.0",
+    "@tiptap/extension-link": "^3.34.0",
+    "@tiptap/extension-underline": "^3.34.0",
+    "@tiptap/react": "^3.34.0",
+    "@tiptap/starter-kit": "^3.34.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "jsdom": "^31.0.1",
@@ -118,11 +135,43 @@
     "pdfjs-dist": "^6.4.299"
   },
   "peerDependencies": {
+    "@tiptap/core": ">=3.0.0",
+    "@tiptap/extension-color": ">=3.0.0",
+    "@tiptap/extension-highlight": ">=3.0.0",
+    "@tiptap/extension-link": ">=3.0.0",
+    "@tiptap/extension-underline": ">=3.0.0",
+    "@tiptap/react": ">=3.0.0",
+    "@tiptap/starter-kit": ">=3.0.0",
     "pdf-lib": ">=1.17.0",
-    "react": ">=18.0.0 <20"
+    "react": ">=18.0.0 <20",
+    "react-dom": ">=18.0.0 <20"
   },
   "peerDependenciesMeta": {
+    "@tiptap/core": {
+      "optional": true
+    },
+    "@tiptap/extension-color": {
+      "optional": true
+    },
+    "@tiptap/extension-highlight": {
+      "optional": true
+    },
+    "@tiptap/extension-link": {
+      "optional": true
+    },
+    "@tiptap/extension-underline": {
+      "optional": true
+    },
+    "@tiptap/react": {
+      "optional": true
+    },
+    "@tiptap/starter-kit": {
+      "optional": true
+    },
     "pdf-lib": {
+      "optional": true
+    },
+    "react-dom": {
       "optional": true
     }
   }

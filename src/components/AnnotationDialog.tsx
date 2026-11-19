@@ -61,6 +61,22 @@ export interface AnnotationDialogProps {
   locales?: LocaleTable;
   /** 文案覆盖 */
   messages?: Partial<Messages>;
+  /**
+   * **富文本编辑器**（宿主可换，比如 TipTapEditor）。
+   *
+   * -> 不传 -> 用包内置的轻量编辑器
+   */
+  editor?: React.ComponentType<{
+    value?: string;
+    onChange?: (html: string, plain: string) => void;
+    toolbar?: RichTextToolbarItem[];
+    palette?: RichTextPalette;
+    placeholder?: string;
+    icons?: Partial<Record<IconName, ReactNode>>;
+    locale?: Locale;
+    locales?: LocaleTable;
+    messages?: Partial<Messages>;
+  }>;
 }
 
 /**
@@ -81,6 +97,7 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
     locale = 'zh',
     locales,
     messages,
+    editor,
   } = props;
 
   const t = useCallback(
@@ -170,19 +187,24 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
         </div>
 
         <div className="scpdf-annotation-dialog__body">
-          <RichTextEditor
-            value={html}
-            onChange={(nextHtml) => {
-              setHtml(nextHtml);
-            }}
-            toolbar={toolbar}
-            palette={palette}
-            icons={icons}
-            locale={locale}
-            locales={locales}
-            messages={messages}
-            placeholder={t('annotation.placeholder')}
-          />
+          {(() => {
+            const EditorComponent = editor ?? RichTextEditor;
+            return (
+              <EditorComponent
+                value={html}
+                onChange={(nextHtml: string) => {
+                  setHtml(nextHtml);
+                }}
+                toolbar={toolbar}
+                palette={palette}
+                icons={icons}
+                locale={locale}
+                locales={locales}
+                messages={messages}
+                placeholder={t('annotation.placeholder')}
+              />
+            );
+          })()}
         </div>
 
         <div className="scpdf-annotation-dialog__foot">

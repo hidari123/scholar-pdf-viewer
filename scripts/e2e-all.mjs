@@ -51,6 +51,7 @@ const suites = [
   { name: '加批注按钮 + 富文本弹窗', file: 'e2e-annotation-dialog.mjs' },
   { name: '统一配置对象', file: 'e2e-config.mjs' },
   { name: '搜索高亮（像素级精度）', file: 'e2e-search-exact.mjs' },
+  { name: 'TipTap 富文本编辑器', file: 'e2e-tiptap.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

@@ -30,6 +30,15 @@ export default defineConfig({
      * → 独立入口 → **要用才装** ✅
      */
     dialog: 'src/components/AnnotationDialog.tsx',
+    /**
+     * **TipTap 富文本编辑器**（独立入口）。
+     *
+     * ⚠️ 为什么独立（实测踩过的坑：体积超预算）：
+     * → TipTap（starter-kit + highlight/color/link/underline）**106 kB brotli**
+     * → 打进主入口 → 首屏加载明显变慢 ❌
+     * → 独立入口 + **可选 peerDependency** → 宿主按需装 ✅
+     */
+    editor: 'src/components/TipTapEditor.tsx',
   },
   format: ['esm', 'cjs'],
   dts: true,
@@ -45,5 +54,17 @@ export default defineConfig({
   splitting: true,
   // 边界线：这些是"我的依赖"，不进产物，由消费方的包管理器解析
   // ⚠️ `pdf-lib` 是**可选依赖**（动态 import）→ 也不能进产物
-  external: ['pdfjs-dist', 'idb', 'pdf-lib'],
+  external: [
+    'pdfjs-dist',
+    'idb',
+    'pdf-lib',
+    // ⚠️ TipTap 是**可选 peerDependency** → 不能进产物（宿主自己装）
+    '@tiptap/core',
+    '@tiptap/react',
+    '@tiptap/starter-kit',
+    '@tiptap/extension-highlight',
+    '@tiptap/extension-color',
+    '@tiptap/extension-link',
+    '@tiptap/extension-underline',
+  ],
 });

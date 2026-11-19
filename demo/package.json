@@ -11,6 +11,13 @@
   },
   "dependencies": {
     "@scholar-club/pdf-viewer": "workspace:*",
+    "@tiptap/core": "^3.34.0",
+    "@tiptap/extension-color": "^3.34.0",
+    "@tiptap/extension-highlight": "^3.34.0",
+    "@tiptap/extension-link": "^3.34.0",
+    "@tiptap/extension-underline": "^3.34.0",
+    "@tiptap/react": "^3.34.0",
+    "@tiptap/starter-kit": "^3.34.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.4.299",
     "react": "^19.3.1",

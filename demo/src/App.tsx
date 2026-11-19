@@ -29,6 +29,7 @@ import {
   themeLabel,
 } from '@scholar-club/pdf-viewer';
 import { AnnotationDialog } from '@scholar-club/pdf-viewer/dialog';
+import { TipTapEditor } from '@scholar-club/pdf-viewer/editor';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import * as pdfjs from 'pdfjs-dist';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1240,6 +1241,7 @@ export default function App() {
           searchEngine={searchEngine}
           onDocumentLoad={handleDocumentLoad}
           onSelectionChange={handleSelection}
+          annotationEditor={TipTapEditor}
           onHighlightCreate={(h) => {
             /*
              * ⚠️ **宿主自己的按钮创建了高亮**（走 `viewerRef.createHighlight`）→ 这里存。

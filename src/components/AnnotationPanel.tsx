@@ -70,6 +70,22 @@ export interface AnnotationPanelProps {
   locales?: LocaleTable;
   /** 文案覆盖 */
   messages?: Partial<Messages>;
+  /**
+   * **富文本编辑器**（宿主可换，比如 TipTapEditor）。
+   *
+   * -> 不传 -> 用包内置的轻量编辑器
+   */
+  editor?: React.ComponentType<{
+    value?: string;
+    onChange?: (html: string, plain: string) => void;
+    toolbar?: RichTextToolbarItem[];
+    palette?: RichTextPalette;
+    placeholder?: string;
+    icons?: Partial<Record<IconName, ReactNode>>;
+    locale?: Locale;
+    locales?: LocaleTable;
+    messages?: Partial<Messages>;
+  }>;
 }
 
 /**
@@ -92,6 +108,7 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
     locale = 'zh',
     locales,
     messages,
+    editor,
   } = props;
 
   /**
@@ -225,17 +242,22 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
         {readOnly ? (
           <ReadOnlyContent html={draft} />
         ) : (
-          <RichTextEditor
-            value={draft}
-            toolbar={toolbar}
-            palette={palette}
-            locale={locale}
-            locales={locales}
-            messages={messages}
-            onChange={handleChange}
-            onSubmit={onSubmit ? handleSubmit : undefined}
-            icons={icons}
-          />
+          (() => {
+            const EditorComponent = editor ?? RichTextEditor;
+            return (
+              <EditorComponent
+                value={draft}
+                toolbar={toolbar}
+                palette={palette}
+                locale={locale}
+                locales={locales}
+                messages={messages}
+                onChange={handleChange}
+                onSubmit={onSubmit ? handleSubmit : undefined}
+                icons={icons}
+              />
+            );
+          })()
         )}
       </div>
 

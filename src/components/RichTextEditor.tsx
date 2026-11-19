@@ -23,6 +23,7 @@
 
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { resolveToolbarLabel } from '../core/editor/label';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
 import {
   defaultRichTextToolbar,
@@ -111,14 +112,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
    * @returns 最终文案
    */
   const resolveLabel = useCallback(
-    (label: string, vars?: Record<string, string | number>) => {
-      const match = /^\{(.+)\}$/.exec(label);
-      if (!match) {
-        return label;
-      }
-      const key = match[1] as keyof Messages;
-      return resolveMessage(locale, key, messages, vars, locales);
-    },
+    (label: string, vars?: Record<string, string | number>) =>
+      resolveToolbarLabel(label, locale, messages, locales, vars),
     [locale, messages, locales],
   );
 

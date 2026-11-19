@@ -77,7 +77,7 @@ import { SearchPanel } from './SearchPanel';
 import { SelectionPopover } from './SelectionPopover';
 import { ThumbnailPanel } from './ThumbnailPanel';
 import type { ToastContent, ToastController } from './Toast';
-import { Toast, useToastController } from './Toast';
+import { useToastController } from './Toast';
 import type { ToolbarConfig } from './Toolbar';
 import { Toolbar } from './Toolbar';
 
@@ -103,6 +103,17 @@ const AnnotationPanel = lazy(() =>
  * → 静态 import → 每个宿主都要背 ❌
  * → 懒加载 → **不用就不加载** ✅
  */
+/**
+ * **Toast 容器**（懒加载）。
+ *
+ * ⚠️ **为什么要懒加载**（实测踩过的坑：体积超预算）：
+ * -> Toast 的组件 + 样式约 1.5 kB（brotli 后）
+ * -> 但**只有弹提示时才需要**
+ * -> 静态 import -> 每个宿主都要背 ❌
+ * -> 懒加载 -> **不弹就不加载** ✅
+ */
+const Toast = lazy(() => import('./Toast').then((mod) => ({ default: mod.Toast })));
+
 const AnnotationDialog = lazy(() =>
   import('./AnnotationDialog').then((mod) => ({ default: mod.AnnotationDialog })),
 );
@@ -243,6 +254,30 @@ export interface PdfViewerProps {
    * → 宿主传了 `onToast` → **完全接管**（用自己的 toast 组件）✅
    */
   onToast?: (toast: ToastController) => void;
+  /**
+   * **批注的富文本编辑器**（宿主可换）。
+   *
+   * ⚠️ 用户需求："自研的很多问题 不要自研的富文本了 用一个现成的吧 集成进来 选配需要的工具"
+   *
+   * → 不传 → 用**包内置的轻量编辑器**（contenteditable，零依赖）✅
+   * → 传了 → 用**宿主的编辑器**（比如 TipTapEditor）✅
+   *
+   * 用法：`import { TipTapEditor } from '@scholar-club/pdf-viewer/editor'`
+   * 然后 `<PdfViewer annotationEditor={TipTapEditor} />`
+   *
+   * ⚠️ **TipTap 是可选 peerDependency** → 主入口体积不变（25 kB）✅
+   */
+  annotationEditor?: React.ComponentType<{
+    value?: string;
+    onChange?: (html: string, plain: string) => void;
+    toolbar?: RichTextToolbarItem[];
+    palette?: RichTextPalette;
+    placeholder?: string;
+    icons?: Partial<Record<IconName, ReactNode>>;
+    locale?: Locale;
+    locales?: LocaleTable;
+    messages?: Partial<Messages>;
+  }>;
   /**
    * **统一配置对象**（"万物可配置"）。
    *
@@ -556,6 +591,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onAnnotationChange,
     onAnnotationSave,
     onAnnotationCreate,
+    annotationEditor,
     onToast,
     onAnnotationDelete,
     onHighlightColorChange,
@@ -3377,16 +3413,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
             ⚠️ 宿主传了 `onToast` → **完全接管** → 包不渲染自己的 ✅
           */}
           {onToast ? null : (
-            <Toast
-              items={toastItems}
-              onClose={(key) => {
-                toast.close(key);
-              }}
-              icons={merged.icons}
-              locale={merged.locale ?? 'zh'}
-              locales={merged.locales}
-              messages={merged.messages}
-            />
+            <Suspense fallback={null}>
+              <Toast
+                items={toastItems}
+                onClose={(key) => {
+                  toast.close(key);
+                }}
+                icons={merged.icons}
+                locale={merged.locale ?? 'zh'}
+                locales={merged.locales}
+                messages={merged.messages}
+              />
+            </Suspense>
           )}
 
           {/*
@@ -3438,6 +3476,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               locale={merged.locale ?? 'zh'}
               locales={merged.locales}
               messages={merged.messages}
+              editor={annotationEditor}
             />
           </Suspense>
 
@@ -3456,6 +3495,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                 locale={merged.locale ?? 'zh'}
                 locales={merged.locales}
                 messages={merged.messages}
+                editor={annotationEditor}
               />
             </Suspense>
           ) : null}

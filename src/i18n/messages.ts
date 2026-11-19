@@ -99,6 +99,7 @@ export interface Messages {
   'annotation.pick': string;
   'annotation.new': string;
   'toast.region': string;
+  'richtext.linkPrompt': string;
   'highlight.fullyCovered': string;
   'toast.close': string;
   'toast.copied': string;
@@ -190,6 +191,7 @@ export const ZH_MESSAGES: Messages = {
   'annotation.pick': '选择批注（{count}）',
   'annotation.new': '新建批注',
   'toast.region': '通知',
+  'richtext.linkPrompt': '链接地址',
   'highlight.fullyCovered': '这段已经被高亮了',
   'toast.close': '关闭',
   'toast.copied': '已复制到剪贴板',
@@ -257,6 +259,7 @@ export const EN_MESSAGES: Messages = {
   'annotation.pick': 'Select annotation ({count})',
   'annotation.new': 'New annotation',
   'toast.region': 'Notifications',
+  'richtext.linkPrompt': 'Link URL',
   'highlight.fullyCovered': 'This text is already highlighted',
   'toast.close': 'Close',
   'toast.copied': 'Copied to clipboard',
