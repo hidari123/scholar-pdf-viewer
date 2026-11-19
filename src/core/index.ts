@@ -8,6 +8,7 @@
 
 export * from './annotation';
 export * from './cache';
+export * from './config';
 export * from './document';
 export * from './errors';
 export * from './export';

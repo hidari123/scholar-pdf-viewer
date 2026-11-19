@@ -40,6 +40,28 @@ export {
 /* ---------- 统一配置（"万物可配置"） ---------- */
 export type { PdfViewerConfig } from './core/config';
 export { mergeConfig, resolveConfigValue } from './core/config';
+export {
+  /**
+   * **包内置的高亮色板**（宿主不传也能用）。
+   *
+   * -> 用户需求："高亮色…是包需要内置的 但是有接口宿主可以配置" ✅
+   */
+  BUILTIN_HIGHLIGHT_PALETTE,
+  /**
+   * **包内置的扩展语言表**（ja / fr）。
+   *
+   * -> 宿主不用再写一整套文案表 ✅
+   */
+  BUILTIN_LOCALES,
+  /**
+   * **按浏览器语言推断默认语言**。
+   */
+  detectDefaultLocale,
+  /**
+   * **合并语言表**（宿主覆盖内置）。
+   */
+  mergeLocales,
+} from './core/config/builtin-defaults';
 /* ---------- 下载（纯 DOM，无网络依赖） ---------- */
 export { downloadFile } from './core/document/download';
 /* ---------- 富文本（零依赖，工具栏宿主可配） ---------- */

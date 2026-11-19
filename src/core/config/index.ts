@@ -63,6 +63,7 @@ import type { HighlightPalette } from '../highlight/palette';
 import type { IconName } from '../icons/icons';
 import type { SelectionAction } from '../selection/actions';
 import type { PdfViewerAppearance, PdfViewerTheme } from '../theme';
+import { BUILTIN_HIGHLIGHT_PALETTE, detectDefaultLocale, mergeLocales } from './builtin-defaults';
 
 /**
  * **统一配置对象**。
@@ -195,9 +196,24 @@ export function mergeConfig(
     theme: resolveConfigValue(props.theme, c.theme),
     appearance: resolveConfigValue(props.appearance, c.appearance),
     icons: resolveConfigValue(props.icons, c.icons),
-    highlightPalette: resolveConfigValue(props.highlightPalette, c.highlightPalette),
-    locale: resolveConfigValue(props.locale, c.locale),
-    locales: resolveConfigValue(props.locales, c.locales),
+    /*
+     * ⚠️⚠️ **内置默认值**（用户需求：
+     * "语言和高亮色都是包需要内置的 但是有接口宿主可以配置 现在你都放宿主这里了"）。
+     *
+     * -> 高亮色板：**不传也有**（内置 6 色）✅
+     * -> 语言表：**内置了 ja / fr** → 宿主不用再写一整套 ✅
+     * -> 宿主的值**优先级更高**（prop > config > 内置）✅
+     */
+    highlightPalette:
+      resolveConfigValue(props.highlightPalette, c.highlightPalette) ?? BUILTIN_HIGHLIGHT_PALETTE,
+    /*
+     * ⚠️ **没指定语言时按浏览器语言推断**（而不是硬编码 'zh'）。
+     * -> 很多宿主是英文站点 -> 默认中文 -> 用户看到"怎么是中文" ❌
+     * -> 推断成浏览器语言 -> **开箱即用** ✅
+     */
+    locale: resolveConfigValue(props.locale, c.locale) ?? detectDefaultLocale(),
+    // 宿主的语言表 + 内置的语言表（宿主覆盖内置）
+    locales: mergeLocales(resolveConfigValue(props.locales, c.locales)),
     messages: resolveConfigValue(props.messages, c.messages),
     selectionActions: resolveConfigValue(props.selectionActions, c.selectionActions),
     annotationToolbar: resolveConfigValue(props.annotationToolbar, c.annotationToolbar),

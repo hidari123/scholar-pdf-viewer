@@ -50,10 +50,18 @@ describe('mergeConfig（统一配置）', () => {
     expect(merged.locale).toBe('en');
   });
 
-  it('**两种都没给 → undefined**（各组件用自己的默认值）', () => {
+  it('**两种都没给 → 用包的内置默认**', () => {
     const merged = mergeConfig(undefined, {});
     expect(merged.theme).toBeUndefined();
-    expect(merged.locale).toBeUndefined();
+    /*
+     * ⚠️ **语言不再默认 'zh'** → 按**浏览器语言**推断。
+     * → 用户需求："语言和高亮色都是包需要内置的" ✅
+     * → 英文环境 → 'en'；中文环境 → 'zh' ✅
+     */
+    expect(['zh', 'en']).toContain(merged.locale);
+    // ⚠️ **高亮色板必须有内置默认**（宿主不传也能用）
+    expect(merged.highlightPalette).toBeDefined();
+    expect(Object.keys(merged.highlightPalette ?? {}).length).toBeGreaterThan(0);
   });
 
   it('**图标 / 色板 / 语言 / 动作 都能配**', () => {

@@ -193,21 +193,15 @@ export default function App() {
    *
    * → 这就是"宿主通过固定 json 添加语言"的接口 ✅
    * → 不用写全 → 缺的自动回退到内置文案
+   *
+   * ⚠️ **现在包内置了 `ja`**（不用宿主写一整套了）✅
+   * → 下面只**覆盖一句**，演示"宿主的优先级更高" ✅
    */
   const HOST_LOCALES = useMemo(
     () => ({
       ja: {
-        'load.loading': 'ドキュメントを読み込み中…',
-        'page.of': '{page} / {total} ページ',
-        'search.placeholder': 'ドキュメントを検索',
-        'search.count': '{count} 件',
-        'outline.title': '目次',
-        'thumbnails.title': 'サムネイル',
-        'print.title': '印刷',
-        'zoom.in': '拡大',
-        'zoom.out': '縮小',
-        'zoom.fitWidth': '幅に合わせる',
-        'zoom.fitPage': 'ページ全体',
+        // 覆盖内置的 "サムネイル" → "ページ"
+        'thumbnails.title': 'ページ一覧',
       },
     }),
     [],
