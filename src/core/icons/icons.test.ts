@@ -121,9 +121,62 @@ describe('内置图标集', () => {
     const upload = getIconShape('upload');
     const download = getIconShape('download');
 
-    // 上传 = 箭头朝上（v-7 → 往下是 v7）；下载 = 箭头朝下（v11）
-    expect(upload?.paths?.some((d) => d.includes('M12 20v-7'))).toBe(true);
-    expect(download?.paths?.some((d) => d.includes('M12 4v11'))).toBe(true);
+    /*
+     * ⚠️ **按几何判断**（不是按路径字符串）→ 改了画法也不会失效。
+     *
+     * → 上传：箭头的**竖线**从下往上（y 大 → y 小）
+     * → 下载：箭头的**竖线**从上往下（y 小 → y 大）
+     */
+    const arrowOf = (shape: { paths?: readonly string[] } | null) =>
+      shape?.paths?.find((d) => /^M12 [\d.]+v-?[\d.]+$/.test(d)) ?? '';
+
+    expect(arrowOf(upload)).toMatch(/^M12 [\d.]+v-/);
+    expect(arrowOf(download)).toMatch(/^M12 [\d.]+v[^-]/);
+  });
+
+  it('**上传/下载的箭头在云里（不戳出云顶）**（用户反馈："箭头放的位置也不对 超出来了"）', () => {
+    for (const name of ['upload', 'download'] as const) {
+      const shape = getIconShape(name);
+      const arrow = shape?.paths?.find((d) => /^M12 [\d.]+v-?[\d.]+$/.test(d)) ?? '';
+
+      // 箭头的竖线：从尾部（y 大）到尖端（y 小）
+      const match = /^M12 ([\d.]+)v(-?)([\d.]+)$/.exec(arrow);
+      expect(match, `${name} 找不到箭头的竖线`).toBeTruthy();
+
+      const startY = Number(match?.[1]);
+      const length = Number(match?.[3]);
+      const tipY = startY - length;
+
+      // 箭头的**尖端**不能贴边（要留余量）
+      expect(tipY).toBeGreaterThanOrEqual(2);
+      expect(tipY).toBeLessThanOrEqual(16);
+      // 箭头的**尾部**也要留余量
+      expect(startY).toBeLessThanOrEqual(19);
+    }
+  });
+
+  it('**复制图标的两张纸一样大**（用户反馈："复制…挤压在一起了"）', () => {
+    const shape = getIconShape('copy');
+    // 两张纸：后面的完整矩形 + 前面只画露出来的上边和左边
+    const paths = shape?.paths ?? [];
+    expect(paths.length).toBe(2);
+    // 两张纸的尺寸都是 12×12 → 一样大
+    expect(paths[0]).toContain('h9');
+    expect(paths[1]).toContain('v9');
+  });
+
+  it('**翻译图标的"文"和"A"不重叠**（用户反馈："翻译…挤压在一起了"）', () => {
+    const shape = getIconShape('translate');
+    const paths = shape?.paths ?? [];
+
+    // "文"占 x=2..11，"A"占 x=12..22 → 中间留了 1px
+    const wen = paths.slice(0, 5).join(' ');
+    const a = paths.slice(5).join(' ');
+
+    // "文"的最右 x = 8.8
+    expect(wen).toContain('M8.8');
+    // "A"的最左 x = 14
+    expect(a).toContain('M14');
   });
 
   it('**未知图标返回 null**（不抛异常）', () => {
