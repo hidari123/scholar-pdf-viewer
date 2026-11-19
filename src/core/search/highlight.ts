@@ -22,6 +22,7 @@
  * @see `align.ts` 的 `mapOffsetToRenderedByText`
  */
 
+import { measureTextWidth } from '../text-layer/font-metrics';
 import type { PositionedTextItem } from '../text-layer/layout';
 import type { IndexOffset } from './align';
 import { convertIndexOffsetToRendered, mapOffsetToRenderedByText } from './align';
@@ -164,14 +165,51 @@ export function hitToRects(
       continue;
     }
 
-    /**
-     * 部分命中时按比例裁剪宽度。
+    /*
+     * ⚠️⚠️ **字符位置必须实测，不能按字符数比例**（实测踩过的坑）。
      *
-     * 例：item 是 "Hello World"（11 字），命中 "World"（后 5 字）
-     * → 起点 = left + width × (6/11)，宽度 = width × (5/11)
+     * ### 问题
+     *
+     * 之前用 `item.width × (offsetInItem / textLength)` → **比例字体**下会偏。
+     *
+     * 实测（真实 PDF，搜 "agent"）：
+     * ```
+     * 文本: "An End-to-End Agent Auditing Engine"（32 字）
+     * 命中: "Agent"（第 14~18 字）
+     *
+     * 真实位置:  left=680, width=90
+     * 按比例算:  left=677, width=81     ← 窄了 9px ❌
+     * ```
+     *
+     * → 原因："Agent" 的**实际像素宽度**和 5/32 这个比例差得多
+     * → 用户看到的就是"高亮框比文字窄 / 位置偏一点" ❌
+     *
+     * ### 修法
+     *
+     * → 用 `measureTextWidth` **实测**前缀的宽度
+     * → 前缀宽 + 命中宽 → 换算到 PDF 宽度（乘 scaleX）
      */
-    const startRatio = offsetInItem / textLength;
-    const endRatio = (offsetInItem + charsInItem) / textLength;
+
+    // 前缀（命中之前的文字）和命中本身的浏览器宽度
+    const prefixText = item.text.slice(0, offsetInItem);
+    const hitText = item.text.slice(offsetInItem, offsetInItem + charsInItem);
+
+    // 浏览器排版的宽度（实测）
+    const browserTotal = item.browserWidth || item.width;
+    const prefixWidth =
+      offsetInItem > 0 ? measureTextWidth(prefixText, item.fontFamily, item.fontSize) || 0 : 0;
+    const hitWidth =
+      charsInItem > 0 ? measureTextWidth(hitText, item.fontFamily, item.fontSize) || 0 : 0;
+
+    /*
+     * ⚠️ **实测失败时的兜底**：按字符数比例。
+     * → 非浏览器环境（SSR / Node 测试）测不到宽度
+     */
+    const fallbackStart = offsetInItem / textLength;
+    const fallbackEnd = (offsetInItem + charsInItem) / textLength;
+
+    const startRatio = prefixWidth > 0 ? prefixWidth / browserTotal : fallbackStart;
+    const endRatio = hitWidth > 0 ? (prefixWidth + hitWidth) / browserTotal : fallbackEnd;
 
     const x = (item.left + item.width * startRatio) / viewportWidth;
     const width = (item.width * (endRatio - startRatio)) / viewportWidth;

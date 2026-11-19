@@ -50,6 +50,7 @@ const suites = [
   { name: '多批注分组 + 便利贴面板 + 富文本', file: 'e2e-annotation-panel.mjs' },
   { name: '加批注按钮 + 富文本弹窗', file: 'e2e-annotation-dialog.mjs' },
   { name: '统一配置对象', file: 'e2e-config.mjs' },
+  { name: '搜索高亮（像素级精度）', file: 'e2e-search-exact.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

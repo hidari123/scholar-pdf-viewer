@@ -97,10 +97,98 @@ export function selectSearchItems<T extends SearchTextItemLike>(
       continue;
     }
 
+    /*
+     * ⚠️⚠️ **"定位不了"的项**：渲染时会跳过 → 索引也必须跳过。
+     *
+     * ### 实测（真实 arXiv PDF 的页眉 logo）
+     *
+     * ```
+     * 搜索 "A2E" → 46 个命中，其中 3 个落在**页眉 logo**上
+     * → 但那个 logo 是**图片**，文本层里**根本没有**对应的 span
+     * → 高亮框画在了**空白处** → 用户看到"高亮跑到奇怪的地方" ❌
+     * ```
+     *
+     * ### 判据（必须和渲染侧一致）
+     *
+     * → 渲染侧（`positionTextItem`）：`fontHeight = hypot(tx[2], tx[3])`
+     *   → `fontHeight` 不是有限数或 ≤ 0 → **返回 null（不渲染）** ✅
+     * → 索引侧也要用**同样的判据** ✅
+     */
+    if (options.viewport && !canPositionItem(item, options.viewport)) {
+      continue;
+    }
+
     result.push(item);
   }
 
   return result;
+}
+
+/**
+ * 判定一个项**能不能被定位**（和渲染侧 `positionTextItem` 的判据一致）。
+ *
+ * ⚠️ **必须和渲染侧完全一致**（`core/text-layer/layout.ts`）：
+ * → `fontHeight = hypot(tx[2], tx[3])`（复合矩阵的垂直分量模长）
+ * → 不是有限数 或 ≤ 0 → **定位不了** → 渲染时跳过
+ *
+ * @param item 文本项
+ * @param viewport 视口
+ * @returns 能定位则 true
+ */
+export function canPositionItem(
+  item: { transform: number[] },
+  viewport: { transform: number[]; scale: number; width: number; height: number },
+): boolean {
+  const tx = compositeTransform(viewport.transform, item.transform);
+  if (!tx) {
+    return false;
+  }
+  const fontHeight = Math.hypot(tx[2] ?? 0, tx[3] ?? 0);
+  return Number.isFinite(fontHeight) && fontHeight > 0;
+}
+
+/**
+ * 复合矩阵：`tx = viewport.transform ∘ item.transform`。
+ *
+ * @param viewportTransform 视口矩阵
+ * @param itemTransform 项矩阵
+ * @returns 复合矩阵（长度不足 6 时返回 null）
+ */
+function compositeTransform(viewportTransform: number[], itemTransform: number[]): number[] | null {
+  if (
+    !viewportTransform ||
+    viewportTransform.length < 6 ||
+    !itemTransform ||
+    itemTransform.length < 6
+  ) {
+    return null;
+  }
+
+  const m1 = viewportTransform;
+  const m2 = itemTransform;
+
+  const a = m1[0] ?? 0;
+  const b = m1[1] ?? 0;
+  const c = m1[2] ?? 0;
+  const d = m1[3] ?? 0;
+  const e = m1[4] ?? 0;
+  const f = m1[5] ?? 0;
+
+  const a2 = m2[0] ?? 0;
+  const b2 = m2[1] ?? 0;
+  const c2 = m2[2] ?? 0;
+  const d2 = m2[3] ?? 0;
+  const e2 = m2[4] ?? 0;
+  const f2 = m2[5] ?? 0;
+
+  return [
+    a * a2 + c * b2,
+    b * a2 + d * b2,
+    a * c2 + c * d2,
+    b * c2 + d * d2,
+    a * e2 + c * f2 + e,
+    b * e2 + d * f2 + f,
+  ];
 }
 
 /**

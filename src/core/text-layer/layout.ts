@@ -88,6 +88,33 @@ export interface PositionedTextItem {
   scaleX: number;
   /** PDF 里的真实宽度（px） */
   width: number;
+  /**
+   * **浏览器排版的实际宽度**（px，未乘 scaleX）。
+   *
+   * ⚠️⚠️ **搜索高亮定位的关键**（实测踩过的坑）。
+   *
+   * ### 为什么需要
+   *
+   * 命中落在项内的某个位置时，要算出"这几个字符有多宽"。
+   * → 之前用**字符数比例**：`width × (chars / text.length)`
+   * → 但**比例字体**里每个字符宽度**不一样**！
+   *
+   * 实测（真实 PDF，搜 "agent"）：
+   * ```
+   * 文本: "An End-to-End Agent Auditing Engine"（32 字）
+   * 命中: "Agent"（第 14~18 字）
+   *
+   * 真实位置:  left=680, width=90
+   * 按比例算:  left=677, width=81     ← 窄了 9px ❌
+   * ```
+   *
+   * → 必须**实测**前缀的宽度，不能按字符数猜 ✅
+   *
+   * → `width / scaleX` = 浏览器排版的实际宽度
+   *
+   * ⚠️ **可选** → 老的调用方（宿主自造 item）不用改 ✅
+   */
+  browserWidth?: number;
   /** 旋转角度（rad，0 = 水平） */
   angle: number;
   /** 是否为段末 */
@@ -304,6 +331,8 @@ export function positionTextItem(
     fontFamily,
     scaleX,
     width: pdfWidth,
+    // 浏览器排版的实际宽度（= pdfWidth / scaleX）
+    browserWidth: scaleX > 0 ? pdfWidth / scaleX : pdfWidth,
     angle,
     hasEOL: item.hasEOL === true,
   };
