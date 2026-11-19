@@ -28,6 +28,8 @@ import {
 import type { LinkAnnotationLike } from '../core/annotation/links';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import type { DocumentCache } from '../core/cache/store';
+import type { PdfViewerConfig } from '../core/config';
+import { mergeConfig } from '../core/config';
 import type { DocumentSource, LoadOptions } from '../core/document/loader';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
 import type { PdfViewerError } from '../core/errors';
@@ -86,6 +88,19 @@ import { Toolbar } from './Toolbar';
  */
 const AnnotationPanel = lazy(() =>
   import('./AnnotationPanel').then((mod) => ({ default: mod.AnnotationPanel })),
+);
+
+/**
+ * **写批注的富文本弹窗**（懒加载）。
+ *
+ * ⚠️ **为什么要懒加载**（实测踩过的坑：体积超预算）：
+ * → 弹窗 + 富文本编辑器约 **1.4 kB**（brotli 后）
+ * → 但**只有"点加批注"时才需要**
+ * → 静态 import → 每个宿主都要背 ❌
+ * → 懒加载 → **不用就不加载** ✅
+ */
+const AnnotationDialog = lazy(() =>
+  import('./AnnotationDialog').then((mod) => ({ default: mod.AnnotationDialog })),
 );
 
 /** 功能开关 */
@@ -209,12 +224,24 @@ export interface PdfViewerProps {
    * const locales = {
    *   ja: { 'load.loading': '読み込み中…', 'page.of': '{page} / {total} ページ' },
    * };
-   * <PdfViewer locale="ja" locales={locales} />
+   * <PdfViewer locale="ja" locales={merged.locales} />
    * ```
    *
    * → **不用写全** → 缺的自动回退到内置文案
    */
   locales?: LocaleTable;
+  /**
+   * **统一配置对象**（"万物可配置"）。
+   *
+   * ⚠️ 用户需求："需要万物可配置 比如说图标、高亮颜色等很多功能都要能支持宿主自主配置。"
+   *
+   * → 之前可配置项**散落在十几个 props** 上 → 啰嗦、容易漏 ❌
+   * → 现在：**一个 config 对象** → 宿主能整体替换 / 合并 / 做预设 ✅
+   *
+   * ⚠️ **优先级：单独的 prop > config 里的同名项**
+   * → 已有代码（`<PdfViewer theme="paper" />`）**行为完全不变** ✅
+   */
+  config?: PdfViewerConfig;
   /** 主题 */
   theme?: PdfViewerTheme;
   /**
@@ -336,8 +363,16 @@ export interface PdfViewerProps {
   onExplain?: (ctx: SelectionActionContext) => void;
   /** 宿主实现了"复制"（不传则用内置的剪贴板实现） */
   onCopy?: (ctx: SelectionActionContext) => void;
-  /** 浮层里"高亮"按钮点击（宿主决定颜色与是否保存） */
-  onHighlight?: (ctx: SelectionActionContext) => void;
+  /**
+   * 浮层里"高亮"按钮点击（宿主决定颜色与是否保存）。
+   *
+   * ⚠️ **可以返回"新建的高亮 id"**（可选）。
+   *
+   * → "加批注"流程需要这个 id（批注要挂在高亮上）
+   * → 宿主返回它 → 包用它建批注 ✅
+   * → 不返回 → 包自己生成一个 id（宿主需要自己对齐）
+   */
+  onHighlight?: (ctx: SelectionActionContext) => string | undefined;
   /** 新建高亮（宿主决定是否保存） */
   onHighlightCreate?: (highlight: NewHighlight) => void;
   /**
@@ -401,6 +436,29 @@ export interface PdfViewerProps {
    */
   onAnnotationSave?: (id: string, html: string, plain: string) => void;
   /**
+   * **新建批注**（从选区浮层的"加批注"触发）。
+   *
+   * ⚠️ 用户需求："需要在框选的时候工具栏弹窗就要有加批注这个，
+   *   写了批注之后用默认高亮。"
+   *
+   * → 包已经把**高亮**建好了（用默认颜色）
+   * → 这个回调告诉宿主：**这个批注挂在哪个高亮上** ✅
+   * → 宿主只需要 `setStickyNotes([...])` 就行
+   *
+   * @param id 批注 id
+   * @param html 富文本 HTML（已清洗）
+   * @param plain 纯文本
+   * @param highlightId 关联的高亮 id
+   * @param selectedText 选中的原文
+   */
+  onAnnotationCreate?: (
+    id: string,
+    html: string,
+    plain: string,
+    highlightId: string,
+    selectedText: string,
+  ) => void;
+  /**
    * **删除批注**。
    */
   onAnnotationDelete?: (id: string) => void;
@@ -450,19 +508,11 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     file,
     documentId,
     highlights = [],
-    highlightPalette,
     cache,
     loadOptions,
     password,
     initialPage = 1,
     initialScale = 'width',
-    toolbar,
-    features = {},
-    locale = 'zh',
-    messages,
-    locales,
-    theme = 'auto',
-    appearance,
     printMode = 'with-highlights',
     slots,
     getPage,
@@ -476,8 +526,6 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onDocumentLoad,
     onError,
     onSelectionChange,
-    selectionActions,
-    icons,
     onTranslate,
     onAsk,
     onNote,
@@ -494,9 +542,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onAnnotationClick,
     onAnnotationChange,
     onAnnotationSave,
+    onAnnotationCreate,
     onAnnotationDelete,
-    annotationToolbar,
-    annotationPalette,
     onHighlightColorChange,
     onHighlightCopy,
     onHighlightMore,
@@ -508,6 +555,47 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onInternalLink,
     children,
   } = props;
+
+  /*
+   * ⚠️ **合并"统一配置对象"和"单独 props"**（"万物可配置"）。
+   *
+   * → 宿主可以两种写法混用：
+   *   `<PdfViewer config={{ theme: 'paper' }} theme="dark" />`
+   *   → **单独的 prop 优先** → theme = 'dark' ✅
+   * → 已有代码（只用单独 props）**行为完全不变** ✅
+   */
+  const merged = useMemo(
+    () =>
+      mergeConfig(props.config, {
+        theme: props.theme,
+        appearance: props.appearance,
+        icons: props.icons,
+        highlightPalette: props.highlightPalette,
+        locale: props.locale,
+        locales: props.locales,
+        messages: props.messages,
+        selectionActions: props.selectionActions,
+        annotationToolbar: props.annotationToolbar,
+        annotationPalette: props.annotationPalette,
+        toolbar: props.toolbar,
+        features: props.features,
+      }),
+    [
+      props.config,
+      props.theme,
+      props.appearance,
+      props.icons,
+      props.highlightPalette,
+      props.locale,
+      props.locales,
+      props.messages,
+      props.selectionActions,
+      props.annotationToolbar,
+      props.annotationPalette,
+      props.toolbar,
+      props.features,
+    ],
+  );
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pageElementsRef = useRef(new Map<number, HTMLElement>());
@@ -551,6 +639,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
   /** 搜索命中（由 SearchPanel 回调） */
   const [searchHits, setSearchHits] = useState<SearchHit[]>([]);
+
+  /*
+   * **待写的批注**（选区 → 打开富文本弹窗）。
+   *
+   * ⚠️ 用户需求：
+   * > "需要在框选的时候工具栏弹窗就要有加批注这个，写了批注之后用默认高亮。"
+   * > "写批注的时候不要用系统默认的alert，设计一个富文本弹窗来写批注"
+   *
+   * → 存的是**整个选区上下文**（文本 + 归一化位置 + 事件）
+   * → 提交时直接丢给 `onHighlight` → 宿主拿到的和高亮按钮**完全一致** ✅
+   */
+  const [pendingNote, setPendingNote] = useState<SelectionActionContext | null>(null);
 
   /** 当前激活的搜索命中下标 */
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
@@ -618,8 +718,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
   const t = useCallback(
     (key: keyof Messages, vars?: Record<string, string | number>) =>
-      resolveMessage(locale, key, messages, vars, locales),
-    [locale, messages, locales],
+      resolveMessage(merged.locale ?? 'zh', key, merged.messages, vars, merged.locales),
+    [merged.locale, merged.messages, merged.locales],
   );
 
   // 1) 加载文档
@@ -1797,7 +1897,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
   // 7) 键盘快捷键
   useEffect(() => {
-    if (features.keyboard === false) {
+    if (merged.features?.keyboard === false) {
       return;
     }
 
@@ -1841,7 +1941,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     return () => {
       container?.removeEventListener('keydown', onKeyDown);
     };
-  }, [features.keyboard, page, numPages, scrollToPage, zoom]);
+  }, [page, numPages, scrollToPage, zoom, merged.features?.keyboard]);
 
   /**
    * 量一条高亮的**视口矩形**（浮层锚点用）。
@@ -2074,16 +2174,28 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       });
     }
 
-    if (onNote) {
-      actions.push({
-        key: BUILTIN_ACTION_KEYS.note,
-        icon: 'note',
-        label: '笔记',
-        group: 'ai',
-        order: 60,
-        onSelect: onNote,
-      });
-    }
+    /*
+     * ⚠️ **"加批注"是内置动作**（用户需求）。
+     *
+     * → 以前只有宿主传 `onNote` 才显示 → 很多宿主没传 → 用户看不到 ❌
+     * → 现在：**始终显示** → 点击打开**包自带的富文本弹窗** ✅
+     * → 宿主仍然可以用 `onNote` 覆盖（自己实现弹窗）✅
+     */
+    actions.push({
+      key: BUILTIN_ACTION_KEYS.note,
+      icon: 'stickyNote',
+      label: '加批注',
+      group: 'ai',
+      order: 60,
+      onSelect: (ctx) => {
+        if (onNote) {
+          onNote(ctx);
+          return;
+        }
+        // 打开包自带的富文本弹窗
+        setPendingNote(ctx);
+      },
+    });
 
     return actions;
   }, [
@@ -2104,8 +2216,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
   /** 合并后的动作列表（宿主覆盖 + 追加） */
   const popoverActions = useMemo(
-    () => mergeSelectionActions(builtinActions, selectionActions),
-    [builtinActions, selectionActions],
+    () => mergeSelectionActions(builtinActions, merged.selectionActions),
+    [builtinActions, merged.selectionActions],
   );
 
   /**
@@ -2504,6 +2616,37 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   }, [searchEngine, pageSizesByPage]);
 
   /**
+   * **搜索用的对齐表**（页码 → 渲染项下标 → 索引项下标）。
+   *
+   * ⚠️⚠️ **高亮定位不准的第二个根因**（实测：搜索 "A2E" 只框住 "A"）。
+   *
+   * → 命中偏移是**索引坐标系**的
+   * → 索引里 "A2E" 是**一个**项；渲染侧是 "A"、"2"、"E" **三个**项
+   * → 直接拿索引偏移去切渲染项 → **只切到 "A"** ❌
+   *
+   * → 所以要把偏移**换算**成渲染坐标 → 需要这张对齐表 ✅
+   */
+  const searchAlignmentByPage = useMemo(() => {
+    const map = new Map<number, number[]>();
+
+    for (const [pageNumber, renderedItems] of textItemsByPage) {
+      const indexTexts = searchIndexItemTexts.get(pageNumber);
+      if (!indexTexts || indexTexts.length === 0) {
+        continue;
+      }
+      map.set(
+        pageNumber,
+        alignRenderedToIndex(
+          indexTexts,
+          renderedItems.map((i) => i.text),
+        ),
+      );
+    }
+
+    return map;
+  }, [textItemsByPage, searchIndexItemTexts]);
+
+  /**
    * **搜索用的索引偏移**（页码 → 每个渲染项在索引里的字符偏移）。
    *
    * ⚠️⚠️ **必须先按"内容"对齐索引和渲染的项**（实测踩过的坑：搜索高亮定位不准）。
@@ -2551,8 +2694,36 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       return new Map<number, SearchHitRect[]>();
     }
 
-    return hitsToRects(searchHits, textItemsByPage, pageSizesByPage, searchOffsetsByPage);
-  }, [searchHits, textItemsByPage, pageSizesByPage, searchOffsetsByPage]);
+    /*
+     * ⚠️ **必须传"对齐表"** → 把命中的索引坐标换算成渲染坐标
+     * → 否则 "A2E" 这种跨多个渲染项的命中**只框住第一个字符** ❌
+     */
+    const indexContextByPage = new Map<
+      number,
+      { itemTexts: readonly string[]; alignment: readonly number[] }
+    >();
+    for (const [pageNumber, alignment] of searchAlignmentByPage) {
+      const itemTexts = searchIndexItemTexts.get(pageNumber);
+      if (itemTexts) {
+        indexContextByPage.set(pageNumber, { itemTexts, alignment });
+      }
+    }
+
+    return hitsToRects(
+      searchHits,
+      textItemsByPage,
+      pageSizesByPage,
+      searchOffsetsByPage,
+      indexContextByPage,
+    );
+  }, [
+    searchHits,
+    textItemsByPage,
+    pageSizesByPage,
+    searchOffsetsByPage,
+    searchAlignmentByPage,
+    searchIndexItemTexts,
+  ]);
 
   /**
    * 滚到搜索命中（精确到命中所在的行）。
@@ -2783,7 +2954,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   const className = [
     'scpdf-root',
     // ⚠️ 主题 + 外观 → class 名（见 `core/theme` 的 `themeClasses`）
-    ...themeClasses(theme, appearance),
+    ...themeClasses(merged.theme ?? 'auto', merged.appearance),
     // ⚠️ "只打印原 PDF"模式（不带高亮）
     printMode === 'original' ? 'scpdf-root--print-original' : '',
   ]
@@ -2798,7 +2969,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * → 走 CSS 变量 → 覆盖主题，不影响其他层。
    */
-  const appearanceStyle = appearanceStyles(appearance);
+  const appearanceStyle = appearanceStyles(merged.appearance);
 
   return (
     <div className={className} style={appearanceStyle} data-testid="pdf-viewer">
@@ -2812,25 +2983,25 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         (slots.toolbar as React.ReactNode)
       ) : (
         <Toolbar
-          icons={icons}
+          icons={merged.icons}
           toolbar={{
-            ...toolbar,
+            ...merged.toolbar,
             /*
              * ⚠️ **`appearance` 的结构开关覆盖 `toolbar` 的配置**。
              *
              * 优先级：`appearance` > `toolbar`（appearance 更"上层"）。
              * → 宿主用 `appearance` 统一控制，用 `toolbar` 做细调。
              */
-            showSearch: appearance?.showSearch ?? toolbar?.showSearch,
-            showThumbnails: appearance?.showThumbnails ?? toolbar?.showThumbnails,
-            showOutline: appearance?.showOutline ?? toolbar?.showOutline,
+            showSearch: merged.appearance?.showSearch ?? merged.toolbar?.showSearch,
+            showThumbnails: merged.appearance?.showThumbnails ?? merged.toolbar?.showThumbnails,
+            showOutline: merged.appearance?.showOutline ?? merged.toolbar?.showOutline,
           }}
           page={page}
           totalPages={numPages}
           scale={scale}
-          locale={locale}
-          locales={locales}
-          messages={messages}
+          locale={merged.locale ?? 'zh'}
+          locales={merged.locales}
+          messages={merged.messages}
           onPageChange={(next) => scrollToPage(next)}
           onZoomIn={zoom.zoomIn}
           onZoomOut={zoom.zoomOut}
@@ -2843,18 +3014,20 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               PAGE_HEIGHT_PT,
             )
           }
-          onToggleSearch={features.search === false ? undefined : () => setSearchOpen((v) => !v)}
+          onToggleSearch={
+            merged.features?.search === false ? undefined : () => setSearchOpen((v) => !v)
+          }
           onToggleThumbnails={
-            features.thumbnails === false || !renderThumbnail
+            merged.features?.thumbnails === false || !renderThumbnail
               ? undefined
               : () => setSidebar((v) => (v === 'thumbnails' ? 'none' : 'thumbnails'))
           }
           onToggleOutline={
-            features.outline === false || !getOutline
+            merged.features?.outline === false || !getOutline
               ? undefined
               : () => setSidebar((v) => (v === 'outline' ? 'none' : 'outline'))
           }
-          onPrint={features.print === false ? undefined : printDocument}
+          onPrint={merged.features?.print === false ? undefined : printDocument}
         />
       )}
 
@@ -2866,9 +3039,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           onClose={handleSearchClose}
           onHitsChange={handleSearchHitsChange}
           onNavigate={handleSearchNavigate}
-          locale={locale}
-          locales={locales}
-          messages={messages}
+          locale={merged.locale ?? 'zh'}
+          locales={merged.locales}
+          messages={merged.messages}
         />
       ) : null}
 
@@ -2896,9 +3069,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                 pageSizes={pageSizesPt}
                 renderThumbnail={renderThumbnail}
                 onPageSelect={(target) => scrollToPage(target)}
-                locale={locale}
-                locales={locales}
-                messages={messages}
+                locale={merged.locale ?? 'zh'}
+                locales={merged.locales}
+                messages={merged.messages}
               />
             ) : null}
 
@@ -2909,9 +3082,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                 resolveToken={outlineResolveToken}
                 currentPage={page}
                 onPageSelect={(target) => scrollToPage(target)}
-                locale={locale}
-                locales={locales}
-                messages={messages}
+                locale={merged.locale ?? 'zh'}
+                locales={merged.locales}
+                messages={merged.messages}
               />
             ) : null}
           </>
@@ -2985,6 +3158,58 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
             ⚠️ **懒加载**（`Suspense`）→ 不打开批注就不加载这 1.5 kB
           */}
+          {/*
+            **写批注的富文本弹窗**（替代 `window.prompt`）。
+            → 用户需求："写批注的时候不要用系统默认的alert，
+              设计一个富文本弹窗来写批注"
+          */}
+          <Suspense fallback={null}>
+            <AnnotationDialog
+              open={pendingNote !== null}
+              onClose={() => {
+                setPendingNote(null);
+              }}
+              onSubmit={(html, plain) => {
+                const note = pendingNote;
+                setPendingNote(null);
+                if (!note) {
+                  return;
+                }
+                /*
+                 * ⚠️ **"写了批注之后用默认高亮"**（用户需求）。
+                 *
+                 * → 先建一条**高亮**（用当前选的颜色）→ 批注的锚点就是它
+                 * → 便签图标落在高亮上 ✅
+                 *
+                 * ⚠️ **只调 `onHighlight`**（不要同时调 `onHighlightCreate`）
+                 * → 两个都调 → 宿主保存两次（实测：点一次生成 3 条）
+                 *
+                 * ⚠️ **宿主可以返回"新建的高亮 id"** → 批注要挂在高亮上 → 必须用**同一个** id
+                 */
+                const returnedId = onHighlight?.({
+                  ...note,
+                  color: pickedColor ?? undefined,
+                });
+                const highlightId =
+                  typeof returnedId === 'string' && returnedId.length > 0
+                    ? returnedId
+                    : `note-hl-${Date.now()}`;
+
+                // 批注内容（宿主存）
+                const annotationId = `note-${highlightId}`;
+                onAnnotationSave?.(annotationId, html, plain);
+                // 新建 → 告诉宿主挂在哪个高亮上
+                onAnnotationCreate?.(annotationId, html, plain, highlightId, note.text);
+              }}
+              toolbar={merged.annotationToolbar}
+              palette={merged.annotationPalette}
+              icons={merged.icons}
+              locale={merged.locale ?? 'zh'}
+              locales={merged.locales}
+              messages={merged.messages}
+            />
+          </Suspense>
+
           {activeAnnotation ? (
             <Suspense fallback={null}>
               <AnnotationPanel
@@ -2994,12 +3219,12 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                 onSubmit={onAnnotationSave}
                 onDelete={onAnnotationDelete ? handleAnnotationDelete : undefined}
                 onClose={handleAnnotationClose}
-                toolbar={annotationToolbar}
-                palette={annotationPalette}
-                icons={icons}
-                locale={locale}
-                locales={locales}
-                messages={messages}
+                toolbar={merged.annotationToolbar}
+                palette={merged.annotationPalette}
+                icons={merged.icons}
+                locale={merged.locale ?? 'zh'}
+                locales={merged.locales}
+                messages={merged.messages}
               />
             </Suspense>
           ) : null}
@@ -3045,7 +3270,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                       activeSearchRectIndex={activeSearchIndexOnPage(pageNumber)}
                       highlights={highlights}
                       activeHighlightId={activeHighlightId}
-                      palette={highlightPalette}
+                      palette={merged.highlightPalette}
                       stickyNotes={stickyNotes}
                       onAnnotationClick={(annotation) => {
                         /*
@@ -3093,10 +3318,10 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         浮层是 `position: fixed` → 不受任何祖先的 transform/overflow 影响。
       */}
       <SelectionPopover
-        locale={locale}
-        locales={locales}
-        messages={messages}
-        icons={icons}
+        locale={merged.locale ?? 'zh'}
+        locales={merged.locales}
+        messages={merged.messages}
+        icons={merged.icons}
         open={popoverOpen}
         selectionRect={popoverAnchor}
         containerRect={popoverContainerRect}
@@ -3105,7 +3330,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         onAction={handlePopoverAction}
         onClose={handlePopoverClose}
         onDismiss={handlePopoverDismiss}
-        highlightPalette={highlightPalette}
+        highlightPalette={merged.highlightPalette}
         onPickColor={handlePickHighlightColor}
       />
 
@@ -3118,10 +3343,10 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         - 动作是"高亮动作"（换色 / 复制 / 删除 / 更多）
       */}
       <SelectionPopover
-        locale={locale}
-        locales={locales}
-        messages={messages}
-        icons={icons}
+        locale={merged.locale ?? 'zh'}
+        locales={merged.locales}
+        messages={merged.messages}
+        icons={merged.icons}
         open={highlightPopover !== null}
         selectionRect={null}
         anchorRect={highlightPopover?.rect ?? null}
@@ -3129,7 +3354,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         actions={highlightPopoverActions}
         onAction={handleHighlightPopoverAction}
         onClose={handleHighlightPopoverClose}
-        highlightPalette={highlightPalette}
+        highlightPalette={merged.highlightPalette}
         onPickColor={handleHighlightColorPick}
       />
 
@@ -3147,9 +3372,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           onCancel={() => {
             setPasswordOpen(false);
           }}
-          locale={locale}
-          locales={locales}
-          messages={messages}
+          locale={merged.locale ?? 'zh'}
+          locales={merged.locales}
+          messages={merged.messages}
         />
       ) : null}
     </div>

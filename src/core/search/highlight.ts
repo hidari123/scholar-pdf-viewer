@@ -24,7 +24,7 @@
 
 import type { PositionedTextItem } from '../text-layer/layout';
 import type { IndexOffset } from './align';
-import { mapOffsetToRenderedByText } from './align';
+import { convertIndexOffsetToRendered, mapOffsetToRenderedByText } from './align';
 import type { SearchHit } from './search';
 
 /** 命中对应的矩形（归一化 0~1，相对页面） */
@@ -116,12 +116,46 @@ export function hitToRects(
   viewportWidth: number,
   viewportHeight: number,
   indexOffsets?: readonly IndexOffset[],
+  /**
+   * **索引的项文本 + 对齐表**（渲染项下标 → 索引项下标）。
+   *
+   * ⚠️⚠️ **命中偏移是"索引坐标系"的** → 必须先换算成"渲染坐标系"。
+   *
+   * 实测（真实 PDF，搜 "A2E"）：
+   * → 索引里 "A2E" 是**一个**项（3 字）
+   * → 渲染侧 "A"、"2"、"E" 是**三个**项
+   * → 不换算 → 只框住 "A" → **高亮只有 1 个字符宽** ❌（用户反馈"定位不准"）
+   */
+  indexContext?: { itemTexts: readonly string[]; alignment: readonly number[] },
 ): SearchHitRect[] {
   if (viewportWidth <= 0 || viewportHeight <= 0 || items.length === 0) {
     return [];
   }
 
-  const mapped = mapRangeToItemsByText(items, hit.start, hit.length, indexOffsets);
+  /*
+   * ⚠️ **先把索引坐标换算成渲染坐标**（实测踩过的坑：高亮只框住一部分）。
+   *
+   * → 命中偏移是**索引文本**里的位置
+   * → 渲染的项边界和索引不同 → 直接用会切错
+   */
+  let hitStart = hit.start;
+  let hitLength = hit.length;
+
+  if (indexContext) {
+    const converted = convertIndexOffsetToRendered(
+      indexContext.itemTexts,
+      items.map((i) => i.text),
+      indexContext.alignment,
+      hit.start,
+      hit.length,
+    );
+    if (converted) {
+      hitStart = converted.start;
+      hitLength = converted.length;
+    }
+  }
+
+  const mapped = mapRangeToItemsByText(items, hitStart, hitLength, indexOffsets);
   const rects: SearchHitRect[] = [];
 
   for (const { item, offsetInItem, charsInItem } of mapped) {
@@ -168,6 +202,8 @@ export function hitsToRects(
   itemsByPage: Map<number, PositionedTextItem[]>,
   viewportSizeByPage: Map<number, { width: number; height: number }>,
   indexOffsetsByPage?: Map<number, IndexOffset[]>,
+  /** 页码 → 索引项文本 + 对齐表（换算命中偏移用） */
+  indexContextByPage?: Map<number, { itemTexts: readonly string[]; alignment: readonly number[] }>,
 ): Map<number, SearchHitRect[]> {
   const result = new Map<number, SearchHitRect[]>();
 
@@ -184,6 +220,7 @@ export function hitsToRects(
       size.width,
       size.height,
       indexOffsetsByPage?.get(hit.pageNumber),
+      indexContextByPage?.get(hit.pageNumber),
     );
 
     const existing = result.get(hit.pageNumber);

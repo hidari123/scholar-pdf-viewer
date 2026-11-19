@@ -166,6 +166,122 @@ export function joinItemTexts(items: readonly { str: string }[]): string {
 }
 
 /**
+ * **把"索引的字符偏移"换算成"渲染的字符偏移"**。
+ *
+ * ## 为什么需要这一步（实测踩过的坑：搜索高亮定位不准）
+ *
+ * ⚠️⚠️ **命中偏移是"索引坐标系"的**，而高亮要画在"渲染的项"上。
+ * → 两边的**项边界不同** → **字符总数也可能不同** → 直接用会错位 ❌
+ *
+ * ### 实测（真实 arXiv PDF）
+ *
+ * ```
+ * 搜索 "A2E"
+ * → 索引里 "A2E" 是一个项（3 个字符）
+ * → 渲染侧 "A"、"2"、"E" 是**三个独立的项**
+ * ```
+ *
+ * → 用"渲染侧字符偏移"直接去切渲染项 → **只切到 "A"** → 高亮框只有 1 个字符宽 ❌
+ * → 用户看到的现象：**"高亮定位不准 / 只框住一部分"**
+ *
+ * ### 换算方法
+ *
+ * 1. 先算出这个偏移落在**索引的哪几个项**上（`mapOffsetToItemTexts`）
+ * 2. 再用**对齐表**（渲染项 → 索引项）找到这些索引项对应的**渲染项**
+ * 3. 用渲染项自己的文本长度**重新定位**偏移
+ *
+ * @param indexItemTexts 索引的项文本
+ * @param renderedTexts 渲染的项文本
+ * @param alignment 对齐表（渲染项下标 → 索引项下标，`-1` = 无对应）
+ * @param start 索引里的起始偏移
+ * @param length 字符数
+ * @returns 渲染坐标系里的 `{start, length}`；找不到时返回 `null`
+ */
+export function convertIndexOffsetToRendered(
+  indexItemTexts: readonly string[],
+  renderedTexts: readonly string[],
+  alignment: readonly number[],
+  start: number,
+  length: number,
+): { start: number; length: number } | null {
+  // ① 偏移落在索引的哪几个项上
+  const inIndex = mapOffsetToItemTexts(indexItemTexts, start, length);
+  if (inIndex.length === 0) {
+    return null;
+  }
+
+  // ② 索引项 → 渲染项（对齐表是反的，要反过来查）
+  /*
+   * ⚠️ **一个索引项可能对应多个渲染项**（实测）。
+   *
+   * → 索引里 "A2E" 是一个项
+   * → 渲染侧 "A"、"2"、"E" 是**三个**项
+   * → `alignRenderedToIndex` 会把**三个都**映射到索引项 0
+   * → 所以这里是 **Map<索引项, 渲染项[]>**（不是单个）✅
+   */
+  /** 索引项下标 → 渲染项下标列表 */
+  const indexToRendered = new Map<number, number[]>();
+  for (let r = 0; r < alignment.length; r += 1) {
+    const i = alignment[r];
+    if (i === undefined || i < 0) {
+      continue;
+    }
+    const list = indexToRendered.get(i);
+    if (list) {
+      list.push(r);
+    } else {
+      indexToRendered.set(i, [r]);
+    }
+  }
+
+  // ③ 换算成渲染坐标
+  let renderedStart = -1;
+  let renderedEnd = -1;
+
+  for (const { index, offsetInItem, charsInItem } of inIndex) {
+    const renderedIndices = indexToRendered.get(index);
+    if (!renderedIndices) {
+      continue;
+    }
+
+    for (const renderedIndex of renderedIndices) {
+      const renderedText = renderedTexts[renderedIndex];
+      if (renderedText === undefined) {
+        continue;
+      }
+
+      // 渲染项在渲染坐标系里的起点
+      let cursor = 0;
+      for (let r = 0; r < renderedIndex; r += 1) {
+        cursor += renderedTexts[r]?.length ?? 0;
+      }
+
+      const from = cursor + offsetInItem;
+      /*
+       * ⚠️ **必须裁到渲染项自己的长度**（实测）。
+       *
+       * → 索引的项可能**比渲染的项长**（"A2E" vs "A"）
+       * → 不裁 → 换算出的长度**超出渲染项** → 画到别的字上 ❌
+       */
+      const to = Math.min(from + charsInItem, cursor + renderedText.length);
+
+      if (renderedStart < 0 || from < renderedStart) {
+        renderedStart = from;
+      }
+      if (to > renderedEnd) {
+        renderedEnd = to;
+      }
+    }
+  }
+
+  if (renderedStart < 0 || renderedEnd <= renderedStart) {
+    return null;
+  }
+
+  return { start: renderedStart, length: renderedEnd - renderedStart };
+}
+
+/**
  * **字符偏移 → 索引的项下标**。
  *
  * @param itemTexts 索引用的项文本（顺序 = 索引顺序）
@@ -243,55 +359,80 @@ export function alignRenderedToIndex(
   /** 索引里已经用过的项（避免重复匹配） */
   const used = new Set<number>();
 
+  /*
+   * ⚠️⚠️ **两遍扫描**（实测踩过的坑：搜索高亮只框住一部分）。
+   *
+   * ### 为什么不能一遍搞定
+   *
+   * ```
+   * 索引的项: ["A2E", ...]
+   * 渲染的项: ["A", "2", "E", ...]
+   * ```
+   *
+   * → 渲染项 "A"：
+   *   - 规则 ②（索引项**包含**渲染项）："A2E" 包含 "A" → 匹配 ✅
+   *   - 规则 ③（渲染项**包含**索引项）："A" 不包含任何索引项 → 不匹配
+   *
+   * → 渲染项 "2"：
+   *   - 规则 ②：**还是** "A2E" → 匹配 ✅（但它已经被"占用"了！）
+   *
+   * → 一遍扫描 → "A" 占用��索引项 0 → "2" 找不到 → **高亮只框住 "A"** ❌
+   *
+   * ### 两遍扫描的分工
+   *
+   * - **第 1 遍**：只做**完全相同**的匹配 → 精确、无歧义
+   * - **第 2 遍**：剩下的用"包含"关系兜底 → **不占用**索引项
+   *   → 多个渲染项可以属于同一个索引项 ✅
+   */
   for (let r = 0; r < renderedTexts.length; r += 1) {
     const text = renderedTexts[r];
     if (text === undefined || text.length === 0) {
       continue;
     }
 
-    // ① 完全相同
-    let found = -1;
     for (let i = 0; i < indexItemTexts.length; i += 1) {
       if (used.has(i)) {
         continue;
       }
       if (indexItemTexts[i] === text) {
-        found = i;
+        used.add(i);
+        result[r] = i;
+        break;
+      }
+    }
+  }
+
+  // 第 2 遍：包含关系兜底（**不占用**索引项）
+  for (let r = 0; r < renderedTexts.length; r += 1) {
+    const existing = result[r];
+    if (existing !== undefined && existing >= 0) {
+      continue;
+    }
+
+    const text = renderedTexts[r];
+    if (text === undefined || text.length === 0) {
+      continue;
+    }
+
+    // ② 索引项**包含**渲染项（索引侧合并了）
+    for (let i = 0; i < indexItemTexts.length; i += 1) {
+      const candidate = indexItemTexts[i];
+      if (candidate?.includes(text) && text.length > 0) {
+        result[r] = i;
         break;
       }
     }
 
-    // ② 渲染侧把几个索引项合并了 → 找**包含它**的索引项
-    if (found < 0) {
+    // ③ 渲染项**包含**索引项（渲染侧合并了）
+    const afterRule2 = result[r];
+    if (afterRule2 === undefined || afterRule2 < 0) {
       for (let i = 0; i < indexItemTexts.length; i += 1) {
-        if (used.has(i)) {
-          continue;
-        }
-        const candidate = indexItemTexts[i];
-        if (candidate?.includes(text) && text.length > 0) {
-          found = i;
-          break;
-        }
-      }
-    }
-
-    // ③ 索引侧把几个渲染项合并了 → 找**被它包含**的索引项
-    if (found < 0) {
-      for (let i = 0; i < indexItemTexts.length; i += 1) {
-        if (used.has(i)) {
-          continue;
-        }
         const candidate = indexItemTexts[i];
         if (candidate && text.includes(candidate) && candidate.length > 0) {
-          found = i;
+          result[r] = i;
           break;
         }
       }
-    }
-
-    if (found >= 0) {
-      used.add(found);
-      result[r] = found;
     }
   }
 
