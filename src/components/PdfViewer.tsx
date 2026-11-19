@@ -2121,7 +2121,6 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) {
         return;
       }
-
       switch (event.key) {
         case 'ArrowLeft':
         case 'PageUp':
@@ -2151,10 +2150,58 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
     const container = containerRef.current;
     container?.addEventListener('keydown', onKeyDown);
+
+    /*
+     * ⚠️ **"退格删高亮"要在 `document` 上监听**（用户需求：
+     * "选中高亮的时候如果点击退格键可以删除高亮"）。
+     *
+     * → 容器上的监听**要求容器有焦点** → 用户点完高亮，焦点可能还在 body
+     *   → 按退格**没反应** ❌
+     * → `document` 上的监听 → **任何时候按退格都生效** ✅
+     *
+     * → 但要排除：
+     *   - 输入框 / 可编辑元素（不能打断打字）❌
+     *   - 有文字选区（用户想删文字）❌
+     *   - 没选中高亮 / 宿主没给删除回调 → 不响应 ✅
+     */
+    const onDocumentKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Backspace' && event.key !== 'Delete') {
+        return;
+      }
+      if (event.key === 'Delete' && event.shiftKey) {
+        return;
+      }
+      if (!activeHighlightId || !onHighlightRemove) {
+        return;
+      }
+      const el = event.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) {
+        return;
+      }
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+        return;
+      }
+      event.preventDefault();
+      onHighlightRemove(activeHighlightId);
+      setHighlightPopover(null);
+      setActiveHighlightId(null);
+    };
+    document.addEventListener('keydown', onDocumentKeyDown);
+
     return () => {
       container?.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keydown', onDocumentKeyDown);
     };
-  }, [page, numPages, scrollToPage, zoom, merged.features?.keyboard]);
+  }, [
+    page,
+    numPages,
+    scrollToPage,
+    zoom,
+    merged.features?.keyboard,
+    activeHighlightId,
+    onHighlightRemove,
+  ]);
 
   /**
    * 量一条高亮的**视口矩形**（浮层锚点用）。
