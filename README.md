@@ -125,37 +125,44 @@ export function Reader({ url }: { url: string }) {
 
 ## `<PdfViewer>` 主要 props
 
-| prop                  | 类型                                       | 说明                                |
-| --------------------- | ------------------------------------------ | ----------------------------------- |
-| `file`                | `string \| Blob \| ArrayBuffer \| null`    | 文档来源（唯一必填）                |
-| `highlights`          | `HighlightRecord[]`                        | 受控高亮                            |
-| `highlightPalette`    | `Record<string, string>`                   | 高亮色板（语义 key → CSS 颜色）     |
-| `selectionActions`    | `SelectionAction[]`                        | 选区浮层动作（覆盖/追加内置）       |
-| `onHighlight`         | `(ctx) => void`                            | 浮层"高亮"被点（带颜色 key）        |
-| `onCopy`              | `(ctx) => void`                            | 浮层"复制"（不传则用剪贴板）        |
-| `onTranslate`         | `(ctx) => void`                            | 浮层"翻译"（不传**不显示**）        |
-| `onAsk`               | `(ctx) => void`                            | 浮层"提问"（不传**不显示**）        |
-| `onNote`              | `(ctx) => void`                            | 浮层"笔记"（不传**不显示**）        |
-| `onExplain`           | `(ctx) => void`                            | 浮层"解释"（不传**不显示**）        |
-| `getPage`             | `(n) => Promise<PageProxyLike>`            | 取页（宿主注入 pdf.js）             |
-| `getPageSizes`        | `(n) => Promise<{width,height}[]>`         | 各页尺寸（pt）——影响跳页准确性      |
-| `getDocInfo`          | `(data) => Promise<PdfDocInfo>`            | 文档信息（页数/元数据）             |
-| `getOutline`          | `() => Promise<OutlineItemLike[] \| null>` | 目录                                |
-| `pageRefToNumber`     | `(ref) => number \| null`                  | 页引用 → 页码（解析目录目标）       |
-| `renderThumbnail`     | `(n, width) => Promise<string \| null>`    | 渲染缩略图（返回图片 URL）          |
-| `searchEngine`        | `PdfSearch \| null`                        | 搜索引擎（core 实例）               |
-| `onSelectionChange`   | `(s: SelectionData \| null) => void`       | 选区变化（**纯几何**）              |
-| `onHighlightCreate`   | `(h: NewHighlight) => void`                | 新建高亮（宿主决定是否保存）        |
-| `onPageChange`        | `(page, total) => void`                    | 当前页变化                          |
-| `onZoomChange`        | `(scale) => void`                          | 缩放变化                            |
-| `onExternalLink`      | `(url) => void`                            | 外部链接点击（宿主决定怎么开）      |
-| `showPasswordDialog`  | `boolean`                                  | 用包内置密码框（加密文档）          |
-| `initialScale`        | `'width' \| number`                        | 初始缩放（默认适配宽度）            |
-| `locale` / `messages` | `'zh' \| 'en'` / `Partial<Messages>`       | 语言 / 文案覆盖                     |
-| `theme`               | `PdfViewerTheme`（见下）                   | 主题（7 套）                        |
-| `appearance`          | `PdfViewerAppearance`                      | 外观（密度 / 外壳 / 页阴影…）       |
-| `printMode`           | `'with-highlights' \| 'original'`          | 打印模式（保留高亮 / 只打印原 PDF） |
-| `toolbar`             | `ToolbarConfig`                            | 工具栏开关 + 左右 slots             |
+| prop                     | 类型                                       | 说明                                 |
+| ------------------------ | ------------------------------------------ | ------------------------------------ |
+| `file`                   | `string \| Blob \| ArrayBuffer \| null`    | 文档来源（唯一必填）                 |
+| `highlights`             | `HighlightRecord[]`                        | 受控高亮                             |
+| `highlightPalette`       | `Record<string, string>`                   | 高亮色板（语义 key → CSS 颜色）      |
+| `selectionActions`       | `SelectionAction[]`                        | 选区浮层动作（覆盖/追加内置）        |
+| `onHighlight`            | `(ctx) => void`                            | 浮层"高亮"被点（带颜色 key）         |
+| `onCopy`                 | `(ctx) => void`                            | 浮层"复制"（不传则用剪贴板）         |
+| `onTranslate`            | `(ctx) => void`                            | 浮层"翻译"（不传**不显示**）         |
+| `onAsk`                  | `(ctx) => void`                            | 浮层"提问"（不传**不显示**）         |
+| `onNote`                 | `(ctx) => void`                            | 浮层"笔记"（不传**不显示**）         |
+| `onExplain`              | `(ctx) => void`                            | 浮层"解释"（不传**不显示**）         |
+| `getPage`                | `(n) => Promise<PageProxyLike>`            | 取页（宿主注入 pdf.js）              |
+| `getPageSizes`           | `(n) => Promise<{width,height}[]>`         | 各页尺寸（pt）——影响跳页准确性       |
+| `getDocInfo`             | `(data) => Promise<PdfDocInfo>`            | 文档信息（页数/元数据）              |
+| `getOutline`             | `() => Promise<OutlineItemLike[] \| null>` | 目录                                 |
+| `pageRefToNumber`        | `(ref) => number \| null`                  | 页引用 → 页码（解析目录目标）        |
+| `renderThumbnail`        | `(n, width) => Promise<string \| null>`    | 渲染缩略图（返回图片 URL）           |
+| `searchEngine`           | `PdfSearch \| null`                        | 搜索引擎（core 实例）                |
+| `onSelectionChange`      | `(s: SelectionData \| null) => void`       | 选区变化（**纯几何**）               |
+| `onHighlightCreate`      | `(h: NewHighlight) => void`                | 新建高亮（宿主决定是否保存）         |
+| `onHighlightComment`     | `(id: string) => void`                     | 高亮浮层"添加批注"（不传**不显示**） |
+| `stickyNotes`            | `AnnotationRecord[]`                       | 批注（小便签）列表（受控）           |
+| `onAnnotationClick`      | `(a: AnnotationRecord) => void`            | 点击批注                             |
+| `onHighlightColorChange` | `(id, color) => void`                      | 高亮浮层"选择高亮颜色"               |
+| `onHighlightRemove`      | `(id: string) => void`                     | 高亮浮层"删除"（不传**不显示**）     |
+| `onHighlightCopy`        | `(text: string) => void`                   | 高亮浮层"复制"（不传则用剪贴板）     |
+| `onHighlightMore`        | `(id: string) => void`                     | 高亮浮层"更多"（不传**不显示**）     |
+| `onPageChange`           | `(page, total) => void`                    | 当前页变化                           |
+| `onZoomChange`           | `(scale) => void`                          | 缩放变化                             |
+| `onExternalLink`         | `(url) => void`                            | 外部链接点击（宿主决定怎么开）       |
+| `showPasswordDialog`     | `boolean`                                  | 用包内置密码框（加密文档）           |
+| `initialScale`           | `'width' \| number`                        | 初始缩放（默认适配宽度）             |
+| `locale` / `messages`    | `'zh' \| 'en'` / `Partial<Messages>`       | 语言 / 文案覆盖                      |
+| `theme`                  | `PdfViewerTheme`（见下）                   | 主题（7 套）                         |
+| `appearance`             | `PdfViewerAppearance`                      | 外观（密度 / 外壳 / 页阴影…）        |
+| `printMode`              | `'with-highlights' \| 'original'`          | 打印模式（保留高亮 / 只打印原 PDF）  |
+| `toolbar`                | `ToolbarConfig`                            | 工具栏开关 + 左右 slots              |
 
 完整清单见 `src/components/PdfViewer.tsx`。
 
@@ -259,6 +266,44 @@ export function Reader({ url }: { url: string }) {
 
 `mousedown` 落浮层外 · `Esc` · 选区被清空 · 滚动 / 缩放 / 翻页。
 
+## 高亮浮层（点高亮块出现的 4 个按钮）
+
+点中高亮块 → 出现操作条（**顺序固定**）：
+
+```
+📝 添加批注 · 🖍 选择高亮颜色 · 📋 复制 · 🗑 删除
+```
+
+| 按钮     | 需要的 prop              | 不传时       |
+| -------- | ------------------------ | ------------ |
+| 添加批注 | `onHighlightComment`     | **不显示**   |
+| 选颜色   | `onHighlightColorChange` | **不显示**   |
+| 复制     | `onHighlightCopy`        | 用内置剪贴板 |
+| 删除     | `onHighlightRemove`      | **不显示**   |
+
+### 批注（WPS 式小便签）
+
+点"添加批注" → 宿主弹编辑框 → 宿主把批注传回来 → 高亮旁边出现**小便签图标** →
+**hover** 显示**便签内容**。
+
+```tsx
+const [notes, setNotes] = useState<AnnotationRecord[]>([]);
+
+<PdfViewer
+  onHighlightComment={(id) => {
+    const content = prompt('批注内容：');
+    if (content) {
+      setNotes((prev) => [...prev, { id: `n-${id}`, highlightId: id, content }]);
+    }
+  }}
+  stickyNotes={notes}
+  onAnnotationClick={(note) => openDetail(note)}
+/>;
+```
+
+⚠️ **包的边界**：包只负责**按钮 + 抛事件 + 渲染小便签**；
+批注**内容怎么编辑、怎么存、怎么同步到后端** → 宿主的事（换后端不用改包）。
+
 ## 错误码
 
 12 个，统一 `PdfViewerError`（带 `code` / `message` / `cause` / `retryable`）：
@@ -358,6 +403,8 @@ if (isRetryable(error)) showRetryButton();
 - ✅ 滚动容器被**摊平**（`overflow: visible`）→ 18 页全在，不是只有一屏
 - ✅ 每页一张纸（`break-after: page`）+ 去掉页阴影（省墨）
 - ✅ **高亮保留**（`print-color-adjust: exact`，否则浏览器会省掉背景色）
+- ✅ **按纸张自动缩放**（`zoom`）→ 内容**完整落在可打印区里**，不裁切、不出空白页
+- ✅ **Ctrl+P 也能用**（打印用的 CSS 变量**一直**维护，不只在点打印按钮时写）
 
 ```tsx
 <PdfViewer printMode="with-highlights" />  {/* 默认：带高亮 */}
@@ -366,6 +413,24 @@ if (isRetryable(error)) showRetryButton();
 
 ⚠️ **宿主自己的 UI 要自己写打印样式**（包只管包内部）。
 ⚠️ 宿主的 inline style 优先级更高 → 需要 `!important` 才能盖住。
+
+### 打印的缩放是怎么算的
+
+```
+A4 可打印区 = (210 - 12×2) × (297 - 12×2) mm = 186 × 273 mm = 703 × 1032 px
+屏幕上的页  = 1407.6 × 1821.6 px（"适合宽度"的缩放，2.3×）
+缩放        = min(703/1407.6, 1032/1821.6) = 0.499
+→ 缩完 703 × 909 px = 186 × 240 mm → 正好落在可打印区里 ✅
+```
+
+⚠️ **不能**用"物理比例"（`612pt → 186mm` = 0.861）去缩**屏幕像素**
+→ 会得到 322mm ≫ A4 → **18 页印成 33 页**。
+→ 所以包提供了两个函数，别用错：
+
+| 函数                              | 用途                                   |
+| --------------------------------- | -------------------------------------- |
+| `computePrintScale(pageSizePt…)`  | **物理**比例（PDF 点尺寸 → 纸张）      |
+| `computePrintScaleForRender(px…)` | **渲染像素** → 纸张（打印时用这个 ✅） |
 
 ## 缩放：适应宽度 vs 适应页面
 
