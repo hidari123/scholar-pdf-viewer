@@ -636,6 +636,26 @@ export default function App() {
           const page = await doc.getPage(pageNumber);
           return {
             pageNumber: page.pageNumber,
+            /*
+             * ⚠️⚠️ **必须提供 `getViewport`**（搜索高亮定位的关键，实测踩过的坑）。
+             *
+             * → 索引要用它判断"哪些是旋转文字"
+             * → 旋转文字在**渲染时不存在** → 索引也必须跳过
+             * → 否则索引文本多几百字符 → **偏移全错位** ❌
+             *
+             * → **页自己提供**比宿主单独传回调更可靠：
+             *   宿主的回调通常依赖异步缓存的页尺寸 → 和索引建索引**竞态** ❌
+             *   页自己的 `getViewport` 是**同步**的 → 永远拿得到 ✅
+             */
+            getViewport: (params: { scale: number }) => {
+              const viewport = page.getViewport(params);
+              return {
+                width: viewport.width,
+                height: viewport.height,
+                scale: viewport.scale,
+                transform: viewport.transform as number[],
+              };
+            },
             getTextContent: async () => {
               const content = await page.getTextContent();
               return {
@@ -646,6 +666,18 @@ export default function App() {
                     transform: item.transform,
                     width: item.width,
                     height: item.height,
+                    /*
+                     * ⚠️⚠️ **必须传 `fontName`**（搜索高亮定位的关键，实测踩过的坑）。
+                     *
+                     * → pdf.js 的 `getTextContent()` 会**合并** item
+                     * → 合并与否取决于 `fontName` / `height` 等字段
+                     * → 渲染侧传了 `fontName`、索引侧没传
+                     *    → **两次调用的 item 边界不一样**
+                     *    → 索引 161 项 / 渲染 112 项 → **偏移错位** ❌
+                     *
+                     * → 两边**字段完全一致** → item 边界一致 → 偏移才对得上 ✅
+                     */
+                    fontName: 'fontName' in item ? item.fontName : undefined,
                     hasEOL: 'hasEOL' in item ? item.hasEOL : false,
                   })),
               };

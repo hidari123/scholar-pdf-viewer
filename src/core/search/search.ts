@@ -27,10 +27,37 @@ export interface PageTextContent {
   items: TextItemLike[];
 }
 
+/**
+ * 视口的最小形状（pdf.js PageViewport 的子集）。
+ *
+ * ⚠️ **索引需要它来判断"哪些是旋转文字"**（实测踩过的坑：高亮定位不准）。
+ */
+export interface SearchViewport {
+  transform: number[];
+  scale: number;
+  width: number;
+  height: number;
+}
+
 /** 取文本页的最小形状（与 pdf.js PDFPageProxy 结构兼容） */
 export interface TextPageLike {
   pageNumber: number;
   getTextContent(): Promise<PageTextContent>;
+  /**
+   * **取视口**（可选，但强烈建议提供）。
+   *
+   * ⚠️ **为什么需要**（实测踩过的坑：搜索高亮定位不准）：
+   * → 渲染时**旋转文字不存在**（不画进文本层）
+   * → 索引如果不跳过它 → 索引文本比渲染文本多几百字符 → **偏移全错位** ❌
+   * → 判断"是不是旋转"**需要视口**
+   *
+   * ⚠️ **为什么放在页上而不是单独传 `viewport` 回调**：
+   * → 单独传回调的话，宿主要自己缓存各页尺寸
+   * → **缓存的时机和索引建索引的时机是竞态的**（实测踩过）
+   *    → 索引可能拿到"还没填好的"尺寸 → 那一页就错位 ❌
+   * → 放在页上 → 包**当场就能拿到**（pdf.js 的 `page.getViewport()` 是同步的）✅
+   */
+  getViewport?: (params: { scale: number }) => SearchViewport;
 }
 
 /** 一次命中 */
@@ -292,7 +319,7 @@ export class PdfSearch {
              *    （`mapOffsetToRenderedByText`）→ 尽量准
              */
             const items = selectSearchItems(content.items, {
-              viewport: options.viewport?.(pageNumber),
+              viewport: this.resolveViewport(page, pageNumber, options),
             });
             const text = joinItemTexts(items);
             this.index.set(pageNumber, {
@@ -329,6 +356,57 @@ export class PdfSearch {
     })();
 
     await this.building;
+  }
+
+  /**
+   * **解析该页的视口**（判断旋转文字用）。
+   *
+   * ## 优先级
+   *
+   * ```
+   * ① page.getViewport({ scale: 1 })   —— 页自己提供（pdf.js 原生）✅ 推荐的
+   * ② options.viewport?.(pageNumber)    —— 宿主单独提供（兜底）
+   * ③ undefined                          —— 拿不到 → 索引会收旋转文字（对齐会偏）
+   * ```
+   *
+   * ⚠️ **为什么优先用页自己的**：
+   * → 宿主的 `viewport` 回调通常依赖**异步缓存**的页尺寸
+   * → 索引建索引和缓存填充是**竞态的** → 有一页拿到 `undefined` 就错位 ❌
+   * → 页自己的 `getViewport` 是**同步**的 → 永远拿得到 ✅
+   *
+   * @param page 页
+   * @param pageNumber 页码
+   * @param options 选项
+   * @returns 视口（拿不到返回 null）
+   */
+  private resolveViewport(
+    page: TextPageLike,
+    pageNumber: number,
+    options: { viewport?: (pageNumber: number) => SearchViewport | undefined },
+  ): SearchViewport | undefined {
+    // ① 页自己提供（pdf.js 的 PDFPageProxy 原生就有）
+    if (typeof page.getViewport === 'function') {
+      try {
+        const viewport = page.getViewport({ scale: 1 });
+        if (viewport && Array.isArray(viewport.transform) && viewport.transform.length >= 6) {
+          return {
+            transform: viewport.transform,
+            scale: viewport.scale ?? 1,
+            width: viewport.width ?? 0,
+            height: viewport.height ?? 0,
+          };
+        }
+      } catch {
+        // 取不到 → 往下走兜底
+      }
+    }
+
+    // ② 宿主提供的
+    try {
+      return options.viewport?.(pageNumber);
+    } catch {
+      return undefined;
+    }
   }
 
   /**
