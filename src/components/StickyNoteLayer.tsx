@@ -6,8 +6,13 @@
  * > "第一个是添加批注 具体添加方式和wps的批注一样 也是加一个小便签纸一样的在上面
  * >  hover会展示出来"
  *
+ * > "如果要批注的内容在同一行呢 别的软件是怎么处理的这个逻辑 你调研一下
+ * >  目前这两个批注会叠在一起 我认为可以只出现一个图标 然后悬浮在图标上可以选择批注几"
+ *
  * → 高亮块旁边出现一个**小便签图标**
  * → **hover** → 弹出**便签内容**（带小尾巴的纸片）
+ * → **同一行的多个批注 → 合并成一个图标**（带数量角标）
+ * → **hover 合并的图标 → 弹出选择列表**（"选择批注 N"）
  *
  * ## 为什么用 DOM 而不是 canvas
  *
@@ -16,10 +21,15 @@
  * - 颜色走 CSS 变量 → 宿主可换肤
  */
 
+import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
+import type { AnnotationGroup } from '../core/annotation/annotation-groups';
+import { groupAnnotations } from '../core/annotation/annotation-groups';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import { STICKY_NOTE_SIZE, stickyNotePosition } from '../core/annotation/sticky-note';
 import type { HighlightRecord, ViewRect } from '../core/types';
+import type { IconName } from './Icon';
+import { Icon } from './Icon';
 
 /** StickyNoteLayer 参数 */
 export interface StickyNoteLayerProps {
@@ -35,6 +45,8 @@ export interface StickyNoteLayerProps {
   onAnnotationClick?: (annotation: AnnotationRecord) => void;
   /** 鼠标进入便签 */
   onAnnotationHover?: (annotation: AnnotationRecord | null) => void;
+  /** 图标覆盖 */
+  icons?: Partial<Record<IconName, ReactNode>>;
 }
 
 /**
@@ -43,11 +55,21 @@ export interface StickyNoteLayerProps {
  * @param props 参数
  */
 export function StickyNoteLayer(props: StickyNoteLayerProps) {
-  const { pageNumber, annotations, highlights, viewport, onAnnotationClick, onAnnotationHover } =
-    props;
+  const {
+    pageNumber,
+    annotations,
+    highlights,
+    viewport,
+    onAnnotationClick,
+    onAnnotationHover,
+    icons,
+  } = props;
 
-  /** 当前 hover 的批注 id（控制便签内容显��） */
+  /** 当前 hover 的批注 id（控制便签内容显示） */
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  /** 当前 hover 的**组**（合并的批注 → 显示选择列表） */
+  const [hoveredGroupKey, setHoveredGroupKey] = useState<string | null>(null);
 
   /** 高亮在页内的矩形（用来给便签找锚点） */
   const highlightRects = useMemo(() => {
@@ -79,85 +101,136 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
     return map;
   }, [highlights, pageNumber, viewport.width, viewport.height]);
 
-  /** 便签的位置 */
-  const notes = useMemo(() => {
-    const result: { annotation: AnnotationRecord; left: number; top: number }[] = [];
+  /** 每条批注的锚点（页内矩形） */
+  const anchors = useMemo(() => {
+    const map = new Map<string, { left: number; top: number; width: number; height: number }>();
 
     for (const annotation of annotations) {
       const rects = highlightRects.get(annotation.highlightId);
-      // 锚点 = 高亮的**并集**（多行高亮 → 便签在整块的高亮右上角）
-      let anchor: ViewRect | null = null;
-      if (rects && rects.length > 0) {
-        let left = Infinity;
-        let top = Infinity;
-        let right = -Infinity;
-        let bottom = -Infinity;
-        for (const r of rects) {
-          left = Math.min(left, r.left);
-          top = Math.min(top, r.top);
-          right = Math.max(right, r.left + r.width);
-          bottom = Math.max(bottom, r.top + r.height);
-        }
-        anchor = { left, top, width: right - left, height: bottom - top, pageNumber };
-      }
-
-      const pos = stickyNotePosition(annotation, anchor, viewport);
-      if (!pos) {
+      if (!rects || rects.length === 0) {
         continue;
       }
-      result.push({ annotation, left: pos.left, top: pos.top });
+      // 锚点 = 高亮的**并集**（多行高亮 → 便签在整块的高亮右上角）
+      let left = Infinity;
+      let top = Infinity;
+      let right = -Infinity;
+      let bottom = -Infinity;
+      for (const r of rects) {
+        left = Math.min(left, r.left);
+        top = Math.min(top, r.top);
+        right = Math.max(right, r.left + r.width);
+        bottom = Math.max(bottom, r.top + r.height);
+      }
+      map.set(annotation.id, { left, top, width: right - left, height: bottom - top });
     }
 
-    return result;
-  }, [annotations, highlightRects, viewport, pageNumber]);
+    return map;
+  }, [annotations, highlightRects]);
 
-  if (notes.length === 0) {
+  /**
+   * **把挤在一起的批注合并成组**（用户需求）。
+   *
+   * → 同一行 + 水平相距不远 → 一组 → **只渲染一个图标**
+   */
+  const groups = useMemo<AnnotationGroup[]>(() => {
+    const items = [];
+    for (const annotation of annotations) {
+      const anchor = anchors.get(annotation.id);
+      if (!anchor) {
+        continue;
+      }
+      items.push({ id: annotation.id, ...anchor });
+    }
+    return groupAnnotations(items);
+  }, [annotations, anchors]);
+
+  /** 每组里第一条批注的记录（用来渲染内容和触发事件） */
+  const annotationById = useMemo(() => {
+    const map = new Map<string, AnnotationRecord>();
+    for (const annotation of annotations) {
+      map.set(annotation.id, annotation);
+    }
+    return map;
+  }, [annotations]);
+
+  if (groups.length === 0) {
     return null;
   }
 
   return (
     <div className="scpdf-sticky-notes" aria-hidden="false">
-      {notes.map(({ annotation, left, top }) => {
-        const isHovered = hoveredId === annotation.id;
+      {groups.map((group) => {
+        const first = group.annotations[0];
+        const firstRecord = first ? annotationById.get(first.id) : undefined;
+        if (!first || !firstRecord) {
+          return null;
+        }
+
+        // 组里只有一条 → 普通便签；有多条 → 合并图标（带角标）
+        const isGroup = group.annotations.length > 1;
+        const isHovered = hoveredGroupKey === group.key;
+
+        // 图标位置（用整组的并集）
+        const pos = stickyNotePosition(firstRecord, group.anchor, viewport);
+        if (!pos) {
+          return null;
+        }
+
         return (
-          <span key={annotation.id} className="scpdf-sticky-note" style={{ left, top }}>
+          <span
+            key={group.key}
+            className="scpdf-sticky-note"
+            data-group={isGroup ? 'true' : 'false'}
+            style={{ left: pos.left, top: pos.top }}
+          >
             <button
               type="button"
               className="scpdf-sticky-note__icon"
               style={{ width: STICKY_NOTE_SIZE, height: STICKY_NOTE_SIZE }}
-              title="批注"
-              aria-label={`批注：${annotation.content.slice(0, 20)}`}
+              title={isGroup ? `选择批注（${group.annotations.length}）` : '批注'}
+              aria-label={
+                isGroup
+                  ? `选择批注（${group.annotations.length} 条）`
+                  : `批注：${firstRecord.content.slice(0, 20)}`
+              }
               onMouseEnter={() => {
-                setHoveredId(annotation.id);
-                onAnnotationHover?.(annotation);
+                setHoveredGroupKey(group.key);
+                setHoveredId(first.id);
+                if (!isGroup) {
+                  onAnnotationHover?.(firstRecord);
+                }
               }}
               onMouseLeave={() => {
+                setHoveredGroupKey(null);
                 setHoveredId(null);
                 onAnnotationHover?.(null);
               }}
               onFocus={() => {
-                setHoveredId(annotation.id);
-                onAnnotationHover?.(annotation);
+                setHoveredGroupKey(group.key);
+                setHoveredId(first.id);
               }}
               onBlur={() => {
+                setHoveredGroupKey(null);
                 setHoveredId(null);
-                onAnnotationHover?.(null);
               }}
-              onClick={() => onAnnotationClick?.(annotation)}
+              onClick={() => {
+                /*
+                 * ⚠️ **合并的组 → 不直接打开**，而是让用户从列表里选。
+                 *
+                 * → 否则多个批注没法区分（用户需求："悬浮在图标上可以选择批注几"）
+                 */
+                if (isGroup) {
+                  return;
+                }
+                onAnnotationClick?.(firstRecord);
+              }}
             >
-              <svg
-                viewBox="0 0 24 24"
-                width={STICKY_NOTE_SIZE}
-                height={STICKY_NOTE_SIZE}
-                aria-hidden
-              >
-                {/* 纸片 + 折角 */}
-                <path
-                  d="M5 3h9l5 5v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"
-                  fill="currentColor"
-                />
-                <path d="M14 3v5h5z" fill="rgba(0,0,0,0.22)" />
-              </svg>
+              <Icon name="stickyNote" size={STICKY_NOTE_SIZE} overrides={icons} />
+
+              {/* 数量角标（合并时显示） */}
+              {isGroup ? (
+                <span className="scpdf-sticky-note__badge">{group.annotations.length}</span>
+              ) : null}
             </button>
 
             {/*
@@ -166,13 +239,56 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
               ⚠️ 用 `aria-hidden` + `visibility` 而不是 `display:none`
               → 保留在无障碍树里（读屏软件能读到）。
             */}
-            <span
-              className="scpdf-sticky-note__content"
-              data-visible={isHovered ? 'true' : 'false'}
-              role="note"
-            >
-              {annotation.content}
-            </span>
+            {!isGroup ? (
+              <span
+                className="scpdf-sticky-note__content"
+                data-visible={hoveredId === first.id ? 'true' : 'false'}
+                role="note"
+              >
+                {firstRecord.content}
+              </span>
+            ) : null}
+
+            {/* 合并组的"选择列表"（hover 时显示） */}
+            {isGroup ? (
+              <span
+                className="scpdf-sticky-note__picker"
+                data-visible={isHovered ? 'true' : 'false'}
+                role="menu"
+              >
+                <span className="scpdf-sticky-note__picker-title">
+                  选择批注（{group.annotations.length}）
+                </span>
+                {group.annotations.map((item) => {
+                  const record = annotationById.get(item.id);
+                  if (!record) {
+                    return null;
+                  }
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="scpdf-sticky-note__picker-item"
+                      role="menuitem"
+                      onMouseEnter={() => {
+                        setHoveredId(item.id);
+                        onAnnotationHover?.(record);
+                      }}
+                      onMouseLeave={() => {
+                        setHoveredId(null);
+                        onAnnotationHover?.(null);
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onAnnotationClick?.(record);
+                      }}
+                    >
+                      {record.content.slice(0, 60) || '（空批注）'}
+                    </button>
+                  );
+                })}
+              </span>
+            ) : null}
           </span>
         );
       })}

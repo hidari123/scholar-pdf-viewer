@@ -15,7 +15,16 @@
  */
 
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { LinkAnnotationLike } from '../core/annotation/links';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import type { DocumentCache } from '../core/cache/store';
@@ -55,7 +64,6 @@ import { useVisiblePages } from '../hooks/useVisiblePages';
 import { useZoom } from '../hooks/useZoom';
 import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
-import { AnnotationPanel } from './AnnotationPanel';
 import type { IconName } from './Icon';
 import { OutlinePanel } from './OutlinePanel';
 import { Page } from './Page';
@@ -66,6 +74,19 @@ import { SelectionPopover } from './SelectionPopover';
 import { ThumbnailPanel } from './ThumbnailPanel';
 import type { ToolbarConfig } from './Toolbar';
 import { Toolbar } from './Toolbar';
+
+/**
+ * **便利贴面板**（懒加载）。
+ *
+ * ⚠️ **为什么要懒加载**（实测踩过的坑：体积超预算）：
+ * → 便利贴面板 + 富文本编辑器约 **1.5 kB**（brotli 后）
+ * → 但**只有"打开批注"时才需要**
+ * → 静态 import → 每个宿主都要背这 1.5 kB ❌
+ * → 懒加载 → **不打开批注就永远不加载** ✅
+ */
+const AnnotationPanel = lazy(() =>
+  import('./AnnotationPanel').then((mod) => ({ default: mod.AnnotationPanel })),
+);
 
 /** 功能开关 */
 export interface Features {
@@ -2961,21 +2982,27 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
             ⚠️ **位置在"页面中间偏右"**（用户明确要求）
             → 用户反馈："目前都没展示完整 在最右边被挡住了"
             → 之前贴在便签图标旁边（页面最右）→ 被裁掉 ❌
+
+            ⚠️ **懒加载**（`Suspense`）→ 不打开批注就不加载这 1.5 kB
           */}
-          <AnnotationPanel
-            annotation={activeAnnotation}
-            container={{ width: containerSize.width, height: containerSize.height }}
-            onChange={onAnnotationChange}
-            onSubmit={onAnnotationSave}
-            onDelete={onAnnotationDelete ? handleAnnotationDelete : undefined}
-            onClose={handleAnnotationClose}
-            toolbar={annotationToolbar}
-            palette={annotationPalette}
-            icons={icons}
-            locale={locale}
-            locales={locales}
-            messages={messages}
-          />
+          {activeAnnotation ? (
+            <Suspense fallback={null}>
+              <AnnotationPanel
+                annotation={activeAnnotation}
+                container={{ width: containerSize.width, height: containerSize.height }}
+                onChange={onAnnotationChange}
+                onSubmit={onAnnotationSave}
+                onDelete={onAnnotationDelete ? handleAnnotationDelete : undefined}
+                onClose={handleAnnotationClose}
+                toolbar={annotationToolbar}
+                palette={annotationPalette}
+                icons={icons}
+                locale={locale}
+                locales={locales}
+                messages={messages}
+              />
+            </Suspense>
+          ) : null}
 
           {/*
           页面区高度 = 最后一项页顶边（即文档总高）。

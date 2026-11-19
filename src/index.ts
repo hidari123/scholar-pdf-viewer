@@ -17,7 +17,20 @@
  */
 
 export * from './components';
-/* ---------- 批注（小便签） ---------- */
+/* ---------- 批注（小便签 + 分组） ---------- */
+export type {
+  Annotation,
+  AnnotationAnchor,
+  AnnotationGroup,
+} from './core/annotation/annotation-groups';
+export {
+  ANNOTATION_GROUP_TOLERANCE,
+  groupAnnotations,
+  horizontalGap,
+  isSameRow,
+  unionAnchor,
+  verticalOverlap,
+} from './core/annotation/annotation-groups';
 export type { AnnotationRecord } from './core/annotation/sticky-note';
 export {
   STICKY_NOTE_OFFSET,
@@ -26,6 +39,18 @@ export {
 } from './core/annotation/sticky-note';
 /* ---------- 下载（纯 DOM，无网络依赖） ---------- */
 export { downloadFile } from './core/document/download';
+/* ---------- 富文本（零依赖，工具栏宿主可配） ---------- */
+export type {
+  RichTextCommand,
+  RichTextPalette,
+  RichTextToolbarItem,
+} from './core/editor/rich-text';
+export {
+  defaultRichTextToolbar,
+  execRichTextCommand,
+  richTextToPlain,
+  sanitizeRichText,
+} from './core/editor/rich-text';
 export type { PdfViewerError, PdfViewerErrorCode } from './core/errors';
 export { isRetryable, pdfViewerError } from './core/errors';
 export type {
@@ -69,7 +94,14 @@ export type {
   IconRect,
   IconShape,
 } from './core/icons/icons';
-export { getIconShape } from './core/icons/icons';
+/*
+ * ⚠️ **几何数据不在主入口导出**（实测踩过的坑：体积超预算）。
+ *
+ * → 45 个图标的几何数据约 5 kB（brotli 后）
+ * → 静态导出 → 主入口 27 kB → 超了 25 kB 的预算 ❌
+ * → 改成**独立入口**：import { getIconShape } from '@scholar-club/pdf-viewer/icons'
+ * → 主入口只在**真正渲染内置图标时**动态加载 ✅
+ */
 export type { OutlineItemLike } from './core/outline/outline';
 export type { PaperSize, PrintMargin } from './core/print';
 /* ---------- 打印 ---------- */

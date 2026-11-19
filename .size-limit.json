@@ -3,7 +3,8 @@
     "name": "主入口（组件 + hooks）",
     "path": "dist/index.js",
     "limit": "25 kB",
-    "import": "{ PdfViewer }"
+    "import": "{ PdfViewer }",
+    "entry": "index"
   },
   {
     "name": "core 子路径（零 React）",
@@ -22,5 +23,11 @@
     "path": "dist/core.js",
     "limit": "6 kB",
     "import": "{ planThumbnails, flattenOutline }"
+  },
+  {
+    "name": "icons 子路径（内置图标集，按需加载）",
+    "path": "dist/icons.js",
+    "limit": "8 kB",
+    "import": "{ getIconShape }"
   }
 ]

@@ -20,13 +20,67 @@
  * ```
  *
  * → 覆盖优先级：**宿主 > 内置** ✅
+ *
+ * ## ⚠️ 内置几何数据是**懒加载**的（实测踩过的坑：体积超预算）
+ *
+ * → 45 个图标的几何数据约 **5 kB**（brotli 后）
+ * → 静态 import → 主入口 **27 kB** → 超了 **25 kB** 的预算 ❌
+ * → 改成**动态 import** → 第一次用到时才加载 → 主入口保持轻量 ✅
+ *
+ * → 代价：图标**第一次渲染**是空白的（异步加载）
+ * → 缓解：加载后**缓存** → 第二次起同步渲染 ✅
+ * → 且**宿主覆盖**的图标**不走这条路**（同步渲染）
  */
 
 import type { ReactNode } from 'react';
-import type { IconName } from '../core/icons/icons';
-import { getIconShape } from '../core/icons/icons';
+import { useEffect, useState } from 'react';
+import type { IconName, IconShape } from '../core/icons/icons';
 
 export type { IconName } from '../core/icons/icons';
+
+/**
+ * **图标几何数据的缓存**（懒加载 → 缓存 → 之后同步）。
+ *
+ * ⚠️ 模块级缓存 → 全局共享 → 只加载一次 ✅
+ */
+const shapeCache = new Map<IconName, IconShape | null>();
+
+/** 正在加载的 Promise（避免重复加载同一个图标） */
+const loading = new Map<IconName, Promise<void>>();
+
+/**
+ * 加载一个图标的几何数据。
+ *
+ * @param name 图标名
+ * @returns 加载完成的 Promise
+ */
+function loadShape(name: IconName): Promise<void> {
+  const cached = shapeCache.get(name);
+  if (cached !== undefined) {
+    return Promise.resolve();
+  }
+
+  const pending = loading.get(name);
+  if (pending) {
+    return pending;
+  }
+
+  const promise = import('../core/icons/icons')
+    .then((mod) => {
+      const shape = mod.getIconShape(name);
+      shapeCache.set(name, shape);
+    })
+    .catch(() => {
+      // 加载失败 → 记成 null（不画图标，但**不崩**）
+      shapeCache.set(name, null);
+    })
+    .finally(() => {
+      loading.delete(name);
+    });
+
+  loading.set(name, promise);
+  return promise;
+}
 
 /** 图标组件参数 */
 export interface IconProps {
@@ -52,13 +106,45 @@ export interface IconProps {
  * @param props 参数
  */
 export function Icon({ name, size = 18, title, className, overrides }: IconProps) {
-  // ⚠️ **宿主覆盖优先** → 宿主的图标体系优先于内置的
+  /*
+   * ⚠️ **懒加载几何数据**（见文件头的说明：体积预算）。
+   *
+   * → 第一次：缓存里没有 → 触发加载 → 先渲染空
+   * → 加载完：写进 state → 重渲染 → 图标出现
+   * → 第二次起：缓存里有 → **同步**渲染（无闪烁）✅
+   */
+  const [shape, setShape] = useState<IconShape | null>(() => shapeCache.get(name) ?? null);
+
+  useEffect(() => {
+    // 缓存里已经有了 → 直接用
+    const cached = shapeCache.get(name);
+    if (cached !== undefined) {
+      setShape(cached);
+      return;
+    }
+
+    let cancelled = false;
+    void loadShape(name).then(() => {
+      if (!cancelled) {
+        setShape(shapeCache.get(name) ?? null);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [name]);
+
+  /*
+   * ⚠️ **宿主覆盖优先** → 宿主的图标体系优先于内置的。
+   *
+   * → 必须放在 hooks **之后**（hooks 不能条件调用）
+   */
   const override = overrides?.[name];
   if (override !== undefined && override !== null) {
     return <>{override}</>;
   }
 
-  const shape = getIconShape(name);
   if (!shape) {
     return null;
   }

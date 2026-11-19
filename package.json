@@ -32,6 +32,16 @@
         "default": "./dist/core.cjs"
       }
     },
+    "./icons": {
+      "import": {
+        "types": "./dist/icons.d.ts",
+        "default": "./dist/icons.js"
+      },
+      "require": {
+        "types": "./dist/icons.d.cts",
+        "default": "./dist/icons.cjs"
+      }
+    },
     "./styles.css": "./dist/styles.css",
     "./themes.css": "./dist/themes.css",
     "./package.json": "./package.json"

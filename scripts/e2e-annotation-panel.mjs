@@ -1,0 +1,224 @@
+/**
+ * E2E：**多批注分组 + 便利贴面板 + 富文本**（用户需求）。
+ *
+ * > "多批注如果位置重叠，比如说都是从某一行出发的多行，
+ * >  按钮就会重叠在最右边，调研一下wps或别的是怎么做的交互，
+ * >  这种情况下同一行可以只显示一个图标+悬浮选择批注
+ * >  +自研富文本输入框（插件调研）+便利贴 UI 展开在页面中间偏右"
+ *
+ * ## 验证什么
+ *
+ * 1. 同一行的多个批注 → **只渲染一个图标**（带数量角标）
+ * 2. **hover 那个图标** → 弹出"选择批注 N"的列表
+ * 3. 点某一条 → 打开**便利贴面板**
+ * 4. 面板在**页面中间偏右**，且**完整可见**（不被裁掉）
+ * 5. 面板里有**富文本编辑器**（工具栏 + 编辑区）
+ */
+
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { chromium } from 'playwright';
+import { E2E_BASE_URL } from './e2e-base.mjs';
+
+function resolveChromium() {
+  const cacheRoot = join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
+  if (!existsSync(cacheRoot)) return undefined;
+  const dirs = readdirSync(cacheRoot)
+    .filter((n) => n.startsWith('chromium-'))
+    .map((n) => ({ n, v: Number.parseInt(n.replace('chromium-', ''), 10) || 0 }))
+    .sort((a, b) => b.v - a.v);
+  for (const d of dirs) {
+    const exe = join(cacheRoot, d.n, 'chrome-win64', 'chrome.exe');
+    if (existsSync(exe)) return exe;
+  }
+  return undefined;
+}
+
+const results = [];
+function check(name, ok, detail = '') {
+  results.push({ name, ok });
+  console.log(`  ${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` - ${detail}` : ''}`);
+}
+
+const exe = resolveChromium();
+const browser = await chromium.launch(exe ? { executablePath: exe } : {});
+const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+const errors = [];
+page.on('pageerror', (e) => errors.push(String(e).slice(0, 120)));
+
+/** 造一条高亮 */
+async function makeHighlight() {
+  await page.evaluate(() => {
+    const spans = [...document.querySelectorAll('.scpdf-text-layer__item')].filter(
+      (s) => (s.textContent ?? '').trim().length > 20,
+    );
+    const sp = spans.find((s) => {
+      const r = s.getBoundingClientRect();
+      return r.width > r.height * 2 && r.top > 200;
+    });
+    if (!sp) return;
+    const range = document.createRange();
+    const node = sp.firstChild ?? sp;
+    range.setStart(node, 0);
+    range.setEnd(node, 10);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+  await page.waitForTimeout(1000);
+
+  for (const b of await page.locator('.scpdf-toolbar__btn').all()) {
+    const label = await b.getAttribute('aria-label');
+    if (label?.includes('添加高亮')) {
+      await b.click();
+      break;
+    }
+  }
+  await page.waitForTimeout(900);
+}
+
+/** 造两个同一行的批注 */
+async function makeSameLineNotes() {
+  for (const b of await page.locator('.scpdf-toolbar__btn').all()) {
+    const label = await b.getAttribute('aria-label');
+    if (label?.includes('同一行')) {
+      await b.click();
+      break;
+    }
+  }
+  await page.waitForTimeout(900);
+}
+
+try {
+  await page.goto(E2E_BASE_URL, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(3500);
+  await page.waitForFunction(
+    () => document.querySelectorAll('.scpdf-text-layer__item').length > 50,
+    { timeout: 30000 },
+  );
+  await page.waitForTimeout(1500);
+
+  await makeHighlight();
+  await makeSameLineNotes();
+
+  // ① 同一行的多个批注 → 只渲染一个图标（带角标）
+  const notes = await page.evaluate(() => {
+    const list = [...document.querySelectorAll('.scpdf-sticky-note')];
+    return list.map((n) => ({
+      group: n.dataset.group,
+      badge: n.querySelector('.scpdf-sticky-note__badge')?.textContent ?? null,
+    }));
+  });
+
+  check('**同一行的批注 → 只渲染一个图标**', notes.length === 1, `渲染了 ${notes.length} 个`);
+  check(
+    '**合并的图标带数量角标**',
+    notes[0]?.group === 'true' && notes[0]?.badge === '2',
+    JSON.stringify(notes[0] ?? {}),
+  );
+
+  // ② hover → 弹出选择列表
+  await page.locator('.scpdf-sticky-note__icon').first().hover();
+  await page.waitForTimeout(700);
+
+  const picker = await page.evaluate(() => {
+    const el = document.querySelector('.scpdf-sticky-note__picker');
+    if (!el) return null;
+    return {
+      visible: el.getAttribute('data-visible'),
+      items: el.querySelectorAll('.scpdf-sticky-note__picker-item').length,
+      title: el.querySelector('.scpdf-sticky-note__picker-title')?.textContent ?? '',
+    };
+  });
+
+  check(
+    '**hover 合并图标 → 弹出"选择批注 N"**',
+    picker?.visible === 'true' && picker?.items === 2,
+    JSON.stringify(picker ?? {}),
+  );
+
+  // ③ 点一条 → 打开便利贴面板
+  await page.locator('.scpdf-sticky-note__picker-item').first().click();
+  await page.waitForTimeout(900);
+
+  const panel = await page.evaluate(() => {
+    const el = document.querySelector('.scpdf-annotation-panel');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      left: Math.round(r.left),
+      top: Math.round(r.top),
+      width: Math.round(r.width),
+      height: Math.round(r.height),
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      fullyVisible:
+        r.left >= 0 && r.right <= window.innerWidth && r.top >= 0 && r.bottom <= window.innerHeight,
+      // 在"中间偏右"？（左边缘 > 视口中线）
+      middleRight: r.left > window.innerWidth * 0.4,
+      hasEditor: !!el.querySelector('.scpdf-rich-text__editor'),
+      toolbarButtons: el.querySelectorAll('.scpdf-rich-text__btn').length,
+    };
+  });
+
+  check('**点批注 → 展开便利贴面板**', panel !== null);
+  check(
+    '**便利贴面板完整可见（不被裁掉）**',
+    panel?.fullyVisible === true,
+    JSON.stringify({
+      left: panel?.left,
+      right: (panel?.left ?? 0) + (panel?.width ?? 0),
+      viewportWidth: panel?.viewportWidth,
+    }),
+  );
+  check(
+    '**便利贴面板在"页面中间偏右"**',
+    panel?.middleRight === true,
+    `left=${panel?.left} viewport=${panel?.viewportWidth}`,
+  );
+  check(
+    '**面板里有富文本编辑器（工具栏 + 编辑区）**',
+    panel?.hasEditor === true && (panel?.toolbarButtons ?? 0) >= 4,
+    `按钮 ${panel?.toolbarButtons} 个`,
+  );
+
+  // ④ 富文本能真的格式化（加粗）
+  const formatted = await page.evaluate(() => {
+    const editor = document.querySelector('.scpdf-rich-text__editor');
+    if (!editor) return null;
+    editor.focus();
+    // 全选
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    // 点"加粗"
+    const bold = [...document.querySelectorAll('.scpdf-rich-text__btn')].find((b) =>
+      (b.getAttribute('aria-label') ?? '').includes('加粗'),
+    );
+    bold?.click();
+    return editor.innerHTML;
+  });
+  await page.waitForTimeout(400);
+
+  check(
+    '**富文本的"加粗"能真的生效**',
+    typeof formatted === 'string' && /<(b|strong)>/i.test(formatted),
+    String(formatted ?? '').slice(0, 60),
+  );
+
+  check('全程无 JS 错误', errors.length === 0, errors.slice(0, 2).join(' | '));
+} catch (error) {
+  check('E2E 执行无异常', false, String(error).slice(0, 200));
+} finally {
+  await browser.close();
+}
+
+const failed = results.filter((r) => !r.ok);
+console.log(`\n结果：${results.length - failed.length}/${results.length} 通过`);
+if (failed.length > 0) {
+  for (const f of failed) console.log(`  - ${f.name}`);
+  process.exitCode = 1;
+}

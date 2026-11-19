@@ -881,6 +881,41 @@ export default function App() {
   }, [setHighlights]);
 
   /**
+   * **造两个"同一行"的批注**（演示用）。
+   *
+   * → 用户需求："多批注如果位置重叠，比如说都是从某一行出发的多行，
+   *   按钮就会重叠在最右边"
+   * → 这两个批注锚定**同一条高亮** → 会挤在一起
+   * → 包应该把它们**合并成一个图标**（带数量角标）→ hover 能选具体哪条 ✅
+   */
+  const handleAddSameLineNotes = useCallback(() => {
+    const target = highlights[0];
+    if (!target) {
+      setHint('先添加一条高亮，再试这个');
+      return;
+    }
+
+    const now = Date.now();
+    setStickyNotes((prev) => [
+      ...prev,
+      {
+        id: `note-a-${now}`,
+        highlightId: target.id,
+        content: '这是第一条批注：<b>加粗</b>、<mark style="background-color: #ffe58f">高亮</mark>',
+        createdAt: now,
+      },
+      {
+        id: `note-b-${now}`,
+        highlightId: target.id,
+        content:
+          '这是第二条批注：看看它们会不会挤在一起 → <a href="https://example.com">一个链接</a>',
+        createdAt: now,
+      },
+    ]);
+    setHint('已加两条同一行的批注（看右上角是不是只有一个图标 + 角标）');
+  }, [highlights]);
+
+  /**
    * **下载 PDF**。
    *
    * ⚠️ 包**不负责取文件**（文件是宿主的）→ 只提供 `downloadFile` 这个纯 DOM 工具。
@@ -997,6 +1032,16 @@ export default function App() {
         <button
           type="button"
           className="scpdf-toolbar__btn"
+          onClick={handleAddSameLineNotes}
+          title="造两个同一行的批注"
+          aria-label="造两个同一行的批注"
+        >
+          <Icon name="comment" />
+        </button>
+
+        <button
+          type="button"
+          className="scpdf-toolbar__btn"
           onClick={handleImportHighlights}
           title="导入高亮（JSON）"
           aria-label="导入高亮"
@@ -1022,6 +1067,7 @@ export default function App() {
       handleImportHighlights,
       handleDownloadPdf,
       handleExportAnnotatedPdf,
+      handleAddSameLineNotes,
     ],
   );
 
@@ -1172,6 +1218,16 @@ export default function App() {
           onHighlightComment={handleHighlightComment}
           stickyNotes={stickyNotes}
           onAnnotationClick={(note) => setHint(`【批注】${note.content.slice(0, 30)}`)}
+          onAnnotationSave={(id, html) => {
+            setStickyNotes((prev) =>
+              prev.map((note) => (note.id === id ? { ...note, content: html } : note)),
+            );
+            setHint('已保存批注');
+          }}
+          onAnnotationDelete={(id) => {
+            setStickyNotes((prev) => prev.filter((note) => note.id !== id));
+            setHint('已删除批注');
+          }}
           onHighlightClick={(h) => setHint(`点击高亮：${h.selectedText.slice(0, 20)}`)} /*
            * 选区浮层的动作 —— **宿主注入**（证明包不需要业务入口）。
            *
