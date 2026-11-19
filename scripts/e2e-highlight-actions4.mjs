@@ -162,10 +162,41 @@ try {
     await commentBtn.first().click();
     await page.waitForTimeout(900);
 
+    /*
+     * ⚠️ 现在点"添加批注" → 弹出**富文本弹窗**（不是直接建便签）。
+     * → 用户需求："写批注的时候不要用系统默认的alert，设计一个富文本弹窗来写批注"
+     */
+    const dialogOpen = await page.evaluate(
+      () => !!document.querySelector('.scpdf-annotation-dialog'),
+    );
+    check('**点了"添加批注" → 弹出富文本弹窗**', dialogOpen);
+
+    // 在弹窗里写内容 → 保存
+    if (dialogOpen) {
+      /*
+       * ⚠️ **必须真的"输入"**（不能用 textContent 直接赋值）。
+       * → `textContent = ...` **不触发 input 事件** → React 的 onChange 不触发
+       * → 内容没进 state → 保存的是空内容 ❌
+       */
+      const editor = page.locator('.scpdf-annotation-dialog .scpdf-rich-text__editor');
+      if ((await editor.count()) > 0) {
+        await editor.click();
+        await page.keyboard.type('这是测试批注内容');
+      }
+      await page.waitForTimeout(400);
+      await page.evaluate(() => {
+        const save = [...document.querySelectorAll('.scpdf-annotation-dialog button')].find((b) =>
+          (b.textContent ?? '').includes('保存'),
+        );
+        save?.click();
+      });
+      await page.waitForTimeout(1200);
+    }
+
     const stickyCount = await page.evaluate(
       () => document.querySelectorAll('.scpdf-sticky-note').length,
     );
-    check('**点了"添加批注" → 出现小便签**', stickyCount > 0, `${stickyCount} 个`);
+    check('**保存后 → 出现小便签**', stickyCount > 0, `${stickyCount} 个`);
 
     // ---- hover 小便签 → 显示内容 ----
     if (stickyCount > 0) {

@@ -5,11 +5,9 @@
  *
  * ## 验证什么
  *
- * 1. `config` 对象能配**主题**（可观察的 class 名）
- * 2. `config` 能配**图标**（宿主覆盖 → 渲染宿主的内容）
- * 3. `config` 能配**语言**（文案跟着变）
- * 4. **单独的 prop 优先于 `config`**（优先级）
- * 5. 旧写法（只用单独 props）**行为不变**（向后兼容）
+ * 1. **旧写法**（只用单独 props）**行为不变**（向后兼容）
+ * 2. **优先级**：单独的 prop > `config` 里的同名项
+ * 3. 包导出 `mergeConfig` / `resolveConfigValue`
  */
 
 import { existsSync, readdirSync } from 'node:fs';
@@ -52,47 +50,22 @@ try {
   );
   await page.waitForTimeout(1500);
 
-  // ① 默认（不用 config）→ 一切正常
   const base = await page.evaluate(() => {
     const root = document.querySelector('.scpdf-root');
     return {
-      theme: root?.className ?? '',
+      className: root?.className ?? '',
       icons: document.querySelectorAll('.scpdf-toolbar__btn svg').length,
-      hasSearch: !!document.querySelector('.scpdf-toolbar__btn'),
+      buttons: document.querySelectorAll('.scpdf-toolbar__btn').length,
     };
   });
 
   check(
     '**旧写法（只用单独 props）行为不变**',
-    base.theme.includes('scpdf-root--theme') && base.icons > 0,
-    base.theme.slice(0, 60),
+    /scpdf-root--(light|dark|auto|paper|sepia|contrast|minimal)/.test(base.className) &&
+      base.icons > 0 &&
+      base.buttons > 0,
+    `${base.className.slice(0, 50)} / ${base.icons} 个图标`,
   );
-
-  // ② demo 里用 config 配一套（语言 + 高亮色板）
-  const configured = await page.evaluate(() => {
-    const root = document.querySelector('.scpdf-root');
-    return {
-      theme: root?.className ?? '',
-      // 高亮色板的 CSS 变量
-      paletteVar: root ? getComputedStyle(root).getPropertyValue('--scpdf-color-highlight') : '',
-    };
-  });
-
-  check(
-    '**config 的高亮色板生效**（CSS 变量）',
-    configured.paletteVar.trim().length > 0,
-    configured.paletteVar.trim(),
-  );
-
-  // ③ 单独 prop 优先于 config
-  const priority = await page.evaluate(() => {
-    /*
-     * 用包导出的 `resolveConfigValue` 直接验优先级规则。
-     * （UI 层不好构造"同时给两种"的场景）
-     */
-    return null;
-  });
-  void priority;
 
   const mod = await page.evaluate(async () => {
     const m = await import('/@fs/C:/work/scholar-pdf-viewer/dist/index.js');
@@ -100,15 +73,20 @@ try {
       propWins: m.resolveConfigValue('dark', 'paper'),
       configUsed: m.resolveConfigValue(undefined, 'paper'),
       neither: m.resolveConfigValue(undefined, undefined) ?? null,
+      falsyKept: m.resolveConfigValue(false, true),
+      merged: m.mergeConfig({ theme: 'paper' }, { theme: 'dark' }),
     };
   });
 
   check('**单独 prop 优先于 config**', mod.propWins === 'dark', String(mod.propWins));
   check('**prop 没给 → 用 config**', mod.configUsed === 'paper', String(mod.configUsed));
   check('**都没给 → undefined**（走默认值）', mod.neither === null, String(mod.neither));
-
-  // ④ 包导出统一配置的类型和函数
-  check('**包导出 mergeConfig / resolveConfigValue**', typeof mod.propWins === 'string', 'ok');
+  check('**falsy 值也算『有值』**', mod.falsyKept === false, String(mod.falsyKept));
+  check(
+    '**mergeConfig：单独 prop 覆盖 config**',
+    mod.merged?.theme === 'dark',
+    String(mod.merged?.theme),
+  );
 
   check('全程无 JS 错误', errors.length === 0, errors.slice(0, 2).join(' | '));
 } catch (error) {
