@@ -10,15 +10,25 @@
  * 宿主没传 `onTranslate` → "翻译"按钮**不显示**（符合"没配就不展示"的要求）。
  */
 
-/** 内置图标名（纯 SVG，无第三方依赖） */
+/**
+ * 内置图标名（纯 SVG，无第三方依赖）。
+ *
+ * ⚠️ 和 `core/icons` 的 `IconName` **同一套规范**（24×24 / stroke 1.75）。
+ *
+ * → 用户反馈"按钮不好看" → 工具栏和选区浮层统一风格 ✅
+ */
 export type SelectionActionIcon =
   | 'highlight'
+  | 'highlightColor'
   | 'copy'
   | 'translate'
   | 'note'
+  | 'stickyNote'
   | 'ask'
   | 'explain'
-  | 'delete';
+  | 'delete'
+  | 'comment'
+  | 'more';
 
 /** 动作回调的上下文 */
 export interface SelectionActionContext {
@@ -108,12 +118,16 @@ export const BUILTIN_ACTION_LABELS: Record<string, string> = {
  */
 const BUILTIN_ICONS: ReadonlySet<string> = new Set<SelectionActionIcon>([
   'highlight',
+  'highlightColor',
   'copy',
   'translate',
   'note',
+  'stickyNote',
   'ask',
   'explain',
   'delete',
+  'comment',
+  'more',
 ]);
 
 /**

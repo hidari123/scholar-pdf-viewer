@@ -54,6 +54,7 @@ import { useVisiblePages } from '../hooks/useVisiblePages';
 import { useZoom } from '../hooks/useZoom';
 import type { Locale, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
+import type { IconName } from './Icon';
 import { OutlinePanel } from './OutlinePanel';
 import { Page } from './Page';
 import type { PageProxyLike } from './PageCanvas';
@@ -270,6 +271,20 @@ export interface PdfViewerProps {
    * 翻译/提问/笔记的**业务实现全在宿主**。
    */
   selectionActions?: SelectionAction[];
+  /**
+   * **图标覆盖**（宿主 → 包）。
+   *
+   * ⚠️ 用户反馈："按钮不好看 上传下载 添加高亮这些 都不好看 再找一些图标插件"
+   *
+   * → 包**自带**一套现代图标（24×24 / stroke 1.75，零依赖）
+   * → 但宿主可能有自己的图标体系（`lucide-react` / `heroicons` …）
+   * → 所以**逐个图标可覆盖** → 风格统一 ✅
+   *
+   * ```tsx
+   * <PdfViewer icons={{ upload: <Upload />, download: <Download /> }} />
+   * ```
+   */
+  icons?: Partial<Record<IconName, ReactNode>>;
   /** 宿主实现了"翻译"→ 显示翻译按钮（等价于在 selectionActions 里配一个 translate） */
   onTranslate?: (ctx: SelectionActionContext) => void;
   /** 宿主实现了"提问" */
@@ -396,6 +411,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onError,
     onSelectionChange,
     selectionActions,
+    icons,
     onTranslate,
     onAsk,
     onNote,
@@ -2671,6 +2687,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         (slots.toolbar as React.ReactNode)
       ) : (
         <Toolbar
+          icons={icons}
           toolbar={{
             ...toolbar,
             /*
@@ -2910,6 +2927,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         浮层是 `position: fixed` → 不受任何祖先的 transform/overflow 影响。
       */}
       <SelectionPopover
+        icons={icons}
         open={popoverOpen}
         selectionRect={popoverAnchor}
         containerRect={popoverContainerRect}
@@ -2931,6 +2949,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         - 动作是"高亮动作"（换色 / 复制 / 删除 / 更多）
       */}
       <SelectionPopover
+        icons={icons}
         open={highlightPopover !== null}
         selectionRect={null}
         anchorRect={highlightPopover?.rect ?? null}

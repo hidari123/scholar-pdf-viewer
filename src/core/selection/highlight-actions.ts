@@ -93,7 +93,7 @@ export function buildHighlightActions(
   if (options.onHighlightComment) {
     actions.push({
       key: HIGHLIGHT_ACTION_KEYS.comment,
-      icon: 'note',
+      icon: 'stickyNote',
       label: HIGHLIGHT_ACTION_LABELS[HIGHLIGHT_ACTION_KEYS.comment],
       group: 'primary',
       order: 10,
@@ -112,7 +112,7 @@ export function buildHighlightActions(
   if (options.onHighlightUpdate) {
     actions.push({
       key: HIGHLIGHT_ACTION_KEYS.color,
-      icon: 'highlight',
+      icon: 'highlightColor',
       label: HIGHLIGHT_ACTION_LABELS[HIGHLIGHT_ACTION_KEYS.color],
       group: 'primary',
       order: 20,
@@ -160,7 +160,7 @@ export function buildHighlightActions(
   if (options.onHighlightMore) {
     actions.push({
       key: HIGHLIGHT_ACTION_KEYS.more,
-      icon: 'explain',
+      icon: 'more',
       label: HIGHLIGHT_ACTION_LABELS[HIGHLIGHT_ACTION_KEYS.more],
       group: 'primary',
       order: 50,

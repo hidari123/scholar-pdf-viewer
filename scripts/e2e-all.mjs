@@ -44,6 +44,8 @@ const suites = [
   { name: '高亮效果', file: 'e2e-highlight.mjs' },
   { name: '缩放行为', file: 'e2e-zoom.mjs' },
   { name: '搜索高亮', file: 'e2e-search-highlight.mjs' },
+  { name: '搜索高亮的定位准确性', file: 'e2e-search-accuracy.mjs' },
+  { name: '图标系统', file: 'e2e-icons.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

@@ -60,6 +60,16 @@ export {
   parseHighlightDoc,
   stringifyHighlightDoc,
 } from './core/highlight/serialize';
+/* ---------- 图标（内置图标集，宿主可覆盖） ---------- */
+export type {
+  IconCircle,
+  IconLine,
+  IconName,
+  IconPolyline,
+  IconRect,
+  IconShape,
+} from './core/icons/icons';
+export { getIconShape } from './core/icons/icons';
 export type { OutlineItemLike } from './core/outline/outline';
 export type { PaperSize, PrintMargin } from './core/print';
 /* ---------- 打印 ---------- */

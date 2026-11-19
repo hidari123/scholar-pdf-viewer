@@ -12,6 +12,7 @@
  * **包的边界**：只做 UI + 事件，不做业务（翻译/提问/笔记由宿主实现）。
  */
 
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { HighlightPalette } from '../core/highlight/palette';
 import type { SelectionAction } from '../core/selection/actions';
@@ -19,6 +20,7 @@ import { BUILTIN_ACTION_KEYS, isBuiltinIcon } from '../core/selection/actions';
 import { HIGHLIGHT_ACTION_KEYS } from '../core/selection/highlight-actions';
 import type { PopoverPosition } from '../core/selection/popover-position';
 import { computePopoverPosition } from '../core/selection/popover-position';
+import type { IconName } from './Icon';
 import { SelectionActionIconView } from './SelectionActionIcons';
 
 /** SelectionPopover 参数 */
@@ -92,6 +94,12 @@ export interface SelectionPopoverProps {
   highlightPalette?: HighlightPalette;
   /** 选颜色（key） */
   onPickColor?: (key: string) => void;
+  /**
+   * **图标覆盖**（宿主 → 包）。
+   *
+   * ⚠️ 宿主可以用自己的图标体系（`lucide-react` 等）覆盖内置图标 → 风格统一 ✅
+   */
+  icons?: Partial<Record<IconName, ReactNode>>;
 }
 
 /**
@@ -141,6 +149,7 @@ export function SelectionPopover({
   onDismiss,
   highlightPalette,
   onPickColor,
+  icons,
 }: SelectionPopoverProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState<PopoverPosition | null>(null);
@@ -580,7 +589,7 @@ export function SelectionPopover({
               >
                 {typeof action.icon === 'string' ? (
                   isBuiltinIcon(action.icon) ? (
-                    <SelectionActionIconView name={action.icon} />
+                    <SelectionActionIconView name={action.icon} overrides={icons} />
                   ) : null
                 ) : (
                   action.icon

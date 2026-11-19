@@ -20,6 +20,7 @@ import {
   downloadFile,
   exportHighlightedPdf,
   exportHighlights,
+  Icon,
   PdfSearch,
   PdfViewer,
   parseHighlightDoc,
@@ -900,7 +901,7 @@ export default function App() {
           title="添加高亮"
           aria-label="添加高亮"
         >
-          +
+          <Icon name="highlight" />
         </button>
 
         <button
@@ -910,7 +911,7 @@ export default function App() {
           title="导出高亮（JSON）"
           aria-label="导出高亮"
         >
-          ⤓
+          <Icon name="exportJson" />
         </button>
 
         {/*
@@ -926,7 +927,7 @@ export default function App() {
           title="导出带高亮的 PDF"
           aria-label="导出带高亮的 PDF"
         >
-          ⤓ᴾ
+          <Icon name="exportPdf" />
         </button>
 
         <button
@@ -936,7 +937,7 @@ export default function App() {
           title="导入高亮（JSON）"
           aria-label="导入高亮"
         >
-          ⤒
+          <Icon name="upload" />
         </button>
 
         <button
@@ -946,7 +947,7 @@ export default function App() {
           title="下载 PDF"
           aria-label="下载 PDF"
         >
-          ⭳
+          <Icon name="download" />
         </button>
       </>
     ),

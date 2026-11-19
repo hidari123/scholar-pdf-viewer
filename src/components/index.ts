@@ -2,6 +2,7 @@
  * components —— UI 层（React）
  */
 export * from './AnnotationLayer';
+export * from './Icon';
 export * from './LinkLayer';
 export * from './OutlinePanel';
 export * from './Page';

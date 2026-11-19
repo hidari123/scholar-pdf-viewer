@@ -12,6 +12,8 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import type { Locale, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
+import type { IconName } from './Icon';
+import { Icon } from './Icon';
 
 /** 工具栏配置 */
 export interface ToolbarConfig {
@@ -60,6 +62,12 @@ export interface ToolbarProps {
   onToggleOutline?: () => void;
   /** 打印 */
   onPrint?: () => void;
+  /**
+   * **图标覆盖**（宿主 → 包）。
+   *
+   * ⚠️ 宿主可以用自己的图标体系（`lucide-react` 等）覆盖内置图标 → 风格统一 ✅
+   */
+  icons?: Partial<Record<IconName, ReactNode>>;
 }
 
 /**
@@ -84,6 +92,7 @@ export function Toolbar(props: ToolbarProps) {
     onToggleThumbnails,
     onToggleOutline,
     onPrint,
+    icons,
   } = props;
 
   /** 文案解析（key → 文案） */
@@ -117,7 +126,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('thumbnails.title')}
             title={t('thumbnails.title')}
           >
-            <ScpdfIcon name="thumbnails" />
+            <Icon name={'thumbnails'} overrides={icons} />
           </button>
         ) : null}
 
@@ -129,7 +138,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('outline.title')}
             title={t('outline.title')}
           >
-            <ScpdfIcon name="outline" />
+            <Icon name={'outline'} overrides={icons} />
           </button>
         ) : null}
 
@@ -141,7 +150,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('search.placeholder')}
             title={t('search.placeholder')}
           >
-            <ScpdfIcon name="search" />
+            <Icon name={'search'} overrides={icons} />
           </button>
         ) : null}
       </div>
@@ -155,7 +164,7 @@ export function Toolbar(props: ToolbarProps) {
             disabled={page <= 1}
             aria-label="上一页"
           >
-            <ScpdfIcon name="prev" />
+            <Icon name={'chevronLeft'} overrides={icons} />
           </button>
 
           <label className="scpdf-toolbar__pager">
@@ -196,7 +205,7 @@ export function Toolbar(props: ToolbarProps) {
             disabled={page >= totalPages}
             aria-label="下一页"
           >
-            <ScpdfIcon name="next" />
+            <Icon name={'chevronRight'} overrides={icons} />
           </button>
         </div>
       ) : null}
@@ -211,7 +220,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('zoom.out')}
             title={t('zoom.out')}
           >
-            <ScpdfIcon name="zoomOut" />
+            <Icon name={'zoomOut'} overrides={icons} />
           </button>
 
           <span className="scpdf-toolbar__scale" aria-live="polite">
@@ -226,7 +235,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('zoom.in')}
             title={t('zoom.in')}
           >
-            <ScpdfIcon name="zoomIn" />
+            <Icon name={'zoomIn'} overrides={icons} />
           </button>
 
           <button
@@ -236,7 +245,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('zoom.fitWidth')}
             title={t('zoom.fitWidth')}
           >
-            <ScpdfIcon name="fitWidth" />
+            <Icon name={'fitWidth'} overrides={icons} />
           </button>
 
           <button
@@ -246,7 +255,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('zoom.fitPage')}
             title={t('zoom.fitPage')}
           >
-            <ScpdfIcon name="fitPage" />
+            <Icon name={'fitPage'} overrides={icons} />
           </button>
 
           {onPrint ? (
@@ -257,7 +266,7 @@ export function Toolbar(props: ToolbarProps) {
               aria-label={t('print.title')}
               title={t('print.title')}
             >
-              <ScpdfIcon name="print" />
+              <Icon name={'print'} overrides={icons} />
             </button>
           ) : null}
 
@@ -266,116 +275,4 @@ export function Toolbar(props: ToolbarProps) {
       ) : null}
     </div>
   );
-}
-
-/** 图标名 */
-type IconName =
-  | 'prev'
-  | 'next'
-  | 'zoomIn'
-  | 'zoomOut'
-  | 'fitWidth'
-  | 'fitPage'
-  | 'search'
-  | 'thumbnails'
-  | 'outline'
-  | 'print';
-
-/**
- * 内联 SVG 图标（不引图标库 → 保持零依赖 + 可换肤）。
- *
- * @param props 图标名与尺寸
- */
-function ScpdfIcon({ name, size = 16 }: { name: IconName; size?: number }) {
-  const common = {
-    width: size,
-    height: size,
-    viewBox: '0 0 16 16',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.5,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-  };
-
-  switch (name) {
-    case 'prev':
-      return (
-        <svg {...common}>
-          <title>Previous page</title>
-          <path d="M10 3 5 8l5 5" />
-        </svg>
-      );
-    case 'next':
-      return (
-        <svg {...common}>
-          <title>Next page</title>
-          <path d="M6 3l5 5-5 5" />
-        </svg>
-      );
-    case 'zoomIn':
-      return (
-        <svg {...common}>
-          <title>Zoom in</title>
-          <circle cx="7" cy="7" r="4.5" />
-          <path d="M10.5 10.5 14 14M5 7h4M7 5v4" />
-        </svg>
-      );
-    case 'zoomOut':
-      return (
-        <svg {...common}>
-          <title>Zoom out</title>
-          <circle cx="7" cy="7" r="4.5" />
-          <path d="M10.5 10.5 14 14M5 7h4" />
-        </svg>
-      );
-    case 'fitWidth':
-      return (
-        <svg {...common}>
-          <title>Fit width</title>
-          <path d="M2 3v10M14 3v10M5 8h6" />
-        </svg>
-      );
-    case 'fitPage':
-      return (
-        <svg {...common}>
-          <title>Fit page</title>
-          <rect x="3.5" y="2.5" width="9" height="11" rx="1" />
-        </svg>
-      );
-    case 'search':
-      return (
-        <svg {...common}>
-          <title>Search</title>
-          <circle cx="7" cy="7" r="4.5" />
-          <path d="M10.5 10.5 14 14" />
-        </svg>
-      );
-    case 'thumbnails':
-      return (
-        <svg {...common}>
-          <title>Thumbnails</title>
-          <rect x="2.5" y="2.5" width="4" height="4" rx="0.5" />
-          <rect x="9.5" y="2.5" width="4" height="4" rx="0.5" />
-          <rect x="2.5" y="9.5" width="4" height="4" rx="0.5" />
-          <rect x="9.5" y="9.5" width="4" height="4" rx="0.5" />
-        </svg>
-      );
-    case 'outline':
-      return (
-        <svg {...common}>
-          <title>Outline</title>
-          <path d="M3 4h10M5 8h8M7 12h6" />
-        </svg>
-      );
-    case 'print':
-      return (
-        <svg {...common}>
-          <title>Print</title>
-          <path d="M4.5 6V2.5h7V6M4.5 12H3V7h10v5h-1.5M4.5 10h7v3.5h-7z" />
-        </svg>
-      );
-    default:
-      return null;
-  }
 }

@@ -126,7 +126,7 @@ export function HighlightPicker({
 
       <button
         type="button"
-        className="scpdf-toolbar__btn"
+        className="scpdf-toolbar__btn scpdf-toolbar__btn--swatch"
         onClick={() => {
           const key = `custom-${draft.replace('#', '')}`;
           onSaveCustom?.(key, draft);
