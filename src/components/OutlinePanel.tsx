@@ -5,7 +5,7 @@
  * 宿主只需提供"页引用 → 页码"的映射，包负责扁平化 + 展开状态 + 渲染。
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { OutlineItemLike } from '../core/outline/outline';
 import { flattenOutline, visibleOutlineItems } from '../core/outline/outline';
 import type { Locale, LocaleTable, Messages } from '../i18n/messages';
@@ -84,6 +84,31 @@ export function OutlinePanel(props: OutlinePanelProps) {
     [flatItems, collapsedIds],
   );
 
+  /**
+   * **待跳转的目录项 id**（页码还没解析出来时记下来）。
+   *
+   * ## 为什么需要（用户反馈："之前目录好像可以点击跳转的 现在不行了吗"）
+   *
+   * → 宿主的 `pageRefToNumber` 依赖**异步**解析（pdf.js 的 `getPageIndex`）
+   * → 目录**第一次渲染**时映射还是空的 → `pageNumber === null`
+   * → 之前：**按钮 disabled** → 用户点了**没反应**（像是坏了）❌
+   * → 现在：**按钮可点** → 记下意图 → 映射好了**自动跳** ✅
+   */
+  const [pendingTargetId, setPendingTargetId] = useState<string | null>(null);
+
+  /** 映射就绪后 → 执行待跳转 */
+  useEffect(() => {
+    if (!pendingTargetId) {
+      return;
+    }
+    // 找这一项现在有没有页码
+    const item = flatItems.find((candidate) => candidate.id === pendingTargetId);
+    if (item && item.pageNumber !== null) {
+      onPageSelect(item.pageNumber);
+      setPendingTargetId(null);
+    }
+  }, [pendingTargetId, flatItems, onPageSelect]);
+
   /** 切换折叠 */
   const toggle = useCallback((id: string) => {
     setCollapsedIds((prev) => {
@@ -129,16 +154,28 @@ export function OutlinePanel(props: OutlinePanelProps) {
 
               <button
                 type="button"
-                className={['scpdf-outline__item', isActive ? 'scpdf-outline__item--active' : '']
+                className={[
+                  'scpdf-outline__item',
+                  isActive ? 'scpdf-outline__item--active' : '',
+                  // ⚠️ 页码还没解析出来 → 加个"解析中"的样式（但**不禁用**）
+                  item.pageNumber === null ? 'scpdf-outline__item--resolving' : '',
+                ]
                   .filter(Boolean)
                   .join(' ')}
                 style={{ paddingLeft: `${item.level * 12 + 4}px` }}
                 onClick={() => {
                   if (item.pageNumber !== null) {
                     onPageSelect(item.pageNumber);
+                    return;
                   }
+                  /*
+                   * ⚠️ **页码还没解析出来 → 记下意图**（不是无反应）。
+                   *
+                   * → 映射就绪后自动跳（见上面的 effect）✅
+                   */
+                  setPendingTargetId(item.id);
                 }}
-                disabled={item.pageNumber === null}
+                aria-busy={item.pageNumber === null ? 'true' : undefined}
               >
                 {item.title}
               </button>

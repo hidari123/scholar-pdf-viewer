@@ -422,6 +422,316 @@
   pointer-events: auto;
 }
 
+/* ---------- 合并批注（同一行的多个批注 → 一个图标） ---------- */
+
+/*
+ * ⚠️ **数量角标**（合并时显示）。
+ *
+ * → 用户需求："目前这两个批注会叠在一起 我认为可以只出现一个图标"
+ * → 参考 Acrobat / WPS：合并成一个图标 + **带数量角标**
+ */
+.scpdf-sticky-note__badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--scpdf-primary, #2f6feb);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  text-align: center;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+}
+
+/*
+ * ⚠️ **选择列表**（hover 合并图标时显示）。
+ *
+ * → 用户需求："悬浮在图标上可以选择批注几"
+ * → 列出这一组里的所有批注 → 点哪条打开哪条
+ */
+.scpdf-sticky-note__picker {
+  position: absolute;
+  left: 26px;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+  max-width: 280px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--scpdf-border, #d9dde3);
+  background: var(--scpdf-surface, #fff);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease,
+    visibility 0.12s;
+  pointer-events: none;
+}
+
+.scpdf-sticky-note__picker[data-visible="true"] {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.scpdf-sticky-note__picker-title {
+  padding: 2px 6px 6px;
+  color: var(--scpdf-text-muted, #6b7280);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.scpdf-sticky-note__picker-item {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--scpdf-text, #1f2328);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.scpdf-sticky-note__picker-item:hover {
+  background: var(--scpdf-hover, rgb(0 0 0 / 5%));
+}
+
+/* ---------- 便利贴面板（批注的编辑 / 查看 UI） ---------- */
+
+/*
+ * ⚠️ **位置：页面中间偏右**（用户明确要求）。
+ *
+ * → 用户反馈："目前都没展示完整 在最右边被挡住了"
+ * → 之前贴在便签图标旁边（页面最右）→ 被容器裁掉 ❌
+ * → 现在落在**可视区中间偏右** → 完整可见 ✅
+ */
+.scpdf-annotation-panel {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  max-height: min(460px, 70%);
+  border-radius: 10px;
+  border: 1px solid var(--scpdf-border, #d9dde3);
+  background: var(--scpdf-surface, #fff);
+  box-shadow: 0 16px 44px rgb(0 0 0 / 22%);
+  overflow: hidden;
+}
+
+.scpdf-annotation-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--scpdf-border, #d9dde3);
+  background: var(--scpdf-surface-alt, #f7f8fa);
+}
+
+.scpdf-annotation-panel__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--scpdf-text, #1f2328);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scpdf-annotation-panel__actions {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.scpdf-annotation-panel__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--scpdf-text-muted, #6b7280);
+  cursor: pointer;
+}
+
+.scpdf-annotation-panel__btn:hover {
+  background: var(--scpdf-hover, rgb(0 0 0 / 6%));
+  color: var(--scpdf-text, #1f2328);
+}
+
+.scpdf-annotation-panel__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+}
+
+.scpdf-annotation-panel__content {
+  color: var(--scpdf-text, #1f2328);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.scpdf-annotation-panel__content p {
+  margin: 0 0 8px;
+}
+
+.scpdf-annotation-panel__foot {
+  padding: 6px 10px;
+  border-top: 1px solid var(--scpdf-border, #d9dde3);
+  color: var(--scpdf-text-muted, #6b7280);
+  font-size: 11px;
+}
+
+/* ---------- 富文本编辑器 ---------- */
+
+.scpdf-rich-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scpdf-rich-text__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 7px;
+  border: 1px solid var(--scpdf-border, #d9dde3);
+  background: var(--scpdf-surface-alt, #f7f8fa);
+}
+
+.scpdf-rich-text__tool {
+  position: relative;
+  display: inline-flex;
+}
+
+.scpdf-rich-text__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--scpdf-text-muted, #6b7280);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.scpdf-rich-text__btn:hover {
+  background: var(--scpdf-hover, rgb(0 0 0 / 7%));
+  color: var(--scpdf-text, #1f2328);
+}
+
+.scpdf-rich-text__btn:focus-visible {
+  outline: 2px solid var(--scpdf-primary, #2f6feb);
+  outline-offset: 1px;
+}
+
+.scpdf-rich-text__btn--primary {
+  margin-left: auto;
+  background: var(--scpdf-primary, #2f6feb);
+  color: #fff;
+}
+
+.scpdf-rich-text__btn--primary:hover {
+  background: var(--scpdf-primary-hover, #2559c4);
+  color: #fff;
+}
+
+/* 颜色面板 */
+.scpdf-rich-text__palette {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 128px;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--scpdf-border, #d9dde3);
+  background: var(--scpdf-surface, #fff);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 18%);
+}
+
+.scpdf-rich-text__swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgb(0 0 0 / 12%);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.scpdf-rich-text__swatch:hover {
+  transform: scale(1.12);
+}
+
+/* 编辑区 */
+.scpdf-rich-text__editor {
+  min-height: 96px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--scpdf-border, #d9dde3);
+  background: var(--scpdf-surface, #fff);
+  color: var(--scpdf-text, #1f2328);
+  font-size: 13px;
+  line-height: 1.6;
+  outline: none;
+}
+
+.scpdf-rich-text__editor:focus {
+  border-color: var(--scpdf-primary, #2f6feb);
+  box-shadow: 0 0 0 3px rgb(47 111 235 / 14%);
+}
+
+/* ⚠️ **空的时候显示占位符**（不能用 `:empty`，因为可能有 `<br>`） */
+.scpdf-rich-text__editor[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: var(--scpdf-text-muted, #9aa1ac);
+  pointer-events: none;
+}
+
+.scpdf-rich-text__editor p {
+  margin: 0 0 6px;
+}
+
+.scpdf-rich-text__editor mark {
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
 .scpdf-annotation {
   position: absolute;
   /*
@@ -997,6 +1307,18 @@
 .scpdf-outline__item:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/*
+ * ⚠️ **"解析中"的目录项**（页码还没解析出来）。
+ *
+ * → 用户反馈："之前目录好像可以点击跳转的 现在不行了吗"
+ * → 之前是 **disabled** → 点了**没反应**（像是坏了）❌
+ * → 现在：**不禁用**（点了会记下意图，映射好了自动跳）→ 只是**视觉上淡一点**
+ */
+.scpdf-outline__item--resolving {
+  opacity: 0.6;
+  font-style: italic;
 }
 
 .scpdf-outline__item--active {

@@ -102,12 +102,53 @@ describe('OutlinePanel', () => {
     expect(screen.getByText('第二章').className).toContain('scpdf-outline__item--active');
   });
 
-  it('无解析出页码的项禁用', () => {
+  it('**无解析出页码的项：不禁用（点了记下意图，映射好了自动跳）**', () => {
+    /*
+     * ⚠️ 用户反馈："之前目录好像可以点击跳转的 现在不行了吗"
+     *
+     * → 之前：**disabled** → 用户点了**没反应**（像是坏了）❌
+     * → 现在：**不禁用** → 记下意图 → 映射就绪后自动跳 ✅
+     */
     setup({
       outline: [{ title: '无目标', dest: null }],
     });
 
-    expect(screen.getByText('无目标').hasAttribute('disabled')).toBe(true);
+    const item = screen.getByText('无目标');
+    expect(item.hasAttribute('disabled')).toBe(false);
+    // 有"解析中"的标记
+    expect(item.getAttribute('aria-busy')).toBe('true');
+  });
+
+  it('**映射就绪后 → 待跳转的项自动跳**', () => {
+    const onPageSelect = vi.fn();
+    let pageNumber: number | null = null;
+
+    const { rerender } = render(
+      <OutlinePanel
+        outline={[{ title: '目标', dest: 'ref1' }]}
+        pageRefToNumber={() => pageNumber}
+        currentPage={1}
+        onPageSelect={onPageSelect}
+      />,
+    );
+
+    // 还没解析出页码 → 点了只记下意图
+    screen.getByText('目标').click();
+    expect(onPageSelect).not.toHaveBeenCalled();
+
+    // 映射好了 → 自动跳
+    pageNumber = 7;
+    rerender(
+      <OutlinePanel
+        outline={[{ title: '目标', dest: 'ref1' }]}
+        pageRefToNumber={() => pageNumber}
+        currentPage={1}
+        onPageSelect={onPageSelect}
+        resolveToken={1}
+      />,
+    );
+
+    expect(onPageSelect).toHaveBeenCalledWith(7);
   });
 
   it('空目录 → 不渲染面板', () => {
