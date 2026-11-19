@@ -56,46 +56,104 @@ export interface ExtractSelectionInput {
 }
 
 /**
- * 判断一个矩形属于哪一页：**中心点落在该页框内**。
+ * 判断一个矩形属于哪一页：**与该页框的"重叠面积"最大**。
  *
- * 为什么用中心点而不是"完全包含"：跨页的选区矩形会被浏览器切在页边界上，
- * 用"完全包含"会两边都不属于（矩形被丢弃）→ 选区缺页。
- * 中心点判定稳定且 O(1)。
+ * ## 为什么不用中心点（实测踩过的坑）
  *
- * ⚠️⚠️ **水平方向必须留容差**（实测踩过的坑）。
+ * 用户反馈："如果跨页选择 工具箱框出来的定位不准确 有时候是负的 就是不在页面上
+ * …如果下一页选的没那么多，就会出现在最顶部"
  *
- * 页框的 `left` 是**量出来的**（页是 `margin-inline: auto` 居中的），
- * 面板开合、缩放、容器尺寸变化都会让它变 —— 而测量有 1~2px 的误差。
+ * ### 中心点判定的两个问题
  *
- * 实测（面板打开）：
  * ```
- * 归页判定: centerX = 681.5 > 0 + 612 → **不属于任何页** ❌
- *           → 选区被丢弃 → 自绘选区层为空
+ * 第 1 页:  [0 ───────── 592]
+ *                  ↑ 中心点在这里
+ * 第 2 页:            [608 ───────── 2430]
  * ```
  *
- * → 水平允许 **±4px** 容差 → 测量误差不会导致选区丢失。
- * 垂直**不放容差**（页的上下边界是硬的，容差会让跨页的矩形判错页）。
+ * ① **跨页的矩形被浏览器切在页边界上** → 中心点可能落在**页间隙**里
+ *    → `pageOfRect` 返回 `null` → **矩形被丢弃** → 选区缺头/缺尾
+ *
+ * ② **矩形比页还高**（跨页时浏览器会给一个贯穿两页的矩形）
+ *    → 中心点在第 1 页 → 归给第 1 页
+ *    → 但矩形**下半截在第 2 页** → 渲染时**跑到页外面** ❌
+ *    → 用户看到的现象："定位不准确 / 是负的 / 不在页面上"
+ *
+ * ### 修法
+ *
+ * - **归页**：按**重叠面积最大**（重叠 0 → 不属于任何页 → 丢弃）
+ * - **裁剪**：归页后把矩形**裁到该页的范围内** → 不会有部分跑到页外 ✅
+ *
+ * @param rect 矩形
+ * @param pages 页框
+ * @returns 页码（不属于任何页则 `null`）
  */
 export function pageOfRect(rect: RectInput, pages: PageFrame[]): number | null {
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-
-  /** 水平容差（px） */
+  /** 水平容差（px）—— 页是居中的，测量有 1~2px 误差 */
   const TOLERANCE = 4;
 
+  let bestPage: PageFrame | null = null;
+  let bestOverlap = 0;
+
   for (const page of pages) {
-    // 垂直：硬边界
-    if (centerY < page.top || centerY > page.top + page.height) {
+    // 垂直重叠
+    const overlapTop = Math.max(rect.top, page.top);
+    const overlapBottom = Math.min(rect.top + rect.height, page.top + page.height);
+    const overlapHeight = overlapBottom - overlapTop;
+    if (overlapHeight <= 0) {
       continue;
     }
-    // 水平：带容差
-    if (centerX < page.left - TOLERANCE || centerX > page.left + page.width + TOLERANCE) {
+
+    // 水平重叠（带容差）
+    const overlapLeft = Math.max(rect.left, page.left - TOLERANCE);
+    const overlapRight = Math.min(rect.left + rect.width, page.left + page.width + TOLERANCE);
+    const overlapWidth = overlapRight - overlapLeft;
+    if (overlapWidth <= 0) {
       continue;
     }
-    return page.pageNumber;
+
+    const overlap = overlapHeight * overlapWidth;
+    /*
+     * ⚠️ **平局时归后一页**（>= 而不是 >）。
+     *
+     * → 跨页的矩形正好被页边界平分时，**内容在后面**（用户往后拖）
+     * → 归后一页 → 选区的"尾巴"保住了 ✅
+     */
+    if (overlap >= bestOverlap) {
+      bestOverlap = overlap;
+      bestPage = page;
+    }
   }
 
-  return null;
+  return bestPage?.pageNumber ?? null;
+}
+
+/**
+ * 把矩形**裁到页的范围内**（防止选区跑到页外）。
+ *
+ * ⚠️ 用户反馈："跨页选择…有时候是负的 就是不在页面上"
+ * → 浏览器给的跨页矩形会**贯穿两页** → 不裁的话，下半截在页外 ❌
+ * → 裁到该页范围内 → 几何永远在页内 ✅
+ *
+ * @param rect 矩形（页内坐标还没减之前）
+ * @param page 页框
+ * @returns 裁剪后的矩形（页内坐标）
+ */
+export function clipRectToPage(
+  rect: RectInput,
+  page: PageFrame,
+): { left: number; top: number; width: number; height: number } {
+  const top = Math.max(rect.top, page.top);
+  const bottom = Math.min(rect.top + rect.height, page.top + page.height);
+  const left = Math.max(rect.left, page.left);
+  const right = Math.min(rect.left + rect.width, page.left + page.width);
+
+  return {
+    left: left - page.left,
+    top: top - page.top,
+    width: Math.max(0, right - left),
+    height: Math.max(0, bottom - top),
+  };
 }
 
 /**
@@ -124,6 +182,18 @@ export function extractSelection(input: ExtractSelectionInput): SelectionData | 
     }
 
     /*
+     * ⚠️ **裁到页的范围内**（实测踩过的坑）。
+     *
+     * 用户反馈："如果跨页选择 工具箱框出来的定位不准确 有时候是负的
+     * 就是不在页面上"
+     *
+     * → 浏览器给的**跨页矩形会贯穿两页**（比如从第 1 页最后一行到第 2 页第一行）
+     * → 归给第 1 页的话，下半截在**第 2 页的位置上** → 渲染时跑到页外 ❌
+     * → 裁到该页范围内 → 几何**永远在页内** ✅
+     */
+    const clipped = clipRectToPage(rect, page);
+
+    /*
      * ⚠️ **裁剪成贴合字形**。
      *
      * 浏览器的选区矩形 = **字体的自然行盒**（比文字高 11px、偏上 6px）
@@ -132,10 +202,10 @@ export function extractSelection(input: ExtractSelectionInput): SelectionData | 
      * 裁剪用**该行的基线** + 字形的 ascent/descent。
      */
     let pageRect: ViewRect = {
-      left: rect.left - page.left,
-      top: rect.top - page.top,
-      width: rect.width,
-      height: rect.height,
+      left: clipped.left,
+      top: clipped.top,
+      width: clipped.width,
+      height: clipped.height,
       pageNumber,
     };
 

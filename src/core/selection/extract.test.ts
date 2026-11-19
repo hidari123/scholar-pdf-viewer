@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PageFrame } from './extract';
-import { extractSelection, pageOfRect } from './extract';
+import { clipRectToPage, extractSelection, pageOfRect } from './extract';
 
 /** 两页的页框（容器坐标：页1 在上，页2 在下） */
 const PAGES: PageFrame[] = [
@@ -207,5 +207,115 @@ describe('extractSelection', () => {
 
     expect(result?.anchor.pageNumber).toBe(1);
     expect(result?.anchor.rect.top).toBe(10);
+  });
+});
+
+/**
+ * ⚠️ **跨页选区的归页与裁剪**（用户反馈）。
+ *
+ * > "如果跨页选择 工具箱框出来的定位不准确 有时候是负的 就是不在页面上
+ * >  如图，此时就是选择下一页稍微多一点会出现这个情况；
+ * >  如果下一页选的没那么多，就会出现在最顶部，定位出了问题请排查"
+ *
+ * ## 场景
+ *
+ * 第 1 页: top=0, height=592
+ * 第 2 页: top=608（中间 16px 是页间隙）
+ *
+ * 浏览器给的**跨页矩形**会**贯穿两页**（top=580, height=40）
+ * → 中心点判定 → 归给第 1 页 → 但下半截在第 2 页的位置上 ❌
+ * → 渲染时**跑到页外面** → 用户看到"负的 / 不在页面上"
+ */
+describe('跨页选区的归页与裁剪', () => {
+  /** 有页间隙的两页 */
+  const PAGES_WITH_GAP: PageFrame[] = [
+    { pageNumber: 1, top: 0, left: 100, width: 600, height: 592 },
+    { pageNumber: 2, top: 608, left: 100, width: 600, height: 1822 },
+  ];
+
+  it('**矩形贯穿两页 → 平局时归后一页**（内容在后面）', () => {
+    // top=580, height=40 → 跨过页边界（592）进入第 2 页（608 起）
+    // 与第 1 页重叠 12px，与第 2 页重叠 12px → 平局 → 归**后一页**
+    const rect = { top: 580, left: 120, width: 200, height: 40 };
+    expect(pageOfRect(rect, PAGES_WITH_GAP)).toBe(2);
+  });
+
+  it('**重叠面积不等 → 归重叠大的（第 1 页多）**', () => {
+    // top=575, height=45 → 与第 1 页重叠 17px，与第 2 页重叠 12px → 归第 1 页
+    const rect = { top: 575, left: 120, width: 200, height: 45 };
+    expect(pageOfRect(rect, PAGES_WITH_GAP)).toBe(1);
+  });
+
+  it('**重叠面积不等 → 归重叠大的（第 2 页多）**', () => {
+    // top=585, height=45 → 与第 1 页重叠 7px，与第 2 页重叠 22px → 归第 2 页
+    const rect = { top: 585, left: 120, width: 200, height: 45 };
+    expect(pageOfRect(rect, PAGES_WITH_GAP)).toBe(2);
+  });
+
+  it('**矩形大部分在第 1 页 → 归第 1 页**', () => {
+    // top=570, height=40 → 与第 1 页重叠 22px，与第 2 页重叠 2px
+    const rect = { top: 570, left: 120, width: 200, height: 40 };
+    expect(pageOfRect(rect, PAGES_WITH_GAP)).toBe(1);
+  });
+
+  it('**完全落在页间隙的矩形 → 丢弃**（不属于任何页）', () => {
+    // top=595, height=10 → 页 1 到 592，页 2 从 608 开始 → 间隙里
+    const rect = { top: 595, left: 120, width: 200, height: 10 };
+    expect(pageOfRect(rect, PAGES_WITH_GAP)).toBeNull();
+  });
+
+  it('**裁剪到页内 → 不会有部分跑到页外**', () => {
+    const rect = { top: 580, left: 120, width: 200, height: 40 };
+    const page = PAGES_WITH_GAP[1] as PageFrame;
+    const clipped = clipRectToPage(rect, page);
+
+    // 裁到第 2 页：从页顶（608）开始，到 620 结束
+    expect(clipped.top).toBe(0);
+    expect(clipped.height).toBe(12);
+    // 水平没被裁（矩形在页内）
+    expect(clipped.left).toBe(20);
+    expect(clipped.width).toBe(200);
+  });
+
+  it('**裁剪后几何永远在页内**（用户说的"负的 / 不在页面上"）', () => {
+    const rect = { top: 580, left: 120, width: 200, height: 40 };
+    const page = PAGES_WITH_GAP[1] as PageFrame;
+    const clipped = clipRectToPage(rect, page);
+
+    expect(clipped.top).toBeGreaterThanOrEqual(0);
+    expect(clipped.top + clipped.height).toBeLessThanOrEqual(page.height);
+    expect(clipped.left).toBeGreaterThanOrEqual(0);
+    expect(clipped.left + clipped.width).toBeLessThanOrEqual(page.width);
+  });
+
+  it('**整段选区 → 每页的矩形都在自己页内**', () => {
+    const result = extractSelection({
+      text: 'x',
+      rects: [
+        // 第 1 页的正常矩形
+        { top: 100, left: 120, width: 200, height: 20 },
+        // 贯穿两页的矩形
+        { top: 580, left: 120, width: 200, height: 40 },
+        // 第 2 页的正常矩形
+        { top: 700, left: 120, width: 200, height: 20 },
+      ],
+      pages: PAGES_WITH_GAP,
+      reference: { width: 600, height: 1822 },
+    });
+
+    expect(result).not.toBeNull();
+
+    // 每一页的矩形都不能超出该页
+    for (const pageNumber of result?.pages ?? []) {
+      const page = PAGES_WITH_GAP.find((p) => p.pageNumber === pageNumber);
+      if (!page) continue;
+      for (const rect of result?.rects ?? []) {
+        if (rect.pageNumber !== pageNumber) continue;
+        expect(rect.top, `页 ${pageNumber} 的矩形 top 越界`).toBeGreaterThanOrEqual(0);
+        expect(rect.top + rect.height, `页 ${pageNumber} 的矩形 bottom 越界`).toBeLessThanOrEqual(
+          page.height,
+        );
+      }
+    }
   });
 });
