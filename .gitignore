@@ -16,3 +16,7 @@ test-results/
 # E2E 的临时产物（每次跑都会变，不入库）
 .tmp-e2e-*/
 .tmp-print/
+
+# 临时截图 / 调试产物
+.tmp-icons/
+.tmp-final/
