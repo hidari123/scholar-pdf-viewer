@@ -11,16 +11,28 @@
  */
 
 import { useMemo, useState } from 'react';
+import type { DemoLocale } from './demo-i18n';
+import { demoText } from './demo-i18n';
 
 /** 内置预设色（宿主的业务选择，包不内置） */
 const PRESET_COLORS = [
-  { key: 'yellow', label: '黄', color: '#ffd54a' },
-  { key: 'green', label: '绿', color: '#a5d6a7' },
-  { key: 'blue', label: '蓝', color: '#90caf9' },
-  { key: 'pink', label: '粉', color: '#f48fb1' },
-  { key: 'purple', label: '紫', color: '#ce93d8' },
-  { key: 'orange', label: '橙', color: '#ffcc80' },
+  { key: 'yellow', color: '#ffd54a' },
+  { key: 'green', color: '#a5d6a7' },
+  { key: 'blue', color: '#90caf9' },
+  { key: 'pink', color: '#f48fb1' },
+  { key: 'purple', color: '#ce93d8' },
+  { key: 'orange', color: '#ffcc80' },
 ] as const;
+
+/** 预设色的名字（国际化） */
+const COLOR_LABEL_KEYS: Record<string, string> = {
+  yellow: 'demo.color.yellow',
+  green: 'demo.color.green',
+  blue: 'demo.color.blue',
+  pink: 'demo.color.pink',
+  purple: 'demo.color.purple',
+  orange: 'demo.color.orange',
+};
 
 /** HighlightPicker 参数 */
 export interface HighlightPickerProps {
@@ -32,6 +44,13 @@ export interface HighlightPickerProps {
   customColors?: Record<string, string>;
   /** 保存自定义颜色 */
   onSaveCustom?: (key: string, color: string) => void;
+  /**
+   * **语言**（宿主侧的文案）。
+   *
+   * → 用户反馈："切换语言还是没变啊"
+   * → 这个选择器是**宿主组件** → 它的文案也得跟着切 ✅
+   */
+  locale?: DemoLocale;
 }
 
 /**
@@ -44,7 +63,10 @@ export function HighlightPicker({
   onChange,
   customColors = {},
   onSaveCustom,
+  locale = 'zh',
 }: HighlightPickerProps) {
+  /** 取文案 */
+  const t = (key: string, vars?: Record<string, string | number>) => demoText(locale, key, vars);
   const [draft, setDraft] = useState('#ffd54a');
 
   /** 预设 + 自定义，合成宿主要传给包的 palette */
@@ -72,8 +94,8 @@ export function HighlightPicker({
         <button
           key={item.key}
           type="button"
-          title={`${item.label}（${item.color}）`}
-          aria-label={`高亮色 ${item.label}`}
+          title={`${t(COLOR_LABEL_KEYS[item.key] ?? item.key)}（${item.color}）`}
+          aria-label={t('demo.colorOf', { name: t(COLOR_LABEL_KEYS[item.key] ?? item.key) })}
           aria-pressed={value === item.key}
           onClick={() => onChange(item.key, item.color)}
           style={{
@@ -91,8 +113,8 @@ export function HighlightPicker({
         <button
           key={key}
           type="button"
-          title={`自定义 ${color}`}
-          aria-label={`自定义高亮色 ${color}`}
+          title={t('demo.customColor', { color })}
+          aria-label={t('demo.customColorName', { color })}
           aria-pressed={value === key}
           onClick={() => onChange(key, color)}
           style={{
@@ -111,8 +133,8 @@ export function HighlightPicker({
         type="color"
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
-        title="自定义颜色"
-        aria-label="选择自定义高亮颜色"
+        title={t('demo.customColorTitle')}
+        aria-label={t('demo.pickCustomColor')}
         style={{
           width: 26,
           height: 22,
@@ -132,11 +154,11 @@ export function HighlightPicker({
           onSaveCustom?.(key, draft);
           onChange(key, draft);
         }}
-        title="保存当前颜色"
-        aria-label="保存自定义高亮颜色"
+        title={t('demo.saveColor')}
+        aria-label={t('demo.saveCustomColor')}
         style={{ fontSize: 12, padding: '2px 6px' }}
       >
-        用此色
+        {t('demo.useThisColor')}
       </button>
 
       {/* 供宿主读取：当前 palette */}

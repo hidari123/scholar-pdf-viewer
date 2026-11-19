@@ -37,6 +37,9 @@ export {
   STICKY_NOTE_SIZE,
   stickyNotePosition,
 } from './core/annotation/sticky-note';
+/* ---------- 统一配置（"万物可配置"） ---------- */
+export type { PdfViewerConfig } from './core/config';
+export { mergeConfig, resolveConfigValue } from './core/config';
 /* ---------- 下载（纯 DOM，无网络依赖） ---------- */
 export { downloadFile } from './core/document/download';
 /* ---------- 富文本（零依赖，工具栏宿主可配） ---------- */
@@ -127,7 +130,14 @@ export type {
   PdfViewerTheme,
 } from './core/theme';
 /* ---------- 主题与外观 ---------- */
-export { appearanceStyles, THEME_LABELS, THEMES, themeClasses } from './core/theme';
+export {
+  appearanceStyles,
+  THEME_LABELS,
+  THEME_LABELS_I18N,
+  THEMES,
+  themeClasses,
+  themeLabel,
+} from './core/theme';
 export type * from './core/types';
 export * from './hooks';
 /* ---------- i18n（宿主可通过 JSON 添加语言） ---------- */

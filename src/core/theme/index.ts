@@ -47,6 +47,54 @@ export const THEME_LABELS: Record<PdfViewerTheme, string> = {
   minimal: '极简',
 };
 
+/**
+ * **主题名的多语言表**（宿主做切换 UI 时用）。
+ *
+ * ⚠️ 用户反馈："切换语言还是没变啊 下拉框选择语言之后
+ *    发现页面上语言还是没换啊"
+ * → 主题切换器下拉框里的名字是 `THEME_LABELS` → **永远是中文** ❌
+ *
+ * → 这里给出**内置的多语言名字** → 宿主直接用 ✅
+ * → 宿主想用自己的叫法 → 传 `themeLabels` 覆盖 ✅
+ */
+export const THEME_LABELS_I18N: Record<string, Record<PdfViewerTheme, string>> = {
+  zh: THEME_LABELS,
+  en: {
+    light: 'Light',
+    dark: 'Dark',
+    auto: 'System',
+    paper: 'Paper',
+    sepia: 'Sepia',
+    contrast: 'High contrast',
+    minimal: 'Minimal',
+  },
+  ja: {
+    light: 'ライト',
+    dark: 'ダーク',
+    auto: 'システム',
+    paper: 'ペーパー',
+    sepia: 'セピア',
+    contrast: 'ハイコントラスト',
+    minimal: 'ミニマル',
+  },
+};
+
+/**
+ * 取主题的名字（按语言）。
+ *
+ * @param theme 主题
+ * @param locale 语言（默认中文）
+ * @param overrides 宿主的覆盖表
+ * @returns 主题名
+ */
+export function themeLabel(
+  theme: PdfViewerTheme,
+  locale = 'zh',
+  overrides?: Partial<Record<PdfViewerTheme, string>>,
+): string {
+  return overrides?.[theme] ?? THEME_LABELS_I18N[locale]?.[theme] ?? THEME_LABELS[theme];
+}
+
 /** 密度 */
 export type PdfViewerDensity = 'compact' | 'cozy' | 'comfortable';
 

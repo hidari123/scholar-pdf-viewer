@@ -25,8 +25,8 @@ import {
   PdfViewer,
   parseHighlightDoc,
   stringifyHighlightDoc,
-  THEME_LABELS,
   THEMES,
+  themeLabel,
 } from '@scholar-club/pdf-viewer';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import * as pdfjs from 'pdfjs-dist';
@@ -34,6 +34,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HighlightPicker, PRESET_COLORS } from './HighlightPicker';
 import { createDebouncedSaver, loadHighlights } from './highlight-store';
 import './demo.css';
+import { demoText } from './demo-i18n';
 import '@scholar-club/pdf-viewer/styles.css';
 
 /**
@@ -164,6 +165,18 @@ export default function App() {
    * ⚠️ 内置 zh / en；宿主还能通过 JSON **加**别的语言。
    */
   const [locale, setLocale] = useState<'zh' | 'en' | 'ja'>('zh');
+
+  /*
+   * **demo 自己的文案**（宿主侧 i18n）。
+   *
+   * → 用户反馈："切换语言还是没变啊"
+   * → 根因：**包内文案切换正常**，但 **demo 自己的按钮是硬编码中文** ❌
+   * → demo 是宿主 → 宿主的文案自己管 → 切语言时**整页**都变 ✅
+   */
+  const t = useCallback(
+    (key: string, vars?: Record<string, string | number>) => demoText(locale, key, vars),
+    [locale],
+  );
 
   /**
    * **宿主注册的语言表**（JSON）。
@@ -307,14 +320,14 @@ export default function App() {
         return false;
       }
       setSampleUrl('/samples/local.pdf');
-      setSampleLabel('本地真实文档');
+      setSampleLabel(t('demo.loadLocal'));
       // ⚠️ **换文档 → 换 documentId** → 高亮按文档隔离（切回原来的文档还在）
       setDocumentId('local');
       return true;
     } catch {
       return false;
     }
-  }, []);
+  }, [t]);
 
   /** 重新载入本地真实文档（切回原文档） */
   const reloadLocal = useCallback(() => {
@@ -330,10 +343,10 @@ export default function App() {
       bytes.byteOffset + bytes.byteLength,
     ) as ArrayBuffer;
     setSampleUrl(URL.createObjectURL(new Blob([buffer], { type: 'application/pdf' })));
-    setSampleLabel('内置样张（3 页）');
+    setSampleLabel(t('demo.loadSample'));
     // ⚠️ **换文档 → 换 documentId** → 高亮按文档隔离（切回原来的文档还在）
     setDocumentId('sample');
-  }, []);
+  }, [t]);
 
   // 启动时优先加载本地真实文档
   useEffect(() => {
@@ -891,7 +904,7 @@ export default function App() {
   const handleAddSameLineNotes = useCallback(() => {
     const target = highlights[0];
     if (!target) {
-      setHint('先添加一条高亮，再试这个');
+      setHint(t('demo.needHighlight'));
       return;
     }
 
@@ -912,8 +925,8 @@ export default function App() {
         createdAt: now,
       },
     ]);
-    setHint('已加两条同一行的批注（看右上角是不是只有一个图标 + 角标）');
-  }, [highlights]);
+    setHint(t('demo.savedNotes'));
+  }, [highlights, t]);
 
   /**
    * **下载 PDF**。
@@ -944,10 +957,10 @@ export default function App() {
    */
   const handleExportAnnotatedPdf = useCallback(() => {
     if (!sampleUrl) {
-      setHint('没有可导出的文档');
+      setHint(t('demo.noDoc'));
       return;
     }
-    setHint('正在导出带高亮的 PDF…');
+    setHint(t('demo.exporting'));
     void fetch(sampleUrl)
       .then((r) => r.arrayBuffer())
       .then((buffer) =>
@@ -963,12 +976,12 @@ export default function App() {
           `${documentId}-annotated.pdf`,
           'application/pdf',
         );
-        setHint(`已导出带高亮的 PDF（${highlights.length} 条高亮）`);
+        setHint(t('demo.exported', { count: highlights.length }));
       })
       .catch((error: unknown) => {
         setHint(`导出失败：${error instanceof Error ? error.message : String(error)}`);
       });
-  }, [sampleUrl, documentId, highlights]);
+  }, [sampleUrl, documentId, highlights, t]);
 
   /** 工具栏插槽（宿主塞自己的按钮 —— 证明包不需要业务入口） */
   const toolbarSlot = useMemo(
@@ -995,10 +1008,10 @@ export default function App() {
               selectedText: selection.text,
               position: selection.norm,
             });
-            setHint('已添加高亮（宿主自存，包不碰后端）');
+            setHint(t('demo.savedHighlight'));
           }}
-          title="添加高亮"
-          aria-label="添加高亮"
+          title={t('demo.addHighlight')}
+          aria-label={t('demo.addHighlight')}
         >
           <Icon name="highlight" />
         </button>
@@ -1007,8 +1020,8 @@ export default function App() {
           type="button"
           className="scpdf-toolbar__btn"
           onClick={handleExportHighlights}
-          title="导出高亮（JSON）"
-          aria-label="导出高亮"
+          title={t('demo.exportJson')}
+          aria-label={t('demo.exportJson')}
         >
           <Icon name="exportJson" />
         </button>
@@ -1023,8 +1036,8 @@ export default function App() {
           type="button"
           className="scpdf-toolbar__btn"
           onClick={handleExportAnnotatedPdf}
-          title="导出带高亮的 PDF"
-          aria-label="导出带高亮的 PDF"
+          title={t('demo.exportPdf')}
+          aria-label={t('demo.exportPdf')}
         >
           <Icon name="exportPdf" />
         </button>
@@ -1033,8 +1046,8 @@ export default function App() {
           type="button"
           className="scpdf-toolbar__btn"
           onClick={handleAddSameLineNotes}
-          title="造两个同一行的批注"
-          aria-label="造两个同一行的批注"
+          title={t('demo.makeNotes')}
+          aria-label={t('demo.makeNotes')}
         >
           <Icon name="comment" />
         </button>
@@ -1043,8 +1056,8 @@ export default function App() {
           type="button"
           className="scpdf-toolbar__btn"
           onClick={handleImportHighlights}
-          title="导入高亮（JSON）"
-          aria-label="导入高亮"
+          title={t('demo.importJson')}
+          aria-label={t('demo.importJson')}
         >
           <Icon name="upload" />
         </button>
@@ -1053,8 +1066,8 @@ export default function App() {
           type="button"
           className="scpdf-toolbar__btn"
           onClick={handleDownloadPdf}
-          title="下载 PDF"
-          aria-label="下载 PDF"
+          title={t('demo.downloadPdf')}
+          aria-label={t('demo.downloadPdf')}
         >
           <Icon name="download" />
         </button>
@@ -1068,6 +1081,7 @@ export default function App() {
       handleDownloadPdf,
       handleExportAnnotatedPdf,
       handleAddSameLineNotes,
+      t,
     ],
   );
 
@@ -1104,14 +1118,15 @@ export default function App() {
       >
         <strong>@scholar-club/pdf-viewer</strong>
         <button type="button" className="scpdf-btn" onClick={createSample}>
-          载入内置样张
+          {t('demo.loadSample')}
         </button>
         <button type="button" className="scpdf-btn" onClick={reloadLocal}>
-          载入本地真实文档
+          {t('demo.loadLocal')}
         </button>
         {sampleUrl ? (
           <span>
-            当前：{sampleLabel || '文档'} · 第 {currentPage} 页 · {Math.round(scale * 100)}%
+            {t('demo.current')} {sampleLabel || '文档'} · {t('demo.page')} {currentPage} ·{' '}
+            {Math.round(scale * 100)}%
           </span>
         ) : (
           <span style={{ opacity: 0.6 }}>加载中…</span>
@@ -1120,14 +1135,14 @@ export default function App() {
 
         {/*
           主题切换器 —— **宿主侧的 UI**。
-          包提供 `theme` prop + `THEMES` / `THEME_LABELS` 常量。
+          包提供 `theme` prop + `THEMES` / `themeLabel` 常量。
 
           ⚠️ **放在同一行**（不另起一行）
           → 否则 header 变高 → PDF 区域下移 → E2E 的坐标选字用例会选到不同的行
           → 实测缩放矩阵的"选区水平贴合墨迹"从 49/49 掉到 46/49。
         */}
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ opacity: 0.7 }}>主题：</span>
+          <span style={{ opacity: 0.7 }}>{t('demo.theme')}</span>
           <select
             value={theme}
             onChange={(e) => setTheme(e.target.value as PdfViewerTheme)}
@@ -1135,11 +1150,11 @@ export default function App() {
           >
             {THEMES.map((t) => (
               <option key={t} value={t}>
-                {THEME_LABELS[t]}
+                {themeLabel(t, locale)}
               </option>
             ))}
           </select>
-          <span style={{ opacity: 0.7, marginLeft: 12 }}>语言：</span>
+          <span style={{ opacity: 0.7, marginLeft: 12 }}>{t('demo.locale')}</span>
           <select
             value={locale}
             onChange={(e) => setLocale(e.target.value as 'zh' | 'en' | 'ja')}
@@ -1150,15 +1165,15 @@ export default function App() {
             {/* 宿主通过 JSON 加的语言 */}
             <option value="ja">日本語</option>
           </select>
-          <span style={{ opacity: 0.7, marginLeft: 12 }}>密度：</span>
+          <span style={{ opacity: 0.7, marginLeft: 12 }}>{t('demo.density')}</span>
           <select
             value={density}
             onChange={(e) => setDensity(e.target.value as PdfViewerDensity)}
             aria-label="密度"
           >
-            <option value="compact">紧凑</option>
-            <option value="cozy">适中</option>
-            <option value="comfortable">宽松</option>
+            <option value="compact">{t('demo.density.compact')}</option>
+            <option value="cozy">{t('demo.density.cozy')}</option>
+            <option value="comfortable">{t('demo.density.comfortable')}</option>
           </select>
         </span>
 
@@ -1168,12 +1183,13 @@ export default function App() {
           取色器/预设/持久化全在宿主。
         */}
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ opacity: 0.7 }}>高亮色：</span>
+          <span style={{ opacity: 0.7 }}>{t('demo.highlightColor')}</span>
           <HighlightPicker
             value={highlightColor}
             customColors={customColors}
             onChange={(key) => setHighlightColor(key)}
             onSaveCustom={(key, color) => setCustomColors((prev) => ({ ...prev, [key]: color }))}
+            locale={locale}
           />
         </span>
       </div>
@@ -1222,11 +1238,11 @@ export default function App() {
             setStickyNotes((prev) =>
               prev.map((note) => (note.id === id ? { ...note, content: html } : note)),
             );
-            setHint('已保存批注');
+            setHint(t('demo.savedNote'));
           }}
           onAnnotationDelete={(id) => {
             setStickyNotes((prev) => prev.filter((note) => note.id !== id));
-            setHint('已删除批注');
+            setHint(t('demo.deletedNote'));
           }}
           onHighlightClick={(h) => setHint(`点击高亮：${h.selectedText.slice(0, 20)}`)} /*
            * 选区浮层的动作 —— **宿主注入**（证明包不需要业务入口）。
