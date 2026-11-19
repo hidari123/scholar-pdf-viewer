@@ -48,6 +48,8 @@ const suites = [
   { name: '图标系统', file: 'e2e-icons.mjs' },
   { name: '多语言（宿主 JSON 添加语言）', file: 'e2e-i18n.mjs' },
   { name: '多批注分组 + 便利贴面板 + 富文本', file: 'e2e-annotation-panel.mjs' },
+  { name: '加批注按钮 + 富文本弹窗', file: 'e2e-annotation-dialog.mjs' },
+  { name: '统一配置对象', file: 'e2e-config.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

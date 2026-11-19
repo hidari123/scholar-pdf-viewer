@@ -157,26 +157,49 @@ describe('内置图标集', () => {
 
   it('**复制图标的两张纸一样大**（用户反馈："复制…挤压在一起了"）', () => {
     const shape = getIconShape('copy');
-    // 两张纸：后面的完整矩形 + 前面只画露出来的上边和左边
+
+    // 后面那张纸：一个规整的矩形（12×12）
+    const rects = shape?.rects ?? [];
+    expect(rects.length).toBe(1);
+    expect(rects[0]?.width).toBe(12);
+    expect(rects[0]?.height).toBe(12);
+    expect(rects[0]?.x).toBe(9);
+    expect(rects[0]?.y).toBe(9);
+
+    // 前面那张纸：一条折线（只画露出来的上边和左边）
     const paths = shape?.paths ?? [];
-    expect(paths.length).toBe(2);
-    // 两张纸的尺寸都是 12×12 → 一样大
-    expect(paths[0]).toContain('h9');
-    expect(paths[1]).toContain('v9');
+    expect(paths.length).toBe(1);
+    // 前面那张从 (3,3) 开始 → 和后面那张一样是 12×12 ✅
+    expect(paths[0]).toContain('M15 3');
+    expect(paths[0]).toContain('v10');
   });
 
   it('**翻译图标的"文"和"A"不重叠**（用户反馈："翻译…挤压在一起了"）', () => {
     const shape = getIconShape('translate');
     const paths = shape?.paths ?? [];
 
-    // "文"占 x=2..11，"A"占 x=12..22 → 中间留了 1px
-    const wen = paths.slice(0, 5).join(' ');
-    const a = paths.slice(5).join(' ');
+    /*
+     * ⚠️ **按几何判断**（不按路径字符串）→ 以后改画法也不会失效。
+     *
+     * → "文"的 x 范围 和 "A"的 x 范围 **不能相交** ✅
+     */
+    // "文" = 前 4 条路径，"A" = 后 2 条
+    const wenPaths = paths.slice(0, 4);
+    const aPaths = paths.slice(4);
 
-    // "文"的最右 x = 8.8
-    expect(wen).toContain('M8.8');
-    // "A"的最左 x = 14
-    expect(a).toContain('M14');
+    /*
+     * → "文" 的所有路径的 x 都要 < "A" 的最小 x
+     * → 直接取每条路径的**绝对起点 x**（M 后面第一个数）✅
+     */
+    const startX = (d: string) => {
+      const m = /^M(-?\d+(\.\d+)?)/.exec(d);
+      return m?.[1] === undefined ? Number.NaN : Number(m[1]);
+    };
+
+    const wenRight = Math.max(...wenPaths.map(startX));
+    const aLeft = Math.min(...aPaths.map(startX));
+
+    expect(wenRight).toBeLessThan(aLeft);
   });
 
   it('**未知图标返回 null**（不抛异常）', () => {
