@@ -12,3 +12,7 @@ e2e-shots/
 # Playwright 报告
 playwright-report/
 test-results/
+
+# E2E 的临时产物（每次跑都会变，不入库）
+.tmp-e2e-*/
+.tmp-print/
