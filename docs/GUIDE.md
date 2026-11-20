@@ -1,0 +1,627 @@
+# 使用指南 / Getting Started
+
+> 怎么把包接进你的项目。**中英双语**。
+>
+> [← 返回 README](../README.md) · [API 参考](./API.md) · [扩展开发](./EXTENDING.md)
+
+---
+
+## 目录 / Table of Contents
+
+- [1. 30 秒接入](#1-30-秒接入)
+- [2. 完整接线示例](#2-完整接线示例)
+- [3. 三个消费契约](#3-三个消费契约)
+- [4. 加载文档](#4-加载文档)
+- [5. 高亮：从选区到持久化](#5-高亮从选区到持久化)
+- [6. 批注](#6-批注)
+- [7. 自定义工具栏](#7-自定义工具栏)
+- [8. 多语言](#8-多语言)
+- [9. 主题与外观](#9-主题与外观)
+- [10. 打印](#10-打印)
+- [11. 缩放](#11-缩放)
+- [12. 导出带高亮的 PDF](#12-导出带高亮的-pdf)
+- [13. 加密文档](#13-加密文档)
+- [14. 错误处理](#14-错误处理)
+- [15. 性能与缓存](#15-性能与缓存)
+- [16. 常见问题](#16-常见问题)
+
+---
+
+## 1. 30 秒接入
+
+**1. 装依赖**
+
+```bash
+pnpm add @scholar-club/pdf-viewer
+# 可选：导出带高亮的 PDF
+pnpm add pdf-lib
+```
+
+**2. 引样式**（**必做**，否则布局全乱）
+
+```tsx
+import '@scholar-club/pdf-viewer/styles.css';
+import '@scholar-club/pdf-viewer/themes.css'; // 可选
+```
+
+**3. 用起来**
+
+```tsx
+import { PdfViewer } from '@scholar-club/pdf-viewer';
+
+export function Reader({ url }: { url: string }) {
+  return (
+    <div style={{ height: '100vh' }}>
+      <PdfViewer file={url} />
+    </div>
+  );
+}
+```
+
+> ⚠️ **容器必须有高度**。包会填满父容器；父容器高度是 0 → 什么都看不见。
+
+---
+
+## 2. 完整接线示例
+
+一个真实的"论文阅读器"宿主：
+
+```tsx
+import { useCallback, useRef, useState } from 'react';
+import {
+  PdfViewer,
+  type PdfViewerHandle,
+  type HighlightRecord,
+  type NewHighlight,
+  type AnnotationRecord,
+} from '@scholar-club/pdf-viewer';
+import '@scholar-club/pdf-viewer/styles.css';
+import '@scholar-club/pdf-viewer/themes.css';
+
+export function PaperReader({ paperId, fileUrl }: Props) {
+  const viewerRef = useRef<PdfViewerHandle>(null);
+  const [highlights, setHighlights] = useState<HighlightRecord[]>([]);
+  const [annotations, setAnnotations] = useState<AnnotationRecord[]>([]);
+
+  // 保存高亮
+  const handleHighlight = useCallback((ctx: any) => {
+    const id = `hl_${Date.now()}`;
+    setHighlights((prev) => [
+      ...prev,
+      {
+        id,
+        selectedText: ctx.text, // ⚠️ 字段叫 selectedText，不是 text
+        position: ctx.position,
+        color: ctx.color ?? 'my-1',
+      },
+      },
+    ]);
+    return id; // ← 返回 id，批注可以挂上去
+  }, []);
+
+  return (
+    <PdfViewer
+      ref={viewerRef}
+      file={fileUrl}
+      documentId={paperId}
+      initialPage={1}
+      initialScale="width"
+      // 数据（受控）
+      highlights={highlights}
+      stickyNotes={annotations}
+      // 行为
+      onHighlight={handleHighlight}
+      onAnnotationSave={(id, html) =>
+        setAnnotations((prev) => prev.map((a) => (a.id === id ? { ...a, content: html } : a)))
+      }
+      onAnnotationCreate={(id, html, _plain, highlightId, text) =>
+        setAnnotations((prev) => [
+          ...prev,
+          { id, content: html, highlightId, pageNumber: undefined, createdAt: Date.now() },
+        ])
+      }
+      onAnnotationDelete={(id) => setAnnotations((prev) => prev.filter((a) => a.id !== id))}
+      // 链接
+      onExternalLink={(url) => window.open(url, '_blank', 'noopener')}
+      onInternalLink={(_dest, pageNumber) => viewerRef.current?.goToPage(pageNumber)}
+      // 错误
+      onError={(error) => console.error(error.code, error.message)}
+    />
+  );
+}
+```
+
+---
+
+## 3. 三个消费契约
+
+宿主和包之间只有三条约定：
+
+| 契约     | 包负责             | 宿主负责                                |
+| -------- | ------------------ | --------------------------------------- |
+| **渲染** | 加载 / 渲染 / 定位 | 提供 pdf.js 的 `getPage` / `getDocInfo` |
+| **数据** | 渲染高亮和批注     | **存储**它们（存数据库 / 后端）         |
+| **动作** | 抛事件（`onXxx`）  | **执行**动作（翻译 / 提问 / 保存）      |
+
+> 💡 **包不碰你的后端**。换后端不用改包。
+
+---
+
+## 4. 加载文档
+
+### `file` 支持什么
+
+```ts
+type DocumentSource = string | Blob | ArrayBuffer | Uint8Array;
+```
+
+### ⚠️ `documentId` 必须变
+
+```tsx
+// ❌ 换文档但 documentId 没变 -> 不会重新加载
+<PdfViewer file={urlA} documentId="doc" />
+<PdfViewer file={urlB} documentId="doc" />
+
+// ✅ documentId 跟着变
+<PdfViewer file={urlB} documentId={`doc_${paperId}`} />
+```
+
+### HTTP 请求带认证
+
+```tsx
+<PdfViewer
+  file="/api/papers/123/content"
+  loadOptions={{ headers: { Authorization: `Bearer ${token}` } }}
+/>;
+```
+
+---
+
+## 5. 高亮：从选区到持久化
+
+### 完整链路
+
+```
+用户拖选文字
+  → 包算出归一化坐标
+  → 弹选区浮层
+  → 用户点"高亮"
+  → 调 onHighlight(ctx)
+  → 宿主存起来
+  → 传给 highlights prop
+  → 包重新渲染
+```
+
+### ⚠️ 必须存归一化坐标
+
+```ts
+interface NormPosition {
+  boundingRect: NormRect; // { x1, y1, x2, y2, width, height, pageNumber }
+  rects: NormRect[]; // 每行一个
+  pageNumber: number;
+}
+```
+
+> 💡 **0~1 的相对位置** → 换缩放、换设备、换 PDF 大小，落点都对。
+> 如果你存的是像素坐标，用户换个缩放高亮就飘了。
+
+### ⚠️ `onHighlight` 和 `onHighlightCreate` 别都调
+
+| 你想干嘛             | 用哪个                                         |
+| -------------------- | ---------------------------------------------- |
+| 用包的浮层"高亮"按钮 | **`onHighlight`**（可返回 id）                 |
+| 宿主自己实现高亮按钮 | **`onHighlightCreate`** + `onHighlightCreated` |
+
+```tsx
+// ❌ 两个都传 -> 保存两次
+onHighlight={save} onHighlightCreate={save}
+
+// ✅ 二选一
+onHighlight={save}
+```
+
+---
+
+## 6. 批注
+
+### 三个回调的分工
+
+| 回调                                                     | 场景                       |
+| -------------------------------------------------------- | -------------------------- |
+| `onAnnotationCreate(id, html, plain, highlightId, text)` | 选区浮层点"加批注"         |
+| `onAnnotationChange(id, html, plain)`                    | 编辑器内容变了（**实时**） |
+| `onAnnotationSave(id, html, plain)`                      | 点"保存"                   |
+
+### ⚠️ HTML 已经消毒过
+
+```tsx
+onAnnotationSave={(id, html, plain) => {
+  // ⚠️ html 已经过 sanitizeRichText 清洗（防 XSS）
+  // 但你存进数据库前，最好**再过一次**（防御纵深）
+  save({ id, html: sanitizeRichText(html), plain });
+}}
+```
+
+### 换掉编辑器（用 TipTap）
+
+```tsx
+import { AnnotationDialog } from '@scholar-club/pdf-viewer/dialog';
+import { TipTapEditor } from '@scholar-club/pdf-viewer/editor';
+
+<PdfViewer
+  annotationEditor={TipTapEditor}
+  // ...
+/>;
+```
+
+> ⚠️ 需要装 `@tiptap/*`（可选 peer 依赖）。
+
+---
+
+## 7. 自定义工具栏
+
+### 7.1 只想加两个按钮（**用 `leftSlot` / `rightSlot`**）
+
+```tsx
+<PdfViewer
+  toolbar={{
+    leftSlot: <MySaveButton />,
+    rightSlot: <MyShareButton />,
+  }}
+/>;
+```
+
+> 💡 **不用整个替换** —— 内置的翻页 / 缩放 / 搜索都还在。
+
+### 7.2 整个替换（`slots.toolbar`）
+
+```tsx
+<PdfViewer
+  ref={viewerRef}
+  slots={{
+    toolbar: (
+      <MyToolbar
+        onZoomIn={() => viewerRef.current?.zoomIn()}
+        onZoomOut={() => viewerRef.current?.zoomOut()}
+        onFitWidth={() => viewerRef.current?.fitWidth()}
+        onPrint={() => viewerRef.current?.print()}
+        onGoToPage={(p) => viewerRef.current?.goToPage(p)}
+      />
+    ),
+  }}
+/>;
+```
+
+> ⚠️ 替换之后 **缩放 / 打印要靠 `viewerRef` 驱动**（内置按钮没了）。
+
+### 7.3 关掉某些内置按钮
+
+```tsx
+<PdfViewer toolbar={{ showSearch: false, showThumbnails: false }} />;
+```
+
+### 7.4 关掉某些功能
+
+```tsx
+<PdfViewer features={{ print: false, outline: false }} />;
+```
+
+---
+
+## 8. 多语言
+
+### 切换语言
+
+```tsx
+const [locale, setLocale] = useState<Locale>('zh');
+
+<PdfViewer locale={locale} />;
+```
+
+### 加一个新语言（西班牙语）
+
+```tsx
+const es = {
+  'load.loading': 'Cargando…',
+  'load.retry': 'Reintentar',
+  'page.of': '{page} de {total}',
+  // 不用写全 -> 缺的自动回退到内置
+};
+
+<PdfViewer locale="es" locales={{ es }} />;
+```
+
+### 覆盖一两个句子
+
+```tsx
+<PdfViewer messages={{ 'load.loading': '正在打开…' }} />;
+```
+
+### 自定义按钮也要能翻译
+
+```tsx
+const toolbar = [{ command: 'bold' as const, label: '{my.bold}', icon: 'bold' as const }];
+
+<PdfViewer annotationToolbar={toolbar} messages={{ 'my.bold': '加粗' }} />;
+```
+
+> 💡 `label` 写 `{xxx.yyy}` 形式 → 包会拿 `xxx.yyy` 去查文案表。
+
+---
+
+## 9. 主题与外观
+
+### 四层定制（从粗到细）
+
+| 层  | 手段                                  | 适合                 |
+| --- | ------------------------------------- | -------------------- |
+| 1   | `theme="dark"`                        | 整体风格             |
+| 2   | `appearance={{ density: 'compact' }}` | 密度 / 外壳 / 页阴影 |
+| 3   | CSS 变量                              | 像素微调             |
+| 4   | `slots`                               | 完全自定义           |
+
+### 常用 `appearance` 字段
+
+```tsx
+<PdfViewer
+  appearance={{
+    density: 'compact', // 'compact' | 'cozy' | 'comfortable'
+    chrome: 'full', // 'full' | 'minimal' | 'hidden'
+    pageShadow: true, // 页阴影
+    pageRadius: 4, // 页圆角（px）
+    showPageNumber: true, // 页脚页码
+    showOutline: true, // 目录侧栏
+    showThumbnails: true, // 缩略图侧栏
+    showSearch: true, // 搜索面板
+    accentColor: '#fa541c', // 强调色
+    fontFamily: 'Inter, sans-serif',
+    fontSize: 14,
+  }}
+/>;
+```
+
+> 💡 `appearance.showOutline` / `showThumbnails` / `showSearch` 是**上层开关**，
+> **优先级高于** `toolbar.showOutline` 等 —— 宿主用 `appearance` 统一控制，
+> 用 `toolbar` 做细调 ✅
+
+### CSS 变量
+
+```css
+:root {
+  --scpdf-color-primary: #fa541c;
+  --scpdf-toolbar-height: 48px;
+}
+```
+
+---
+
+## 10. 打印
+
+### 两种模式
+
+```tsx
+<PdfViewer printMode="with-highlights" />  // 默认：打印带高亮
+<PdfViewer printMode="original" />         // 只打印原 PDF
+```
+
+### ⚠️ 打印按钮需要两件事
+
+```tsx
+<PdfViewer
+  features={{ print: true }} // 默认就是 true
+  toolbar={{ showZoom: true }} // ⚠️ 打印按钮在 showZoom 块里
+/>;
+```
+
+> ⚠️ **当前已知问题**：`showZoom: false` 会**连带隐藏打印按钮**（因为打印按钮在缩放块里）。
+> 需要打印但不要缩放按钮 → 用 `slots.toolbar` 自己排。
+
+### 打印纸张
+
+```tsx
+<PdfViewer
+// ⚠️ 目前写死 A4，美洲市场需要 Letter 的宿主要自己 window.print()
+/>;
+```
+
+---
+
+## 11. 缩放
+
+### 三种方式
+
+```tsx
+viewerRef.current?.zoomIn(); // 放大（就近取整到 10%）
+viewerRef.current?.zoomOut(); // 缩小
+viewerRef.current?.fitWidth(); // 适应宽度
+viewerRef.current?.fitPage(); // 适应整页
+```
+
+### Ctrl + 滚轮
+
+按住 **Ctrl**（macOS 是 **Cmd**）滚轮即可缩放 —— 和所有 PDF 阅读器一致。
+不按 Ctrl → 正常滚动页面。
+
+### ⚠️ 手动缩放会解除"自适应"
+
+和 WPS / 浏览器行为一致：用户手动调过比例后，容器变窄**不会**强行重新适配。
+
+---
+
+## 12. 导出带高亮的 PDF
+
+把高亮写成**真正的 PDF 批注**（`/Subtype /Highlight`）——
+Acrobat / Preview / Chrome / Edge 打开都能看到，**也能点开看原文**。
+
+```tsx
+import { exportHighlightedPdf } from '@scholar-club/pdf-viewer';
+
+const bytes = await exportHighlightedPdf({
+  pdfBytes, // 原始 PDF 字节（宿主自己取）
+  highlights, // 高亮列表
+  pageSizesPt: viewerRef.current?.getPageSizesPt() ?? [],
+});
+
+// 下载
+const blob = new Blob([bytes], { type: 'application/pdf' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = 'annotated.pdf';
+a.click();
+URL.revokeObjectURL(url);
+```
+
+> ⚠️ 需要装 **`pdf-lib`**（可选 peer 依赖）。没装会给出明确报错。
+
+---
+
+## 13. 加密文档
+
+### 用包内置的密码框（最简单）
+
+```tsx
+<PdfViewer file={url} showPasswordDialog />;
+```
+
+### 宿主自己接管
+
+```tsx
+<PdfViewer
+  file={url}
+  onRequestPassword={({ retry, cancel }) => {
+    const pw = window.prompt('请输入密码');
+    if (pw) retry(pw);
+    else cancel();
+  }}
+/>;
+```
+
+---
+
+## 14. 错误处理
+
+```tsx
+<PdfViewer
+  onError={(error) => {
+    console.error(error.code); // 'E_LOAD_NETWORK'
+    console.error(error.message); // 可直接展示的文案
+    console.error(error.retryable); // 重试有没有意义
+
+    if (error.retryable) {
+      showRetryButton(() => reload());
+    }
+  }}
+/>;
+```
+
+> 💡 包内置的错误界面**已经**按 `retryable` 判断要不要显示「重试」按钮
+> （"文件不是 PDF"不会给无意义的重试）。
+
+### 搜索引擎
+
+```tsx
+<PdfViewer searchEngine={myPdfSearch} />;
+```
+
+> ⚠️⚠️ **关键坑**：建索引用的 `getTextContent()` **必须和渲染用的是同一个**！
+>
+> -> 不一样 -> **所有命中的高亮位置全错** ❌
+> -> 原因：搜索靠字符偏移定位，渲染的偏移和索引的偏移对不上 -> 命中位置漂移 ❌
+>
+> ```ts
+> // ⚠️ 索引和渲染要用同一个 page proxy
+> const page = await doc.getPage(n);
+> await search.indexPage(n, await page.getTextContent());
+> // 渲染时也是这一份
+> <PdfViewer getPage={async (n) => { await doc.getPage(n); }} />
+> ```
+
+---
+
+## 15. 性能与缓存
+
+### 内存缓存（默认）
+
+```tsx
+<PdfViewer file={url} documentId="paper-1" />;
+```
+
+### 用 IndexedDB 缓存（`idb`）
+
+```ts
+import { DocumentCache } from '@scholar-club/pdf-viewer/core';
+
+const cache = new DocumentCache({
+  dbName: 'my-pdf-cache',   // IndexedDB 的库名
+  maxBytes: 200 * 1024 * 1024, // 200MB 上限（超出按 LRU 淘汰）
+  memoryOnly: false,       // true = 只用内存（不落盘）
+});
+
+await cache.init();  // ⚠️ 要先 init（失败会自动降级为内存）
+
+<PdfViewer file={url} documentId="paper-1" cache={cache} />
+```
+
+> 💡 `DocumentCache` 底层是 **IndexedDB**，失败**自动降级为内存**（不会崩）。
+> 只会暴露 5 个动作：`get` / `set` / `remove` / `clear` / `stats` —— 不暴露 IDB 细节。
+
+### 性能建议
+
+- ✅ 传 `getPageSizes`（跳页才准）
+- ✅ 用 `documentId` 复用缓存
+- ✅ 高亮用归一化坐标（渲染快）
+- ❌ 别在 `onHighlight` 里做同步的重活（会卡渲染）
+
+---
+
+## 16. 常见问题
+
+<details>
+<summary><b>页面空白 / 什么都看不见</b></summary>
+
+1. 容器**没有高度** → 包填满父容器，父容器 0 高就是 0 高
+2. **忘了引样式** → `import '@scholar-club/pdf-viewer/styles.css'`
+</details>
+
+<details>
+<summary><b>跳页不准 / 滚动条长度不对</b></summary>
+
+没传 `getPageSizes` → 包用 A4 兜底 → 不同尺寸的 PDF 就偏。
+**传上它**。
+</details>
+
+<details>
+<summary><b>换了文档但没重新加载</b></summary>
+
+`documentId` 没变。**换文档时一定要改 `documentId`**。
+</details>
+
+<details>
+<summary><b>高亮位置飘了 / 换个缩放就错位</b></summary>
+
+存了像素坐标而不是**归一化坐标**。用 `ctx.position`（`NormPosition`）。
+</details>
+
+<details>
+<summary><b>点一次高亮存了三条</b></summary>
+
+`onHighlight` 和 `onHighlightCreate` 都传了。**二选一**。
+</details>
+
+<details>
+<summary><b>"翻译"按钮不显示</b></summary>
+
+这是**故意的**：宿主没实现 → 不渲染。传 `onTranslate` 就有。
+</details>
+
+<details>
+<summary><b>选区蓝色块一直浮着 / 取消不了</b></summary>
+
+宿主自己实现了高亮按钮但没通知包。调 `viewerRef.current.createHighlight(hl)`
+或配 `onHighlightCreated`。
+</details>
+
+---
+
+**← 返回 [README](../README.md) · [API 参考](./API.md) · [扩展开发](./EXTENDING.md)**
