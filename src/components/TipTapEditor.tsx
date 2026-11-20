@@ -48,6 +48,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { resolveToolbarLabel } from '../core/editor/label';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
 import { defaultRichTextToolbar, richTextToPlain } from '../core/editor/rich-text';
+import type { ToolbarStateEditor } from '../core/editor/toolbar-state';
+import { computeToolbarActiveState } from '../core/editor/toolbar-state';
 import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
@@ -289,6 +291,24 @@ export function TipTapEditor(props: TipTapEditorProps) {
 }
 
 /** 工具栏（用 TipTap 的命令） */
+/**
+ * **要检查"激活状态"的格式**（用于轮询的签名）。
+ *
+ * ⚠️ **和 `computeToolbarActiveState` 里的映射保持一致** ✅
+ */
+const FORMAT_CHECKS = [
+  'bold',
+  'italic',
+  'underline',
+  'strike',
+  'highlight',
+  'textStyle',
+  'link',
+  'bulletList',
+  'orderedList',
+  'blockquote',
+] as const;
+
 function TipTapToolbar(props: {
   hostRef: React.RefObject<HTMLDivElement | null>;
   items: RichTextToolbarItem[];
@@ -347,6 +367,110 @@ function TipTapToolbar(props: {
     };
   }, [getEditor]);
 
+  /*
+   * ⚠️⚠️ **工具栏的"按下态"**（用户需求：
+   * "点了加粗之后 加粗按钮没加深颜色 别的按钮也一样 看不出点击了"）。
+   *
+   * → 之前工具栏**不知道当前选区是什么格式** -> 按钮永远不变 ❌
+   * → 现在：**轮询编辑器的状态** -> 变了就重算 ✅
+   *
+   * ### 为什么用"轮询"而不是订阅事件
+   *
+   * → 订阅 `selectionUpdate` / `transaction` **不可靠**（实测踩过的坑）：
+   *   - TipTap v3 的事件在**某些路径下不触发**（命令执行、程序化改内容）❌
+   *   - React StrictMode 下 effect 会跑两次 -> 监听器**注册了两份** ❌
+   *   - 事件触发时 React 的批处理时机**不好控** ❌
+   * → 轮询（`requestAnimationFrame`）**永远拿到最新状态**，且实现简单 ✅
+   * → 开销：每帧一次 `isActive` -> **可以忽略** ✅
+   */
+  const [activeTick, forceActiveUpdate] = useState(0);
+  useEffect(() => {
+    if (!mounted) {
+      return;
+    }
+    let raf = 0;
+    let last = '';
+    const tick = () => {
+      const ed = getEditor() as unknown as {
+        state?: { selection?: { from?: number; to?: number } };
+      } | null;
+      /*
+       * ⚠️⚠️ **签名必须包含"格式状态"，不能只看选区位置**（实测踩过的坑）。
+       *
+       * ### 之前（只签名选区位置）
+       *
+       * ```js
+       * const signature = `${sel.from}-${sel.to}`;
+       * ```
+       *
+       * → 点"加粗" -> **选区位置没变**（还是 1-12）-> 签名一样 ❌
+       * → `forceActiveUpdate` **不调用** -> `useMemo` 不重算 ❌
+       * → 按钮的 `data-active` **永远是 "false"** ❌
+       *   （实测：HTML 已经变成 `<strong>` 了，但按钮还是灰的）
+       *
+       * ### 现在
+       *
+       * → 签名 = **选区位置 + 文档大小 + 各格式的激活状态** ✅
+       * → 格式变了 -> 签名变了 -> 重算 ✅
+       */
+      const sel = ed?.state?.selection;
+      const raw = ed as unknown as { isActive?: (n: string) => boolean } | null;
+      const formatSig = raw?.isActive
+        ? FORMAT_CHECKS.map((name) => (raw.isActive?.(name) ? '1' : '0')).join('')
+        : '';
+      const signature = sel ? `${sel.from}-${sel.to}|${formatSig}` : '';
+      if (signature !== last) {
+        last = signature;
+        forceActiveUpdate((n) => n + 1);
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+    raf = window.requestAnimationFrame(tick);
+    return () => {
+      window.cancelAnimationFrame(raf);
+    };
+  }, [mounted, getEditor]);
+
+  /** 每个按钮的激活状态（顺序和 `items` 一致） */
+  const activeStates = useMemo(() => {
+    /*
+     * ⚠️⚠️ **`activeTick` 必须在这里被"用掉"**（实测踩过的坑）。
+     *
+     * → 它是**依赖** -> 必须**在回调里读到** -> 否则 biome 会把它从依赖数组里**删掉** ❌
+     *   （实测：biome 的 `useExhaustiveDependencies`  autofix 把 `activeTick` 从 deps 里删了
+     *    -> `useMemo` 永远用缓存 -> 按钮的 `data-active` 一直是 "false" ❌）
+     * → 这里读一下（不用它的值，只为满足依赖检查）✅
+     */
+    void activeTick;
+
+    const raw = getEditor() as unknown as {
+      isActive?: ToolbarStateEditor['isActive'];
+      can?: () => { undo?: () => boolean; redo?: () => boolean };
+    } | null;
+    if (!raw?.isActive) {
+      return computeToolbarActiveState(
+        items.map((item) => item.command),
+        null,
+      );
+    }
+    /*
+     * ⚠️ **适配 TipTap 的 `can()` API**。
+     *
+     * → TipTap 的撤销判断是 `editor.can().undo()`（不是 `editor.canUndo()`）✅
+     * → 我们把它包成统一的接口 -> core 那边不用知道 TipTap ✅
+     */
+    const adapter: ToolbarStateEditor = {
+      isActive: (nameOrAttrs, attributes) => raw.isActive?.(nameOrAttrs, attributes) ?? false,
+      can: () => Boolean(raw.can?.().undo?.()),
+      canUndo: () => Boolean(raw.can?.().undo?.()),
+      canRedo: () => Boolean(raw.can?.().redo?.()),
+    };
+    return computeToolbarActiveState(
+      items.map((item) => item.command),
+      adapter,
+    );
+  }, [items, getEditor, activeTick]);
+
   /** TipTap 的链式命令（用一个宽松的类型，避免依赖具体泛型） */
   type Chained = Record<string, (...args: never[]) => { run: () => void }>;
 
@@ -385,6 +509,8 @@ function TipTapToolbar(props: {
       insertOrderedList: 'toggleOrderedList',
       formatBlock: 'toggleBlockquote',
       removeFormat: 'unsetAllMarks',
+      undo: 'undo',
+      redo: 'redo',
     };
 
     const name = map[command];
@@ -424,37 +550,52 @@ function TipTapToolbar(props: {
 
   return (
     <div className="scpdf-rich-text__toolbar">
-      {items.map((item) => (
-        <button
-          key={item.command}
-          type="button"
-          className="scpdf-rich-text__btn"
-          title={item.label}
-          aria-label={item.label}
-          /*
-           * ⚠️⚠️ **必须用 `onMouseDown` + `preventDefault`**（实测踩过的坑）。
-           *
-           * → 点按钮 → 浏览器把焦点从编辑器移走 → **选区丢失** ❌
-           * → 之后 `toggleBold` 作用在**空选区**上 → 什么都没发生 ❌
-           *   （实测：点"加粗"后 HTML 完全没变）
-           *
-           * → `preventDefault` → **阻止焦点转移** → 选区还在 → 命令生效 ✅
-           * → 并且 `mousedown` 比 `click` 更早 → 命令在选区还在时执行 ✅
-           */
-          onMouseDown={(event) => {
-            event.preventDefault();
-          }}
-          onClick={() => {
-            run(item.command, item.palette ? Object.values(item.palette)[0] : undefined);
-          }}
-        >
-          {item.icon ? (
-            <Icon name={item.icon as IconName} size={15} overrides={icons} />
-          ) : (
-            item.label
-          )}
-        </button>
-      ))}
+      {items.map((item, index) => {
+        const state = activeStates[index];
+        const active = state?.active ?? false;
+        const disabled = state?.disabled ?? false;
+        return (
+          <button
+            key={item.command}
+            type="button"
+            className="scpdf-rich-text__btn"
+            title={item.label}
+            aria-label={item.label}
+            /*
+             * ⚠️⚠️ **按下态**（用户需求：
+             * "点了加粗之后 加粗按钮没加深颜色 别的按钮也一样 看不出点击了"）。
+             *
+             * → `data-active` -> CSS 画**明显的按下态**（主色底 + 主色图标）✅
+             * → `aria-pressed` -> 无障碍也能读出"这个格式开着" ✅
+             */
+            data-active={active ? 'true' : 'false'}
+            aria-pressed={active}
+            disabled={disabled}
+            /*
+             * ⚠️⚠️ **必须用 `onMouseDown` + `preventDefault`**（实测踩过的坑）。
+             *
+             * → 点按钮 → 浏览器把焦点从编辑器移走 → **选区丢失** ❌
+             * → 之后 `toggleBold` 作用在**空选区**上 → 什么都没发生 ❌
+             *   （实测：点"加粗"后 HTML 完全没变）
+             *
+             * → `preventDefault` → **阻止焦点转移** → 选区还在 → 命令生效 ✅
+             * → 并且 `mousedown` 比 `click` 更早 → 命令在选区还在时执行 ✅
+             */
+            onMouseDown={(event) => {
+              event.preventDefault();
+            }}
+            onClick={() => {
+              run(item.command, item.palette ? Object.values(item.palette)[0] : undefined);
+            }}
+          >
+            {item.icon ? (
+              <Icon name={item.icon as IconName} size={15} overrides={icons} />
+            ) : (
+              item.label
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

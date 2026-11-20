@@ -111,6 +111,7 @@ export interface Messages {
   'richtext.bold': string;
   'richtext.italic': string;
   'richtext.underline': string;
+  'richtext.strikeThrough': string;
   'richtext.highlight': string;
   'richtext.textColor': string;
   'richtext.link': string;
@@ -202,6 +203,7 @@ export const ZH_MESSAGES: Messages = {
   'richtext.bold': '加粗',
   'richtext.italic': '斜体',
   'richtext.underline': '下划线',
+  'richtext.strikeThrough': '删除线',
   'richtext.highlight': '高亮',
   'richtext.textColor': '文字颜色',
   'richtext.link': '链接',
@@ -270,6 +272,7 @@ export const EN_MESSAGES: Messages = {
   'richtext.bold': 'Bold',
   'richtext.italic': 'Italic',
   'richtext.underline': 'Underline',
+  'richtext.strikeThrough': 'Strikethrough',
   'richtext.highlight': 'Highlight',
   'richtext.textColor': 'Text color',
   'richtext.link': 'Link',

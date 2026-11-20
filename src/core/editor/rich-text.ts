@@ -74,6 +74,24 @@ export interface RichTextPalette {
  * ⚠️ **label 支持 i18n 占位符**：传 `{key}` 形式 → 由 `RichTextEditor` 解析。
  *    不传 label → 用命令名（英文，可用但不是本地化的）
  *
+ * ## 默认包含哪些（用户需求："工具栏可以的"）
+ *
+ * | 按钮 | 命令 | 状态 |
+ * |---|---|---|
+ * | B 加粗 | `bold` | ✅ |
+ * | I 斜体 | `italic` | ✅ |
+ * | U 下划线 | `underline` | ✅ |
+ * | S 删除线 | `strikeThrough` | ✅ |
+ * | A 文字颜色 | `foreColor` | ✅ |
+ * | 高亮底色 | `hiliteColor` | ✅（有 palette 时） |
+ * | 链接 | `createLink` | ✅ |
+ * | 无序列表 | `insertUnorderedList` | ✅ |
+ * | 有序列表 | `insertOrderedList` | ✅ |
+ * | 引用 | `formatBlock` | ✅ |
+ * | 清除格式 | `removeFormat` | ✅ |
+ * | 撤销 | `undo` | ✅ |
+ * | 重做 | `redo` | ✅ |
+ *
  * @param palette 高亮色板（用于 `hiliteColor`）
  * @returns 默认工具栏项
  */
@@ -82,6 +100,7 @@ export function defaultRichTextToolbar(palette?: RichTextPalette): RichTextToolb
     { command: 'bold', label: '{richtext.bold}', icon: 'bold' },
     { command: 'italic', label: '{richtext.italic}', icon: 'italic' },
     { command: 'underline', label: '{richtext.underline}', icon: 'underline' },
+    { command: 'strikeThrough', label: '{richtext.strikeThrough}', icon: 'strike' },
   ];
 
   if (palette) {
@@ -96,6 +115,12 @@ export function defaultRichTextToolbar(palette?: RichTextPalette): RichTextToolb
   items.push(
     { command: 'foreColor', label: '{richtext.textColor}', icon: 'textColor', palette },
     { command: 'createLink', label: '{richtext.link}', icon: 'link' },
+    { command: 'insertUnorderedList', label: '{richtext.unorderedList}', icon: 'list' },
+    { command: 'insertOrderedList', label: '{richtext.orderedList}', icon: 'listOrdered' },
+    { command: 'formatBlock', label: '{richtext.quote}', icon: 'quote' },
+    { command: 'removeFormat', label: '{richtext.clearFormat}', icon: 'clearFormat' },
+    { command: 'undo', label: '{richtext.undo}', icon: 'undo' },
+    { command: 'redo', label: '{richtext.redo}', icon: 'redo' },
   );
 
   return items;

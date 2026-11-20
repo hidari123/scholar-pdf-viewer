@@ -1052,6 +1052,36 @@
   color: var(--scpdf-text, #1f2328);
 }
 
+/*
+ * ⚠️⚠️ **按下态**（用户需求：
+ * "点了加粗之后 加粗按钮没加深颜色 别的按钮也一样 看不出点击了"）。
+ *
+ * → 之前**只有 `:hover`** -> 按了之后和没按**长得一样** ❌
+ * → 现在有 `data-active="true"` -> **主色底 + 主色图标** -> 一眼能看出 ✅
+ *
+ * → 颜色用 `color-mix` 和主色混一点背景 -> 和 hover 区分得开 ✅
+ */
+.scpdf-rich-text__btn[data-active="true"] {
+  background: var(--scpdf-primary-soft, rgb(47 111 235 / 14%));
+  color: var(--scpdf-primary, #2f6feb);
+}
+
+.scpdf-rich-text__btn[data-active="true"]:hover {
+  background: var(--scpdf-primary-soft, rgb(47 111 235 / 20%));
+  color: var(--scpdf-primary, #2f6feb);
+}
+
+/* 不可用（比如没法撤销了） */
+.scpdf-rich-text__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.scpdf-rich-text__btn:disabled:hover {
+  background: transparent;
+  color: var(--scpdf-text-muted, #6b7280);
+}
+
 .scpdf-rich-text__btn:focus-visible {
   outline: 2px solid var(--scpdf-primary, #2f6feb);
   outline-offset: 1px;

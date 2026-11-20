@@ -124,6 +124,62 @@ export function RichTextEditor(props: RichTextEditorProps) {
   const [empty, setEmpty] = useState(value.length === 0);
 
   /**
+   * ⚠️ **选区变化的计数器**（用来刷新工具栏的按下态）。
+   *
+   * → contenteditable 的选区变化**不会触发 React 重渲染** ❌
+   * → 用户移动光标 / 选中一段文字 -> 工具栏的"按下态"要跟着变 ✅
+   * → 用一个递增的计数器 -> 变了就重渲染 ✅
+   */
+  const [_selectionTick, setSelectionTick] = useState(0);
+
+  /** 选区变化时刷新（`selectionchange` 是全局事件） */
+  useEffect(() => {
+    const onSelectionChange = () => {
+      setSelectionTick((n) => n + 1);
+    };
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', onSelectionChange);
+    };
+  }, []);
+
+  /**
+   * **问浏览器"当前选区是不是这个格式"**。
+   *
+   * → `document.queryCommandState('bold')` -> 内置编辑器（execCommand）能问出结果 ✅
+   * → 浏览器不支持 -> 返回 false（按钮不高亮，不影响使用）✅
+   */
+  const queryCommandActive = useCallback(
+    (command: string): boolean => {
+      /*
+       * ⚠️ **只有部分命令能问状态**。
+       * → `queryCommandState` 只认：bold / italic / underline / strikeThrough /
+       *   insertUnorderedList / insertOrderedList / formatBlock 等
+       * → 问不出来的（颜色、高亮、链接）-> 直接 false ✅
+       */
+      const queryable = new Set([
+        'bold',
+        'italic',
+        'underline',
+        'strikeThrough',
+        'insertUnorderedList',
+        'insertOrderedList',
+        'formatBlock',
+      ]);
+      if (!queryable.has(command)) {
+        return false;
+      }
+      try {
+        return document.queryCommandState(command) === true;
+      } catch {
+        return false;
+      }
+    },
+    // biome-ignore lint/correctness/useExhaustiveDependencies: selectionTick 只是用来触发重算
+    [],
+  );
+
+  /**
    * ⚠️ **只同步一次**（外部 value 变化时）。
    *
    * → contenteditable 是**非受控**的（React 不管它的内容）
@@ -214,6 +270,14 @@ export function RichTextEditor(props: RichTextEditorProps) {
         {items.map((item) => {
           const hasPalette = item.command === 'hiliteColor' || item.command === 'foreColor';
           const paletteOpen = openPalette === item.command;
+          /*
+           * ⚠️ **按下态**（用户需求：
+           * "点了加粗之后 加粗按钮没加深颜色 别的按钮也一样 看不出点击了"）。
+           *
+           * → 内置编辑器用的是 `document.execCommand` -> 用 `queryCommandState` 问浏览器 ✅
+           * → 选区变化时 React 不一定重渲染 -> 用 `onFocus/onBlur` + 一个 tick 强制刷新 ✅
+           */
+          const active = queryCommandActive(item.command);
 
           return (
             <span key={item.command} className="scpdf-rich-text__tool">
@@ -223,6 +287,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
                 title={resolveLabel(item.label)}
                 aria-label={resolveLabel(item.label)}
                 aria-expanded={hasPalette ? paletteOpen : undefined}
+                data-active={active ? 'true' : 'false'}
+                aria-pressed={active}
                 onMouseDown={(event) => {
                   // ⚠️ **阻止默认行为** → 不然编辑区会失焦 → 光标丢失
                   event.preventDefault();
@@ -233,6 +299,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
                     return;
                   }
                   run(item.command);
+                  // 命令执行后选区格式变了 -> 刷新按下态
+                  setSelectionTick((n) => n + 1);
                 }}
               >
                 {item.icon ? (

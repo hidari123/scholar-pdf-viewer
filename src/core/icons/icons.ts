@@ -88,6 +88,11 @@ export type IconName =
   | 'bold'
   | 'italic'
   | 'underline'
+  | 'strike'
+  | 'quote'
+  | 'clearFormat'
+  | 'undo'
+  | 'redo'
   | 'textColor'
   | 'list'
   | 'listOrdered'
@@ -499,6 +504,33 @@ export function getIconShape(name: IconName): IconShape | null {
     case 'underline':
       return {
         paths: ['M6 4v7a6 6 0 0 0 12 0V4', 'M4 20h16'],
+      };
+    case 'strike':
+      // 删除线："S" + 中间一条横线
+      return {
+        paths: ['M16 5.5A4.5 4.5 0 0 0 12.4 4C10 4 8 5.4 8 7.5c0 2 1.6 3 4 3.6'],
+        lines: [{ x1: 4, y1: 12, x2: 20, y2: 12 }],
+      };
+    case 'quote':
+      // 引用：两个引号
+      return {
+        paths: ['M7 7h4v5a4 4 0 0 1-4 4z', 'M15 7h4v5a4 4 0 0 1-4 4z'],
+      };
+    case 'clearFormat':
+      // 清除格式："A" + 斜杠（像 Photoshop 的橡皮擦）
+      return {
+        paths: ['M8 17 12 5l4 12', 'M9.5 13h5'],
+        lines: [{ x1: 4, y1: 20, x2: 20, y2: 20 }],
+      };
+    case 'undo':
+      // 撤销：左转箭头（带回转的横线）
+      return {
+        paths: ['M9 14 4 9l5-5', 'M4 9h9a6 6 0 0 1 0 12h-3'],
+      };
+    case 'redo':
+      // 重做：右转箭头（带回转的横线）
+      return {
+        paths: ['M15 14l5-5-5-5', 'M20 9h-9a6 6 0 0 0 0 12h3'],
       };
     case 'textColor':
       // "A" + 下划线
