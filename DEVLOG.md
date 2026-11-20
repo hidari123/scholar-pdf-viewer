@@ -3821,3 +3821,137 @@ zoom 加在 .scpdf-pages 上:
 - `pnpm test` -> **603 passed**（48 files）
 - `pnpm verify` -> **8/8 全绿**
 - E2E -> **534/534**（46 个套件，0 失败）
+
+---
+
+# 第 22 轮（整体审计：功能 / 逻辑 / 测试 / 宿主接口 / 回归）
+
+## 目标
+
+> "建个目标整体检查一下项目功能是否完善 逻辑是否清晰 测试是否完整是否覆盖边界
+>  宿主接口是否完整规范是否易用是否可读性强 然后完全测试回归至少三次 功能交互也要完整检查"
+
+## 审计方式
+
+**两个并行子代理**（只读审计）：
+- 一个查**宿主接口**（完整性 / 一致性 / 易用性 / 可读性 / 可测性）
+- 一个查**测试覆盖**（逐文件清单 + 边界用例 + E2E 盲区）
+
+我自己同时查了 **React 陷阱**（`setState(fn)` / deps 里的对象字面量 / 组件 memo 状态）和**文档与实现的一致性**。
+
+## 找到并修掉的问题（8 个 commit）
+
+### ① `initialPage` 根本不跳转（**真 bug**）
+
+-> 只用来初始化 state，**没有任何地方调 `scrollToPage`** ❌
+-> **页码显示 5、视口停在第 1 页** ❌
+-> 宿主最常见的用法（"打开到我上次读到的地方"）**直接失效** ❌
+
+**修**：等页尺寸算出来 -> 跳一次（ref 记住）-> 换文档重跳 ✅
+**顺带**：换文档后初始缩放也重新适配（之前 ref 永远不重置）✅
+
+### ② `PdfViewerHandle` 缺方法（**文档写了但不存在**）
+
+-> JSDoc 示例写着 `viewerRef.current?.zoomIn()` ❌
+-> README 写着"宿主自己接 `viewerRef`（`zoomIn` / `zoomOut` / `print`）" ❌
+-> **handle 里根本没有这些方法** -> 宿主照做 -> **点按钮没反应** ❌
+
+**修**：handle 补齐到 **11 个方法**（+ `zoomIn` / `zoomOut` / `fitWidth` / `fitPage` / `print`）✅
+
+### ③ 死配置
+
+| 配置                                    | 问题                                                          |
+| --------------------------------------- | ------------------------------------------------------------- |
+| `defaultHighlightColor`                 | 全仓库**只有声明那一处** -> 写了**完全没效果** ❌ -> **删掉** |
+| `config.toolbar.showPrint`              | `ToolbarConfig` **根本没这个字段** -> 写了没用 ❌ -> **删掉** |
+| `config.toolbar` 是**另一份匿名字面量** | 和 `ToolbarConfig` 字段不一致 ❌ -> **统一成一份**            |
+
+-> `ToolbarConfig` **搬到 `core/theme`** -> `core/config` 才不用**反向依赖 components** ✅
+
+### ④ `config.features` 是 `Record<string, boolean>`
+
+-> 任何 key 都能写 -> **拼错也编译通过**（`serach` / `featuers`）❌
+-> 拼错了**静默无效** -> 宿主以为关掉了搜索，其实没关 ❌
+
+**修**：`Features` 搬到 `core/config` + `features?: Partial<Features>` -> **拼错直接编译报错** ✅
+
+### ⑤ XSS 漏洞：`sanitizeRichText` 的 style 过滤
+
+```
+background-color:url(javascript:alert(1))  →  能通过清洗 ❌
+```
+
+-> 值组 `[^;]+` **把 `url(...)` 一起吞掉** ❌
+-> 批注 HTML 会存到宿主后端 -> **真实的攻击面** ❌
+
+**修**：新增 `isPlainColor()` -> **只认纯颜色**（含 `url(` / `expression(` / `\` / `/*` 一律丢掉整个 style）✅
+
+### ⑥ `PdfViewerError.retryable`（文档写了但字段不存在）
+
+-> 宿主写 `error.retryable` -> **永远 undefined**（falsy）❌
+-> 宿主以为"不可重试" -> **不给用户重试按钮** ❌
+
+**修**：字段真的加上 + **UI 也用上了**（只有可重试的错误才显示「重试」）✅
+
+### ⑦ 宿主接口的类型安全
+
+| 问题                                                         | 修法                                                                                               |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `SelectionActionContext.position: unknown`                   | -> `NormPosition`（拼错字段名**直接报错**）✅                                                      |
+| `event` 必填但实际传 `undefined as never`                    | -> **可选**；宿主 `ctx.event.preventDefault()` 不再崩 ✅                                           |
+| `core` 引用 `React.MouseEvent`                               | -> 自定义 `PointerEventLike`（**core 彻底不碰 React**）✅                                          |
+| `SelectionActionIcon` 有 `'delete'`、`IconName` 有 `'trash'` | -> 统一成 `'trash'`；`SelectionActionIcon` 改成 `Extract<IconName, ...>`（**类型上保证是子集**）✅ |
+| `RichTextToolbarItem.icon: string`                           | -> `IconName`（拼错**编译报错**，不再渲染成空白图标）✅                                            |
+
+### ⑧ 打印的无限 rAF + 下载的内存泄漏
+
+-> 打印：宿主给的 `pageCount` 永远对不上 -> **无限递归 rAF**（CPU 100%）❌ -> 加**上限 60 帧** ✅
+-> 下载：`anchor.click()` 抛错 -> **`revokeObjectURL` 永远不调** -> Blob **永久占内存** ❌ -> **try/finally** ✅
+
+## 测试补强
+
+| 新增                                       | 条数 | 为什么                                   |
+| ------------------------------------------ | ---- | ---------------------------------------- |
+| `src/core/errors.test.ts`                  | 10   | 12 个错误码 + `retryable` 从来没被断言过 |
+| `src/core/editor/rich-text.test.tsx`       | 21   | **XSS 防线**（包的根导出）+ 工具栏默认值 |
+| `src/core/document/download.test.ts`       | 9    | 公开 API + 内存泄漏                      |
+| `src/core/selection/item-geometry.test.ts` | 15   | 147 行零测试；还**没导出**给宿主         |
+| `src/components/PasswordDialog.test.tsx`   | 10   | 加密文档唯一入口；含"清空密码"的安全要求 |
+| `scripts/e2e-keyboard.mjs`                 | 11   | **键盘导航零覆盖**（可达性）             |
+| `scripts/e2e-audit-fixes.mjs`              | 5    | `initialPage` + handle 方法              |
+
+## 覆盖率（以前**根本没有工具**）
+
+```
+All files | 51.35% lines | 46.53% functions | 41.96% branches
+```
+
+-> 加了 `@vitest/coverage-v8` + `vitest.config.ts` 的 `coverage` 段 ✅
+-> **加了下限**（卡得很紧：只留 0.5~1.5 个点）-> 覆盖率掉下去 **CI 直接红** ✅
+-> `pnpm verify` 从 8 个 gate 变成 **9 个**（多了 `coverage`）✅
+
+## 回归（**连续 3 次全绿**）
+
+```
+第 1 次：545/545  0 套件失败
+第 2 次：545/545  0 套件失败
+第 3 次：545/545  0 套件失败
+```
+
+（期间撞到 **1 次偶发失败** -> 重跑 3 次全绿 -> 是**已有的 flaky**，不是这次改的）
+
+## 第 22 轮总验证
+
+- `pnpm verify` -> **9/9 全绿**（含覆盖率门禁）
+- `pnpm test` -> **668 passed**（53 files）
+- E2E -> **545/545**（47 个套件，**连续 3 次**）
+- 覆盖率 -> **51.35% lines / 46.53% functions / 41.96% branches**
+
+## 还没修的（已记录，下轮）
+
+- **Ctrl+滚轮缩放**：`useZoom.ts` 的注释写了"Ctrl+滚轮"，但**代码里根本没有 wheel 监听** ❌
+- **拖放文件**：全仓库 **0 个 drop 监听** -> 这个功能**根本不存在** ❌
+- **RTL**：没有任何 `dir` 支持 -> 阿拉伯语/希伯来语宿主**没法用** ❌
+- **`config` 覆盖的 prop 不到一半** -> 宿主做不出一套完整的"暗色预设" ⚠️
+- **`PdfViewer.tsx` 4254 行**（33 个 `useCallback` + 16 个 `useEffect`）-> 可读性偏重 ⚠️
+- **打印纸张写死 A4** -> 美洲市场要用 Letter 的话宿主只能自己 `window.print()` ❌
