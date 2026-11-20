@@ -10,7 +10,7 @@
  * 2. 预览里的内容是**富文本**（`<p>` 渲染成段落，不是显示标签）
  * 3. hover 时出现**编辑 / 展开**按钮
  * 4. **鼠标移到内容框上 → 框不消失**（用户反馈的核心问题）
- * 5. 点"编辑" → 打开批注面板
+ * 5. 点"编辑" → 打开**锚点弹窗**（有「保存」按钮）
  */
 
 import { existsSync, readdirSync } from 'node:fs';
@@ -152,17 +152,33 @@ try {
       );
     }
 
-    // ③ 点"编辑" → 打开批注面板
+    /*
+     * ③ 点"编辑" → **打开锚点弹窗**（不是右侧面板）
+     *
+     * ⚠️ **行为改过了**（用户需求：
+     * "富文本编辑完之后没有保存按钮啊 保存都保存不了
+     *  而且 富文本点了编辑 怎么富文本编辑框还在文档最上面啊
+     *  要出现在视野里啊 就点的旁边"）
+     * -> 之前打开的是**右侧便利贴面板**（离批注很远、没有保存按钮）❌
+     * -> 现在打开**锚点弹窗**（贴在批注旁边、有保存按钮）✅
+     */
     const editBtn = page.locator('.scpdf-sticky-note__action[aria-label="编辑批注"]');
     if ((await editBtn.count()) > 0) {
       await editBtn.click({ force: true });
       await page.waitForTimeout(1200);
-      const panelOpen = await page.evaluate(
-        () => !!document.querySelector('.scpdf-annotation-panel'),
-      );
-      check('**点"编辑" → 打开批注面板**', panelOpen);
+      const editState = await page.evaluate(() => {
+        const d = document.querySelector('.scpdf-annotation-dialog');
+        return {
+          dialogOpen: !!d,
+          hasSave: d
+            ? [...d.querySelectorAll('button')].some((b) => (b.textContent ?? '').trim() === '保存')
+            : false,
+        };
+      });
+      check('**点"编辑" → 打开锚点弹窗**', editState.dialogOpen);
+      check('**弹窗里有「保存」按钮**', editState.hasSave);
     } else {
-      check('**点"编辑" → 打开批注面板**', false, '找不到编辑按钮');
+      check('**点"编辑" → 打开锚点弹窗**', false, '找不到编辑按钮');
     }
   }
 
