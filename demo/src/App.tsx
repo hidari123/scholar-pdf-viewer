@@ -72,6 +72,17 @@ export default function App() {
    */
   const viewerRef = useRef<PdfViewerHandle>(null);
 
+  /*
+   * ⚠️ **把 handle 挂到 window 上**（E2E 要用；宿主调试也方便）。
+   *
+   * -> 审计新增了 `zoomIn` / `zoomOut` / `fitWidth` / `fitPage` / `print` ->
+   *    需要能**从外面验证它们真的能用** ✅
+   */
+  useEffect(() => {
+    // @ts-expect-error 调试用的全局句柄
+    window.__scpdfViewer = viewerRef;
+  }, []);
+
   /**
    * **当前文档 id**（高亮按文档隔离的 key）。
    *

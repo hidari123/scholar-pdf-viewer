@@ -190,6 +190,29 @@ export interface PdfViewerHandle {
   getPageSizesPt: () => { width: number; height: number }[];
   /** 跳到某页 */
   goToPage: (page: number) => void;
+  /**
+   * **放大**（和工具栏的"+"一样）。
+   *
+   * ⚠️ **宿主替换了内置工具栏（`slots.toolbar`）时靠它驱动缩放** ✅
+   *    （之前文档写了但方法**根本不存在** -> 宿主照做点按钮没反应 ❌）
+   */
+  zoomIn: () => void;
+  /** **缩小**（和工具栏的"-"一样） */
+  zoomOut: () => void;
+  /**
+   * **适配宽度**（和工具栏的"适应宽度"一样）。
+   *
+   * -> 页的**左右留白**由包处理 ✅
+   */
+  fitWidth: () => void;
+  /** **适配整页**（整页完整可见） */
+  fitPage: () => void;
+  /**
+   * **打印**（和工具栏的"打印"一样）。
+   *
+   * -> 走包内置的 \`@media print\` 样式（高亮保留 / 只打原 PDF 由 \`printMode\` 决定）✅
+   */
+  print: () => void;
 }
 
 /** PdfViewer props */
@@ -1223,6 +1246,44 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     },
   });
 
+  /*
+   * ⚠️⚠️ **`initialPage` 必须真的跳过去**（审计发现的真 bug）。
+   *
+   * ### 问题
+   *
+   * -> 之前 \`initialPage\` **只用来初始化 state**（\`useState(initialPage)\`）❌
+   *   -> **没有任何地方调 \`scrollToPage(initialPage)\`** ❌
+   *   -> 结果：**页码显示 5，但视口停在第 1 页** ❌
+   *   -> 然后 \`useCurrentPage\` 的滚动监听**把 state 改回 1** ❌
+   *   -> 宿主最常见的用法（"打开到我上次读到的地方"）**直接失效** ❌
+   *
+   * ### 修法
+   *
+   * -> 等**页尺寸算出来**（\`pageTops\` 有内容）-> 跳到 \`initialPage\` ✅
+   * -> **只跳一次**（用 ref 记住）-> 用户自己翻页后不会被拉回去 ✅
+   * -> 换文档（\`documentId\` 变了）-> **重新跳一次** ✅
+   */
+  const initialPageAppliedRef = useRef<string | null>(null);
+  useEffect(() => {
+    // 页尺寸还没算出来 -> 等
+    if (numPages <= 0 || pageTops.length <= 1) {
+      return;
+    }
+    // 同一份文档只跳一次
+    const key = documentId ?? 'default';
+    if (initialPageAppliedRef.current === key) {
+      return;
+    }
+    if (initialPage <= 1) {
+      // 第 1 页不用跳（但要记住 -> 换文档时也别再跳）
+      initialPageAppliedRef.current = key;
+      return;
+    }
+    initialPageAppliedRef.current = key;
+    // ⚠️ **不用平滑** -> 初次打开要"立刻到"（平滑滚几千像素要好几秒）✅
+    scrollToPage(initialPage, { smooth: false });
+  }, [numPages, pageTops, initialPage, documentId, scrollToPage]);
+
   /**
    * **缩放后保持选区**。
    *
@@ -1334,9 +1395,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    */
   const initialScaleAppliedRef = useRef(false);
 
+  /*
+   * ⚠️⚠️ **换文档 -> 初始缩放要重新算**（审计发现的 bug）。
+   *
+   * -> 之前 ref **永远不重置** ❌
+   *   -> 换一份文档 -> 还是**上次的缩放**（可能大到看不见内容）❌
+   * -> 现在：**按 \`documentId\` 记住** -> 换文档就重新适配 ✅
+   */
+  const initialScaleDocRef = useRef<string | null>(null);
+
   useEffect(() => {
     // 只在 initialScale === 'width' 时做适配宽度；数字初始值直接用
-    if (initialScale !== 'width' || initialScaleAppliedRef.current) {
+    if (initialScale !== 'width') {
       return;
     }
     const container = containerRef.current;
@@ -1344,14 +1414,25 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       return;
     }
 
+    /*
+     * ⚠️ **换文档 -> 重新适配**（按 \`documentId\` 区分）✅
+     *
+     * -> 没有 \`documentId\` 时用 \`'default'\` -> 同一份文档只适配一次 ✅
+     */
+    const key = documentId ?? 'default';
+    if (initialScaleDocRef.current === key) {
+      return;
+    }
+    initialScaleDocRef.current = key;
     initialScaleAppliedRef.current = true;
+
     const pt = pageSizesPt[0] ?? { width: PAGE_WIDTH_PT, height: PAGE_HEIGHT_PT };
     /*
      * ⚠️ **也传高度** -> 初始就整页完整可见（下面不会有滚动条）
      *   （用户反馈："目前fitWidth的时候下面还会出现滚动条"）
      */
     zoom.fitWidth(container.clientWidth, pt.width, container.clientHeight, pt.height);
-  }, [initialScale, numPages, pageSizesPt, zoom]);
+  }, [initialScale, numPages, pageSizesPt, zoom, documentId]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -2171,6 +2252,53 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       getNumPages: () => numPages,
       getPageSizesPt: () => pageSizesPt.map((size) => ({ ...size })),
       goToPage: (target: number) => scrollToPage(target),
+      /*
+       * ⚠️⚠️ **缩放 / 打印**（审计发现的 bug：文档写了但**根本不存在**）。
+       *
+       * ### 问题
+       *
+       * -> \`PdfViewer.tsx\` 的 JSDoc 示例写着：
+       *    \`toolbar: <MyToolbar onZoomIn={() => viewerRef.current?.zoomIn()} />\`
+       * -> README 也写着"宿主自己接 \`viewerRef\`（\`zoomIn\` / \`zoomOut\` / \`print\` …）"
+       * -> **但 handle 里根本没有这些方法** ❌
+       *   -> 宿主照着文档写 -> \`viewerRef.current?.zoomIn()\` -> **undefined** ❌
+       *   -> 点自己的"放大"按钮 -> **什么都不会发生** ❌
+       *
+       * ### 修法
+       *
+       * -> 把这些方法**真的加到 handle 上** ✅
+       * -> 宿主替换了内置工具栏（\`slots.toolbar\`）-> **靠这个驱动缩放/打印** ✅
+       */
+      zoomIn: () => zoom.zoomIn(),
+      zoomOut: () => zoom.zoomOut(),
+      /**
+       * **适配宽度**（和工具栏的"适应宽度"一样）。
+       *
+       * -> 宿主替换了工具栏 -> 靠它实现"适应宽度"按钮 ✅
+       */
+      fitWidth: () => {
+        const container = containerRef.current;
+        const pt = pageSizesPt[0] ?? { width: PAGE_WIDTH_PT, height: PAGE_HEIGHT_PT };
+        zoom.fitWidth(
+          container?.clientWidth ?? 0,
+          pt.width,
+          container?.clientHeight ?? 0,
+          pt.height,
+        );
+      },
+      /** **适配整页**（整页完整可见） */
+      fitPage: () => {
+        const container = containerRef.current;
+        const pt = pageSizesPt[0] ?? { width: PAGE_WIDTH_PT, height: PAGE_HEIGHT_PT };
+        zoom.fitPage(
+          container?.clientWidth ?? 0,
+          container?.clientHeight ?? 0,
+          pt.width,
+          pt.height,
+        );
+      },
+      /** **打印**（和工具栏的"打印"按钮一样） */
+      print: () => printDocument(),
     }),
     [
       textSelection,
@@ -2181,6 +2309,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       onHighlightCreated,
       onHighlightCreate,
       clearSelectionAfterHighlight,
+      zoom,
+      printDocument,
     ],
   );
 
