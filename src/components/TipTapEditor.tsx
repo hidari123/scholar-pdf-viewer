@@ -190,7 +190,6 @@ export function TipTapEditor(props: TipTapEditorProps) {
      *   （实测：打字后 ProseMirror 里还是空的）
      * → 内容的同步交给下面那个 effect ✅
      */
-    // biome-ignore lint/correctness/useExhaustiveDependencies: 只在挂载时加载一次
   }, [value]);
 
   // 外部内容变化 → 同步到编辑器

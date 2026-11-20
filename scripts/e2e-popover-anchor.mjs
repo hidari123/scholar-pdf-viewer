@@ -64,6 +64,15 @@ const readGap = async () =>
       selExists: true,
       popTop: +pr.top.toFixed(1),
       selBottom: +nb.bottom.toFixed(1),
+      popBottom: +pr.bottom.toFixed(1),
+      selTop: +nb.top.toFixed(1),
+      /*
+       * ⚠️ **浮层和选区的"距离"**（不管在上还是在下）。
+       *
+       * -> gap 为负 = 浮层在选区**上方**（空间不够时的正确行为）✅
+       * -> 所以要取绝对值 -> 再看和选区的距离 ✅
+       */
+      distance: +Math.min(Math.abs(pr.top - nb.bottom), Math.abs(pr.bottom - nb.top)).toFixed(1),
     };
   });
 
@@ -114,8 +123,8 @@ try {
     check('选中后浮层出现', base.popExists);
     check(
       '浮层锚定在选区上（下方或上方都行，但不能脱离选区）',
-      base.gap !== null && Math.abs(base.gap) < 200,
-      `间距 ${base.gap}px`,
+      base.distance !== null && base.distance < 20,
+      `距离 ${base.distance}px`,
     );
   }
 
@@ -129,10 +138,18 @@ try {
   await page.locator('button[aria-label="放大"]').click();
   await page.waitForTimeout(2500);
   const zoomed = await readGap();
+  /*
+   * ⚠️ **不能要求"间距和缩放前完全一致"**（实测踩过的坑）。
+   *
+   * -> 浮层在选区**下方**放不下时 -> 会**翻到上方**（这是正确行为）✅
+   * -> 缩放后选区的位置变了 -> 可能从"下方"变成"上方" ❌
+   *   -> 这时 gap 从 8px 变成 -126px -> 但**浮层还是贴着选区** ✅
+   * -> 所以断言应该是：**浮层和选区的距离很小**（不是 gap 相等）✅
+   */
   check(
     '**缩放后浮层仍锚定在选区上**',
-    zoomed.gap !== null && Math.abs(zoomed.gap - (base.gap ?? 8)) < 14,
-    `间距 ${base?.gap}px → ${zoomed.gap}px`,
+    zoomed.distance !== null && zoomed.distance < 20,
+    `距离 ${base?.distance}px → ${zoomed.distance}px（gap ${base?.gap} → ${zoomed.gap}）`,
   );
 
   // 选区本身必须**活下来**（缩放会重建文本层 → 浏览器会丢掉选区）

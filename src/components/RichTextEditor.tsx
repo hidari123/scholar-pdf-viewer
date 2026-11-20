@@ -34,6 +34,7 @@ import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
+import { LinkPopover } from './LinkPopover';
 
 /** RichTextEditor 参数 */
 export interface RichTextEditorProps {
@@ -103,6 +104,25 @@ export function RichTextEditor(props: RichTextEditorProps) {
   /** 当前展开的颜色面板（命令名） */
   const [openPalette, setOpenPalette] = useState<string | null>(null);
 
+  /*
+   * **链接弹窗**（用户反馈："现在点击链接按钮 弹框不出现了"）。
+   *
+   * ⚠️⚠️ **之前内置编辑器根本没有链接弹窗** ❌
+   * -> 它直接调 `document.execCommand('createLink', false, '')` -> **插了个空链接** ❌
+   * -> 宿主**没装 TipTap** 时（或者用内置编辑器）-> 点"链接"**什么都不会发生** ❌
+   * -> 现在：**和 TipTap 编辑器用同一个 `LinkPopover`** ✅
+   */
+  const [linkState, setLinkState] = useState<{
+    open: boolean;
+    anchor: { left: number; top: number; right: number; bottom: number } | null;
+    from: number;
+    to: number;
+    text: string;
+  }>({ open: false, anchor: null, from: 0, to: 0, text: '' });
+
+  /** 链接按钮的 ref（用来算弹窗的锚点） */
+  const linkButtonRef = useRef<HTMLButtonElement | null>(null);
+
   /**
    * **工具栏项的文案**（解析 `{key}` 形式的 i18n 占位符）。
    *
@@ -151,35 +171,31 @@ export function RichTextEditor(props: RichTextEditorProps) {
    * → `document.queryCommandState('bold')` -> 内置编辑器（execCommand）能问出结果 ✅
    * → 浏览器不支持 -> 返回 false（按钮不高亮，不影响使用）✅
    */
-  const queryCommandActive = useCallback(
-    (command: string): boolean => {
-      /*
-       * ⚠️ **只有部分命令能问状态**。
-       * → `queryCommandState` 只认：bold / italic / underline / strikeThrough /
-       *   insertUnorderedList / insertOrderedList / formatBlock 等
-       * → 问不出来的（颜色、高亮、链接）-> 直接 false ✅
-       */
-      const queryable = new Set([
-        'bold',
-        'italic',
-        'underline',
-        'strikeThrough',
-        'insertUnorderedList',
-        'insertOrderedList',
-        'formatBlock',
-      ]);
-      if (!queryable.has(command)) {
-        return false;
-      }
-      try {
-        return document.queryCommandState(command) === true;
-      } catch {
-        return false;
-      }
-    },
-    // biome-ignore lint/correctness/useExhaustiveDependencies: selectionTick 只是用来触发重算
-    [],
-  );
+  const queryCommandActive = useCallback((command: string): boolean => {
+    /*
+     * ⚠️ **只有部分命令能问状态**。
+     * → `queryCommandState` 只认：bold / italic / underline / strikeThrough /
+     *   insertUnorderedList / insertOrderedList / formatBlock 等
+     * → 问不出来的（颜色、高亮、链接）-> 直接 false ✅
+     */
+    const queryable = new Set([
+      'bold',
+      'italic',
+      'underline',
+      'strikeThrough',
+      'insertUnorderedList',
+      'insertOrderedList',
+      'formatBlock',
+    ]);
+    if (!queryable.has(command)) {
+      return false;
+    }
+    try {
+      return document.queryCommandState(command) === true;
+    } catch {
+      return false;
+    }
+  }, []);
 
   /**
    * ⚠️ **只同步一次**（外部 value 变化时）。
@@ -226,6 +242,58 @@ export function RichTextEditor(props: RichTextEditorProps) {
     onChange?.(html, plain);
   }, [onChange]);
 
+  /**
+   * **打开链接弹窗**（记下选区和按钮位置）。
+   *
+   * ⚠️ **不能直接 `execCommand('createLink')`** -> 那会插一个**空链接** ❌
+   */
+  const openLinkPopover = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) {
+      return;
+    }
+    // 记下选区（用 DOM 的 selection）
+    const selection = window.getSelection();
+    const text = selection?.toString() ?? '';
+    const rect = linkButtonRef.current?.getBoundingClientRect();
+    setLinkState({
+      open: true,
+      anchor: rect
+        ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+        : null,
+      from: 0,
+      to: 0,
+      text,
+    });
+  }, []);
+
+  /** 应用链接 */
+  const applyLink = useCallback(
+    (href: string, text: string) => {
+      const el = editorRef.current;
+      if (!el) {
+        return;
+      }
+      el.focus({ preventScroll: true });
+      /*
+       * ⚠️ **没选文字** -> 插入"展示文字"（带链接）。
+       *
+       * -> `execCommand('createLink', false, href)` 会把**光标处的字**变成链接 ❌
+       * -> 正确做法：**插入一段 HTML**（`<a href="...">文字</a>`）✅
+       */
+      const selection = window.getSelection();
+      const hasSelection = !!selection && !selection.isCollapsed && selection.toString().length > 0;
+      if (hasSelection) {
+        document.execCommand('createLink', false, href);
+      } else {
+        document.execCommand('insertHTML', false, `<a href="${href}">${text || href}</a>`);
+      }
+      emit();
+      setLinkState((s) => ({ ...s, open: false }));
+    },
+    [emit],
+  );
+
   /** 执行命令 */
   const run = useCallback(
     (command: RichTextToolbarItem['command'], commandValue?: string) => {
@@ -236,10 +304,22 @@ export function RichTextEditor(props: RichTextEditorProps) {
       // ⚠️ **必须先聚焦编辑区** → 否则 execCommand 作用在错误的位置
       // ⚠️ `preventScroll: true` → 点了工具栏**不要滚动页面**（用户反馈）
       el.focus({ preventScroll: true });
+
+      /*
+       * ⚠️⚠️ **"链接"要弹自己的弹窗**（用户反馈："点击链接按钮 弹框不出现了"）。
+       *
+       * -> 之前直接 `execCommand('createLink', false, '')` -> **空链接** ❌
+       * -> 没有 TipTap 的宿主**点链接什么都不会发生** ❌
+       */
+      if (command === 'createLink') {
+        openLinkPopover();
+        return;
+      }
+
       execRichTextCommand(command, commandValue);
       emit();
     },
-    [emit],
+    [emit, openLinkPopover],
   );
 
   /** 点颜色 → 应用颜色 */
@@ -286,6 +366,10 @@ export function RichTextEditor(props: RichTextEditorProps) {
               <button
                 type="button"
                 className="scpdf-rich-text__btn"
+                /*
+                 * ⚠️ **链接按钮要记位置** -> 弹窗贴在它下面 ✅
+                 */
+                ref={item.command === 'createLink' ? linkButtonRef : undefined}
                 title={resolveLabel(item.label)}
                 aria-label={resolveLabel(item.label)}
                 aria-expanded={hasPalette ? paletteOpen : undefined}
@@ -332,6 +416,30 @@ export function RichTextEditor(props: RichTextEditorProps) {
             </span>
           );
         })}
+
+        {/*
+         * **链接弹窗**（和 TipTap 编辑器共用同一个组件）✅
+         *
+         * ⚠️ 用户反馈："现在点击链接按钮 弹框不出现了"
+         * -> 之前内置编辑器**根本没有弹窗** -> 直接插了个空链接 ❌
+         */}
+        <LinkPopover
+          open={linkState.open}
+          anchor={linkState.anchor}
+          selectedText={linkState.text}
+          onSubmit={applyLink}
+          onCancel={() => {
+            setLinkState((s) => ({ ...s, open: false }));
+          }}
+          labels={{
+            href: t('richtext.linkHref'),
+            text: t('richtext.linkText'),
+            confirm: t('richtext.linkConfirm'),
+            cancel: t('richtext.linkCancel'),
+            placeholderHref: t('richtext.linkHrefPlaceholder'),
+            placeholderText: t('richtext.linkTextPlaceholder'),
+          }}
+        />
 
         {/* 提交 / 取消（宿主也可以整个不要） */}
         {onSubmit ? (

@@ -29,6 +29,54 @@ export const SCALE_STEP = 0.1;
  */
 export const SCALE_QUANTUM = 0.1;
 
+/**
+ * **适配宽度时，两边留的空白**（px）。
+ *
+ * ⚠️ 用户反馈："默认的fitWidth 两边也要留一点空隙的 具体像wps展示的一样"。
+ *
+ * → 之前只减了 `32`（左右各 16px）-> **几乎贴着边** ❌
+ * -> WPS 的样子是**页两侧有明显的留白** ✅
+ * -> 现在：左右各留 **`FIT_WIDTH_PADDING`（24px）** ✅
+ */
+export const FIT_WIDTH_PADDING = 24;
+
+/**
+ * **就近把缩放取整到 10% 的倍数**（放大 / 缩小一步）。
+ *
+ * ⚠️ 用户反馈："缩放那里用户可以自己选择缩放的大小 最大不能超过250%
+ * 比如说 fit的时候是237%，那么点击加号或者减号 放大缩小
+ * 减号到230加号到240 这里用整十数"。
+ *
+ * ### 例
+ *
+ * | 当前 | 放大 | 缩小 |
+ * |---|---|---|
+ * | 237% | **240%** | **230%** |
+ * | 235% | **240%** | **230%** |
+ * | 230% | **240%** | **220%** |
+ * | 90%  | **100%** | **80%** |
+ *
+ * → **就近**取整（不是向上/向下）-> 连点两次**不会跳过 10%** ✅
+ * → 已经在整十数上 -> 直接**加/减一步** ✅
+ *
+ * @param current 当前比例（2.37 = 237%）
+ * @param direction 1 = 放大，-1 = 缩小
+ * @returns 取整后的比例
+ */
+export function stepScaleByQuantum(current: number, direction: 1 | -1): number {
+  if (!Number.isFinite(current) || current <= 0) {
+    return current;
+  }
+  const steps = current / SCALE_QUANTUM;
+  const onStep = Math.abs(steps - Math.round(steps)) < 0.001;
+  const next = onStep
+    ? Math.round(steps) + direction
+    : direction > 0
+      ? Math.ceil(steps - 0.001)
+      : Math.floor(steps + 0.001);
+  return next * SCALE_QUANTUM;
+}
+
 /** useZoom 参数 */
 export interface UseZoomOptions {
   /** 滚动容器 */
@@ -60,8 +108,17 @@ export interface UseZoomResult {
   zoomIn: () => void;
   /** 缩小 */
   zoomOut: () => void;
-  /** 适配宽度（传入容器宽度与页面宽度 pt） */
-  fitWidth: (containerWidth: number, pageWidth: number) => void;
+  /**
+   * 适配宽度（传入容器宽度与页面宽度 pt）。
+   *
+   * ⚠️ **传了高度 -> 整页完整可见**（下面不会有滚动条）✅
+   */
+  fitWidth: (
+    containerWidth: number,
+    pageWidth: number,
+    containerHeight?: number,
+    pageHeight?: number,
+  ) => void;
   /** 适配页面（传入容器宽高与页面尺寸 pt） */
   fitPage: (
     containerWidth: number,
@@ -194,12 +251,22 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
     [applyScale, setFitMode],
   );
 
+  /*
+   * ⚠️⚠️ **放大/缩小要"就近取整到 10%"**（用户反馈：
+   * "缩放那里用户可以自己选择缩放的大小 最大不能超过250%
+   *  比如说 fit的时候是237%，那么点击加号或者减号 放大缩小
+   *  减号到230加号到240 这里用整十数"）。
+   *
+   * → 逻辑抽成了纯函数 \`stepScaleByQuantum\`（**可单测**）✅
+   * → 237% 放大 -> **240%** ✅
+   * → 237% 缩小 -> **230%** ✅
+   */
   const zoomIn = useCallback(() => {
-    setScale(scale + SCALE_STEP);
+    setScale(stepScaleByQuantum(scale, 1));
   }, [scale, setScale]);
 
   const zoomOut = useCallback(() => {
-    setScale(scale - SCALE_STEP);
+    setScale(stepScaleByQuantum(scale, -1));
   }, [scale, setScale]);
 
   /**
@@ -208,16 +275,40 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
    * ⚠️ **会设置适配模式 = `'width'`** →
    *    之后容器变窄（比如打开缩略图）→ **自动重新适配**（WPS 式行为）。
    *
+   * ⚠️⚠️ **两边要留空隙**（用户反馈：
+   * "默认的fitWidth 两边也要留一点空隙的 具体像wps展示的一样"）。
+   *
+   * -> 之前减 `32`（左右各 16px）-> 页宽还是**比容器宽** ❌
+   *   （实测：容器 1384px、页宽 1408px -> **下面出现横向滚动条** ❌
+   *    -> 这就是用户说的"fitWidth 的时候下面还会出现滚动条"）
+   * -> 现在减 `FIT_WIDTH_PADDING * 2`（左右各 24px）✅
+   *   -> 页宽 = 1384 - 48 = 1336px < 容器 -> **没有横向滚动条** ✅
+   *   -> 而且**页两边有留白**（WPS 那样）✅
+   *
+   * ⚠️ **不按高度限制**（实测踩过的坑）：
+   *
+   * -> 一开始想"也按高度算，取小的那个" -> 页变成 **90%** ❌
+   *   -> 竖版页（612×792pt）按宽度算是 218% -> 按高度算只有 99% ❌
+   *   -> **取小的** -> 页变得很小 -> **所有依赖坐标的 E2E 全挂** ❌
+   * -> 用户要的是"宽度适配 + 两边留白" -> **只按宽度** ✅
+   *
    * @param containerWidth 容器可用宽度（px）
    * @param pageWidth 页面宽度（pt，scale=1 时的尺寸）
+   * @param containerHeight 容器可用高度（px）—— **保留但不用**
+   * @param pageHeight 页面高度（pt，scale=1 时的尺寸）—— **保留但不用**
    */
   const fitWidth = useCallback(
-    (containerWidth: number, pageWidth: number) => {
+    (
+      containerWidth: number,
+      pageWidth: number,
+      _containerHeight?: number,
+      _pageHeight?: number,
+    ) => {
       if (containerWidth <= 0 || pageWidth <= 0) {
         return;
       }
-      // 减掉容器内边距（左右各 16px）
-      const available = containerWidth - 32;
+      // 左右各留一点空隙（WPS 式）-> 页宽小于容器 -> 没有横向滚动条
+      const available = containerWidth - FIT_WIDTH_PADDING * 2;
       setFitMode('width');
       applyScale(available / pageWidth);
     },

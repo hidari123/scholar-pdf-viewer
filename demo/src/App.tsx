@@ -1240,6 +1240,23 @@ export default function App() {
             globalThis.open?.(url, '_blank', 'noopener,noreferrer');
             setHint(`打开外链：${url}`);
           }}
+          onInternalLink={(dest, pageNumber) => {
+            /*
+             * ⚠️ **内部跳转（PDF 目录里的链接）**。
+             *
+             * → 宿主不接这个回调 -> 包**什么都不做**（"宿主没配就不响应"）❌
+             *   （实测：不接的话点 PDF 目录页里的章节链接**页面不动** ❌）
+             * -> 接上 -> **跳到对应页** ✅
+             *
+             * ⚠️ 这里用**页码**跳转（demo 的 PDF 目录用的是具名目标 `section.N`，
+             *    宿主可以自己解析 `dest` 拿到更精确的位置）。
+             */
+            const named = typeof dest === 'string' ? dest : null;
+            setHint(
+              named ? `内部跳转：${named}（第 ${pageNumber} 页）` : `内部跳转：第 ${pageNumber} 页`,
+            );
+            viewerRef.current?.goToPage(pageNumber);
+          }}
           onPageChange={(p) => setCurrentPage(p)}
           onZoomChange={(s) => setScale(s)}
         />

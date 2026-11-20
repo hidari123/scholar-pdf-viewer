@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { MAX_SCALE, MIN_SCALE, quantizeScale } from './useZoom';
+import {
+  FIT_WIDTH_PADDING,
+  MAX_SCALE,
+  MIN_SCALE,
+  quantizeScale,
+  stepScaleByQuantum,
+} from './useZoom';
 
 describe('quantizeScale', () => {
   it('量化到 10% 的倍数', () => {
@@ -33,5 +39,69 @@ describe('缩放范围', () => {
   it('范围是 10% 的倍数（与量化步长一致）', () => {
     expect(MIN_SCALE * 100).toBe(Math.round(MIN_SCALE * 100));
     expect(MAX_SCALE * 100).toBe(Math.round(MAX_SCALE * 100));
+  });
+});
+
+/**
+ * **就近取整到 10%**（用户反馈：
+ * "缩放那里用户可以自己选择缩放的大小 最大不能超过250%
+ *  比如说 fit的时候是237%，那么点击加号或者减号 放大缩小
+ *  减号到230加号到240 这里用整十数"）。
+ */
+describe('stepScaleByQuantum（就近取整到 10%）', () => {
+  it('237% 放大 -> 240%（用户举的例子）', () => {
+    expect(stepScaleByQuantum(2.37, 1)).toBeCloseTo(2.4, 5);
+  });
+
+  it('237% 缩小 -> 230%（用户举的例子）', () => {
+    expect(stepScaleByQuantum(2.37, -1)).toBeCloseTo(2.3, 5);
+  });
+
+  it('235% 放大 -> 240%（就近，不是 250）', () => {
+    expect(stepScaleByQuantum(2.35, 1)).toBeCloseTo(2.4, 5);
+  });
+
+  it('235% 缩小 -> 230%（就近，不是 220）', () => {
+    expect(stepScaleByQuantum(2.35, -1)).toBeCloseTo(2.3, 5);
+  });
+
+  it('已经在整十数上 -> 直接加一步', () => {
+    expect(stepScaleByQuantum(2.3, 1)).toBeCloseTo(2.4, 5);
+    expect(stepScaleByQuantum(2.3, -1)).toBeCloseTo(2.2, 5);
+  });
+
+  it('90% -> 100% / 80%', () => {
+    expect(stepScaleByQuantum(0.9, 1)).toBeCloseTo(1.0, 5);
+    expect(stepScaleByQuantum(0.9, -1)).toBeCloseTo(0.8, 5);
+  });
+
+  it('连点两次不会跳过 10%', () => {
+    // 237% -> 240% -> 250%（而不是 240% -> 260%）
+    const once = stepScaleByQuantum(2.37, 1);
+    const twice = stepScaleByQuantum(once, 1);
+    expect(twice).toBeCloseTo(2.5, 5);
+  });
+
+  it('结果永远是 10% 的倍数', () => {
+    for (const current of [0.37, 0.91, 1.03, 1.07, 2.37, 2.44, 2.46, 2.5]) {
+      for (const direction of [1, -1] as const) {
+        const next = stepScaleByQuantum(current, direction);
+        const percent = next * 100;
+        expect(Math.abs(percent - Math.round(percent / 10) * 10)).toBeLessThan(0.001);
+      }
+    }
+  });
+
+  it('非法输入原样返回', () => {
+    expect(stepScaleByQuantum(Number.NaN, 1)).toBeNaN();
+    expect(stepScaleByQuantum(0, 1)).toBe(0);
+    expect(stepScaleByQuantum(-1, 1)).toBe(-1);
+  });
+});
+
+describe('fitWidth 的留白', () => {
+  it('两边都要留空隙（用户反馈："两边也要留一点空隙的"）', () => {
+    // 至少 20px -> 看起来像 WPS 那样有留白
+    expect(FIT_WIDTH_PADDING).toBeGreaterThanOrEqual(20);
   });
 });

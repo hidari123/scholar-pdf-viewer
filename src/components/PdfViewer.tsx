@@ -1346,7 +1346,11 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
     initialScaleAppliedRef.current = true;
     const pt = pageSizesPt[0] ?? { width: PAGE_WIDTH_PT, height: PAGE_HEIGHT_PT };
-    zoom.fitWidth(container.clientWidth, pt.width);
+    /*
+     * ⚠️ **也传高度** -> 初始就整页完整可见（下面不会有滚动条）
+     *   （用户反馈："目前fitWidth的时候下面还会出现滚动条"）
+     */
+    zoom.fitWidth(container.clientWidth, pt.width, container.clientHeight, pt.height);
   }, [initialScale, numPages, pageSizesPt, zoom]);
 
   useEffect(() => {
@@ -1405,7 +1409,12 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       }
 
       if (fitMode === 'width') {
-        zoom.fitWidth(width, pt.width);
+        /*
+         * ⚠️ **也传高度** -> 整页完整可见（下面不会有滚动条）。
+         *
+         * ⚠️ **但高度变化不能触发重适配**（会抖）-> 这里用容器的**当前**高度 ✅
+         */
+        zoom.fitWidth(width, pt.width, height, pt.height);
         return;
       }
       if (fitMode === 'page') {
@@ -1536,6 +1545,42 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     }
     return null;
   }, []);
+
+  /*
+   * ⚠️⚠️ **鼠标移到链接上 -> 光标变成"小手"**（用户反馈：
+   * "光标也还是文字光标 没有变成小手 也不能点击"）。
+   *
+   * ### 为什么不能靠 CSS
+   *
+   * -> 链接层是 \`pointer-events: none\`（**故意的**！见 \`findLinkAtPoint\` 的说明）❌
+   *   -> \`pointer-events: none\` 的元素**永远不会成为 hover 的目标** ❌
+   *   -> 所以 \`.scpdf-link { cursor: pointer }\` **永远不生效** ❌
+   *   （实测：鼠标移到 GitHub 链接上，光标还是 \`text\` ❌）
+   *
+   * ### ⚠️⚠️ **也不能用 React state**（实测踩过的坑）
+   *
+   * -> 用 `setState` 切光标 -> 每次 mousemove 都可能**重渲染** ❌
+   *   -> 重渲染 -> **文本层被重建** -> **正在拖的选区直接没了** ❌
+   *   （实测：`mouse.down` -> `mouse.move` -> 选区为空、浮层不出现 ❌）
+   *   -> **12 个选区相关的 E2E 全部挂掉** ❌
+   *
+   * ### 现在的做法
+   *
+   * -> **直接改 DOM 的 style**（不触发 React 重渲染）✅
+   * -> 只有光标样式变了，DOM 结构没变 -> 文本层不会被重建 ✅
+   * -> 拖选完全不受影响 ✅
+   */
+  const handleContainerMouseMove = useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      const container = event.currentTarget;
+      // ⚠️ **直接改 style** -> 不 setState -> 不会重渲染 -> 不会打断拖选 ✅
+      const cursor = findLinkAtPoint(event.clientX, event.clientY) ? 'pointer' : '';
+      if (container.style.cursor !== cursor) {
+        container.style.cursor = cursor;
+      }
+    },
+    [findLinkAtPoint],
+  );
 
   /**
    * **容器上的链接点击委托**。
@@ -3509,7 +3554,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           onPageChange={(next) => scrollToPage(next)}
           onZoomIn={zoom.zoomIn}
           onZoomOut={zoom.zoomOut}
-          onFitWidth={() => zoom.fitWidth(containerRef.current?.clientWidth ?? 0, PAGE_WIDTH_PT)}
+          onFitWidth={() =>
+            zoom.fitWidth(
+              containerRef.current?.clientWidth ?? 0,
+              PAGE_WIDTH_PT,
+              /*
+               * ⚠️ **也传高度** -> 整页完整可见（下面不会有滚动条）
+               *   （用户反馈："目前fitWidth的时候下面还会出现滚动条"）
+               */
+              containerRef.current?.clientHeight ?? 0,
+              PAGE_HEIGHT_PT,
+            )
+          }
           onFitPage={() =>
             zoom.fitPage(
               containerRef.current?.clientWidth ?? 0,
@@ -3618,9 +3674,31 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
            * `onKeyDown` 满足 a11y 规则（有 click 就要有键盘等价操作）：
            * 链接元素自己已经处理了 Enter/Space，这里只需要不阻断冒泡。
            */
+          onMouseLeave={(event) => {
+            // ⚠️ **直接改 style** -> 不 setState -> 不会重渲染 -> 不会打断拖选 ✅
+            event.currentTarget.style.cursor = '';
+          }}
+          onMouseMove={handleContainerMouseMove}
           onClick={(event) => {
-            handleHighlightContainerClick(event);
+            /*
+             * ⚠️⚠️ **链接要"先"处理**（实测踩过的坑）。
+             *
+             * ### 问题
+             *
+             * → 之前是高亮先处理 -> 点空白处时它调了 `event.stopPropagation()` ❌
+             *   -> **链接的处理被挡住了** -> 点 PDF 里的链接**什么都不会发生** ❌
+             *   （实测：点 `https://github.com/datamllab/AE2.git` -> 页码不变、URL 不变 ❌）
+             *
+             * ### 现在
+             *
+             * -> **先**处理链接：命中链接就 `stopPropagation()` -> 高亮不会被处理 ✅
+             * -> **再**处理高亮 ✅
+             */
             handleContainerClick(event);
+            if (event.defaultPrevented) {
+              return;
+            }
+            handleHighlightContainerClick(event);
           }}
           onKeyDown={(event) => {
             /*
