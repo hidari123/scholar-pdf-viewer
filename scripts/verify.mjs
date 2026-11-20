@@ -15,6 +15,14 @@ const gates = [
   { name: 'lint', args: ['run', 'lint'] },
   { name: 'typecheck', args: ['run', 'typecheck'] },
   { name: 'test', args: ['run', 'test'] },
+  /*
+   * ⚠️ **覆盖率**（审计发现的：以前**根本没有**覆盖率工具）。
+   *
+   * -> 没有它 -> 覆盖率**完全不可见** -> 回归看不见 ❌
+   * -> 现在：**有下限**（`vitest.config.ts` 的 `thresholds`）✅
+   *   -> 覆盖率掉下去 -> **CI 直接红** ✅
+   */
+  { name: 'coverage', args: ['run', 'test:coverage'] },
   { name: 'build', args: ['run', 'build'] },
   { name: 'demo:typecheck', args: ['-C', 'demo', 'run', 'typecheck'] },
   // 发布门禁：包体积 / package.json 规范 / 类型解析

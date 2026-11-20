@@ -13,15 +13,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { downloadFile } from './download';
 
 describe('downloadFile', () => {
-  let createObjectURL: ReturnType<typeof vi.fn>;
-  let revokeObjectURL: ReturnType<typeof vi.fn>;
+  let createObjectURL: (obj: Blob | MediaSource) => string;
+  let revokeObjectURL: (url: string) => void;
 
   beforeEach(() => {
-    createObjectURL = vi.fn(() => 'blob:mock');
-    revokeObjectURL = vi.fn();
-    // @ts-expect-error 测试桩
+    createObjectURL = vi.fn(() => 'blob:mock') as unknown as (obj: Blob | MediaSource) => string;
+    revokeObjectURL = vi.fn() as unknown as (url: string) => void;
     URL.createObjectURL = createObjectURL;
-    // @ts-expect-error 测试桩
     URL.revokeObjectURL = revokeObjectURL;
     vi.useFakeTimers();
   });
@@ -83,7 +81,6 @@ describe('downloadFile', () => {
   it('**mimeType 传给 Blob**', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     let captured: Blob | undefined;
-    // @ts-expect-error 测试桩
     URL.createObjectURL = vi.fn((blob: Blob) => {
       captured = blob;
       return 'blob:mock';
