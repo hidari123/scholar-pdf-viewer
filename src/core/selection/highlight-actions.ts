@@ -146,7 +146,7 @@ export function buildHighlightActions(
   if (options.onHighlightRemove) {
     actions.push({
       key: HIGHLIGHT_ACTION_KEYS.remove,
-      icon: 'delete',
+      icon: 'trash',
       label: HIGHLIGHT_ACTION_LABELS[HIGHLIGHT_ACTION_KEYS.remove],
       group: 'primary',
       order: 40,

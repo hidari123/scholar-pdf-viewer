@@ -10,6 +10,24 @@
  * 宿主没传 `onTranslate` → "翻译"按钮**不显示**（符合"没配就不展示"的要求）。
  */
 
+import type { IconName } from '../icons/icons';
+import type { NormPosition } from '../types';
+
+/**
+ * **一个"像鼠标事件"的东西**（结构化类型）。
+ *
+ * ⚠️ **为什么不用 `React.MouseEvent`**（审计发现的 bug）：
+ * -> \`core\` 的铁律是**零 React 依赖** ❌
+ * -> 但 \`SelectionActionContext.event\` 引用了 \`React.MouseEvent\` ❌
+ *   -> 只靠 React 的 **UMD 全局命名空间**才能编译 ❌
+ *   -> 在 \`isolatedModules\` / 非 UMD 消费者下**会炸** ❌
+ * -> 现在：**自己定义一个结构化类型** -> core 彻底不碰 React ✅
+ */
+export interface PointerEventLike {
+  preventDefault: () => void;
+  stopPropagation: () => void;
+}
+
 /**
  * 内置图标名（纯 SVG，无第三方依赖）。
  *
@@ -17,7 +35,16 @@
  *
  * → 用户反馈"按钮不好看" → 工具栏和选区浮层统一风格 ✅
  */
-export type SelectionActionIcon =
+/**
+ * ⚠️ **必须是 `IconName` 的子集**（审计发现的 bug）。
+ *
+ * -> 之前这里有 `'delete'` -> 但 `IconName` 里叫 `'trash'` ❌
+ *   -> 两套图标词汇 -> 宿主写 `icons={{ delete: <X/> }}` **类型报错** ❌
+ *   -> 运行时靠 `SelectionActionIcons.tsx` 里的 `delete: 'trash'` 映射兜底 ❌
+ * -> 现在：**用 `IconName` 的真名** -> 两边永远一致 ✅
+ */
+export type SelectionActionIcon = Extract<
+  IconName,
   | 'highlight'
   | 'highlightColor'
   | 'copy'
@@ -26,18 +53,34 @@ export type SelectionActionIcon =
   | 'stickyNote'
   | 'ask'
   | 'explain'
-  | 'delete'
+  | 'trash'
   | 'comment'
-  | 'more';
+  | 'more'
+>;
 
 /** 动作回调的上下文 */
 export interface SelectionActionContext {
   /** 选中的文本 */
   text: string;
-  /** 选区的归一化几何（宿主存高亮用） */
-  position: unknown;
-  /** 触发动作的 DOM 事件 */
-  event: React.MouseEvent<HTMLElement>;
+  /**
+   * 选区的归一化几何（宿主存高亮用）。
+   *
+   * ⚠️ **之前是 `unknown`**（审计发现的 bug）：
+   * -> 宿主每次用都要写 \`ctx.position as NormPosition\` -> **到处是强制转换** ❌
+   * -> 拼错了字段名**编译不报错**（因为是 `unknown`）❌
+   * -> 现在：**具体类型** -> 拼错**直接报错** ✅
+   */
+  position: NormPosition;
+  /**
+   * 触发动作的 DOM 事件。
+   *
+   * ⚠️ **之前是必填**（审计发现的 bug）：
+   * -> 但"点高亮块打开浮层"那条路径**根本没有事件** ❌
+   *   -> 调用处写的是 \`event: undefined as never\` ❌
+   *   -> 宿主写 \`ctx.event.preventDefault()\` -> **运行时崩** ❌
+   * -> 现在：**可选** -> 宿主要用就判断一下 ✅
+   */
+  event?: PointerEventLike;
   /**
    * 高亮的颜色 key（语义 key，对应 `highlightPalette`）。
    *
@@ -125,7 +168,7 @@ const BUILTIN_ICONS: ReadonlySet<string> = new Set<SelectionActionIcon>([
   'stickyNote',
   'ask',
   'explain',
-  'delete',
+  'trash',
   'comment',
   'more',
 ]);

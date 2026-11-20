@@ -60,6 +60,7 @@ import type {
   PdfDocInfo,
   SelectionData,
 } from '../core/types';
+import { EMPTY_NORM_POSITION } from '../core/types';
 import { useCurrentPage } from '../hooks/useCurrentPage';
 import { usePdfDocument } from '../hooks/usePdfDocument';
 import { usePrint } from '../hooks/usePrint';
@@ -3094,8 +3095,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       }
       action.onSelect?.({
         text: highlightPopover.text,
-        position: findHighlightPosition(highlightPopover.id) ?? null,
-        event: undefined as never,
+        /*
+         * ⚠️ **这里没有 DOM 事件**（点的是高亮块，不是浮层里的按钮）。
+         *
+         * -> 之前写的是 \`event: undefined as never\` ❌
+         *   -> 类型上骗过编译器 -> 宿主写 \`ctx.event.preventDefault()\` **运行时崩** ❌
+         * -> 现在：**\`event\` 是可选的** -> 不传就是"没有" ✅
+         * -> \`position\` 找不到时用**空对象**而不是 \`null\`（类型是 \`NormPosition\`）✅
+         */
+        position: findHighlightPosition(highlightPopover.id) ?? EMPTY_NORM_POSITION,
       });
       // 换色 / 删除后关闭；复制保留（可能还要连续操作）
       if (

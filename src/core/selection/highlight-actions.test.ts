@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { EMPTY_NORM_POSITION } from '../types';
 import { buildHighlightActions, HIGHLIGHT_ACTION_KEYS } from './highlight-actions';
 
 describe('buildHighlightActions', () => {
@@ -78,7 +79,7 @@ describe('buildHighlightActions', () => {
 
     actions[0]?.onSelect?.({
       text: '文字',
-      position: null,
+      position: EMPTY_NORM_POSITION,
       event: {} as never,
     });
 
@@ -95,7 +96,7 @@ describe('buildHighlightActions', () => {
     });
 
     const remove = actions.find((a) => a.key === HIGHLIGHT_ACTION_KEYS.remove);
-    remove?.onSelect?.({ text: '文字', position: null, event: {} as never });
+    remove?.onSelect?.({ text: '文字', position: EMPTY_NORM_POSITION, event: {} as never });
 
     expect(called).toBe('h123');
   });
@@ -112,7 +113,7 @@ describe('buildHighlightActions', () => {
     const copy = actions.find((a) => a.key === HIGHLIGHT_ACTION_KEYS.copy);
     copy?.onSelect?.({
       text: '要复制的文字',
-      position: null,
+      position: EMPTY_NORM_POSITION,
       event: {} as never,
     });
 

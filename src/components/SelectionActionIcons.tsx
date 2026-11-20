@@ -27,7 +27,7 @@ const ICON_MAP: Record<SelectionActionIcon, IconName> = {
   stickyNote: 'stickyNote',
   ask: 'ask',
   explain: 'explain',
-  delete: 'trash',
+  trash: 'trash',
   comment: 'comment',
   more: 'more',
 };

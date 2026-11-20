@@ -31,6 +31,8 @@
  * → **存什么、存哪、怎么存** → 宿主的事（和批注一样）
  */
 
+import type { IconName } from '../icons/icons';
+
 /** 富文本的**命令**（工具栏的一个按钮） */
 export type RichTextCommand =
   /** 加粗 */
@@ -132,8 +134,15 @@ export interface RichTextToolbarItem {
   command: RichTextCommand;
   /** 提示文案（也用作 aria-label） */
   label: string;
-  /** 图标名（内置图标集） */
-  icon?: string;
+  /**
+   * 图标名（内置图标集）。
+   *
+   * ⚠️ **之前是 `string`**（审计发现的 bug）：
+   * -> 宿主拼错（\`icon: 'bolder'\`）**编译通过** ❌
+   *   -> 渲染出来是**空白图标** ❌（用户看着像"按钮坏了"）
+   * -> 现在：**\`IconName\`** -> 拼错**直接编译报错** ✅
+   */
+  icon?: IconName;
   /** 颜色面板（`hiliteColor` / `foreColor` 用） */
   palette?: RichTextPalette;
   /** 分组（同组的相邻，组间有分隔线） */
