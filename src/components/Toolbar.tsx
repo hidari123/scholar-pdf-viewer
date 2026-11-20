@@ -10,28 +10,22 @@
 
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
+import type { ToolbarConfig } from '../core/theme';
 import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
 
-/** 工具栏配置 */
-export interface ToolbarConfig {
-  /** 显示翻页 */
-  showPageNav?: boolean;
-  /** 显示缩放 */
-  showZoom?: boolean;
-  /** 显示搜索 */
-  showSearch?: boolean;
-  /** 显示缩略图 */
-  showThumbnails?: boolean;
-  /** 显示目录 */
-  showOutline?: boolean;
-  /** 左侧插槽（宿主任意内容） */
-  leftSlot?: ReactNode;
-  /** 右侧插槽（宿主任意内容） */
-  rightSlot?: ReactNode;
-}
+/**
+ * **工具栏配置**。
+ *
+ * ⚠️ **定义在 `core/theme`**（审计修复）：
+ * -> `core/config` 要引用它 -> core **不能反向依赖 components** ❌
+ * -> 现在住在 core -> **两边共用同一份** ✅
+ *
+ * -> 这里**重新导出**，保持对外 API 不变 ✅
+ */
+export type { ToolbarConfig } from '../core/theme';
 
 /** Toolbar 参数 */
 export interface ToolbarProps {

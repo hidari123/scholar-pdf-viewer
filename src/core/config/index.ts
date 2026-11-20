@@ -62,7 +62,7 @@ import type { RichTextPalette, RichTextToolbarItem } from '../editor/rich-text';
 import type { HighlightPalette } from '../highlight/palette';
 import type { IconName } from '../icons/icons';
 import type { SelectionAction } from '../selection/actions';
-import type { PdfViewerAppearance, PdfViewerTheme } from '../theme';
+import type { PdfViewerAppearance, PdfViewerTheme, ToolbarConfig } from '../theme';
 import {
   BUILTIN_ANNOTATION_PALETTE,
   BUILTIN_HIGHLIGHT_PALETTE,
@@ -100,8 +100,6 @@ export interface PdfViewerConfig {
    * → 高亮记录的 `color: 'my-1'` 会渲染成色板里的颜色 ✅
    */
   highlightPalette?: HighlightPalette;
-  /** 高亮块的默认颜色（key） */
-  defaultHighlightColor?: string;
 
   /* —— 语言 —— */
 
@@ -131,19 +129,43 @@ export interface PdfViewerConfig {
 
   /* —— 结构 —— */
 
-  /** 工具栏配置（显示哪些按钮） */
-  toolbar?: {
-    showPageNav?: boolean;
-    showZoom?: boolean;
-    showSearch?: boolean;
-    showThumbnails?: boolean;
-    showOutline?: boolean;
-    showPrint?: boolean;
-    leftSlot?: ReactNode;
-    rightSlot?: ReactNode;
-  };
-  /** 功能开关 */
-  features?: Record<string, boolean>;
+  /**
+   * **工具栏配置**（显示哪些按钮）。
+   *
+   * ⚠️ **用的是和 `Toolbar` 组件**同一个类型**（审计发现的 bug）：
+   * -> 之前这里是一份**匿名对象字面量** -> 和 `ToolbarConfig` **字段不一致** ❌
+   *   -> 里面有 `showPrint`（`ToolbarConfig` 没有）-> **死配置** ❌
+   * -> 现在直接用 `ToolbarConfig` -> **两边永远一致** ✅
+   */
+  toolbar?: ToolbarConfig;
+  /** 功能开关（默认全开；只有显式写 `false` 才关） */
+  features?: Partial<Features>;
+}
+
+/**
+ * **功能开关**（哪些功能开 / 关）。
+ *
+ * ⚠️ **默认全开**（opt-out）——
+ * -> 传 `{ search: false }` -> 关掉搜索 ✅
+ * -> 传 `{}` -> **什么都不关** ✅
+ * -> 只有显式写 `false` 才关 ✅
+ *
+ * ⚠️ **之前这里是 `Record<string, boolean>`**（审计发现的 bug）：
+ * -> 任何 key 都能写 -> **拼错也编译通过**（比如 `serach`）❌
+ * -> 拼错了**静默无效** -> 宿主以为关掉了搜索，其实没关 ❌
+ * -> 现在**用具体的类型** -> 拼错**直接编译报错** ✅
+ */
+export interface Features {
+  /** 搜索 */
+  search?: boolean;
+  /** 缩略图 */
+  thumbnails?: boolean;
+  /** 目录 */
+  outline?: boolean;
+  /** 键盘快捷键 */
+  keyboard?: boolean;
+  /** 打印 */
+  print?: boolean;
 }
 
 /**

@@ -190,6 +190,48 @@ export function richTextToPlain(html: string): string {
 }
 
 /**
+ * **是不是一个"纯颜色值"？**
+ *
+ * ⚠️ 审计发现的**真实漏洞**：
+ * -> 之前的正则 \`([^;]+)\` 会把 \`url(javascript:...)\` 一起吞掉 ❌
+ * -> 所以现在**只认纯颜色** ✅
+ *
+ * 允许：
+ * - \`#rgb\` / \`#rgba\` / \`#rrggbb\` / \`#rrggbbaa\`
+ * - \`rgb(...)\` / \`rgba(...)\`（数字或百分比）
+ * - 常见颜色名（white / black / red …）
+ *
+ * 不允许：
+ * - 任何含 \`url(\` / \`expression(\` / \`\`（转义）/ \`/*\`（注释）的值 ❌
+ *
+ * @param value CSS 值（已 trim）
+ * @returns 是不是安全的纯颜色
+ */
+function isPlainColor(value: string): boolean {
+  const v = value.trim();
+  if (v.length === 0 || v.length > 64) {
+    return false;
+  }
+  // ⚠️ **含这些的一律拒绝**（即使长得像颜色）❌
+  if (/url\s*\(|expression\s*\(|image-set\s*\(|@import|[\\/*]|\(\s*['"]/i.test(v)) {
+    return false;
+  }
+  // 十六进制
+  if (/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v)) {
+    return true;
+  }
+  // rgb / rgba / hsl / hsla（内容只能是数字、百分比、逗号、空格、点号）
+  if (/^(?:rgb|rgba|hsl|hsla)\(\s*[0-9.,%\s]+\)$/i.test(v)) {
+    return true;
+  }
+  // 颜色名（只认字母）
+  if (/^[a-z]{3,30}$/i.test(v)) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * **清洗 HTML**（只保留安全的标签）。
  *
  * ⚠️ 批注内容会存到宿主的后端 → **可能 XSS** → 必须清洗 ✅
@@ -259,11 +301,38 @@ export function sanitizeRichText(html: string): string {
     }
 
     if (tag === 'SPAN' || tag === 'MARK') {
-      // 只保留颜色相关的 style
+      /*
+       * ⚠️⚠️ **只保留颜色相关的 style**（审计发现的**真实漏洞**）。
+       *
+       * ### 之前的漏洞
+       *
+       * ```js
+       * const color = /(^|;)\s*(background-color|color)\s*:\s*([^;]+)/i.exec(style);
+       * ```
+       *
+       * -> 值组 \`[^;]+\` **会把 \`url(...)\` 一起吞掉** ❌
+       * -> \`background-color:url(javascript:alert(1))\` **能通过** ❌
+       *   （实测：清洗后原样保留 -> **XSS** ❌）
+       *
+       * ### 现在的修法
+       *
+       * -> 值里**不允许出现 \`url(\` / \`expression(\` / \`image-set(\`** -> 直接丢掉 ✅
+       * -> 也不允许 \`\\`（CSS 转义）-> 防止 \`\\75 rl(...)\` 这种绕过 ✅
+       * -> 只保留**纯颜色值**（\`#rgb\` / \`#rrggbb\` / \`rgb(...)\` / \`rgba(...)\` / 颜色名）✅
+       */
       const style = el.getAttribute('style') ?? '';
-      const color = /(^|;)\s*(background-color|color)\s*:\s*([^;]+)/i.exec(style);
-      if (color) {
-        el.setAttribute('style', color[0].trim());
+      const match = /(^|;)\s*(background-color|color)\s*:\s*([^;]+)/i.exec(style);
+      if (match) {
+        const value = match[3] ?? '';
+        /*
+         * ⚠️ **危险的值直接丢掉**（不"修补"，直接不要）✅
+         */
+        const dangerous = /url\s*\(|expression\s*\(|image-set\s*\(|@import|\\|\/\*/i.test(value);
+        if (!dangerous && isPlainColor(value)) {
+          el.setAttribute('style', match[0].trim());
+        } else {
+          el.removeAttribute('style');
+        }
       } else {
         el.removeAttribute('style');
       }

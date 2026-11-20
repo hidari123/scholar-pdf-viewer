@@ -23,6 +23,8 @@
  * - `contrast` 高对比度（无障碍）
  * - `minimal` 极简黑白（打印友好）
  */
+import type { ReactNode } from 'react';
+
 export type PdfViewerTheme = 'light' | 'dark' | 'auto' | 'paper' | 'sepia' | 'contrast' | 'minimal';
 
 /** 全部内置主题（宿主做切换 UI 时用） */
@@ -149,6 +151,33 @@ export interface PdfViewerAppearance {
  *    （core 的铁律：不 import react）。
  *    → React 层（`PdfViewer`）会把它当 `ReactNode` 渲染。
  */
+/**
+ * **工具栏配置**（显示哪些按钮 + 两端的插槽）。
+ *
+ * ⚠️ **为什么住在 core**（审计发现的 bug）：
+ * -> 之前它在 `components/Toolbar.tsx` -> `core/config` 想引用它就得
+ *    **从 core 反向依赖 components** ❌（违反分层：core 不依赖 components）
+ * -> 而且 `PdfViewerConfig.toolbar` 是**另一份匿名字面量** -> 两边字段不一致 ❌
+ *    -> 里面有 `showPrint`（`ToolbarConfig` 没有）-> **死配置** ❌
+ * -> 现在：**只有一份** -> 两边永远一致 ✅
+ */
+export interface ToolbarConfig {
+  /** 显示翻页 */
+  showPageNav?: boolean;
+  /** 显示缩放 */
+  showZoom?: boolean;
+  /** 显示搜索 */
+  showSearch?: boolean;
+  /** 显示缩略图 */
+  showThumbnails?: boolean;
+  /** 显示目录 */
+  showOutline?: boolean;
+  /** 左侧插槽（宿主任意内容） */
+  leftSlot?: ReactNode;
+  /** 右侧插槽（宿主任意内容） */
+  rightSlot?: ReactNode;
+}
+
 export interface PdfViewerSlots {
   /** 替换整个工具栏 */
   toolbar?: unknown;

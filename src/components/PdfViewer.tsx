@@ -28,7 +28,7 @@ import {
 import type { LinkAnnotationLike } from '../core/annotation/links';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import type { DocumentCache } from '../core/cache/store';
-import type { PdfViewerConfig } from '../core/config';
+import type { Features, PdfViewerConfig } from '../core/config';
 import { mergeConfig } from '../core/config';
 import type { DocumentSource, LoadOptions } from '../core/document/loader';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
@@ -118,20 +118,6 @@ const Toast = lazy(() => import('./Toast').then((mod) => ({ default: mod.Toast }
 const AnnotationDialog = lazy(() =>
   import('./AnnotationDialog').then((mod) => ({ default: mod.AnnotationDialog })),
 );
-
-/** 功能开关 */
-export interface Features {
-  /** 搜索 */
-  search?: boolean;
-  /** 缩略图 */
-  thumbnails?: boolean;
-  /** 目录 */
-  outline?: boolean;
-  /** 键盘快捷键 */
-  keyboard?: boolean;
-  /** 打印 */
-  print?: boolean;
-}
 
 /**
  * `PdfViewer` 的**命令式句柄**（宿主用 `ref` 拿）。
@@ -3902,9 +3888,20 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               <p className="scpdf-state__hint">
                 {t((error.code ? `error.${error.code}` : 'error.generic') as keyof Messages)}
               </p>
-              <button type="button" className="scpdf-btn" onClick={reload}>
-                {t('load.retry')}
-              </button>
+              {/*
+               * ⚠️ **只有"可重试"的错误才给重试按钮**（审计发现的 bug）。
+               *
+               * -> 之前**无条件**显示 -> "文件不是 PDF"也给"重试" ❌
+               *   -> 用户点了还是同一个错 -> **白点一次** ❌
+               * -> 现在：用 \`error.retryable\` ✅
+               *   -> 网络 / 超时 / HTTP 错误 -> **给重试** ✅
+               *   -> 文件坏了 / 密码错 -> **不给**（给别的出路）✅
+               */}
+              {error.retryable !== false ? (
+                <button type="button" className="scpdf-btn" onClick={reload}>
+                  {t('load.retry')}
+                </button>
+              ) : null}
             </div>
           ) : null}
 
