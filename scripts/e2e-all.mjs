@@ -57,6 +57,7 @@ const suites = [
   { name: '自定义链接弹窗（两行）', file: 'e2e-editor-link.mjs' },
   { name: 'UI 打磨（输入框 / 位置 / 高亮 / 语言 / hover）', file: 'e2e-ui-polish.mjs' },
   { name: '第 21 轮（链接弹窗 / 删除线 / 缩放 / 跳转）', file: 'e2e-round21.mjs' },
+  { name: '键盘导航（翻页 / Home / End / 缩放）', file: 'e2e-keyboard.mjs' },
   { name: '内置的语言和高亮色', file: 'e2e-builtin-defaults.mjs' },
   { name: '内置配置（色板 + 语言）可被宿主覆盖', file: 'e2e-builtin-config.mjs' },
   { name: '目录的异步页码解析', file: 'e2e-outline-resolve.mjs' },
