@@ -122,7 +122,23 @@ export function createTipTapEditor(host: HTMLElement | null, options: CreateTipT
       Underline,
       Highlight.configure({ multicolor: true }),
       Color,
-      Link.configure({ openOnClick: false, autolink: true }),
+      /*
+       * ⚠️⚠️ **Link 的 `inclusive` 必须改成 false**（用户反馈：
+       * "输入了链接之后再往后加文字 还是链接的样式 这逻辑就没有一个是对的"）。
+       *
+       * → TipTap 的 Link 扩展里：`inclusive() { return this.options.autolink; }`
+       * -> autolink 开着 -> **inclusive 也是 true** ❌
+       * -> 在链接末尾继续打字 -> **新文字继承链接标记** ❌
+       *   （实测："click here" + " MORE" -> "click her MOREe" 全是链接）
+       *
+       * -> 覆盖 `inclusive()` -> 永远 false ✅
+       * -> **autolink 仍然开着**（输入网址仍然自动变链接）✅
+       *   （实测："see https://example.com now" -> 只有网址是链接）
+       */
+      Link.extend({ inclusive: () => false }).configure({
+        openOnClick: false,
+        autolink: true,
+      }),
       /*
        * ⚠️ **占位符用 TipTap 官方扩展**。
        *

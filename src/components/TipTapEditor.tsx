@@ -54,6 +54,7 @@ import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
+import { LinkPopover } from './LinkPopover';
 import { RichTextEditor } from './RichTextEditor';
 
 /**
@@ -474,6 +475,65 @@ function TipTapToolbar(props: {
   /** TipTap 的链式命令（用一个宽松的类型，避免依赖具体泛型） */
   type Chained = Record<string, (...args: never[]) => { run: () => void }>;
 
+  /*
+   * ⚠️⚠️ **链接弹窗的状态**。
+   *
+   * → `open` —— 是否打开 ✅
+   * → `anchor` —— 链接按钮的位置（视口坐标）-> 弹窗贴着它显示 ✅
+   * → `selection` —— **打开那一刻的选区**（位置 + 文字）✅
+   *   → 确定链接时用它来打标记 ✅
+   *   → 用户在弹窗里操作时，编辑器的选区可能变了 -> 必须记住打开时的 ✅
+   */
+  const [linkState, setLinkState] = useState<{
+    open: boolean;
+    anchor: { left: number; top: number; right: number; bottom: number } | null;
+    from: number;
+    to: number;
+    text: string;
+  }>({ open: false, anchor: null, from: 0, to: 0, text: '' });
+
+  /**
+   * **打开链接弹窗**（记下当前的选区和按钮位置）。
+   */
+  const openLinkPopover = useCallback(() => {
+    const ed = getEditor() as unknown as {
+      state?: { selection?: { from: number; to: number } };
+    } | null;
+    const sel = ed?.state?.selection;
+    if (!ed || !sel) {
+      return;
+    }
+
+    /*
+     * ⚠️ **记下选中的文字**（第 2 行的默认值）。
+     * → 用 `state.doc.textBetween(from, to)` ✅
+     * → 不要用 `window.getSelection()`（弹窗打开后会变）❌
+     */
+    const doc = (
+      ed as unknown as { state: { doc: { textBetween: (a: number, b: number) => string } } }
+    ).state.doc;
+    const text = sel.from === sel.to ? '' : doc.textBetween(sel.from, sel.to);
+
+    /*
+     * ⚠️ **按钮的位置**（弹窗的锚点）。
+     * → 用链接按钮的 `getBoundingClientRect()` ✅
+     */
+    const rect = linkButtonRef.current?.getBoundingClientRect();
+
+    setLinkState({
+      open: true,
+      anchor: rect
+        ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+        : null,
+      from: sel.from,
+      to: sel.to,
+      text,
+    });
+  }, [getEditor]);
+
+  /** 链接按钮的位置（用 ref 拿，避免用全局选择器） */
+  const linkButtonRef = useRef<HTMLButtonElement | null>(null);
+
   const run = (command: RichTextToolbarItem['command'], value?: string) => {
     const ed = getEditor();
     if (!ed) {
@@ -533,69 +593,273 @@ function TipTapToolbar(props: {
     }
 
     if (command === 'createLink') {
-      const href = window.prompt(t('richtext.linkPrompt'), 'https://');
-      if (!href) {
-        return;
-      }
-      fn({ href } as never).run();
+      /*
+       * ⚠️⚠️ **不再用 `window.prompt`**（用户需求：
+       * "链接弹窗是默认的弹窗 ... 这个输入框你自己写一个出来 不要用系统默认的框 很丑"）。
+       *
+       * → `window.prompt` **阻塞**整个页面 -> 编辑器失焦 -> **选区丢失** ❌
+       *   （实测：点"链接"后弹系统框，填完再选文字就没了）
+       * → 样式**完全不可控** ❌
+       * → 只能填一个值 -> 没法同时填"链接"和"展示文字" ❌
+       *
+       * → 现在：**打开自己的 `LinkPopover`** ✅
+       * → 打开时**先记下当前选区**（位置 + 文字）-> 确定时用 ✅
+       */
+      openLinkPopover();
       return;
     }
 
     fn().run();
   };
 
+  /**
+   * **确定链接**（把链接 + 展示文字应用到编辑器的选区上）。
+   *
+   * ⚠️⚠️ **三个场景**（用户需求）：
+   *
+   * | 场景 | 做法 |
+   * |---|---|
+   * | **选了文字** | 给选区打链接标记 ✅ |
+   * | **没选文字 + 展示文字 = 网址** | **插入**一个带链接的文本 ✅ |
+   * | **没选文字 + 展示文字 ≠ 网址** | **插入**"展示文字"并给它打链接 ✅ |
+   *
+   * ⚠️ **插入后光标要放到链接之后**，且**清掉 storedMarks** ❌
+   * → 否则继续打字会**继承链接样式**（用户反馈："输入了链接之后再往后加文字
+   *   还是链接的样式 这逻辑就没有一个是对的"）✅
+   */
+  const applyLink = useCallback(
+    (href: string, text: string) => {
+      /*
+       * ⚠️ **用一个宽松的链式类型**（避免依赖 TipTap 的具体泛型）。
+       *
+       * → 每个命令返回**链本身**（可以继续 `.xxx()`）✅
+       * → 最后用 `.run()` 执行 ✅
+       */
+      type LinkChain = {
+        setLink: (attrs: { href: string }) => LinkChain;
+        insertContent: (content: string) => LinkChain;
+        insertContentAt: (range: { from: number; to: number }, content: string) => LinkChain;
+        setTextSelection: (pos: number | { from: number; to: number }) => LinkChain;
+        unsetMark: (name: string) => LinkChain;
+        run: () => void;
+      };
+      const ed = getEditor() as unknown as {
+        chain: () => LinkChain;
+        focus?: () => void;
+        state: { doc: { content: { size: number } } };
+      } | null;
+      if (!ed) {
+        return;
+      }
+      const { from, to } = linkState;
+
+      if (from !== to) {
+        /*
+         * ⚠️ **选了文字** -> 打链接标记。
+         *
+         * → 如果用户改了"显示文字" -> **要把选中的文字替换成它** ✅
+         *   （用户需求："框内可以修改文字"）
+         * → 没改 -> 保持原样 ✅
+         */
+        const selected = linkState.text;
+        if (text && text !== selected) {
+          // 先替换文字，再打链接
+          ed.chain().insertContentAt({ from, to }, escapeHtml(text)).run();
+          // 替换后选区会变 -> 重新算范围
+          const newTo = from + text.length;
+          ed.chain().setTextSelection({ from, to: newTo }).run();
+          ed.chain().setLink({ href }).run();
+        } else {
+          ed.chain().setLink({ href }).run();
+        }
+      } else {
+        // 没选文字 -> 插入"展示文字"（带链接）
+        ed.chain()
+          .insertContent(`<a href="${href}">${escapeHtml(text)}</a>`)
+          .run();
+      }
+
+      /*
+       * ⚠️⚠️ **光标放到链接之后 + 清掉 storedMarks + 聚焦编辑器**（实测踩过的坑）。
+       *
+       * → TipTap 的 link mark 默认 `inclusive: true` -> 继续打字会**继承链接** ❌
+       *   （实测："click here" + " MORE" -> "click her MOREe" 全是链接）
+       * -> 解法：
+       *   1. `inclusive: () => false`（在 runtime 里改）-> 新文字不自动继承 ✅
+       *   2. 光标放到**段落末尾**（链接之后）✅
+       *   3. `unsetMark('link')` -> 清掉光标处的 storedMarks ✅
+       *   4. **聚焦编辑器** -> 用户能接着打字 ✅
+       *      （实测：不聚焦的话弹窗一关，键盘输入**完全没反应** ❌）
+       *
+       * ⚠️⚠️ **每一步都要用"新的 chain"**（实测踩过的坑）。
+       *
+       * → `ed.chain()` 会**捕获当时的 state**（一个 transaction 的快照）
+       * → 用同一个 chain 连着跑 -> 后面的命令作用在**旧的 state** 上 ❌
+       *   （实测：选区设了还是 1-12，不是末尾）
+       * -> 每步**重新 `ed.chain()`** -> 拿到最新的 state ✅
+       */
+      const end = ed.state.doc.content.size - 1;
+
+      /*
+       * ⚠️⚠️ **顺序 + 方法都很重要**（实测踩过的坑）。
+       *
+       * ### 踩过的三个坑
+       *
+       * 1. `chain()` 捕获**当时的 state** -> 用同一个 chain 连着跑，
+       *    后面的命令作用在**旧 state** 上 ❌
+       *    -> 每步**重新 `ed.chain()`** ✅
+       *
+       * 2. `unsetMark('link')` 在**链接文本上** -> **把链接本身删掉了** ❌
+       *    （实测：`<a href=...>hello world</a>` -> `<p>hello world</p>`，链接没了）
+       *    -> `unsetMark` 是"去掉**范围内**的 mark"，不是"清光标的 storedMarks" ❌
+       *
+       * 3. `setTextSelection` -> `unsetMark` -> **选区被 unsetMark 重置回原处** ❌
+       *    （实测：设完之后选区还是 1-12，不是末尾）
+       *
+       * ### 正确的做法
+       *
+       * -> **先移开选区**（到链接之后）✅
+       * -> **再直接改 transaction 的 storedMarks**（不是用命令）✅
+       */
+      ed.chain().setTextSelection(end).run();
+
+      /*
+       * ⚠️ **直接清 storedMarks**（不用 `unsetMark` 命令）。
+       *
+       * → 我们要的只是"光标处不要再自动带上链接" ✅
+       * -> `tr.setStoredMarks(...)` 只影响**光标处的"待用格式"** ✅
+       */
+      const view = (ed as unknown as { view?: { dispatch?: (tr: unknown) => void } }).view;
+      const tr = (ed as unknown as { state?: { tr?: unknown } }).state?.tr;
+      if (view?.dispatch && tr) {
+        try {
+          const typed = tr as unknown as {
+            storedMarks?: { type: { name: string } }[];
+            setStoredMarks: (marks: unknown) => void;
+          };
+          typed.setStoredMarks(typed.storedMarks?.filter((m) => m.type.name !== 'link') ?? null);
+          view.dispatch(tr);
+        } catch {
+          /* 清不掉就算了（不影响主要功能） */
+        }
+      }
+
+      /*
+       * ⚠️ **聚焦要单独调**（不能放进 chain 里）。
+       *
+       * → `chain().focus()` 会**重置选区到开头** ❌
+       * → 所以：先 `setTextSelection`（设好选区），再单独 `focus()` ✅
+       */
+      ed.focus?.();
+
+      /*
+       * ⚠️⚠️ **`ed.focus()` 不够**（实测踩过的坑）。
+       *
+       * -> 点"确定"按钮 -> 焦点在**按钮**上 -> 弹窗关闭 -> 按钮被卸载
+       * -> 焦点**掉到 body** 上了 ❌ -> 键盘输入**完全没反应** ❌
+       * -> 所以要**直接聚焦 DOM 元素**（`.ProseMirror`）✅
+       */
+      const pmEl = (getEditor() as unknown as { view?: { dom?: HTMLElement } } | null)?.view?.dom;
+      if (pmEl) {
+        pmEl.focus({ preventScroll: true });
+      }
+
+      setLinkState((s) => ({ ...s, open: false }));
+    },
+    [getEditor, linkState],
+  );
+
   if (!mounted) {
     return null;
   }
 
   return (
-    <div className="scpdf-rich-text__toolbar">
-      {items.map((item, index) => {
-        const state = activeStates[index];
-        const active = state?.active ?? false;
-        const disabled = state?.disabled ?? false;
-        return (
-          <button
-            key={item.command}
-            type="button"
-            className="scpdf-rich-text__btn"
-            title={item.label}
-            aria-label={item.label}
-            /*
-             * ⚠️⚠️ **按下态**（用户需求：
-             * "点了加粗之后 加粗按钮没加深颜色 别的按钮也一样 看不出点击了"）。
-             *
-             * → `data-active` -> CSS 画**明显的按下态**（主色底 + 主色图标）✅
-             * → `aria-pressed` -> 无障碍也能读出"这个格式开着" ✅
-             */
-            data-active={active ? 'true' : 'false'}
-            aria-pressed={active}
-            disabled={disabled}
-            /*
-             * ⚠️⚠️ **必须用 `onMouseDown` + `preventDefault`**（实测踩过的坑）。
-             *
-             * → 点按钮 → 浏览器把焦点从编辑器移走 → **选区丢失** ❌
-             * → 之后 `toggleBold` 作用在**空选区**上 → 什么都没发生 ❌
-             *   （实测：点"加粗"后 HTML 完全没变）
-             *
-             * → `preventDefault` → **阻止焦点转移** → 选区还在 → 命令生效 ✅
-             * → 并且 `mousedown` 比 `click` 更早 → 命令在选区还在时执行 ✅
-             */
-            onMouseDown={(event) => {
-              event.preventDefault();
-            }}
-            onClick={() => {
-              run(item.command, item.palette ? Object.values(item.palette)[0] : undefined);
-            }}
-          >
-            {item.icon ? (
-              <Icon name={item.icon as IconName} size={15} overrides={icons} />
-            ) : (
-              item.label
-            )}
-          </button>
-        );
-      })}
+    <div className="scpdf-rich-text__toolbar-wrap">
+      <div className="scpdf-rich-text__toolbar">
+        {items.map((item, index) => {
+          const state = activeStates[index];
+          const active = state?.active ?? false;
+          const disabled = state?.disabled ?? false;
+          const isLink = item.command === 'createLink';
+          return (
+            <button
+              key={item.command}
+              type="button"
+              className="scpdf-rich-text__btn"
+              title={item.label}
+              aria-label={item.label}
+              /*
+               * ⚠️⚠️ **按下态**（用户需求：
+               * "点了加粗之后 加粗按钮没加深颜色 别的按钮也一样 看不出点击了"）。
+               *
+               * → `data-active` -> CSS 画**明显的按下态**（主色底 + 主色图标）✅
+               * → `aria-pressed` -> 无障碍也能读出"这个格式开着" ✅
+               */
+              data-active={active ? 'true' : 'false'}
+              aria-pressed={active}
+              disabled={disabled}
+              /*
+               * ⚠️ **链接按钮要记位置**（弹窗的锚点）✅
+               */
+              ref={isLink ? linkButtonRef : undefined}
+              /*
+               * ⚠️⚠️ **必须用 `onMouseDown` + `preventDefault`**（实测踩过的坑）。
+               *
+               * → 点按钮 → 浏览器把焦点从编辑器移走 → **选区丢失** ❌
+               * → 之后 `toggleBold` 作用在**空选区**上 → 什么都没发生 ❌
+               *   （实测：点"加粗"后 HTML 完全没变）
+               *
+               * → `preventDefault` → **阻止焦点转移** → 选区还在 → 命令生效 ✅
+               * → 并且 `mousedown` 比 `click` 更早 → 命令在选区还在时执行 ✅
+               */
+              onMouseDown={(event) => {
+                event.preventDefault();
+              }}
+              onClick={() => {
+                run(item.command, item.palette ? Object.values(item.palette)[0] : undefined);
+              }}
+            >
+              {item.icon ? (
+                <Icon name={item.icon as IconName} size={15} overrides={icons} />
+              ) : (
+                item.label
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/*
+       **链接弹窗**（自己写的，不用 `window.prompt`）✅
+       */}
+      <LinkPopover
+        open={linkState.open}
+        anchor={linkState.anchor}
+        selectedText={linkState.text}
+        labels={{
+          href: t('richtext.linkHref'),
+          text: t('richtext.linkText'),
+          confirm: t('richtext.linkConfirm'),
+          cancel: t('richtext.linkCancel'),
+          placeholderHref: t('richtext.linkHrefPlaceholder'),
+          placeholderText: t('richtext.linkTextPlaceholder'),
+        }}
+        onSubmit={applyLink}
+        onCancel={() => {
+          setLinkState((s) => ({ ...s, open: false }));
+        }}
+      />
     </div>
   );
+}
+
+/**
+ * **HTML 转义**（插入链接文字时用）。
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

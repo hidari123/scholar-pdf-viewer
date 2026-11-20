@@ -54,6 +54,7 @@ const suites = [
   { name: 'TipTap 富文本编辑器', file: 'e2e-tiptap.mjs' },
   { name: '编辑器的空格 + update 事件', file: 'e2e-editor-space.mjs' },
   { name: '工具栏的按下态 + 完整功能', file: 'e2e-editor-toolbar.mjs' },
+  { name: '自定义链接弹窗（两行）', file: 'e2e-editor-link.mjs' },
   { name: '内置的语言和高亮色', file: 'e2e-builtin-defaults.mjs' },
   { name: '内置配置（色板 + 语言）可被宿主覆盖', file: 'e2e-builtin-config.mjs' },
   { name: '目录的异步页码解析', file: 'e2e-outline-resolve.mjs' },

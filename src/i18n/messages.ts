@@ -100,6 +100,12 @@ export interface Messages {
   'annotation.new': string;
   'toast.region': string;
   'richtext.linkPrompt': string;
+  'richtext.linkHref': string;
+  'richtext.linkText': string;
+  'richtext.linkConfirm': string;
+  'richtext.linkCancel': string;
+  'richtext.linkHrefPlaceholder': string;
+  'richtext.linkTextPlaceholder': string;
   'highlight.fullyCovered': string;
   'toast.close': string;
   'toast.copied': string;
@@ -193,6 +199,12 @@ export const ZH_MESSAGES: Messages = {
   'annotation.new': '新建批注',
   'toast.region': '通知',
   'richtext.linkPrompt': '链接地址',
+  'richtext.linkHref': '链接',
+  'richtext.linkText': '显示文字',
+  'richtext.linkConfirm': '确定',
+  'richtext.linkCancel': '取消',
+  'richtext.linkHrefPlaceholder': '粘贴或输入链接',
+  'richtext.linkTextPlaceholder': '默认显示链接地址',
   'highlight.fullyCovered': '这段已经被高亮了',
   'toast.close': '关闭',
   'toast.copied': '已复制到剪贴板',
@@ -262,6 +274,12 @@ export const EN_MESSAGES: Messages = {
   'annotation.new': 'New annotation',
   'toast.region': 'Notifications',
   'richtext.linkPrompt': 'Link URL',
+  'richtext.linkHref': 'Link',
+  'richtext.linkText': 'Display text',
+  'richtext.linkConfirm': 'Confirm',
+  'richtext.linkCancel': 'Cancel',
+  'richtext.linkHrefPlaceholder': 'Paste or type a link',
+  'richtext.linkTextPlaceholder': 'Defaults to the link URL',
   'highlight.fullyCovered': 'This text is already highlighted',
   'toast.close': 'Close',
   'toast.copied': 'Copied to clipboard',
