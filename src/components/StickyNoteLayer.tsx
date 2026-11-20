@@ -50,8 +50,9 @@ export interface StickyNoteLayerProps {
    * **点"编辑"**（宿主实现：打开编辑框）。
    *
    * → 宿主没传 → **不显示编辑按钮** ✅（"宿主没配就不渲染"）
+   * → 第二个参数是**按钮元素** -> 宿主可以拿它算弹窗锚点 ✅
    */
-  onAnnotationEdit?: (annotation: AnnotationRecord) => void;
+  onAnnotationEdit?: (annotation: AnnotationRecord, element?: HTMLElement) => void;
   /**
    * **点"展开"**（宿主实现：打开详情）。
    *
@@ -315,7 +316,14 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                         title="编辑批注"
                         onClick={(event) => {
                           event.stopPropagation();
-                          onAnnotationEdit(firstRecord);
+                          /*
+                           * ⚠️ **把按钮元素传出去**（用来算弹窗的锚点）。
+                           *
+                           * → 用户需求："富文本点了编辑 怎么富文本编辑框还在文档最上面啊
+                           *   要出现在视野里啊 就点的旁边" ✅
+                           * -> 宿主用它的 `getBoundingClientRect()` 当锚点 ✅
+                           */
+                          onAnnotationEdit(firstRecord, event.currentTarget);
                         }}
                       >
                         <Icon name="edit" size={13} overrides={icons} />

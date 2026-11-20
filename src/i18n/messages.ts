@@ -98,6 +98,7 @@ export interface Messages {
   'annotation.placeholder': string;
   'annotation.pick': string;
   'annotation.new': string;
+  'annotation.edit': string;
   'toast.region': string;
   'richtext.linkPrompt': string;
   'richtext.linkHref': string;
@@ -197,6 +198,7 @@ export const ZH_MESSAGES: Messages = {
   'annotation.placeholder': '写点什么…',
   'annotation.pick': '选择批注（{count}）',
   'annotation.new': '新建批注',
+  'annotation.edit': '编辑批注',
   'toast.region': '通知',
   'richtext.linkPrompt': '链接地址',
   'richtext.linkHref': '链接',
@@ -272,6 +274,7 @@ export const EN_MESSAGES: Messages = {
   'annotation.placeholder': 'Write something…',
   'annotation.pick': 'Select annotation ({count})',
   'annotation.new': 'New annotation',
+  'annotation.edit': 'Edit annotation',
   'toast.region': 'Notifications',
   'richtext.linkPrompt': 'Link URL',
   'richtext.linkHref': 'Link',

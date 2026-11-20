@@ -108,7 +108,7 @@ export interface PageProps {
   /** 点击批注 */
   onAnnotationClick?: (annotation: AnnotationRecord) => void;
   /** 点"编辑"按钮（宿主实现：打开编辑框） */
-  onAnnotationEdit?: (annotation: AnnotationRecord) => void;
+  onAnnotationEdit?: (annotation: AnnotationRecord, element?: HTMLElement) => void;
   /** 点"展开"按钮（宿主实现：打开详情） */
   onAnnotationExpand?: (annotation: AnnotationRecord) => void;
   /** 无障碍标签 */

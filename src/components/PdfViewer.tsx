@@ -3375,6 +3375,72 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     setActiveAnnotationId(null);
   }, []);
 
+  /*
+   * ⚠️⚠️ **"编辑批注"的弹窗**（用户需求：
+   * "富文本编辑完之后没有保存按钮啊 保存都保存不了
+   *  而且 富文本点了编辑 怎么富文本编辑框还在文档最上面啊
+   *  要出现在视野里啊 就点的旁边"）。
+   *
+   * ### 之前
+   *
+   * → 点"编辑" -> 打开**右侧的便利贴面板**（`AnnotationPanel`）❌
+   * → 面板**离批注很远**（甚至在视口外）-> "还在文档最上面" ❌
+   * → 面板里**没有「保存」按钮** -> 只能靠 `Ctrl+Enter` ❌
+   *   （而 TipTap 编辑器**根本没接 `onSubmit`** -> **根本保存不了** ❌）
+   *
+   * ### 现在
+   *
+   * -> 点"编辑" -> 打开**锚点弹窗**（`AnnotationDialog`）✅
+   * -> 弹窗**贴在批注图标下面**（飞书评论气泡的感觉）✅
+   * -> 弹窗里**有「保存」「取消」按钮** ✅
+   * -> 和"新建批注"**同一套组件**（行为一致）✅
+   */
+  const [editAnnotation, setEditAnnotation] = useState<{
+    id: string;
+    content: string;
+    anchor: { left: number; top: number; right: number; bottom: number } | null;
+  } | null>(null);
+
+  /** 编辑批注的锚点版本（滚动/缩放时重算位置） */
+  const [editAnchorTick, setEditAnchorTick] = useState(0);
+
+  /** 页面滚动 / 缩放 -> 锚点位置变了 -> 重算 */
+  useEffect(() => {
+    if (!editAnnotation) {
+      return;
+    }
+    const update = () => {
+      setEditAnchorTick((n) => n + 1);
+    };
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [editAnnotation]);
+
+  /**
+   * **打开"编辑批注"弹窗**（锚点 = 批注图标的位置）。
+   *
+   * @param annotation 要编辑的批注
+   * @param element 批注图标元素（用来算锚点）
+   */
+  const handleAnnotationEdit = useCallback(
+    (annotation: AnnotationRecord, element?: HTMLElement | null) => {
+      const rect = element?.getBoundingClientRect();
+      setEditAnnotation({
+        id: annotation.id,
+        content: annotation.content ?? '',
+        anchor: rect
+          ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+          : null,
+      });
+      setActiveAnnotationId(null);
+    },
+    [],
+  );
+
   const className = [
     'scpdf-root',
     // ⚠️ 主题 + 外观 → class 名（见 `core/theme` 的 `themeClasses`）
@@ -3697,6 +3763,53 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
             />
           </Suspense>
 
+          {/*
+            **编辑批注的锚点弹窗**（用户需求：
+            "富文本编辑完之后没有保存按钮啊 保存都保存不了
+             而且 富文本点了编辑 怎么富文本编辑框还在文档最上面啊
+             要出现在视野里啊 就点的旁边"）。
+
+            -> 和"新建批注"**同一个组件** -> 行为一致 ✅
+            -> 弹窗**贴在批注图标下面**（飞书评论气泡的感觉）✅
+            -> 弹窗里**有「保存」「取消」** ✅
+          */}
+          <Suspense fallback={null}>
+            <AnnotationDialog
+              open={editAnnotation !== null}
+              /*
+               * ⚠️ **锚点**（批注按钮的视口矩形）-> 弹窗贴着它显示 ✅
+               */
+              anchorRect={editAnnotation?.anchor ?? null}
+              anchorVersion={editAnchorTick}
+              initialContent={editAnnotation?.content ?? ''}
+              title={t('annotation.edit')}
+              onClose={() => {
+                setEditAnnotation(null);
+              }}
+              onSubmit={(html, plain) => {
+                const editing = editAnnotation;
+                setEditAnnotation(null);
+                if (!editing) {
+                  return;
+                }
+                /*
+                 * ⚠️ **保存**（用户需求："富文本编辑完之后没有保存按钮啊 保存都保存不了"）。
+                 *
+                 * -> `onAnnotationSave(id, html, plain)` -> 宿主更新这条批注 ✅
+                 * -> 和"新建"走的是**同一个回调** -> 宿主的处理逻辑一致 ✅
+                 */
+                onAnnotationSave?.(editing.id, html, plain);
+              }}
+              toolbar={merged.annotationToolbar}
+              palette={merged.annotationPalette}
+              icons={merged.icons}
+              locale={merged.locale ?? 'zh'}
+              locales={merged.locales}
+              messages={merged.messages}
+              editor={annotationEditor}
+            />
+          </Suspense>
+
           {activeAnnotation ? (
             <Suspense fallback={null}>
               <AnnotationPanel
@@ -3770,13 +3883,17 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                         setActiveAnnotationId(annotation.id);
                         onAnnotationClick?.(annotation);
                       }}
-                      onAnnotationEdit={(annotation) => {
+                      onAnnotationEdit={(annotation, element) => {
                         /*
-                         * ⚠️ **点"编辑" → 打开便利贴面板**（宿主也可以自己处理）。
+                         * ⚠️⚠️ **点"编辑" → 打开锚点弹窗**（用户需求：
+                         * "富文本编辑完之后没有保存按钮啊 保存都保存不了
+                         *  而且 富文本点了编辑 怎么富文本编辑框还在文档最上面啊
+                         *  要出现在视野里啊 就点的旁边"）。
                          *
-                         * → 用户需求："hover之后会出现编辑按钮，点击可以进行编辑" ✅
+                         * → 之前打开的是**右侧的便利贴面板** -> 离批注很远 ❌
+                         * → 现在打开**锚点弹窗** -> **贴在批注旁边** ✅
                          */
-                        setActiveAnnotationId(annotation.id);
+                        handleAnnotationEdit(annotation, element);
                         onAnnotationEdit?.(annotation);
                       }}
                       onAnnotationExpand={(annotation) => {
