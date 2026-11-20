@@ -79,13 +79,17 @@ export function createTipTapEditor(host: HTMLElement | null, options: CreateTipT
    */
   if (h.__scpdfEditor) {
     const existing = h.__scpdfEditor;
-    (existing.options as unknown as { onUpdate?: (p: { editor: Editor }) => void }).onUpdate = ({
-      editor: e,
-    }: {
-      editor: Editor;
-    }) => {
-      options.onChange(e.getHTML());
-    };
+    /*
+     * ⚠️⚠️ **复用时必须能换掉"内容变化"的回调**。
+     *
+     * → 之前改 `existing.options.onUpdate` -> **完全无效**（TipTap v3 构造时就绑好了）
+     * → 复用时宿主可能换了回调 -> 我们还在调旧的 ❌
+     *
+     * → 解法：把回调**存在编辑器实例上** -> 事件处理函数读它 ✅
+     *   （事件处理函数是构造时注册的，但它每次都读**最新的**那个 ref-like 字段）
+     */
+    (existing as Editor & { __scpdfOnChange?: (html: string) => void }).__scpdfOnChange =
+      options.onChange;
     if (existing.getHTML() !== options.content) {
       existing.commands.setContent(options.content);
     }
@@ -129,10 +133,27 @@ export function createTipTapEditor(host: HTMLElement | null, options: CreateTipT
       Placeholder.configure({ placeholder: options.placeholder ?? '' }),
     ],
     content: options.content,
-    onUpdate: ({ editor: e }) => {
-      options.onChange(e.getHTML());
-    },
   });
+
+  /*
+   * ⚠️⚠️ **用 `editor.on('update')`，不要用构造参数里的 `onUpdate`**（实测踩过的坑）。
+   *
+   * → TipTap v3 在**构造时**就把 `options.onUpdate` 绑进事件总线
+   * → 之后**改 `editor.options.onUpdate` 不生效** ❌
+   *   （实测：打字后 `onUpdate` **一次都没触发** → 宿主的 `value` 永远是空的
+   *    → 工具栏能改文档，但宿主不知道内容变了 → "各种功能都没有"的直接原因）
+   * → `editor.on('update', fn)` 是**正规方式** ✅（实测能正常触发）
+   */
+  editor.on('update', ({ editor: e }) => {
+    /*
+     * ⚠️ **读实例上的最新回调**（不是闭包里的那个）-> 复用时能换掉 ✅
+     */
+    const handler = (editor as Editor & { __scpdfOnChange?: (html: string) => void })
+      .__scpdfOnChange;
+    (handler ?? options.onChange)(e.getHTML());
+  });
+  (editor as Editor & { __scpdfOnChange?: (html: string) => void }).__scpdfOnChange =
+    options.onChange;
 
   /*
    * ⚠️⚠️ **同一个 host 上只挂一个编辑器**（实测踩过的坑）。

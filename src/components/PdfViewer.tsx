@@ -3543,6 +3543,37 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
             handleContainerClick(event);
           }}
           onKeyDown={(event) => {
+            /*
+             * ⚠️⚠️ **只在焦点真的在容器自身时**才阻止空格滚动页面。
+             *
+             * ### 之前（实测踩过的坑）
+             *
+             * ```js
+             * if (event.key === ' ') event.preventDefault();
+             * ```
+             *
+             * → 这个 `onKeyDown` 挂在 `<section class="scpdf-container">` 上
+             * → **批注弹窗在 React 树里是 container 的后代**（DOM 上靠 `position: fixed` 弹出，
+             *   但 **React 的合成事件照样冒泡**）
+             * → 用户在富文本编辑器里按空格 → 冒泡到 container → `preventDefault()`
+             * → 浏览器因此**不再派发 `beforeinput`**（实测：字母 "a" 会触发，空格**完全不触发**）
+             * → **空格永远进不了文档** ❌
+             *
+             *   （实测：`keyboard.type("hello world")` -> 文档里只有 `helloworld`）
+             *
+             * ### 现在
+             *
+             * → 焦点在**输入类元素**里（编辑器 / 输入框 / contenteditable）
+             *   -> **放行**，让空格正常输入 ✅
+             * → 焦点在容器自身（用户只是用键盘翻页）-> 照旧阻止滚动 ✅
+             */
+            const target = event.target as HTMLElement | null;
+            const inEditable =
+              target?.isContentEditable ||
+              (target ? /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) : false);
+            if (inEditable) {
+              return;
+            }
             // 链接元素自己处理 Enter/Space；这里只阻止空格滚动页面
             if (event.key === ' ') {
               event.preventDefault();

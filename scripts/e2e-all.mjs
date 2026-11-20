@@ -52,6 +52,7 @@ const suites = [
   { name: '统一配置对象', file: 'e2e-config.mjs' },
   { name: '搜索高亮（像素级精度）', file: 'e2e-search-exact.mjs' },
   { name: 'TipTap 富文本编辑器', file: 'e2e-tiptap.mjs' },
+  { name: '编辑器的空格 + update 事件', file: 'e2e-editor-space.mjs' },
   { name: '内置的语言和高亮色', file: 'e2e-builtin-defaults.mjs' },
   { name: '内置配置（色板 + 语言）可被宿主覆盖', file: 'e2e-builtin-config.mjs' },
   { name: '目录的异步页码解析', file: 'e2e-outline-resolve.mjs' },
