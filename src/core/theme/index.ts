@@ -265,7 +265,18 @@ export function appearanceStyles(appearance?: PdfViewerAppearance): Record<strin
   if (appearance.accentColor) {
     style['--scpdf-color-primary'] = appearance.accentColor;
   }
+  /*
+   * ⚠️⚠️ **字体必须写到 CSS 真正用的那个变量上**（审计发现的**死配置**）。
+   *
+   * -> 之前写的是 \`--scpdf-font-family\` ❌
+   *   -> 但 \`.scpdf-root\` 用的是 \`--scpdf-font-reading\`（\`viewer.css:51\`）❌
+   *   -> **两个变量从不连通** -> 宿主设了 \`fontFamily\` -> **完全没效果** ❌
+   * -> 现在：**两个都写** ✅
+   *   -> \`--scpdf-font-reading\`（真正生效的）✅
+   *   -> \`--scpdf-font-family\`（保留，万一以后 CSS 用了它）✅
+   */
   if (appearance.fontFamily) {
+    style['--scpdf-font-reading'] = appearance.fontFamily;
     style['--scpdf-font-family'] = appearance.fontFamily;
   }
   if (typeof appearance.fontSize === 'number' && appearance.fontSize > 0) {

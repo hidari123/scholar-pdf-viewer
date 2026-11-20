@@ -32,6 +32,14 @@
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei",
     sans-serif;
   /*
+   * 基准字号（`appearance.fontSize` 会覆盖它）。
+   *
+   * ⚠️ **以前 `appearance.fontSize` 写的是一个 CSS 里根本不存在的变量** ❌
+   *   -> 宿主设了 `fontSize: 16` -> **完全没效果** ❌（死配置）
+   * -> 现在：**真的有这个变量**，并且**用上了** ✅
+   */
+  --scpdf-font-size: 13px;
+  /*
    * ---------- 布局尺寸（appearance 的"密度"会覆盖） ----------
    *
    * ⚠️ **尺寸也走 CSS 变量** → 宿主想改密度**不用改 JS**。
@@ -117,7 +125,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  /* ⚠️ 走变量 -> `appearance.fontSize` 能真的生效 ✅ */
+  font-size: var(--scpdf-font-size);
 }
 
 .scpdf-toolbar__page-input {
