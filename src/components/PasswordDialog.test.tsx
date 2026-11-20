@@ -16,6 +16,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { PasswordDialog } from './PasswordDialog';
 
 describe('PasswordDialog', () => {
+  /** 取密码输入框（`type="password"` 的角色不是 textbox -> 用 CSS 选择器） */
+  const getInput = (): HTMLInputElement => {
+    const el = document.querySelector<HTMLInputElement>('.scpdf-dialog__input');
+    if (!el) {
+      throw new Error('找不到密码输入框');
+    }
+    return el;
+  };
+
   it('**open = false 时不渲染**', () => {
     render(<PasswordDialog open={false} onSubmit={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -41,10 +50,7 @@ describe('PasswordDialog', () => {
     const user = userEvent.setup();
     render(<PasswordDialog open onSubmit={onSubmit} onCancel={vi.fn()} />);
 
-    await user.type(
-      document.querySelector('.scpdf-dialog__input') as HTMLInputElement,
-      'secret123',
-    );
+    await user.type(getInput(), 'secret123');
     const button = screen.getByRole('button', { name: /确定|确认|提交|submit|ok/i });
     await user.click(button);
 
@@ -57,7 +63,7 @@ describe('PasswordDialog', () => {
     const user = userEvent.setup();
     render(<PasswordDialog open onSubmit={onSubmit} onCancel={vi.fn()} />);
 
-    const input = document.querySelector('.scpdf-dialog__input') as HTMLInputElement;
+    const input = getInput();
     await user.type(input, 'secret123{Enter}');
 
     expect(onSubmit).toHaveBeenCalledWith('secret123');
@@ -85,9 +91,7 @@ describe('PasswordDialog', () => {
 
   it('**重新打开时清空上次的密码**（安全要求）', () => {
     const { rerender } = render(<PasswordDialog open onSubmit={vi.fn()} onCancel={vi.fn()} />);
-    const input =
-      screen.getByLabelText(/密码|password/i) ??
-      (document.querySelector('.scpdf-dialog__input') as HTMLInputElement as HTMLInputElement);
+    const input = getInput();
     fireEvent.change(input, { target: { value: 'secret' } });
     expect(input.value).toBe('secret');
 
@@ -96,17 +100,13 @@ describe('PasswordDialog', () => {
     // 再打开
     rerender(<PasswordDialog open onSubmit={vi.fn()} onCancel={vi.fn()} />);
 
-    const reopened =
-      screen.getByLabelText(/密码|password/i) ??
-      (document.querySelector('.scpdf-dialog__input') as HTMLInputElement as HTMLInputElement);
+    const reopened = getInput();
     expect(reopened.value).toBe('');
   });
 
   it('**输入框是密码类型**（别在屏幕上明文显示）', () => {
     render(<PasswordDialog open onSubmit={vi.fn()} onCancel={vi.fn()} />);
-    const input =
-      screen.getByLabelText(/密码|password/i) ??
-      (document.querySelector('.scpdf-dialog__input') as HTMLInputElement as HTMLInputElement);
+    const input = getInput();
     expect(input.type).toBe('password');
   });
 });

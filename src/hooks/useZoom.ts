@@ -168,6 +168,16 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
   const prevScaleRef = useRef(scale);
 
   /**
+   * **当前的缩放**（给 wheel 监听用）。
+   *
+   * ⚠️ wheel 监听是**一次性注册**的（不随 scale 重注册）
+   * -> 所以它读到的 `scale` 会**过期** ❌
+   * -> 用 ref 存**最新值** -> 每次滚轮都能拿到当前比例 ✅
+   */
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+
+  /**
    * **当前的适配模式**。
    *
    * - `'width'` —— 适配宽度（容器变窄 → 自动重适配）
@@ -337,6 +347,47 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
     },
     [applyScale, setFitMode],
   );
+
+  /*
+   * ⚠️⚠️ **Ctrl + 滚轮缩放**（审计发现的：注释里写了，**代码里根本没有**）。
+   *
+   * ### 问题
+   *
+   * -> 上面 \`setScale\` 的注释写着"用户手动缩放（点 +/-、**Ctrl+滚轮**）" ❌
+   * -> 但**全仓库 0 个 wheel 监听** ❌
+   *   -> 用户按 Ctrl 滚轮 -> **什么都不会发生** ❌
+   *   -> 而这是**所有 PDF 阅读器的标准操作**（Chrome / Edge / WPS / Acrobat 都有）❌
+   *
+   * ### 现在的做法
+   *
+   * -> 在容器上监听 \`wheel\` -> **只有按住 Ctrl（或 Cmd）才拦** ✅
+   *   -> 不按 Ctrl -> **不拦** -> 页面正常滚动 ✅（不能抢用户的滚动）
+   * -> \`preventDefault\` -> **不让浏览器自己缩放页面**（那个是整个网页缩放）✅
+   * -> 缩放**就近取整到 10%**（和 +/- 按钮一样）✅
+   *
+   * ⚠️ **监听用 \`{ passive: false }\`** -> 否则 \`preventDefault\` **不生效** ❌
+   */
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+    const onWheel = (event: WheelEvent) => {
+      // 只在按住 Ctrl / Cmd 时拦
+      if (!event.ctrlKey && !event.metaKey) {
+        return;
+      }
+      // 拦下浏览器自己的"整页缩放"
+      event.preventDefault();
+      const direction: 1 | -1 = event.deltaY < 0 ? 1 : -1;
+      setScale(stepScaleByQuantum(scaleRef.current, direction));
+    };
+    // ⚠️ **必须 `passive: false`** -> 否则 `preventDefault()` 被忽略 ❌
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', onWheel);
+    };
+  }, [containerRef, setScale]);
 
   /*
    * ⚠️ **返回值必须稳定**（用 `useMemo` 包起来）。
