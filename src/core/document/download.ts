@@ -48,10 +48,26 @@ export function downloadFile(
   anchor.rel = 'noopener';
   anchor.style.display = 'none';
 
-  document.body.append(anchor);
-  anchor.click();
-  // ⚠️ 用 `removeChild`（`Element.remove()` 不接受参数）
-  document.body.removeChild(anchor);
+  try {
+    document.body.append(anchor);
+    anchor.click();
+  } catch (error) {
+    /*
+     * ⚠️⚠️ **点击失败也要 revoke**（审计发现的**内存泄漏**）。
+     *
+     * -> 之前 \`anchor.click()\` 抛错 -> **直接跳到 catch 之外** ❌
+     *   -> \`revokeObjectURL\` **永远不会被调** ❌
+     *   -> Blob **永久占着内存**（大文件 = 几十 MB）❌
+     * -> 现在：**try/finally** -> 一定会 revoke ✅
+     */
+    URL.revokeObjectURL(url);
+    throw error;
+  } finally {
+    // ⚠️ 用 `removeChild`（`Element.remove()` 不接受参数）
+    if (anchor.parentNode) {
+      anchor.parentNode.removeChild(anchor);
+    }
+  }
 
   /*
    * ⚠️ **必须 revoke**，否则 Blob 会一直占着内存。

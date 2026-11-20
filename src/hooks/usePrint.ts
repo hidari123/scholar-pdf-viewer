@@ -31,6 +31,16 @@ import {
   type PrintMargin,
 } from '../core/print';
 
+/**
+ * **打印时"页数对不上"最多重试多少帧**（约 1 秒）。
+ *
+ * ⚠️ 审计发现的**无限 rAF 风险**：
+ * -> 宿主给的 \`pageCount\` 永远对不上 -> **无限递归 rAF** ❌
+ *    -> CPU 100% + **永远停不下来** ❌
+ * -> 现在：**有上限** -> 放弃也算完成 ✅
+ */
+const MAX_PRINT_RETRIES = 60;
+
 /** usePrint 的参数 */
 export interface UsePrintOptions {
   /** 页面的**点**尺寸（72dpi，如 A4 = 595 × 842） */
@@ -181,7 +191,7 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
      * ⚠️ **页可能还没渲染出来**（首帧 / 虚拟滚动）
      * → 用 `ResizeObserver` 盯着第一页 → 尺寸变了就重算。
      */
-    const applyPageHeights = () => {
+    const applyPageHeights = (retryCount = 0) => {
       const pages = target.querySelectorAll<HTMLElement>('.scpdf-page');
       for (const pageEl of pages) {
         /*
@@ -217,11 +227,19 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
           pageEl.style.setProperty('--scpdf-print-page-width', `${width}px`);
         }
       }
-      // ⚠️ **页数对不上 → 再等下一帧**（页可能正在渲染）
-      // → `pageCount` 是宿主给的页数（用来触发这个 effect 重跑）
-      if (pageCount !== undefined && pages.length !== pageCount) {
+      /*
+       * ⚠️⚠️ **页数对不上 -> 再等下一帧**（页可能正在渲染）
+       * -> `pageCount` 是宿主给的页数（用来触发这个 effect 重跑）
+       *
+       * ⚠️⚠️ **但必须有上限**（审计发现的**无限 rAF 风险**）：
+       * -> 如果宿主给的 \`pageCount\` **永远对不上**（比如数错了）❌
+       *   -> 这里会**无限递归 rAF** -> **永远停不下来** ❌
+       *   -> 每次 rAF 都重新量所有页 -> **CPU 100%** ❌
+       * -> 现在：**最多重试 60 帧（约 1 秒）** -> 之后放弃 ✅
+       */
+      if (pageCount !== undefined && pages.length !== pageCount && retryCount < MAX_PRINT_RETRIES) {
         requestAnimationFrame(() => {
-          applyPageHeights();
+          applyPageHeights(retryCount + 1);
         });
       }
     };
