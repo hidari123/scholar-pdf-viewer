@@ -83,6 +83,35 @@ export function LinkPopover(props: LinkPopoverProps) {
     }, 0);
   }, [open, selectedText]);
 
+  /*
+   * ⚠️⚠️ **Esc 只能关掉链接弹窗，不能关掉整个批注弹窗**（实测踩过的坑）。
+   *
+   * → 批注弹窗的 Esc 监听挂在 `document` 上，且是 **`capture: true`** ⚠️
+   *   -> **捕获阶段**比输入框的**冒泡阶段**先跑 ❌
+   *   -> 结果：按 Esc -> **整个批注弹窗被关掉**，链接弹窗还留在逻辑里 ❌
+   *   （实测：Esc 之后 `.scpdf-annotation-dialog` 整个消失了）
+   *
+   * -> 修法：链接弹窗也用**捕获阶段**监听 -> **它先跑** -> `stopPropagation` ✅
+   *   -> 批注弹窗的监听器就收不到这个 Esc 了 ✅
+   */
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        // 拦下来（不让外层收到）
+        event.preventDefault();
+        event.stopPropagation();
+        onCancel();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [open, onCancel]);
+
   /**
    * **第 1 行 -> 第 2 行联动**（用户没手动改过第 2 行时）。
    *

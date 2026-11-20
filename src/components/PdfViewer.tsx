@@ -2467,7 +2467,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       {
         key: BUILTIN_ACTION_KEYS.highlight,
         icon: 'highlight',
-        label: '高亮',
+        label: t('selection.actionHighlight'),
         group: 'primary',
         order: 10,
         onSelect: (ctx) => {
@@ -2507,7 +2507,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       {
         key: BUILTIN_ACTION_KEYS.copy,
         icon: 'copy',
-        label: '复制',
+        label: t('selection.actionCopy'),
         group: 'primary',
         order: 20,
         onSelect: (ctx) => {
@@ -2543,7 +2543,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       actions.push({
         key: BUILTIN_ACTION_KEYS.translate,
         icon: 'translate',
-        label: '翻译',
+        label: t('selection.actionTranslate'),
         group: 'ai',
         order: 30,
         onSelect: onTranslate,
@@ -2554,7 +2554,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       actions.push({
         key: BUILTIN_ACTION_KEYS.ask,
         icon: 'ask',
-        label: '提问',
+        label: t('selection.actionAsk'),
         group: 'ai',
         order: 40,
         onSelect: onAsk,
@@ -2565,7 +2565,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       actions.push({
         key: BUILTIN_ACTION_KEYS.explain,
         icon: 'explain',
-        label: '解释',
+        label: t('selection.actionExplain'),
         group: 'ai',
         order: 50,
         onSelect: onExplain,
@@ -2582,7 +2582,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     actions.push({
       key: BUILTIN_ACTION_KEYS.note,
       icon: 'stickyNote',
-      label: '加批注',
+      label: t('selection.addNote'),
       group: 'ai',
       order: 60,
       onSelect: (ctx) => {
@@ -3462,7 +3462,21 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   const appearanceStyle = appearanceStyles(merged.appearance);
 
   return (
-    <div className={className} style={appearanceStyle} data-testid="pdf-viewer">
+    <div
+      className={className}
+      style={appearanceStyle}
+      data-testid="pdf-viewer"
+      /*
+       * ⚠️ **弹窗打开时** -> 标记一下（用户反馈：
+       * "目前在编辑框内部输入文字 光标移动上去的时候
+       *  如果底部有pdf上的高亮文字 则高亮文字会被选中"）。
+       *
+       * → 浏览器里所有 contenteditable **共用一份选区** ⚠️
+       * → 在编辑器里移动光标 -> 原生选区可能**延伸到 PDF 的文本层** ❌
+       * -> 标记一下 -> CSS 让文本层**不可选** ✅
+       */
+      data-dialog-open={pendingNote !== null || editAnnotation !== null ? 'true' : 'false'}
+    >
       {/*
         插槽 `toolbar`（方案 D）：宿主给了就**整个替换**内置工具栏。
 
@@ -3667,7 +3681,19 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           {error ? (
             <div className="scpdf-state scpdf-state--error" role="alert">
               <p className="scpdf-state__title">{t('load.failed')}</p>
-              <p className="scpdf-state__hint">{error.message}</p>
+              {/*
+               * ⚠️⚠️ **按错误码取文案**（用户需求：
+               * "整体 title的语言不统一 需要内部设置两套语言"）。
+               *
+               * → 之前直接显示 `error.message` -> 那是**开发者用的中文** ❌
+               *   （比如 "文档加载失败（HTTP 404）"）-> **不跟语言切换** ❌
+               * -> 现在：**按 `error.code` 查内置文案** ✅
+               * -> 没有对应文案 -> 兜底到 `error.generic` ✅
+               * -> 原始 `message` 仍然保留在错误对象里 -> **宿主自己要用时还能拿到** ✅
+               */}
+              <p className="scpdf-state__hint">
+                {t((error.code ? `error.${error.code}` : 'error.generic') as keyof Messages)}
+              </p>
               <button type="button" className="scpdf-btn" onClick={reload}>
                 {t('load.retry')}
               </button>
@@ -3905,6 +3931,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                         setActiveAnnotationId(annotation.id);
                         onAnnotationExpand?.(annotation);
                       }}
+                      locale={merged.locale ?? 'zh'}
+                      locales={merged.locales}
+                      messages={merged.messages}
                       selectionShape={selectionShapes.get(pageNumber)}
                       onHighlightClick={handleHighlightClick}
                       onExternalLink={onExternalLink}

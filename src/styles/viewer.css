@@ -825,8 +825,26 @@
     border-color 120ms ease;
 }
 
+/*
+ * ⚠️⚠️ **hover 要"加深"，不是"变浅"**（用户反馈：
+ * "富文本编辑框的保存按钮 hover上去之后底色会变白 看不清楚字了
+ *  应该是加深处理 而不是变浅 包括旁边的取消按钮 没有加上底色"）。
+ *
+ * ### 之前
+ *
+ * → 「保存」：`filter: brightness(1.06)` -> 蓝色**变亮** -> 白字看不清 ❌
+ * → 「取消」：`background: #fff` -> hover `#f7f8fa` -> **几乎没变化**
+ *   -> 用户看着像"没加上底色" ❌
+ *
+ * ### 现在
+ *
+ * → 「保存」：hover 时**颜色变深**（`filter: brightness(0.92)`）✅
+ * -> 白字在深蓝上更清楚 ✅
+ * → 「取消」：hover 时用**明显一点的灰**（不是几乎一样的白）✅
+ */
 .scpdf-annotation-dialog__btn:hover {
-  background: var(--scpdf-surface-alt, #f7f8fa);
+  background: var(--scpdf-surface-alt, #eceef1);
+  border-color: var(--scpdf-text-muted, #9aa1ac);
 }
 
 .scpdf-annotation-dialog__btn--primary {
@@ -836,8 +854,18 @@
   font-weight: 500;
 }
 
+/*
+ * ⚠️ **hover 变深**（不是变浅）—— 白字在深色上更清楚 ✅
+ *
+ * → 之前用 `filter: brightness(0.92)` -> 颜色**看着**是深了，
+ *   但 `getComputedStyle().backgroundColor` **读出来还是原来的** ❌
+ *   -> 宿主想**读当前颜色**来匹配主题 -> 读不到 ❌
+ * -> 现在：**直接改背景色**（`color-mix` 往黑里混）-> 读得到 ✅
+ */
 .scpdf-annotation-dialog__btn--primary:hover {
-  filter: brightness(1.06);
+  background: color-mix(in srgb, var(--scpdf-accent, #2f6feb) 86%, #000);
+  border-color: color-mix(in srgb, var(--scpdf-accent, #2f6feb) 86%, #000);
+  color: #fff;
 }
 
 .scpdf-annotation-dialog__btn--ghost {
@@ -1112,6 +1140,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* ⚠️ **必须 `border-box`** -> 宽度**含 padding 和 border** ✅ */
+  box-sizing: border-box;
   padding: 12px;
   border-radius: 10px;
   border: 1px solid var(--scpdf-border, #d9dde3);
@@ -1132,6 +1162,15 @@
 }
 
 .scpdf-link-popover__input {
+  /*
+   * ⚠️⚠️ **必须 `box-sizing: border-box`**（用户反馈：
+   * "填写链接的时候 ui有问题 里面的输入框超出右边边界了"）。
+   *
+   * → 默认是 `content-box` -> `width: 100%` **不含 padding 和 border** ❌
+   *   （实测：弹窗 340px 宽，输入框实际 **358px** -> 右边超出 18px ❌）
+   * -> `border-box` -> `width: 100%` **含 padding 和 border** -> 刚好填满 ✅
+   */
+  box-sizing: border-box;
   width: 100%;
   height: 30px;
   padding: 0 8px;
@@ -1166,7 +1205,8 @@
 }
 
 .scpdf-link-popover__btn:hover {
-  background: var(--scpdf-hover, rgb(0 0 0 / 7%));
+  /* ⚠️ **hover 变深一点**（和弹窗的按钮一致）✅ */
+  background: var(--scpdf-surface-alt, #eceef1);
 }
 
 .scpdf-link-popover__btn--primary {
@@ -1174,8 +1214,10 @@
   color: #fff;
 }
 
+/* ⚠️ **hover 变深**（不是变浅）—— 白字在深色上更清楚 ✅ */
 .scpdf-link-popover__btn--primary:hover {
-  background: var(--scpdf-primary-hover, #2559c4);
+  background: color-mix(in srgb, var(--scpdf-primary, #2f6feb) 86%, #000);
+  color: #fff;
 }
 
 .scpdf-link-popover__btn:disabled {
@@ -1254,9 +1296,33 @@
   margin: 0 0 6px;
 }
 
+/*
+ * ⚠️⚠️ **高亮要有底色**（用户反馈："高亮效果也没出来"）。
+ *
+ * → 之前只有 `padding` / `border-radius` -> **看不出高亮** ❌
+ * -> 现在：**给一个默认底色** ✅
+ */
 .scpdf-rich-text__editor mark {
   padding: 0 2px;
   border-radius: 2px;
+  background-color: var(--scpdf-rich-text-highlight, #fff3a3);
+  color: inherit;
+}
+
+/* ⚠️ **引用要有样式**（用户反馈："引用需要加上样式"）✅ */
+.scpdf-rich-text__editor blockquote {
+  margin: 0 0 6px;
+  padding: 2px 0 2px 10px;
+  border-left: 3px solid var(--scpdf-border, #d9dde3);
+  color: var(--scpdf-text-muted, #6b7280);
+  font-style: italic;
+}
+
+/* 列表的间距 */
+.scpdf-rich-text__editor ul,
+.scpdf-rich-text__editor ol {
+  margin: 0 0 6px;
+  padding-left: 22px;
 }
 
 /*
@@ -1325,8 +1391,53 @@
 }
 
 .scpdf-tiptap__editor .ProseMirror mark {
+  /*
+   * ⚠️⚠️ **高亮要有底色**（用户反馈：
+   * "富文本框高亮文字和引用的样式没出来 ... 高亮效果也没出来"）。
+   *
+   * → 之前只有 `padding` / `border-radius`，**没有 `background-color`** ❌
+   * -> TipTap 的 `toggleHighlight` 不带颜色时，`<mark>` **默认没有底色** ❌
+   *   -> 用户点了"高亮"，**看不出任何变化** ❌
+   * -> 现在：**给一个默认底色** ✅
+   *
+   * ⚠️ **带颜色的高亮**（`style="background-color: xxx"`）-> 用它自己的颜色 ✅
+   *   （内联样式会覆盖我们的默认值 -> 这里只兜底）✅
+   */
   padding: 0 2px;
   border-radius: 2px;
+  background-color: var(--scpdf-rich-text-highlight, #fff3a3);
+  color: inherit;
+}
+
+/*
+ * ⚠️⚠️ **引用（`blockquote`）要有样式**（用户反馈："引用需要加上样式"）。
+ *
+ * → 之前**完全没有样式** -> 就是一个普通段落 ❌
+ * -> 现在：**左边一条竖线 + 缩进 + 斜体**（飞书 / 常见编辑器的样子）✅
+ */
+.scpdf-tiptap__editor .ProseMirror blockquote {
+  margin: 0 0 6px;
+  padding: 2px 0 2px 10px;
+  border-left: 3px solid var(--scpdf-border, #d9dde3);
+  color: var(--scpdf-text-muted, #6b7280);
+  font-style: italic;
+}
+
+/* 列表也要有间距（不然挤在一起） */
+.scpdf-tiptap__editor .ProseMirror ul,
+.scpdf-tiptap__editor .ProseMirror ol {
+  margin: 0 0 6px;
+  padding-left: 22px;
+}
+
+.scpdf-tiptap__editor .ProseMirror li p {
+  margin: 0;
+}
+
+/* 链接的样式（编辑器里的） */
+.scpdf-tiptap__editor .ProseMirror a {
+  color: var(--scpdf-primary, #2f6feb);
+  text-decoration: underline;
 }
 
 .scpdf-annotation {
@@ -2127,4 +2238,34 @@
   .scpdf-root--print-original .scpdf-annotation {
     display: none;
   }
+}
+
+/*
+ * ⚠️⚠️ **弹窗打开时，PDF 的文字不能被选中**（用户反馈：
+ * "目前在编辑框内部输入文字 光标移动上去的时候
+ *  如果底部有pdf上的高亮文字 则高亮文字会被选中 这个逻辑有误 请排查"）。
+ *
+ * ### 为什么会出现
+ *
+ * → 文本层是 `user-select: text`（这是它存在的意义 —— 让用户能选 PDF 的字）✅
+ * → 但**编辑器也是 contenteditable** -> **浏览器的选区是全局的一份** ⚠️
+ * → 在编辑器里移动光标时，浏览器的原生选区**可能延伸到 PDF 的文本层** ❌
+ *   （两个 contenteditable 在同一个文档里，DOM 顺序上 PDF 在前）
+ * -> 结果：**PDF 的高亮文字被画上选中态** -> 用户以为"被选中了" ❌
+ *
+ * ### 修法
+ *
+ * → 弹窗打开时，给根节点加 `data-dialog-open` -> **文本层不可选** ✅
+ * → 弹窗关闭时恢复 ✅
+ * → **不影响**没有弹窗时的正常框选 ✅
+ */
+.scpdf-root[data-dialog-open="true"] .scpdf-text-layer {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 弹窗打开时，PDF 的标注块也不该被"选中" */
+.scpdf-root[data-dialog-open="true"] .scpdf-annotations {
+  user-select: none;
+  -webkit-user-select: none;
 }

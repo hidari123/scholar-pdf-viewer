@@ -177,7 +177,8 @@ export function SelectionPopover({
    * → 之前浮层的 title 是**硬编码中文** → 现在全走文案表 ✅
    */
   const t = useCallback(
-    (key: keyof Messages) => resolveMessage(locale, key, messages, undefined, locales),
+    (key: keyof Messages, vars?: Record<string, string | number>) =>
+      resolveMessage(locale, key, messages, vars, locales),
     [locale, messages, locales],
   );
 
@@ -666,7 +667,7 @@ export function SelectionPopover({
                       className="scpdf-selection-popover__swatch"
                       style={{ background: color }}
                       title={color}
-                      aria-label={`高亮色 ${key}`}
+                      aria-label={t('selection.highlightColor', { key })}
                       onClick={(event) => {
                         event.stopPropagation();
                         onPickColor(key);

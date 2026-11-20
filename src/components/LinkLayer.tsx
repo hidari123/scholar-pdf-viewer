@@ -21,9 +21,11 @@
  *   （拖动时根本不判定链接 → 文本层正常选区。）
  */
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { LinkAnnotationLike } from '../core/annotation/links';
 import { linkToViewRect, normalizeLinks } from '../core/annotation/links';
+import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import { resolveMessage } from '../i18n/messages';
 
 /** LinkLayer 参数 */
 export interface LinkLayerProps {
@@ -39,6 +41,16 @@ export interface LinkLayerProps {
   onExternalLink?: (url: string) => void;
   /** 点击内部跳转（宿主解析 dest → 页码） */
   onInternalLink?: (dest: string | unknown[], pageNumber: number) => void;
+  /**
+   * **语言**（用于文案）。
+   *
+   * ⚠️ 用户需求："这种文字都是要设置两套语言的哈 内置在包内"
+   */
+  locale?: Locale;
+  /** 宿主注册的语言表 */
+  locales?: LocaleTable;
+  /** 文案覆盖 */
+  messages?: Partial<Messages>;
 }
 
 /**
@@ -47,7 +59,24 @@ export interface LinkLayerProps {
  * @param props 参数
  */
 export function LinkLayer(props: LinkLayerProps) {
-  const { annotations, pageSize, viewport, pageNumber, onExternalLink, onInternalLink } = props;
+  const {
+    annotations,
+    pageSize,
+    viewport,
+    pageNumber,
+    onExternalLink,
+    onInternalLink,
+    locale = 'zh',
+    locales,
+    messages,
+  } = props;
+
+  /** 文案解析（走 i18n） */
+  const t = useCallback(
+    (key: keyof Messages, vars?: Record<string, string | number>) =>
+      resolveMessage(locale, key, messages, vars, locales),
+    [locale, messages, locales],
+  );
 
   /** 归一化后的链接 */
   const links = useMemo(
@@ -63,7 +92,7 @@ export function LinkLayer(props: LinkLayerProps) {
     <div className="scpdf-links">
       {links.map((link) => {
         const rect = linkToViewRect(link, viewport.width, viewport.height);
-        const label = link.url ?? '内部链接';
+        const label = link.url ?? t('link.internal');
 
         return (
           /*

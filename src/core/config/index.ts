@@ -63,7 +63,12 @@ import type { HighlightPalette } from '../highlight/palette';
 import type { IconName } from '../icons/icons';
 import type { SelectionAction } from '../selection/actions';
 import type { PdfViewerAppearance, PdfViewerTheme } from '../theme';
-import { BUILTIN_HIGHLIGHT_PALETTE, detectDefaultLocale, mergeLocales } from './builtin-defaults';
+import {
+  BUILTIN_ANNOTATION_PALETTE,
+  BUILTIN_HIGHLIGHT_PALETTE,
+  detectDefaultLocale,
+  mergeLocales,
+} from './builtin-defaults';
 
 /**
  * **统一配置对象**。
@@ -217,7 +222,16 @@ export function mergeConfig(
     messages: resolveConfigValue(props.messages, c.messages),
     selectionActions: resolveConfigValue(props.selectionActions, c.selectionActions),
     annotationToolbar: resolveConfigValue(props.annotationToolbar, c.annotationToolbar),
-    annotationPalette: resolveConfigValue(props.annotationPalette, c.annotationPalette),
+    /*
+     * ⚠️⚠️ **必须有内置兜底**（用户反馈："高亮效果也没出来"）。
+     *
+     * -> 之前不传就没有色板 -> **工具栏里没有"高亮底色"按钮** ❌
+     * -> 用户以为高亮坏了 -> 其实是**按钮根本没渲染** ❌
+     * -> 现在：**内置一份** -> 不传也有 ✅
+     */
+    annotationPalette:
+      resolveConfigValue(props.annotationPalette, c.annotationPalette) ??
+      BUILTIN_ANNOTATION_PALETTE,
     toolbar: resolveConfigValue(props.toolbar, c.toolbar),
     features: resolveConfigValue(props.features, c.features),
   };
@@ -232,7 +246,9 @@ export function mergeConfig(
  * -> 重新导出 -> 宿主从哪个子路径都能拿到 ✅
  */
 export {
-  /** 内置的高亮色板（6 色） */
+  /** 内置的批注色板（富文本"高亮底色"，6 色） */
+  BUILTIN_ANNOTATION_PALETTE,
+  /** 内置的高亮色板（8 色） */
   BUILTIN_HIGHLIGHT_PALETTE,
   /** 内置的语言表（中文 / 英文 / 日文 / 法文） */
   BUILTIN_LOCALES,

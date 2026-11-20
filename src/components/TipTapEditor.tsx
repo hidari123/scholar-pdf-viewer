@@ -87,6 +87,14 @@ export interface TipTapEditorProps {
   locales?: LocaleTable;
   /** 文案覆盖 */
   messages?: Partial<Messages>;
+  /**
+   * **嵌套弹窗的状态**（比如链接弹窗开没开）。
+   *
+   * ⚠️ 外层弹窗用它决定 Esc 的行为：
+   * -> 链接弹窗开着 -> Esc 关**链接弹窗**，不关外层 ✅
+   *   （实测踩过的坑：Esc 把整个批注弹窗也关掉了 ❌）
+   */
+  onOverlayStateChange?: (hasOverlay: boolean) => void;
 }
 
 /**
@@ -109,6 +117,7 @@ export function TipTapEditor(props: TipTapEditorProps) {
     locale = 'zh',
     locales,
     messages,
+    onOverlayStateChange,
   } = props;
 
   const t = useCallback(
@@ -285,7 +294,13 @@ export function TipTapEditor(props: TipTapEditorProps) {
 
   return (
     <div className="scpdf-rich-text">
-      <TipTapToolbar hostRef={hostRef} items={items} icons={icons} t={t} />
+      <TipTapToolbar
+        hostRef={hostRef}
+        items={items}
+        icons={icons}
+        t={t}
+        onOverlayStateChange={onOverlayStateChange}
+      />
       <div ref={hostRef} className="scpdf-rich-text__editor scpdf-tiptap__editor" />
     </div>
   );
@@ -315,8 +330,10 @@ function TipTapToolbar(props: {
   items: RichTextToolbarItem[];
   icons?: Partial<Record<IconName, ReactNode>>;
   t: (key: keyof Messages, vars?: Record<string, string | number>) => string;
+  /** 嵌套弹窗的状态（通知外层） */
+  onOverlayStateChange?: (hasOverlay: boolean) => void;
 }) {
-  const { hostRef, items, icons, t } = props;
+  const { hostRef, items, icons, t, onOverlayStateChange } = props;
 
   /**
    * **拿到编辑器实例**。
@@ -491,6 +508,20 @@ function TipTapToolbar(props: {
     to: number;
     text: string;
   }>({ open: false, anchor: null, from: 0, to: 0, text: '' });
+
+  /*
+   * **嵌套弹窗的状态** -> 通知外层（外层据此决定 Esc 的行为）。
+   *
+   * ⚠️ 用户体验：链接弹窗开着时按 Esc -> **只关链接弹窗**，
+   *   别把整个批注弹窗也关了 ❌（实测踩过的坑）
+   */
+  const linkOverlayOpen = linkState.open;
+  useEffect(() => {
+    onOverlayStateChange?.(linkOverlayOpen);
+    return () => {
+      onOverlayStateChange?.(false);
+    };
+  }, [linkOverlayOpen, onOverlayStateChange]);
 
   /**
    * **打开链接弹窗**（记下当前的选区和按钮位置）。

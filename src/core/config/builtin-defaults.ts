@@ -26,6 +26,7 @@
 
 import type { Locale, LocaleMessages, LocaleTable } from '../../i18n/messages';
 import { MESSAGES } from '../../i18n/messages';
+import type { RichTextPalette } from '../editor/rich-text';
 import type { HighlightPalette } from '../highlight/palette';
 import { DEFAULT_HIGHLIGHT_PALETTE } from '../highlight/palette';
 
@@ -63,6 +64,18 @@ export const BUILTIN_LOCALES: LocaleTable = {
     'empty.title': 'ドキュメントが指定されていません',
     'empty.hint': 'file プロパティで PDF のパスまたはファイルを渡してください',
     'error.generic': 'エラーが発生しました',
+    'error.E_LOAD_HTTP': '読み込みに失敗しました（HTTP）',
+    'error.E_LOAD_NETWORK': 'ネットワークエラー',
+    'error.E_LOAD_TIMEOUT': '読み込みがタイムアウトしました',
+    'error.E_PDF_INVALID': '有効なPDFファイルではありません',
+    'error.E_EMPTY': 'ドキュメントが指定されていません',
+    'error.E_PDF_ENCRYPTED': 'このドキュメントは暗号化されています',
+    'error.E_PDF_PASSWORD_WRONG': 'パスワードが違います',
+    'error.E_RENDER_PAGE': 'ページの描画に失敗しました',
+    'error.E_FONT_MISSING': 'フォントがありません',
+    'error.E_CACHE_QUOTA': 'キャッシュ容量が不足しています',
+    'error.E_CACHE_UNAVAILABLE': 'キャッシュを利用できません',
+    'error.E_LINK_INVALID': '無効なリンクです',
     'password.title': 'このドキュメントは暗号化されています',
     'password.placeholder': 'パスワードを入力',
     'password.submit': 'OK',
@@ -90,7 +103,6 @@ export const BUILTIN_LOCALES: LocaleTable = {
     'selection.actions': '操作',
     'selection.color': '色',
     'selection.expandColor': 'すべての色',
-    'annotation.title': 'メモ',
     'annotation.delete': '削除',
     'annotation.close': '閉じる',
     'annotation.content': '内容',
@@ -100,6 +112,18 @@ export const BUILTIN_LOCALES: LocaleTable = {
     'annotation.pick': '色を選ぶ',
     'annotation.new': '新しいメモ',
     'annotation.edit': 'メモを編集',
+    'selection.actionHighlight': 'ハイライト',
+    'selection.actionCopy': 'コピー',
+    'selection.actionTranslate': '翻訳',
+    'selection.actionAsk': '質問',
+    'selection.actionExplain': '説明',
+    'annotation.title': 'メモ',
+    'annotation.withContent': 'メモ：{content}',
+    'annotation.selectGroup': 'メモを選択（{count}）',
+    'annotation.expand': 'メモを展開',
+    'annotation.empty': '（空のメモ）',
+    'link.internal': '内部リンク',
+    'selection.highlightColor': 'ハイライト色 {key}',
     'toast.region': '通知',
     'richtext.linkPrompt': 'リンク先',
     'highlight.fullyCovered': 'このテキストはすでにハイライトされています',
@@ -137,6 +161,18 @@ export const BUILTIN_LOCALES: LocaleTable = {
     'empty.title': 'Aucun document spécifié',
     'empty.hint': 'Passez le chemin ou le fichier PDF via la prop file',
     'error.generic': 'Une erreur est survenue',
+    'error.E_LOAD_HTTP': 'Échec du chargement (HTTP)',
+    'error.E_LOAD_NETWORK': 'Erreur réseau',
+    'error.E_LOAD_TIMEOUT': 'Délai de chargement dépassé',
+    'error.E_PDF_INVALID': "Le fichier n'est pas un PDF valide",
+    'error.E_EMPTY': 'Aucun document spécifié',
+    'error.E_PDF_ENCRYPTED': 'Ce document est chiffré',
+    'error.E_PDF_PASSWORD_WRONG': 'Mot de passe incorrect',
+    'error.E_RENDER_PAGE': 'Échec du rendu de la page',
+    'error.E_FONT_MISSING': 'Police manquante',
+    'error.E_CACHE_QUOTA': 'Quota du cache dépassé',
+    'error.E_CACHE_UNAVAILABLE': 'Cache indisponible',
+    'error.E_LINK_INVALID': 'Lien invalide',
     'password.title': 'Ce document est chiffré',
     'password.placeholder': 'Saisissez le mot de passe',
     'password.submit': 'OK',
@@ -164,7 +200,6 @@ export const BUILTIN_LOCALES: LocaleTable = {
     'selection.actions': 'Actions',
     'selection.color': 'Couleur',
     'selection.expandColor': 'Toutes les couleurs',
-    'annotation.title': 'Note',
     'annotation.delete': 'Supprimer',
     'annotation.close': 'Fermer',
     'annotation.content': 'Contenu',
@@ -174,6 +209,18 @@ export const BUILTIN_LOCALES: LocaleTable = {
     'annotation.pick': 'Choisir une couleur',
     'annotation.new': 'Nouvelle note',
     'annotation.edit': 'Modifier la note',
+    'selection.actionHighlight': 'Surligner',
+    'selection.actionCopy': 'Copier',
+    'selection.actionTranslate': 'Traduire',
+    'selection.actionAsk': 'Demander',
+    'selection.actionExplain': 'Expliquer',
+    'annotation.title': 'Note',
+    'annotation.withContent': 'Note : {content}',
+    'annotation.selectGroup': 'Choisir une note ({count})',
+    'annotation.expand': 'Développer la note',
+    'annotation.empty': '(Note vide)',
+    'link.internal': 'Lien interne',
+    'selection.highlightColor': 'Couleur de surlignage {key}',
     'toast.region': 'Notifications',
     'richtext.linkPrompt': 'URL du lien',
     'highlight.fullyCovered': 'Ce texte est déjà surligné',
@@ -211,6 +258,25 @@ export const BUILTIN_LOCALES: LocaleTable = {
  * → 和 `DEFAULT_HIGHLIGHT_PALETTE` 一样（独立导出方便宿主引用）✅
  */
 export const BUILTIN_HIGHLIGHT_PALETTE: HighlightPalette = DEFAULT_HIGHLIGHT_PALETTE;
+
+/**
+ * **内置的批注色板**（富文本编辑器里的"高亮底色"）。
+ *
+ * ⚠️⚠️ **之前没有内置** -> 宿主不传 `annotationPalette` 就**没有高亮按钮** ❌
+ *   （实测：工具栏里只有 13 个按钮，**没有"高亮底色"** ❌
+ *    -> 用户反馈"高亮效果也没出来" —— 其实是**按钮都没出来** ❌）
+ *
+ * -> 现在：**内置一份** -> 不传也有高亮按钮 ✅
+ * -> 宿主传了 -> **覆盖内置的** ✅
+ */
+export const BUILTIN_ANNOTATION_PALETTE: RichTextPalette = {
+  yellow: '#fff3a3',
+  green: '#c8e6c9',
+  blue: '#bbdefb',
+  pink: '#f8bbd0',
+  purple: '#e1bee7',
+  orange: '#ffe0b2',
+};
 
 /**
  * **推断默认语言**。

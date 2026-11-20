@@ -22,12 +22,14 @@
  */
 
 import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { AnnotationGroup } from '../core/annotation/annotation-groups';
 import { groupAnnotations } from '../core/annotation/annotation-groups';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import { STICKY_NOTE_SIZE, stickyNotePosition } from '../core/annotation/sticky-note';
 import type { HighlightRecord, ViewRect } from '../core/types';
+import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
 import { RichTextPreview } from './RichTextPreview';
@@ -61,6 +63,17 @@ export interface StickyNoteLayerProps {
   onAnnotationExpand?: (annotation: AnnotationRecord) => void;
   /** 图标覆盖 */
   icons?: Partial<Record<IconName, ReactNode>>;
+  /**
+   * **语言**（用于文案）。
+   *
+   * ⚠️ **批注的所有文案都要走 i18n**（用户需求：
+   * "编辑批注啊 title啊 取消保存啊 这种文字都是要设置两套语言的哈"）。
+   */
+  locale?: Locale;
+  /** 宿主注册的语言表 */
+  locales?: LocaleTable;
+  /** 文案覆盖 */
+  messages?: Partial<Messages>;
 }
 
 /**
@@ -79,7 +92,19 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
     onAnnotationEdit,
     onAnnotationExpand,
     icons,
+    locale = 'zh',
+    locales,
+    messages,
   } = props;
+
+  /**
+   * **文案解析**（走 i18n -> 跟着语言切换）。
+   */
+  const t = useCallback(
+    (key: keyof Messages, vars?: Record<string, string | number>) =>
+      resolveMessage(locale, key, messages, vars, locales),
+    [locale, messages, locales],
+  );
 
   /** 当前 hover 的批注 id（控制便签内容显示） */
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -203,11 +228,15 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
               type="button"
               className="scpdf-sticky-note__icon"
               style={{ width: STICKY_NOTE_SIZE, height: STICKY_NOTE_SIZE }}
-              title={isGroup ? `选择批注（${group.annotations.length}）` : '批注'}
+              title={
+                isGroup
+                  ? t('annotation.selectGroup', { count: group.annotations.length })
+                  : t('annotation.title')
+              }
               aria-label={
                 isGroup
-                  ? `选择批注（${group.annotations.length} 条）`
-                  : `批注：${firstRecord.content.slice(0, 20)}`
+                  ? t('annotation.selectGroup', { count: group.annotations.length })
+                  : t('annotation.withContent', { content: firstRecord.content.slice(0, 20) })
               }
               onMouseEnter={() => {
                 setHoveredGroupKey(group.key);
@@ -312,8 +341,8 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                       <button
                         type="button"
                         className="scpdf-sticky-note__action"
-                        aria-label="编辑批注"
-                        title="编辑批注"
+                        aria-label={t('annotation.edit')}
+                        title={t('annotation.edit')}
                         onClick={(event) => {
                           event.stopPropagation();
                           /*
@@ -333,8 +362,8 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                       <button
                         type="button"
                         className="scpdf-sticky-note__action"
-                        aria-label="展开批注"
-                        title="展开批注"
+                        aria-label={t('annotation.expand')}
+                        title={t('annotation.expand')}
                         onClick={(event) => {
                           event.stopPropagation();
                           onAnnotationExpand(firstRecord);
@@ -382,7 +411,7 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                         onAnnotationClick?.(record);
                       }}
                     >
-                      {record.content.slice(0, 60) || '（空批注）'}
+                      {record.content.slice(0, 60) || t('annotation.empty')}
                     </button>
                   );
                 })}

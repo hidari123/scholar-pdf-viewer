@@ -20,6 +20,7 @@ import type { PageSelectionShape } from '../core/selection/shape';
 import type { PositionedTextItem } from '../core/text-layer/layout';
 import { layoutTextItemsWithIndexOffsets } from '../core/text-layer/layout';
 import type { HighlightRecord } from '../core/types';
+import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { AnnotationLayer } from './AnnotationLayer';
 import { LinkLayer } from './LinkLayer';
 import type { PageProxyLike, TextContentLike } from './PageCanvas';
@@ -107,6 +108,16 @@ export interface PageProps {
   stickyNotes?: AnnotationRecord[];
   /** 点击批注 */
   onAnnotationClick?: (annotation: AnnotationRecord) => void;
+  /**
+   * **语言相关**（透传给便签层 -> 它的文案要走 i18n）。
+   *
+   * ⚠️ 用户需求："编辑批注啊 title啊 取消保存啊 这种文字都是要设置两套语言的哈"
+   */
+  locale?: Locale;
+  /** 宿主注册的语言表 */
+  locales?: LocaleTable;
+  /** 文案覆盖 */
+  messages?: Partial<Messages>;
   /** 点"编辑"按钮（宿主实现：打开编辑框） */
   onAnnotationEdit?: (annotation: AnnotationRecord, element?: HTMLElement) => void;
   /** 点"展开"按钮（宿主实现：打开详情） */
@@ -146,6 +157,9 @@ export function PageInner(props: PageProps) {
     onAnnotationClick,
     onAnnotationEdit,
     onAnnotationExpand,
+    locale,
+    locales,
+    messages,
     ariaLabel,
   } = props;
 
@@ -305,6 +319,9 @@ export function PageInner(props: PageProps) {
           pageNumber={pageNumber}
           onExternalLink={onExternalLink}
           onInternalLink={onInternalLink}
+          locale={locale}
+          locales={locales}
+          messages={messages}
         />
       ) : null}
 
@@ -333,6 +350,9 @@ export function PageInner(props: PageProps) {
           onAnnotationClick={onAnnotationClick}
           onAnnotationEdit={onAnnotationEdit}
           onAnnotationExpand={onAnnotationExpand}
+          locale={locale}
+          locales={locales}
+          messages={messages}
         />
       ) : null}
     </>

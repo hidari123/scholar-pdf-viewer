@@ -61,6 +61,8 @@ export interface RichTextEditorProps {
   locales?: LocaleTable;
   /** 文案覆盖 */
   messages?: Partial<Messages>;
+  /** 嵌套弹窗的状态（透传给 TipTap 编辑器） */
+  onOverlayStateChange?: (hasOverlay: boolean) => void;
 }
 
 /**

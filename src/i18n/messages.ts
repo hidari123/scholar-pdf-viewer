@@ -55,6 +55,18 @@ export interface Messages {
   'empty.title': string;
   'empty.hint': string;
   'error.generic': string;
+  'error.E_LOAD_HTTP': string;
+  'error.E_LOAD_NETWORK': string;
+  'error.E_LOAD_TIMEOUT': string;
+  'error.E_PDF_INVALID': string;
+  'error.E_EMPTY': string;
+  'error.E_PDF_ENCRYPTED': string;
+  'error.E_PDF_PASSWORD_WRONG': string;
+  'error.E_RENDER_PAGE': string;
+  'error.E_FONT_MISSING': string;
+  'error.E_CACHE_QUOTA': string;
+  'error.E_CACHE_UNAVAILABLE': string;
+  'error.E_LINK_INVALID': string;
   'password.title': string;
   'password.placeholder': string;
   'password.submit': string;
@@ -89,7 +101,6 @@ export interface Messages {
   'selection.color': string;
   'selection.expandColor': string;
   /* —— 批注面板 / 富文本 —— */
-  'annotation.title': string;
   'annotation.delete': string;
   'annotation.close': string;
   'annotation.content': string;
@@ -98,7 +109,6 @@ export interface Messages {
   'annotation.placeholder': string;
   'annotation.pick': string;
   'annotation.new': string;
-  'annotation.edit': string;
   'toast.region': string;
   'richtext.linkPrompt': string;
   'richtext.linkHref': string;
@@ -114,6 +124,19 @@ export interface Messages {
   'toast.exportSuccess': string;
   'toast.exportFailed': string;
   'selection.addNote': string;
+  'selection.actionHighlight': string;
+  'selection.actionCopy': string;
+  'selection.actionTranslate': string;
+  'selection.actionAsk': string;
+  'selection.actionExplain': string;
+  'annotation.title': string;
+  'annotation.withContent': string;
+  'annotation.selectGroup': string;
+  'annotation.edit': string;
+  'annotation.expand': string;
+  'annotation.empty': string;
+  'link.internal': string;
+  'selection.highlightColor': string;
   /* —— 富文本工具栏 —— */
   'richtext.bold': string;
   'richtext.italic': string;
@@ -162,6 +185,18 @@ export const ZH_MESSAGES: Messages = {
   'empty.title': '未指定文档',
   'empty.hint': '请通过 file 属性传入 PDF 地址或文件',
   'error.generic': '出错了',
+  'error.E_LOAD_HTTP': '加载失败（HTTP {status}）',
+  'error.E_LOAD_NETWORK': '网络错误，加载失败',
+  'error.E_LOAD_TIMEOUT': '加载超时',
+  'error.E_PDF_INVALID': '文件不是有效的 PDF',
+  'error.E_EMPTY': '没有指定文档',
+  'error.E_PDF_ENCRYPTED': '文档已加密',
+  'error.E_PDF_PASSWORD_WRONG': '密码不正确',
+  'error.E_RENDER_PAGE': '页面渲染失败',
+  'error.E_FONT_MISSING': '缺少字体',
+  'error.E_CACHE_QUOTA': '缓存空间不足',
+  'error.E_CACHE_UNAVAILABLE': '缓存不可用',
+  'error.E_LINK_INVALID': '链接无效',
   'password.title': '该文档已加密',
   'password.placeholder': '请输入密码',
   'password.submit': '确定',
@@ -189,7 +224,6 @@ export const ZH_MESSAGES: Messages = {
   'selection.actions': '选区操作',
   'selection.color': '选择颜色',
   'selection.expandColor': '展开颜色下拉',
-  'annotation.title': '批注',
   'annotation.delete': '删除',
   'annotation.close': '关闭',
   'annotation.content': '批注内容',
@@ -198,7 +232,6 @@ export const ZH_MESSAGES: Messages = {
   'annotation.placeholder': '写点什么…',
   'annotation.pick': '选择批注（{count}）',
   'annotation.new': '新建批注',
-  'annotation.edit': '编辑批注',
   'toast.region': '通知',
   'richtext.linkPrompt': '链接地址',
   'richtext.linkHref': '链接',
@@ -214,6 +247,19 @@ export const ZH_MESSAGES: Messages = {
   'toast.exportSuccess': '导出成功',
   'toast.exportFailed': '导出失败',
   'selection.addNote': '加批注',
+  'selection.actionHighlight': '高亮',
+  'selection.actionCopy': '复制',
+  'selection.actionTranslate': '翻译',
+  'selection.actionAsk': '提问',
+  'selection.actionExplain': '解释',
+  'annotation.title': '批注',
+  'annotation.withContent': '批注：{content}',
+  'annotation.selectGroup': '选择批注（{count}）',
+  'annotation.edit': '编辑批注',
+  'annotation.expand': '展开批注',
+  'annotation.empty': '（空批注）',
+  'link.internal': '内部链接',
+  'selection.highlightColor': '高亮色 {key}',
   'richtext.bold': '加粗',
   'richtext.italic': '斜体',
   'richtext.underline': '下划线',
@@ -238,6 +284,18 @@ export const EN_MESSAGES: Messages = {
   'empty.title': 'No document',
   'empty.hint': 'Pass a PDF URL or file via the file prop',
   'error.generic': 'Something went wrong',
+  'error.E_LOAD_HTTP': 'Failed to load (HTTP {status})',
+  'error.E_LOAD_NETWORK': 'Network error while loading',
+  'error.E_LOAD_TIMEOUT': 'Loading timed out',
+  'error.E_PDF_INVALID': 'The file is not a valid PDF',
+  'error.E_EMPTY': 'No document specified',
+  'error.E_PDF_ENCRYPTED': 'This document is encrypted',
+  'error.E_PDF_PASSWORD_WRONG': 'Incorrect password',
+  'error.E_RENDER_PAGE': 'Failed to render the page',
+  'error.E_FONT_MISSING': 'Missing font',
+  'error.E_CACHE_QUOTA': 'Cache quota exceeded',
+  'error.E_CACHE_UNAVAILABLE': 'Cache unavailable',
+  'error.E_LINK_INVALID': 'Invalid link',
   'password.title': 'This document is encrypted',
   'password.placeholder': 'Enter password',
   'password.submit': 'OK',
@@ -265,7 +323,6 @@ export const EN_MESSAGES: Messages = {
   'selection.actions': 'Selection actions',
   'selection.color': 'Select color',
   'selection.expandColor': 'Expand color dropdown',
-  'annotation.title': 'Annotation',
   'annotation.delete': 'Delete',
   'annotation.close': 'Close',
   'annotation.content': 'Annotation content',
@@ -274,7 +331,6 @@ export const EN_MESSAGES: Messages = {
   'annotation.placeholder': 'Write something…',
   'annotation.pick': 'Select annotation ({count})',
   'annotation.new': 'New annotation',
-  'annotation.edit': 'Edit annotation',
   'toast.region': 'Notifications',
   'richtext.linkPrompt': 'Link URL',
   'richtext.linkHref': 'Link',
@@ -290,6 +346,19 @@ export const EN_MESSAGES: Messages = {
   'toast.exportSuccess': 'Exported successfully',
   'toast.exportFailed': 'Export failed',
   'selection.addNote': 'Add note',
+  'selection.actionHighlight': 'Highlight',
+  'selection.actionCopy': 'Copy',
+  'selection.actionTranslate': 'Translate',
+  'selection.actionAsk': 'Ask',
+  'selection.actionExplain': 'Explain',
+  'annotation.title': 'Annotation',
+  'annotation.withContent': 'Annotation: {content}',
+  'annotation.selectGroup': 'Select annotation ({count})',
+  'annotation.edit': 'Edit annotation',
+  'annotation.expand': 'Expand annotation',
+  'annotation.empty': '(Empty annotation)',
+  'link.internal': 'Internal link',
+  'selection.highlightColor': 'Highlight color {key}',
   'richtext.bold': 'Bold',
   'richtext.italic': 'Italic',
   'richtext.underline': 'Underline',

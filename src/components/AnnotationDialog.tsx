@@ -72,6 +72,14 @@ export interface AnnotationDialogProps {
   toolbar?: RichTextToolbarItem[];
   /** 高亮色板 */
   palette?: RichTextPalette;
+  /**
+   * **有嵌套弹窗打开？**（比如链接弹窗）
+   *
+   * ⚠️ 用来决定 Esc 的行为：
+   * -> 嵌套弹窗开着 -> Esc 关**嵌套弹窗**，不关本弹窗 ✅
+   * -> 没开 -> Esc 关本弹窗 ✅
+   */
+  hasNestedOverlay?: boolean;
   /** 图标覆盖 */
   icons?: Partial<Record<IconName, ReactNode>>;
   /** 语言 */
@@ -95,6 +103,7 @@ export interface AnnotationDialogProps {
     locale?: Locale;
     locales?: LocaleTable;
     messages?: Partial<Messages>;
+    onOverlayStateChange?: (hasOverlay: boolean) => void;
   }>;
 }
 
@@ -119,7 +128,20 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
     locales,
     messages,
     editor,
+    hasNestedOverlay = false,
   } = props;
+
+  /*
+   * **嵌套弹窗的状态**（比如链接弹窗）。
+   *
+   * ⚠️ Esc 的行为要靠它：
+   * -> 链接弹窗开着 -> Esc **只关链接弹窗** ✅
+   *   （实测踩过的坑：Esc 把整个批注弹窗也关掉了 ❌）
+   */
+  const [overlayOpen, setOverlayOpen] = useState(false);
+  const handleOverlayState = useCallback((hasOverlay: boolean) => {
+    setOverlayOpen(hasOverlay);
+  }, []);
 
   const t = useCallback(
     (key: keyof Messages, vars?: Record<string, string | number>) =>
@@ -166,12 +188,34 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
         }
       }
 
-      // 水平：别超出视口
-      if (left + size.width > vw - margin) {
-        left = vw - size.width - margin;
+      /*
+       * ⚠️⚠️ **水平：别贴着视口右边**（用户反馈：
+       * "如果批注在这一行最右边 打开编辑批注的框过于靠右 已经贴着最右边了 需要往中间来点"）。
+       *
+       * → 之前只是"超出就夹回来" -> 贴边时**刚好卡在边上** ❌
+       * -> 现在：**留出额外的安全边距**（`margin * 2`）✅
+       *   -> 弹窗不会紧贴屏幕边缘 -> **往中间来一点** ✅
+       */
+      const safeMargin = margin * 2;
+      if (left + size.width > vw - safeMargin) {
+        left = vw - size.width - safeMargin;
       }
-      if (left < margin) {
-        left = margin;
+      if (left < safeMargin) {
+        left = safeMargin;
+      }
+
+      /*
+       * ⚠️⚠️ **垂直：也保证整个弹窗在视口内**（实测踩过的坑）。
+       *
+       * → 弹窗高度会**变**（编辑器加载完才变高）-> 位置要跟着重算 ✅
+       * -> 但万一还是超出 -> **夹回视口内** ✅
+       *   （不然「保存」按钮在屏幕外 -> 点都点不到 ❌）
+       */
+      if (top + size.height > vh - margin) {
+        top = Math.max(margin, vh - size.height - margin);
+      }
+      if (top < margin) {
+        top = margin;
       }
 
       return { left, top };
@@ -212,10 +256,37 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
     window.addEventListener('scroll', update, true);
     window.addEventListener('resize', update);
 
+    /*
+     * ⚠️⚠️ **尺寸变了要重算位置**（实测踩过的坑）。
+     *
+     * ### 问题
+     *
+     * → 打开时富文本编辑器**还没加载完** -> 第一次量到的高度**偏小**
+     *   （实测：h 一路从 **122 -> 237 -> 281** 变）
+     * -> 用偏小的高度算出来的位置 -> 弹窗**底部超出视口** ❌
+     *   （实测：弹窗 y=680、bottom=962，视口只有 900 -> **「保存」按钮在屏幕外** ❌
+     *    -> 连点都点不到 -> `locator.click` 超时 ❌）
+     *
+     * ### 修法
+     *
+     * -> 用 `ResizeObserver` **盯着尺寸** -> 变一次就重算一次位置 ✅
+     * -> 这样不管编辑器什么时候加载完，弹窗都会**自动挪到正确位置** ✅
+     */
+    const observer =
+      typeof ResizeObserver !== 'undefined' && dialogRef.current
+        ? new ResizeObserver(() => {
+            update();
+          })
+        : null;
+    if (observer && dialogRef.current) {
+      observer.observe(dialogRef.current);
+    }
+
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('scroll', update, true);
       window.removeEventListener('resize', update);
+      observer?.disconnect();
     };
   }, [open, anchorRect, computePosition, anchorVersion]);
 
@@ -236,13 +307,27 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
     };
   }, [open, initialContent]);
 
-  // Esc 关闭
+  /*
+   * ⚠️⚠️ **Esc 关闭**（但**嵌套弹窗打开时不算**）。
+   *
+   * → 这个监听挂在 `document` 上，且是 **`capture: true`** ⚠️
+   *   -> **捕获阶段**比输入框的**冒泡阶段**先跑 ❌
+   *   -> 结果：链接弹窗开着时按 Esc -> **整个批注弹窗被关掉** ❌
+   *   （实测：Esc 之后 `.scpdf-annotation-dialog` 整个消失了）
+   *
+   * -> 修法：**有嵌套弹窗打开时，Esc 不关自己** ✅
+   *   -> 让嵌套弹窗自己处理 Esc ✅
+   */
   useEffect(() => {
     if (!open) {
       return;
     }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // 有嵌套弹窗（比如链接弹窗）-> 让它自己处理 ❌ 不关自己
+        if (hasNestedOverlay || overlayOpen) {
+          return;
+        }
         event.stopPropagation();
         onClose();
       }
@@ -251,7 +336,7 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
     return () => {
       document.removeEventListener('keydown', onKeyDown, true);
     };
-  }, [open, onClose]);
+  }, [open, onClose, hasNestedOverlay, overlayOpen]);
 
   const handleSubmit = useCallback(() => {
     const clean = sanitizeRichText(html);
@@ -334,6 +419,7 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
                 locales={locales}
                 messages={messages}
                 placeholder={t('annotation.placeholder')}
+                onOverlayStateChange={handleOverlayState}
               />
             );
           })()}
