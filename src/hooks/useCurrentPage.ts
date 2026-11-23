@@ -22,7 +22,7 @@ export interface UseCurrentPageOptions {
 /** useCurrentPage 返回值 */
 export interface UseCurrentPageResult {
   /** 跳到指定页 */
-  scrollToPage: (page: number, options?: { smooth?: boolean }) => void;
+  scrollToPage: (page: number, options?: { smooth?: boolean; offsetY?: number }) => void;
 }
 
 /**
@@ -80,7 +80,7 @@ export function useCurrentPage(options: UseCurrentPageOptions): UseCurrentPageRe
 
   /** 跳页 */
   const scrollToPage = useCallback(
-    (page: number, options: { smooth?: boolean } = {}) => {
+    (page: number, options: { smooth?: boolean; offsetY?: number } = {}) => {
       const container = containerRef.current;
       if (!container) {
         return;
@@ -108,7 +108,18 @@ export function useCurrentPage(options: UseCurrentPageOptions): UseCurrentPageRe
 
       const behavior = options.smooth === false || isFar || isLongDistance ? 'auto' : 'smooth';
 
-      container.scrollTo({ top, behavior });
+      /*
+       * ⚠️ **页内偏移**（内部链接跳到"那一行"用）。
+       *
+       * -> 目标页 == 当前页时 -> dest 里有 **y 坐标** ✅
+       *   -> 只跳页顶的话 -> **看不到目标** ❌
+       *   -> 用户要求："目标页=当前页 如果定位行数不一样也是要跳转的" ✅
+       *
+       * -> \`offsetY\` 是**容器内的 px**（正数 = 往下）✅
+       */
+      const target = options.offsetY ? top + options.offsetY : top;
+
+      container.scrollTo({ top: target, behavior });
     },
     [containerRef, pageTops],
   );

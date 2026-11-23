@@ -14,6 +14,7 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import type { LinkAnnotationLike } from '../core/annotation/links';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import type { HighlightPalette } from '../core/highlight/palette';
+import type { InternalLinkContext } from '../core/outline/link-context';
 import type { IndexOffset } from '../core/search/align';
 import type { SearchHitRect } from '../core/search/highlight';
 import type { PageSelectionShape } from '../core/selection/shape';
@@ -81,7 +82,7 @@ export interface PageProps {
    * → inline 函数每次渲染都是新引用 → **`React.memo` 失效** → 拖动选区时
    *   18 个页全部重渲染 → 卡顿（实测的性能坑）。
    */
-  onInternalLink?: (dest: string | unknown[], pageNumber: number) => void;
+  onInternalLink?: (ctx: InternalLinkContext) => void;
   /** 渲染失败 */
   onRenderError?: (error: unknown, pageNumber: number) => void;
   /**

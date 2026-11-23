@@ -37,6 +37,7 @@ import { pdfViewerError } from '../core/errors';
 import type { HighlightRect as HitRect } from '../core/highlight/hit-test';
 import { pickHighlightAtPoint } from '../core/highlight/hit-test';
 import type { HighlightPalette } from '../core/highlight/palette';
+import type { InternalLinkContext } from '../core/outline/link-context';
 import type { OutlineItemLike } from '../core/outline/outline';
 import { resolveOutlinePageNumbers } from '../core/outline/resolve';
 import type { PAPER_SIZES, PaperSize, PrintMargin } from '../core/print';
@@ -657,8 +658,37 @@ export interface PdfViewerProps {
   showPasswordDialog?: boolean;
   /** 外部链接点击（宿主决定怎么开） */
   onExternalLink?: (url: string) => void;
-  /** 内部链接点击（宿主解析 dest → 页码） */
-  onInternalLink?: (dest: string | unknown[], pageNumber: number) => void;
+  /**
+   * **内部链接点击**（包内跳转 + 宿主可拦截）。
+   *
+   * ## ⚠️⚠️ **语义变更**（用户明确要求："包都自动跳 但是提供取消回调给宿主
+   *   宿主可以自己控制不让他跳 目标页=当前页 如果定位行数不一样也是要跳转的"）
+   *
+   * ### 现在的契约
+   *
+   * ```ts
+   * onInternalLink?: (ctx: InternalLinkContext) => void;
+   * ```
+   *
+   * -> 字段见 `InternalLinkContext` ✅
+   *
+   * ### 流程（**跳转只有一个执行者** -> 不会跳两次）
+   *
+   * ```
+   * 点内部链接
+   *   → 包用 resolvePageRef 解析 dest -> targetPage
+   *   → 调 onInternalLink({ dest, targetPage, currentPage, cancel })
+   *       → 宿主不调 cancel() -> **包跳** ✅
+   *       → 宿主调 cancel()     -> **包不跳** ✅
+   * ```
+   *
+   * ### ⚠️ **为什么"目标页 == 当前页"也要跳**
+   *
+   * -> dest 里还有 **y 坐标**（\`dest[3]\`）-> 目标在当前页的**某一行** ✅
+   * -> 只跳页顶的话 -> **看不到目标** ❌
+   * -> 所以：**跳到那一行**（不是页顶）✅
+   */
+  onInternalLink?: (ctx: InternalLinkContext) => void;
   /** 自定义内容（渲染在工具栏下方，宿主可放自己的面板） */
   children?: ReactNode;
 }
@@ -1772,6 +1802,136 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     [findLinkAtPoint],
   );
 
+  /*
+   * ⚠️⚠️ **内部链接的幂等锁**（用户要求："宿主为什么跳两次？这个逻辑我不认可 需要加鲁棒性"）。
+   *
+   * -> 同一目标页 **200ms 内**不重复跳 ✅
+   * -> 防"包跳了 + 宿主也跳了" -> **滚两下** ❌
+   */
+  const lastInternalJumpRef = useRef<{ page: number; time: number } | null>(null);
+
+  /*
+   * ⚠️ **"页引用 / 命名目标 -> 页码"的解析器**（内部链接 + 目录用）。
+   *
+   * ## ⚠️⚠️ **必须是【异步】的**（审计发现的**真 bug**）
+   *
+   * -> 之前只用了**同步**的 `pageRefToNumber` ❌
+   *   -> 但 PDF 里的链接**大量是"命名目标"**（`"section.1"`）✅
+   *   -> 命名目标要 `getDestination()`（**异步**）才能展开 ❌
+   *   -> 宿主的 `resolvePageRef` 正是干这个的 ✅
+   *   -> 不用它 -> **内部链接永远解析不出来** ❌
+   *   ->   -> 用户点链接**没反应** ❌（用户反馈："点击目录或者是可以跳转的链接还是没办法进行跳转"）
+   *
+   * ### 现在的解析顺序
+   *
+   * 1. 宿主的 **`resolvePageRef`**（异步，能处理命名目标）✅
+   * 2. 宿主的 **`pageRefToNumber`**（同步）✅
+   * 3. 包自己解析出来的 **`outlinePageMapper`**（目录解析的结果）✅
+   * 4. 都没有 -> `null` -> **提示"链接无法跳转"**（不静默）✅
+   */
+  const resolveRefAsync = useCallback(
+    async (ref: unknown): Promise<number | null> => {
+      if (resolvePageRef) {
+        try {
+          const resolved = await resolvePageRef(ref);
+          if (resolved !== null && resolved !== undefined && resolved >= 1) {
+            return resolved;
+          }
+        } catch {
+          // 解析失败 -> 试下一个
+        }
+      }
+      if (pageRefToNumber) {
+        const page = pageRefToNumber(ref);
+        if (page !== null && page >= 1) {
+          return page;
+        }
+      }
+      if (outlinePageMapper) {
+        const page = outlinePageMapper(ref);
+        if (page !== null && page >= 1) {
+          return page;
+        }
+      }
+      return null;
+    },
+    [resolvePageRef, pageRefToNumber, outlinePageMapper],
+  );
+
+  /**
+   * **解析 dest -> 目标页**（异步）。
+   *
+   * -> 数组形态：第一个元素是页引用 -> 查映射 ✅
+   * -> 字符串形态：**命名目标** -> 先展开（异步）-> 再查映射 ✅
+   */
+  const resolveDestPageAsync = useCallback(
+    async (dest: string | unknown[]): Promise<number | null> => {
+      if (!dest) {
+        return null;
+      }
+      if (Array.isArray(dest)) {
+        if (dest.length === 0) {
+          return null;
+        }
+        const page = await resolveRefAsync(dest[0]);
+        return page !== null && page >= 1 ? page : null;
+      }
+      if (typeof dest === 'string') {
+        const page = await resolveRefAsync(dest);
+        return page !== null && page >= 1 ? page : null;
+      }
+      return null;
+    },
+    [resolveRefAsync],
+  );
+
+  /**
+   * **同步的**解析器（目录面板用 —— 它要立刻显示"能不能跳"）。
+   *
+   * ⚠️ 目录用的是**页引用**（不是命名目标）-> 同步映射够用 ✅
+   * -> 命名目标（内部链接）走 `resolveRefAsync` ✅
+   */
+  const resolveRefSync = useCallback(
+    (ref: unknown): number | null => {
+      if (pageRefToNumber) {
+        return pageRefToNumber(ref);
+      }
+      if (outlinePageMapper) {
+        return outlinePageMapper(ref);
+      }
+      return null;
+    },
+    [pageRefToNumber, outlinePageMapper],
+  );
+
+  /*
+   * ⚠️ **PDF 点坐标 -> 容器内的 px 偏移**（页内跳转用）。
+   *
+   * -> dest[3] 是 PDF 的 y 坐标（**从页面底部往上**）✅
+   * -> 要换成"容器里往下多少 px" ✅
+   * -> 需要页的 pt 高度 -> 缩放比例 = 渲染高度 / pt 高度 ✅
+   *
+   * ⚠️ **为什么需要它**：
+   * -> 用户要求："目标页=当前页 如果定位行数不一样也是要跳转的" ✅
+   * -> 只跳页顶 -> **看不到目标那一行** ❌
+   */
+  const ptToContainerOffset = useCallback(
+    (targetY: number, pageNumber: number): number | undefined => {
+      const pt = pageSizesPt[pageNumber - 1];
+      if (!pt?.height) {
+        return undefined;
+      }
+      // PDF 的 y 从底部往上 -> 距离页顶 = ptHeight - y
+      const fromTopPt = pt.height - targetY;
+      if (fromTopPt < 0) {
+        return undefined;
+      }
+      // pt -> 视口 px（乘当前缩放）
+      return fromTopPt * scale;
+    },
+    [pageSizesPt, scale],
+  );
+
   /**
    * **容器上的链接点击委托**。
    *
@@ -1784,7 +1944,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * → 拖动时根本不触发 `click` → 文本层正常选区 ✅
    */
   const handleContainerClick = useCallback(
-    (event: React.MouseEvent<HTMLElement>) => {
+    async (event: React.MouseEvent<HTMLElement>) => {
       if (!onExternalLink && !onInternalLink) {
         return;
       }
@@ -1832,16 +1992,121 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         onExternalLink?.(url);
         return;
       }
-      if (destRaw) {
-        try {
-          const dest = JSON.parse(destRaw) as unknown[];
-          onInternalLink?.(dest, Number.isFinite(pageNumber) ? pageNumber : 1);
-        } catch {
-          // 解析失败 → 忽略（不抛给宿主）
-        }
+      if (!destRaw) {
+        return;
       }
+
+      /*
+       * ⚠️⚠️ **内部链接：包自己跳 + 宿主可拦截**（用户要求：
+       * "包都自动跳 但是提供取消回调给宿主 宿主可以自己控制不让他跳"）。
+       *
+       * ### 跳转只有一个执行者（**不会跳两次**）
+       *
+       * -> 包解析 dest -> targetPage ✅
+       * -> 调 `onInternalLink(ctx)`（带 `cancel()`）✅
+       *    -> 宿主**不调** `cancel()` -> **包跳** ✅
+       *    -> 宿主**调** `cancel()`     -> **包不跳** ✅
+       * -> 宿主的回调**只被通知**，**不要求宿主再跳一次** ✅
+       *    -> 之前的设计是"包跳 + 宿主也跳" -> **跳两次** ❌
+       */
+      let dest: string | unknown[];
+      try {
+        dest = JSON.parse(destRaw) as unknown[];
+      } catch {
+        // 解析失败 -> 忽略（不抛给宿主）
+        return;
+      }
+
+      // ⚠️ **幂等锁**：同一目标页短时间内不重复跳（防"跳两次"）
+      const now = Date.now();
+
+      /*
+       * ⚠️⚠️ **解析目标页是【异步】的**（审计修复）。
+       *
+       * -> PDF 里的链接**大量是"命名目标"**（`"section.1"`）✅
+       * -> 命名目标要 `getDestination()`（**异步**）才能展开成页引用 ❌
+       * -> 之前只用**同步**的 `pageRefToNumber` -> **永远解析不出来** ❌
+       *   -> 用户点链接**没反应** ❌
+       * -> 现在：用 `resolveRefAsync`（优先宿主的 `resolvePageRef`）✅
+       */
+      const targetPage = await resolveDestPageAsync(dest);
+
+      /*
+       * ⚠️ **dest 里的 y 坐标**（PDF 点坐标）。
+       *
+       * -> 目标页 == 当前页时 -> 要滚到**那一行** ✅
+       *   -> 用户要求："目标页=当前页 如果定位行数不一样也是要跳转的" ✅
+       */
+      const targetY = Array.isArray(dest) && typeof dest[3] === 'number' ? dest[3] : null;
+
+      let cancelled = false;
+      const cancel = () => {
+        cancelled = true;
+      };
+
+      onInternalLink?.({
+        dest,
+        targetPage,
+        currentPage: Number.isFinite(pageNumber) ? pageNumber : 1,
+        targetY,
+        cancel,
+      });
+
+      // 宿主取消了 -> 不跳
+      if (cancelled) {
+        return;
+      }
+
+      /*
+       * ⚠️ **解析不出目标页 -> 不能静默**（鲁棒性）。
+       *
+       * -> 宿主没给 `resolvePageRef` / `pageRefToNumber` -> 解析不出来 ✅
+       * -> 之前：**什么都不做** -> 用户点了链接"没反应" ❌
+       * -> 现在：**提示** ✅
+       */
+      if (targetPage === null) {
+        toast.info(t('link.unresolved'));
+        return;
+      }
+
+      /*
+       * ⚠️ **幂等锁**：同一目标页 200ms 内不重复跳。
+       *
+       * -> 防"宿主和包都跳"导致**滚两下** ✅
+       * -> 用户明确要求："宿主为什么跳两次？这个逻辑我不认可 需要加鲁棒性" ✅
+       */
+      if (
+        lastInternalJumpRef.current &&
+        lastInternalJumpRef.current.page === targetPage &&
+        now - lastInternalJumpRef.current.time < 200
+      ) {
+        return;
+      }
+      lastInternalJumpRef.current = { page: targetPage, time: now };
+
+      /*
+       * ⚠️ **目标页 == 当前页 -> 滚到"那一行"**（不是页顶）。
+       *
+       * -> dest[3] 是 PDF 点坐标 -> 要换算成容器内的 px ✅
+       * -> `getPageSizes` 给出页的 pt 尺寸 -> 用它换算缩放 ✅
+       */
+      const offsetY =
+        targetPage === (Number.isFinite(pageNumber) ? pageNumber : 1) && targetY !== null
+          ? ptToContainerOffset(targetY, targetPage)
+          : undefined;
+
+      scrollToPage(targetPage, offsetY !== undefined ? { offsetY } : undefined);
     },
-    [onExternalLink, onInternalLink, findLinkAtPoint],
+    [
+      onExternalLink,
+      onInternalLink,
+      findLinkAtPoint,
+      t,
+      toast,
+      scrollToPage,
+      ptToContainerOffset,
+      resolveDestPageAsync,
+    ],
   );
 
   /**
@@ -3962,7 +4227,21 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                  * ⚠️ **宿主的同步映射优先** → 宿主的**异步映射**（包解析的）兜底 ✅
                  * → 都不给 → 目录项显示"解析中"，点了会记下意图（等映射好了自动跳）
                  */
-                pageRefToNumber={pageRefToNumber ?? outlinePageMapper ?? (() => null)}
+                /*
+                 * ⚠️⚠️ **不能再用内联箭头函数**（审计发现的真 bug）。
+                 *
+                 * -> 之前是 `() => null` ❌
+                 *   -> **每次渲染都是新函数** ❌
+                 *   -> `OutlinePanel` 的 `useMemo(flattenOutline, [..., pageRefToNumber])` 依赖**永远变** ❌
+                 *   -> 目录**每次渲染都重算** ❌
+                 *   -> 而且**永远返回 null** -> **目录点了没反应** ❌
+                 *
+                 * -> 现在：用**稳定的** `resolveRefSync` ✅
+                 *   -> 宿主的 `pageRefToNumber` 优先 ✅
+                 *   -> 否则用包自己解析出来的 `outlinePageMapper` ✅
+                 *   -> 都没有 -> 返回 null -> **给出可见提示**（不静默）✅
+                 */
+                pageRefToNumber={resolveRefSync}
                 resolveToken={internalResolveToken + (outlineResolveToken ?? 0)}
                 currentPage={page}
                 onPageSelect={(target) => scrollToPage(target)}

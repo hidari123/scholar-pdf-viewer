@@ -122,6 +122,16 @@ export function OutlinePanel(props: OutlinePanelProps) {
     });
   }, []);
 
+  /*
+   * ⚠️⚠️ **"完全解析不出来"的可见提示**（审计修复：之前是**静默无反应**）。
+   *
+   * -> 宿主既没给 `pageRefToNumber`，也没给 `resolvePageRef` ❌
+   *   -> 目录项的 `pageNumber` **全是 null** ❌
+   *   -> 用户点了**没反应**，看起来像坏了 ❌
+   * -> 现在：**显示一条提示** ✅（告诉用户要提供映射）
+   */
+  const allUnresolved = flatItems.length > 0 && flatItems.every((item) => item.pageNumber === null);
+
   if (flatItems.length === 0) {
     return null;
   }
@@ -129,6 +139,8 @@ export function OutlinePanel(props: OutlinePanelProps) {
   return (
     <aside className="scpdf-panel scpdf-panel--outline" aria-label={t('outline.title')}>
       <h2 className="scpdf-panel__title">{t('outline.title')}</h2>
+
+      {allUnresolved ? <p className="scpdf-panel__hint">{t('outline.unresolvedHint')}</p> : null}
 
       <nav className="scpdf-outline">
         {visibleItems.map((item) => {

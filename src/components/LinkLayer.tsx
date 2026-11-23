@@ -24,6 +24,7 @@
 import { useCallback, useMemo } from 'react';
 import type { LinkAnnotationLike } from '../core/annotation/links';
 import { linkToViewRect, normalizeLinks } from '../core/annotation/links';
+import type { InternalLinkContext } from '../core/outline/link-context';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 
@@ -40,7 +41,7 @@ export interface LinkLayerProps {
   /** 点击外部链接（宿主决定怎么开：新窗口 / 应用内） */
   onExternalLink?: (url: string) => void;
   /** 点击内部跳转（宿主解析 dest → 页码） */
-  onInternalLink?: (dest: string | unknown[], pageNumber: number) => void;
+  onInternalLink?: (ctx: InternalLinkContext) => void;
   /**
    * **语言**（用于文案）。
    *
@@ -137,7 +138,27 @@ export function LinkLayer(props: LinkLayerProps) {
                 if (link.url) {
                   onExternalLink?.(link.url);
                 } else if (link.dest) {
-                  onInternalLink?.(link.dest, pageNumber);
+                  /*
+                   * ⚠️ **内部链接：包自己跳 + 宿主可拦截**（语义变更）。
+                   *
+                   * -> 之前是 `onInternalLink(dest, pageNumber)` ❌
+                   *   -> `pageNumber` 是**链接所在页**，不是目标页 ❌
+                   * -> 现在：**一个上下文对象** ✅
+                   *   -> `targetPage` = 包解析出来的**目标页** ✅
+                   *   -> `cancel()` = 宿主可以**取消这次跳转** ✅
+                   *
+                   * ⚠️ **键盘触发也要走同一条路**（否则键盘和鼠标行为不一致）✅
+                   */
+                  onInternalLink?.({
+                    dest: link.dest,
+                    targetPage: null,
+                    currentPage: pageNumber,
+                    targetY:
+                      Array.isArray(link.dest) && typeof link.dest[3] === 'number'
+                        ? link.dest[3]
+                        : null,
+                    cancel: () => {},
+                  });
                 }
               }
             }}

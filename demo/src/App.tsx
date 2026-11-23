@@ -1269,22 +1269,36 @@ export default function App() {
             globalThis.open?.(url, '_blank', 'noopener,noreferrer');
             setHint(`打开外链：${url}`);
           }}
-          onInternalLink={(dest, pageNumber) => {
+          onInternalLink={(ctx) => {
             /*
-             * ⚠️ **内部跳转（PDF 目录里的链接）**。
+             * ⚠️ **内部跳转（PDF 里的页内链接）**。
              *
-             * → 宿主不接这个回调 -> 包**什么都不做**（"宿主没配就不响应"）❌
-             *   （实测：不接的话点 PDF 目录页里的章节链接**页面不动** ❌）
-             * -> 接上 -> **跳到对应页** ✅
+             * ### 现在的契约（包自己跳 + 宿主可拦截）
              *
-             * ⚠️ 这里用**页码**跳转（demo 的 PDF 目录用的是具名目标 `section.N`，
-             *    宿主可以自己解析 `dest` 拿到更精确的位置）。
+             * -> `ctx.targetPage` = **目标页**（包解析出来的）✅
+             *    -> 之前给的是**链接所在页**（没用）❌
+             * -> `ctx.currentPage` = 链接**所在**的页 ✅
+             * -> `ctx.targetY` = 目标在页内的 y 坐标（跳到**那一行**用）✅
+             * -> `ctx.cancel()` = **取消这次跳转** ✅
+             *
+             * ### ⚠️ **默认行为：包自己跳** ✅
+             *
+             * -> **不要**在这里再调 `goToPage` ❌
+             *    -> 包已经跳了 -> **会跳两次** ❌
+             * -> 想自己接管（比如弹确认框）-> 调 `ctx.cancel()` ✅
              */
-            const named = typeof dest === 'string' ? dest : null;
+            const named = typeof ctx.dest === 'string' ? ctx.dest : null;
             setHint(
-              named ? `内部跳转：${named}（第 ${pageNumber} 页）` : `内部跳转：第 ${pageNumber} 页`,
+              named
+                ? `内部跳转：${named}（第 ${ctx.targetPage ?? ctx.currentPage} 页）`
+                : `内部跳转：第 ${ctx.targetPage ?? ctx.currentPage} 页`,
             );
-            viewerRef.current?.goToPage(pageNumber);
+            /*
+             * ⚠️ **这里演示"取消"**（宿主自己接管的情况）。
+             * -> 注释掉下面这行 -> 包**自动跳** ✅
+             * -> 取消它 -> 包**不跳** ✅
+             */
+            // ctx.cancel();
           }}
           onPageChange={(p) => setCurrentPage(p)}
           onZoomChange={(s) => setScale(s)}

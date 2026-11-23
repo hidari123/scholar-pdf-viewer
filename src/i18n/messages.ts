@@ -126,6 +126,15 @@ export interface Messages {
    *   -> 选区浮层（选中文字）走 i18n -> 英文 ✅
    *   -> **两个浮层并排 -> "中英文混杂"** ✅
    */
+  /*
+   * ⚠️ **内部链接跳转**（审计修复：之前解析不出来时**什么都不做** -> 点了没反应）。
+   */
+  'link.unresolved': string;
+  /**
+   * ⚠️ **目录页码解析不出来时的提示**（之前是**静默无反应**）。
+   */
+  'outline.unresolvedHint': string;
+  'link.jumped': string;
   'highlight.actionComment': string;
   'highlight.actionColor': string;
   'highlight.actionCopy': string;
@@ -278,6 +287,9 @@ export const ZH_MESSAGES: Messages = {
   'richtext.linkHrefPlaceholder': '粘贴或输入链接',
   'richtext.linkTextPlaceholder': '默认显示链接地址',
   'highlight.fullyCovered': '这段已经被高亮了',
+  'link.unresolved': '这个链接无法跳转（文档缺少页码映射）',
+  'outline.unresolvedHint': '无法定位页码：请提供 resolvePageRef 或 pageRefToNumber',
+  'link.jumped': '已跳转到第 {page} 页',
   'highlight.actionComment': '批注',
   'highlight.actionColor': '颜色',
   'highlight.actionCopy': '复制',
@@ -382,6 +394,9 @@ export const EN_MESSAGES: Messages = {
   'richtext.linkHrefPlaceholder': 'Paste or type a link',
   'richtext.linkTextPlaceholder': 'Defaults to the link URL',
   'highlight.fullyCovered': 'This text is already highlighted',
+  'link.unresolved': 'This link cannot be resolved (the document has no page mapping)',
+  'outline.unresolvedHint': 'Cannot locate pages: provide resolvePageRef or pageRefToNumber',
+  'link.jumped': 'Jumped to page {page}',
   'highlight.actionComment': 'Comment',
   'highlight.actionColor': 'Color',
   'highlight.actionCopy': 'Copy',

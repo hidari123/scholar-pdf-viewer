@@ -127,6 +127,10 @@ export const BUILTIN_LOCALES: LocaleTable = {
     'toast.region': '通知',
     'richtext.linkPrompt': 'リンク先',
     'highlight.fullyCovered': 'このテキストはすでにハイライトされています',
+    'link.unresolved': 'このリンクは解決できません（ページにマッピングがありません）',
+    'outline.unresolvedHint':
+      'ページ番号を特定できません：resolvePageRef か pageRefToNumber を渡してください',
+    'link.jumped': '{page} ページに移動しました',
     'highlight.actionComment': 'コメントを追加',
     'highlight.actionColor': 'ハイライト色',
     'highlight.actionCopy': 'コピー',
@@ -229,6 +233,10 @@ export const BUILTIN_LOCALES: LocaleTable = {
     'toast.region': 'Notifications',
     'richtext.linkPrompt': 'URL du lien',
     'highlight.fullyCovered': 'Ce texte est déjà surligné',
+    'link.unresolved': "Ce lien ne peut pas être résolu (le document n'a pas de mappage de page)",
+    'outline.unresolvedHint':
+      'Impossible de localiser les pages : fournissez resolvePageRef ou pageRefToNumber',
+    'link.jumped': 'Allé à la page {page}',
     'highlight.actionComment': 'Ajouter un commentaire',
     'highlight.actionColor': 'Couleur du surlignage',
     'highlight.actionCopy': 'Copier',

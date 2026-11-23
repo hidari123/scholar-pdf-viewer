@@ -2049,6 +2049,22 @@
   opacity: 0.8;
 }
 
+/*
+ * ⚠️ **面板里的提示**（比如"目录页码解析不出来"）。
+ *
+ * -> 之前是**静默无反应** -> 用户以为坏了 ❌
+ * -> 现在：**明确告诉用户要提供什么** ✅
+ */
+.scpdf-panel__hint {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--scpdf-color-surface-muted, rgba(0, 0, 0, 0.04));
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--scpdf-color-text-muted, rgba(0, 0, 0, 0.62));
+}
+
 /* 缩略图 */
 
 .scpdf-thumbnails {

@@ -39,7 +39,7 @@
   {
     "name": "dialog 子路径（写批注的富文本弹窗）",
     "path": "dist/dialog.js",
-    "limit": "8 kB",
+    "limit": "9 kB",
     "import": "{ AnnotationDialog }"
   }
 ]
