@@ -61,6 +61,7 @@ import type { Locale, LocaleMessages, LocaleTable, Messages } from '../../i18n/m
 import type { RichTextPalette, RichTextToolbarItem } from '../editor/rich-text';
 import type { HighlightPalette } from '../highlight/palette';
 import type { IconName } from '../icons/icons';
+import type { PAPER_SIZES, PaperSize, PrintMargin } from '../print';
 import type { SelectionAction } from '../selection/actions';
 import type { PdfViewerAppearance, PdfViewerTheme, ToolbarConfig } from '../theme';
 import {
@@ -140,6 +141,15 @@ export interface PdfViewerConfig {
   toolbar?: ToolbarConfig;
   /** 功能开关（默认全开；只有显式写 `false` 才关） */
   features?: Partial<Features>;
+  /**
+   * **打印纸张**（默认 `'A4'`）。
+   *
+   * ⚠️ **之前写死 A4** -> 美洲市场的 Letter 用户**打印会超出页面** ❌
+   * -> 现在：**宿主可配** ✅
+   */
+  printPaper?: keyof typeof PAPER_SIZES | PaperSize;
+  /** 打印边距（mm，部分覆盖） */
+  printMargin?: Partial<PrintMargin>;
 }
 
 /**
@@ -216,6 +226,8 @@ export function mergeConfig(
     annotationPalette?: RichTextPalette;
     toolbar?: PdfViewerConfig['toolbar'];
     features?: Record<string, boolean>;
+    printPaper?: PdfViewerConfig['printPaper'];
+    printMargin?: PdfViewerConfig['printMargin'];
   },
 ) {
   const c = config ?? {};
@@ -256,6 +268,13 @@ export function mergeConfig(
       BUILTIN_ANNOTATION_PALETTE,
     toolbar: resolveConfigValue(props.toolbar, c.toolbar),
     features: resolveConfigValue(props.features, c.features),
+    /*
+     * ⚠️ **打印纸张 / 边距**（审计发现的：之前**写死 A4**）。
+     * -> 美洲市场的 Letter 用户打印会**超出页面** ❌
+     * -> 现在：**宿主可配**（prop > config > 默认 A4）✅
+     */
+    printPaper: resolveConfigValue(props.printPaper, c.printPaper),
+    printMargin: resolveConfigValue(props.printMargin, c.printMargin),
   };
 }
 

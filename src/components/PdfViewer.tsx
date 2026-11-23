@@ -39,6 +39,7 @@ import { pickHighlightAtPoint } from '../core/highlight/hit-test';
 import type { HighlightPalette } from '../core/highlight/palette';
 import type { OutlineItemLike } from '../core/outline/outline';
 import { resolveOutlinePageNumbers } from '../core/outline/resolve';
+import type { PAPER_SIZES, PaperSize, PrintMargin } from '../core/print';
 import type { IndexOffset } from '../core/search/align';
 import { alignRenderedToIndex } from '../core/search/align';
 import type { SearchHitRect } from '../core/search/highlight';
@@ -332,6 +333,32 @@ export interface PdfViewerProps {
    */
   printMode?: 'with-highlights' | 'original';
   /**
+   * **打印纸张**（默认 `'A4'`）。
+   *
+   * ⚠️ **之前写死 A4**（审计发现的）：
+   * -> 美洲市场用 **Letter**（215.9 × 279.4mm）❌
+   *   -> 包按 A4 算缩放 -> 打印出来**可能超出页面** ❌
+   * -> 现在：**宿主可以指定** ✅
+   *
+   * ```tsx
+   * <PdfViewer printPaper="Letter" />
+   * <PdfViewer printPaper={{ width: 210, height: 297 }} />  // 自定义
+   * ```
+   *
+   * 内置：`'A4'` `'A3'` `'Letter'` `'Legal'`
+   */
+  printPaper?: keyof typeof PAPER_SIZES | PaperSize;
+  /**
+   * **打印边距**（mm，**部分覆盖**）。
+   *
+   * ```tsx
+   * <PdfViewer printMargin={{ top: 20, bottom: 20 }} />
+   * ```
+   *
+   * ⚠️ **不传就用 `DEFAULT_PRINT_MARGIN`（四边 12mm）** ✅
+   */
+  printMargin?: Partial<PrintMargin>;
+  /**
    * **插槽**（方案 D：完全自定义）。
    *
    * 每个槽给了就**替换**内置的那块；不给就用内置的。
@@ -609,6 +636,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     initialPage = 1,
     initialScale = 'width',
     printMode = 'with-highlights',
+    printPaper = 'A4',
+    printMargin,
     slots,
     getPage,
     getPageSizes,
@@ -679,6 +708,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         annotationPalette: props.annotationPalette,
         toolbar: props.toolbar,
         features: props.features,
+        printPaper: props.printPaper,
+        printMargin: props.printMargin,
       }),
     [
       props.config,
@@ -694,6 +725,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       props.annotationPalette,
       props.toolbar,
       props.features,
+      props.printPaper,
+      props.printMargin,
     ],
   );
 
@@ -1366,7 +1399,16 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    */
   const { print: printDocument } = usePrint({
     pageSizePt: pageSizesPt[0],
-    paper: 'A4',
+    /*
+     * ⚠️ **纸张不再写死 A4**（审计发现的）。
+     *
+     * -> 之前是 \`paper: 'A4'\` ❌
+     *   -> 美洲市场用 Letter -> 包按 A4 算缩放 -> **打印可能超出页面** ❌
+     * -> 现在：**宿主可配**（\`printPaper\` prop 或 \`config.printPaper\`）✅
+     */
+    paper: merged.printPaper ?? printPaper,
+    /** 边距（部分覆盖；不传用默认 12mm） */
+    margin: merged.printMargin ?? printMargin,
     /*
      * ⚠️ **传页数** → 打印用的 CSS 变量会**一直**保持正确
      * → 用户按 **Ctrl+P**（不经过我们的按钮）也能得到正确的缩放

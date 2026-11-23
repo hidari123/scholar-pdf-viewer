@@ -89,4 +89,29 @@ describe('mergeConfig（统一配置）', () => {
     expect(merged.toolbar?.showSearch).toBe(false);
     expect(merged.features?.keyboard).toBe(false);
   });
+
+  /*
+   * ⚠️ **打印纸张 / 边距**（审计发现的：之前**写死 A4**）。
+   */
+
+  it('**config 里能配打印纸张**', () => {
+    const merged = mergeConfig({ printPaper: 'Letter' }, {});
+    expect(merged.printPaper).toBe('Letter');
+  });
+
+  it('**单独 prop 覆盖 config 的打印纸张**', () => {
+    const merged = mergeConfig({ printPaper: 'Letter' }, { printPaper: 'Legal' });
+    expect(merged.printPaper).toBe('Legal');
+  });
+
+  it('**config 里能配打印边距**', () => {
+    const merged = mergeConfig({ printMargin: { top: 20 } }, {});
+    expect(merged.printMargin).toEqual({ top: 20 });
+  });
+
+  it('**不配 -> undefined**（用 usePrint 的默认边距）', () => {
+    const merged = mergeConfig(undefined, {});
+    expect(merged.printPaper).toBeUndefined();
+    expect(merged.printMargin).toBeUndefined();
+  });
 });
