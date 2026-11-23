@@ -45,6 +45,15 @@ export type RichTextCommand =
   | 'strikeThrough'
   /** 高亮（背景色） */
   | 'hiliteColor'
+  /**
+   * **文字高亮**（背景色，**字色不变**）。
+   *
+   * ⚠️ **和 `hiliteColor` 的区别**：
+   * -> `hiliteColor` = 荧光笔效果（背景色 + 可能带浅色）
+   * -> `textHighlight` = 纯背景色，**字色完全不变** ✅（用户需求：
+   *    "这个颜色可以放在文字的高亮上"）
+   */
+  | 'textHighlight'
   /** 文字颜色 */
   | 'foreColor'
   /** 链接 */
@@ -84,8 +93,9 @@ export interface RichTextPalette {
  * | I 斜体 | `italic` | ✅ |
  * | U 下划线 | `underline` | ✅ |
  * | S 删除线 | `strikeThrough` | ✅ |
- * | A 文字颜色 | `foreColor` | ✅ |
  * | 高亮底色 | `hiliteColor` | ✅（有 palette 时） |
+ * | 文字高亮 | `textHighlight` | ✅（有 textPalette 时） |
+ * | A 文字颜色 | `foreColor` | ✅ |
  * | 链接 | `createLink` | ✅ |
  * | 无序列表 | `insertUnorderedList` | ✅ |
  * | 有序列表 | `insertOrderedList` | ✅ |
@@ -94,10 +104,20 @@ export interface RichTextPalette {
  * | 撤销 | `undo` | ✅ |
  * | 重做 | `redo` | ✅ |
  *
- * @param palette 高亮色板（用于 `hiliteColor`）
+ * ## ⚠️⚠️ **文字颜色必须用【深色】色板**（用户反馈："如果是放在文字上 就太浅了"）
+ *
+ * -> `palette`（高亮底色）= **浅色**（\`#fff3a3\` 这种）✅
+ * -> 拿来当**文字颜色** -> **浅得看不见** ❌
+ * -> 所以 `foreColor` **必须**用 `textPalette`（深色）✅
+ *
+ * @param palette 高亮色板（用于 `hiliteColor` / `textHighlight`）
+ * @param textPalette **文字颜色**色板（深色，用于 `foreColor`）
  * @returns 默认工具栏项
  */
-export function defaultRichTextToolbar(palette?: RichTextPalette): RichTextToolbarItem[] {
+export function defaultRichTextToolbar(
+  palette?: RichTextPalette,
+  textPalette?: RichTextPalette,
+): RichTextToolbarItem[] {
   const items: RichTextToolbarItem[] = [
     { command: 'bold', label: '{richtext.bold}', icon: 'bold' },
     { command: 'italic', label: '{richtext.italic}', icon: 'italic' },
@@ -114,8 +134,30 @@ export function defaultRichTextToolbar(palette?: RichTextPalette): RichTextToolb
     });
   }
 
+  /*
+   * ⚠️ **"文字高亮"按钮**（用户需求：
+   * "这个颜色可以放在文字的高亮上 增加一个添加文字高亮的按钮"）。
+   *
+   * -> 和 `hiliteColor` 的区别：**字色不变**，只加背景色 ✅
+   * -> 用**高亮底色板**（浅色）-> 适合当背景 ✅
+   */
+  if (palette) {
+    items.push({
+      command: 'textHighlight',
+      label: '{richtext.textHighlight}',
+      icon: 'textHighlight',
+      palette,
+    });
+  }
+
   items.push(
-    { command: 'foreColor', label: '{richtext.textColor}', icon: 'textColor', palette },
+    // ⚠️ **文字颜色用【深色】色板**（浅色当字色看不见）✅
+    {
+      command: 'foreColor',
+      label: '{richtext.textColor}',
+      icon: 'textColor',
+      palette: textPalette,
+    },
     { command: 'createLink', label: '{richtext.link}', icon: 'link' },
     { command: 'insertUnorderedList', label: '{richtext.unorderedList}', icon: 'list' },
     { command: 'insertOrderedList', label: '{richtext.orderedList}', icon: 'listOrdered' },
@@ -206,14 +248,25 @@ export function execRichTextCommand(command: RichTextCommand, value?: string): v
    * execCommand('styleWithCSS', false, 'true')  再执行  → <span style="color: rgb(255,0,0)">
    * ```
    */
-  if (command === 'hiliteColor' || command === 'foreColor') {
+  if (command === 'hiliteColor' || command === 'foreColor' || command === 'textHighlight') {
     // ⚠️ **先开 CSS 模式**（全局状态，但只在执行前设置一次）
     try {
       document.execCommand('styleWithCSS', false, 'true');
     } catch {
       // 浏览器不支持 -> 退回默认（会生成 <font>，但至少不崩）
     }
-    document.execCommand(command, false, value ?? '#ffff00');
+    /*
+     * ⚠️ **"文字高亮" -> 用 `hiliteColor` 实现**（用户需求：
+     * "这个颜色可以放在文字的高亮上 增加一个添加文字高亮的按钮"）。
+     *
+     * -> `hiliteColor` 在浏览器里就是**设置背景色** ✅
+     * -> **不会改字色** ✅ -> 正好是"文字高亮"要的效果 ✅
+     */
+    document.execCommand(
+      command === 'textHighlight' ? 'hiliteColor' : command,
+      false,
+      value ?? '#ffff00',
+    );
     return;
   }
 

@@ -44,8 +44,15 @@ export interface RichTextEditorProps {
   placeholder?: string;
   /** 工具栏配置（**不传 → 用默认的**） */
   toolbar?: RichTextToolbarItem[];
-  /** 高亮色板 */
+  /** 高亮色板（**浅色**，当"高亮底色"用） */
   palette?: RichTextPalette;
+  /**
+   * **"文字颜色"色板**（**深色**）。
+   *
+   * ⚠️ **和 `palette` 分开**（用户反馈：
+   * "富文本的那个文字颜色 如果是放在文字上 就太浅了 文字可以适当加深颜色"）。
+   */
+  textPalette?: RichTextPalette;
   /** 内容变化（HTML） */
   onChange?: (html: string, plain: string) => void;
   /** 提交（Enter 或点按钮） */
@@ -77,6 +84,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
     placeholder,
     toolbar,
     palette,
+    textPalette,
     onChange,
     onSubmit,
     onCancel,
@@ -140,7 +148,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
   );
 
   /** 工具栏项（宿主没传 → 默认的） */
-  const items = toolbar ?? defaultRichTextToolbar(palette);
+  const items = toolbar ?? defaultRichTextToolbar(palette, textPalette);
 
   /** 是否为空（用来决定要不要显示占位符） */
   const [empty, setEmpty] = useState(value.length === 0);
@@ -350,7 +358,20 @@ export function RichTextEditor(props: RichTextEditorProps) {
       {/* 工具栏（宿主完全可配） */}
       <div className="scpdf-rich-text__toolbar" role="toolbar">
         {items.map((item) => {
-          const hasPalette = item.command === 'hiliteColor' || item.command === 'foreColor';
+          /*
+           * ⚠️ **三个颜色命令都会弹面板**（用户需求）。
+           *
+           * -> `hiliteColor`    = 高亮底色（浅色）✅
+           * -> `textHighlight` = 文字高亮（背景色，**字色不变**）✅
+           * -> `foreColor`     = 文字颜色（**深色**）✅
+           *
+           * -> `removeFormat`（清除格式）**不弹面板** -> 直接执行 ✅
+           *    （用户反馈："清空format这个功能的按钮和修改文字颜色的按钮一样 需要区分开"）
+           */
+          const hasPalette =
+            item.command === 'hiliteColor' ||
+            item.command === 'textHighlight' ||
+            item.command === 'foreColor';
           const paletteOpen = openPalette === item.command;
           /*
            * ⚠️ **按下态**（用户需求：
@@ -399,7 +420,9 @@ export function RichTextEditor(props: RichTextEditorProps) {
               {/* 颜色面板 */}
               {hasPalette && paletteOpen ? (
                 <span className="scpdf-rich-text__palette">
-                  {Object.entries(item.palette ?? palette ?? {}).map(([key, color]) => (
+                  {Object.entries(
+                    item.palette ?? (item.command === 'foreColor' ? textPalette : palette) ?? {},
+                  ).map(([key, color]) => (
                     <button
                       key={key}
                       type="button"

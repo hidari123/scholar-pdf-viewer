@@ -67,6 +67,10 @@ const suites = [
   { name: '批注 hover 的操作按钮 + 富文本预览', file: 'e2e-annotation-hover.mjs' },
   { name: '批注弹窗的定位 + 编辑器的样子', file: 'e2e-annotation-dialog-anchor.mjs' },
   { name: '富文本：文字颜色 + 清空格式', file: 'e2e-richtext-color.mjs' },
+  {
+    name: '富文本：深色字色 + 文字高亮 + 图标区分',
+    file: 'e2e-richtext-text-highlight.mjs',
+  },
   { name: '批注期间点到底下的高亮', file: 'e2e-annotation-highlight-under.mjs' },
   {
     name: '批注弹窗点击不误激活高亮',

@@ -165,6 +165,8 @@ export interface Messages {
   'richtext.underline': string;
   'richtext.strikeThrough': string;
   'richtext.highlight': string;
+  /** 文字高亮（背景色，字色不变） */
+  'richtext.textHighlight': string;
   'richtext.textColor': string;
   'richtext.link': string;
   'richtext.orderedList': string;
@@ -319,6 +321,7 @@ export const ZH_MESSAGES: Messages = {
   'richtext.underline': '下划线',
   'richtext.strikeThrough': '删除线',
   'richtext.highlight': '高亮',
+  'richtext.textHighlight': '文字高亮',
   'richtext.textColor': '文字颜色',
   'richtext.link': '链接',
   'richtext.orderedList': '有序列表',
@@ -426,6 +429,7 @@ export const EN_MESSAGES: Messages = {
   'richtext.underline': 'Underline',
   'richtext.strikeThrough': 'Strikethrough',
   'richtext.highlight': 'Highlight',
+  'richtext.textHighlight': 'Text highlight',
   'richtext.textColor': 'Text color',
   'richtext.link': 'Link',
   'richtext.orderedList': 'Ordered list',

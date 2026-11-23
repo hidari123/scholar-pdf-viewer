@@ -75,8 +75,15 @@ export interface TipTapEditorProps {
   onChange?: (html: string, plain: string) => void;
   /** 工具栏（宿主可配；不传 → 默认的） */
   toolbar?: RichTextToolbarItem[];
-  /** 高亮色板 */
+  /** 高亮色板（**浅色**，当"高亮底色"用） */
   palette?: RichTextPalette;
+  /**
+   * **"文字颜色"色板**（**深色**）。
+   *
+   * ⚠️ **和 `palette` 分开**（用户反馈：
+   * "富文本的那个文字颜色 如果是放在文字上 就太浅了 文字可以适当加深颜色"）。
+   */
+  textPalette?: RichTextPalette;
   /** 占位文案 */
   placeholder?: string;
   /** 图标覆盖 */
@@ -112,6 +119,7 @@ export function TipTapEditor(props: TipTapEditorProps) {
     onChange,
     toolbar,
     palette,
+    textPalette,
     placeholder,
     icons,
     locale = 'zh',
@@ -267,11 +275,11 @@ export function TipTapEditor(props: TipTapEditorProps) {
    */
   const items = useMemo(
     () =>
-      (toolbar ?? defaultRichTextToolbar(palette)).map((item) => ({
+      (toolbar ?? defaultRichTextToolbar(palette, textPalette)).map((item) => ({
         ...item,
         label: resolveToolbarLabel(item.label, locale, messages, locales),
       })),
-    [toolbar, palette, locale, messages, locales],
+    [toolbar, palette, textPalette, locale, messages, locales],
   );
 
   // ⚠️ **宿主没装 TipTap** → 回退到内置的轻量编辑器
@@ -282,6 +290,7 @@ export function TipTapEditor(props: TipTapEditorProps) {
         onChange={onChange}
         toolbar={items}
         palette={palette}
+        textPalette={textPalette}
         icons={icons}
         locale={locale}
         locales={locales}
@@ -329,13 +338,15 @@ function TipTapToolbar(props: {
   hostRef: React.RefObject<HTMLDivElement | null>;
   items: RichTextToolbarItem[];
   icons?: Partial<Record<IconName, ReactNode>>;
-  /** 颜色面板（文字颜色 / 高亮底色共用） */
+  /** 颜色面板（高亮底色 / 文字高亮共用，**浅色**） */
   palette?: RichTextPalette;
+  /** **文字颜色**色板（**深色**） */
+  textPalette?: RichTextPalette;
   t: (key: keyof Messages, vars?: Record<string, string | number>) => string;
   /** 嵌套弹窗的状态（通知外层） */
   onOverlayStateChange?: (hasOverlay: boolean) => void;
 }) {
-  const { hostRef, items, icons, palette, t, onOverlayStateChange } = props;
+  const { hostRef, items, icons, palette, textPalette, t, onOverlayStateChange } = props;
 
   /**
    * **当前展开的颜色面板**（命令名）。
@@ -608,6 +619,7 @@ function TipTapToolbar(props: {
       underline: 'toggleUnderline',
       strikeThrough: 'toggleStrike',
       hiliteColor: 'toggleHighlight',
+      textHighlight: 'toggleHighlight',
       foreColor: 'setColor',
       createLink: 'setLink',
       insertUnorderedList: 'toggleBulletList',
@@ -645,7 +657,7 @@ function TipTapToolbar(props: {
       return;
     }
 
-    if (command === 'hiliteColor') {
+    if (command === 'hiliteColor' || command === 'textHighlight') {
       if (value) {
         fn({ color: value } as never).run();
       } else {
@@ -848,7 +860,18 @@ function TipTapToolbar(props: {
            *
            * -> 和内置编辑器（`RichTextEditor`）**保持一致** ✅
            */
-          const hasPalette = item.command === 'hiliteColor' || item.command === 'foreColor';
+          /*
+           * ⚠️ **三个颜色命令都会弹面板**（用户需求）。
+           *
+           * -> `hiliteColor`    = 高亮底色 ✅
+           * -> `textHighlight` = 文字高亮（背景色，字色不变）✅
+           * -> `foreColor`     = 文字颜色（深色）✅
+           * -> `removeFormat`（清除格式）**不弹面板** -> 直接执行 ✅
+           */
+          const hasPalette =
+            item.command === 'hiliteColor' ||
+            item.command === 'textHighlight' ||
+            item.command === 'foreColor';
           return (
             <button
               key={item.command}
@@ -913,7 +936,9 @@ function TipTapToolbar(props: {
       {openPalette ? (
         <span className="scpdf-rich-text__palette">
           {Object.entries(
-            items.find((i) => i.command === openPalette)?.palette ?? palette ?? {},
+            items.find((i) => i.command === openPalette)?.palette ??
+              (openPalette === 'foreColor' ? textPalette : palette) ??
+              {},
           ).map(([key, color]) => (
             <button
               key={key}

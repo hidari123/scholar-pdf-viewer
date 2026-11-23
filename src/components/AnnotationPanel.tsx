@@ -58,8 +58,15 @@ export interface AnnotationPanelProps {
   onClose?: () => void;
   /** 富文本工具栏（宿主可配；不传 → 默认的） */
   toolbar?: RichTextToolbarItem[];
-  /** 高亮色板 */
+  /** 高亮色板（**浅色**，当"高亮底色"用） */
   palette?: RichTextPalette;
+  /**
+   * **"文字颜色"色板**（**深色**）。
+   *
+   * ⚠️ **和 `palette` 分开**（用户反馈：
+   * "富文本的那个文字颜色 如果是放在文字上 就太浅了 文字可以适当加深颜色"）。
+   */
+  textPalette?: RichTextPalette;
   /** 只读模式（只看不改） */
   readOnly?: boolean;
   /** 图标覆盖 */
@@ -80,6 +87,8 @@ export interface AnnotationPanelProps {
     onChange?: (html: string, plain: string) => void;
     toolbar?: RichTextToolbarItem[];
     palette?: RichTextPalette;
+    /** **文字颜色**色板（**深色**） */
+    textPalette?: RichTextPalette;
     placeholder?: string;
     icons?: Partial<Record<IconName, ReactNode>>;
     locale?: Locale;
@@ -103,6 +112,7 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
     onClose,
     toolbar,
     palette,
+    textPalette,
     readOnly = false,
     icons,
     locale = 'zh',
@@ -255,6 +265,7 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
                 value={draft}
                 toolbar={toolbar}
                 palette={palette}
+                textPalette={textPalette}
                 locale={locale}
                 locales={locales}
                 messages={messages}

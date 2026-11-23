@@ -66,6 +66,7 @@ import type { SelectionAction } from '../selection/actions';
 import type { PdfViewerAppearance, PdfViewerTheme, ToolbarConfig } from '../theme';
 import {
   BUILTIN_ANNOTATION_PALETTE,
+  BUILTIN_ANNOTATION_TEXT_PALETTE,
   BUILTIN_HIGHLIGHT_PALETTE,
   detectDefaultLocale,
   mergeLocales,
@@ -158,6 +159,17 @@ export interface PdfViewerConfig {
   annotationToolbar?: RichTextToolbarItem[];
   /** 批注编辑器的高亮色板 */
   annotationPalette?: RichTextPalette;
+  /**
+   * **批注编辑器的"文字颜色"色板**（**深色**）。
+   *
+   * ⚠️⚠️ **和 `annotationPalette` 分开**（用户反馈：
+   * "富文本的那个文字颜色 如果是放在文字上 就太浅了 文字可以适当加深颜色"）。
+   *
+   * -> `annotationPalette` = **浅色**（\`#fff3a3\` 这种）-> 当**高亮底色** ✅
+   * -> 拿来当**文字颜色** -> **浅得看不见** ❌
+   * -> 所以**单独一份深色板** ✅
+   */
+  annotationTextPalette?: RichTextPalette;
 
   /* —— 结构 —— */
 
@@ -255,6 +267,7 @@ export function mergeConfig(
     selectionActions?: SelectionAction[];
     annotationToolbar?: RichTextToolbarItem[];
     annotationPalette?: RichTextPalette;
+    annotationTextPalette?: RichTextPalette;
     toolbar?: PdfViewerConfig['toolbar'];
     features?: Record<string, boolean>;
     printPaper?: PdfViewerConfig['printPaper'];
@@ -297,6 +310,16 @@ export function mergeConfig(
     annotationPalette:
       resolveConfigValue(props.annotationPalette, c.annotationPalette) ??
       BUILTIN_ANNOTATION_PALETTE,
+    /*
+     * ⚠️⚠️ **文字颜色色板（深色）**（用户反馈：
+     * "富文本的那个文字颜色 如果是放在文字上 就太浅了 文字可以适当加深颜色"）。
+     *
+     * -> `annotationPalette` 是**浅色**（当高亮底色用）✅
+     * -> **文字颜色必须用深色** -> **单独一份** ✅
+     */
+    annotationTextPalette:
+      resolveConfigValue(props.annotationTextPalette, c.annotationTextPalette) ??
+      BUILTIN_ANNOTATION_TEXT_PALETTE,
     toolbar: resolveConfigValue(props.toolbar, c.toolbar),
     features: resolveConfigValue(props.features, c.features),
     /*
@@ -320,6 +343,8 @@ export function mergeConfig(
 export {
   /** 内置的批注色板（富文本"高亮底色"，6 色） */
   BUILTIN_ANNOTATION_PALETTE,
+  /** 内置的"文字颜色"色板（深色，7 色） */
+  BUILTIN_ANNOTATION_TEXT_PALETTE,
   /** 内置的高亮色板（8 色） */
   BUILTIN_HIGHLIGHT_PALETTE,
   /** 内置的语言表（中文 / 英文 / 日文 / 法文） */

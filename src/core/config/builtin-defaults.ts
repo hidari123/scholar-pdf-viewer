@@ -297,6 +297,37 @@ export const BUILTIN_ANNOTATION_PALETTE: RichTextPalette = {
 };
 
 /**
+ * **内置的"文字颜色"色板**（富文本编辑器里的"A 字色"）。
+ *
+ * ## ⚠️⚠️ **必须是【深色】**（用户反馈："如果是放在文字上 就太浅了 文字可以适当加深颜色"）
+ *
+ * -> `BUILTIN_ANNOTATION_PALETTE` 是**高亮底色**（\`#fff3a3\` 这种浅色）✅
+ * -> 拿来当**文字颜色** -> **浅得看不见** ❌
+ * -> 所以**单独一份深色板** ✅
+ *
+ * -> 深色板同时也能当**文字高亮**的底色（对比度更好）✅
+ *
+ * | 语义 key | 颜色 | 用途 |
+ * |---|---|---|
+ * | red | \`#c62828\` | 深红 |
+ * | blue | \`#1565c0\` | 深蓝 |
+ * | green | \`#2e7d32\` | 深绿 |
+ * | purple | \`#6a1b9a\` | 深紫 |
+ * | orange | \`#b26a00\` | 深橙 |
+ * | gray | \`#37474f\` | 深灰 |
+ * | black | \`#000000\` | 纯黑 |
+ */
+export const BUILTIN_ANNOTATION_TEXT_PALETTE: RichTextPalette = {
+  red: '#c62828',
+  blue: '#1565c0',
+  green: '#2e7d32',
+  purple: '#6a1b9a',
+  orange: '#b26a00',
+  gray: '#37474f',
+  black: '#000000',
+};
+
+/**
  * **推断默认语言**。
  *
  * → 之前是硬编码 `zh` → 很多宿主其实是英文站点 ❌

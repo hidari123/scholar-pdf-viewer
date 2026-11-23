@@ -94,6 +94,8 @@ export type IconName =
   | 'undo'
   | 'redo'
   | 'textColor'
+  /** 文字高亮（"A" + 背景块） */
+  | 'textHighlight'
   | 'list'
   | 'listOrdered'
   | 'menu'
@@ -328,6 +330,21 @@ export function getIconShape(name: IconName): IconShape | null {
         paths: ['M14 4l6 6-8 8H6v-6l8-8Z'],
         rects: [{ x: 4, y: 20, width: 16, height: 2, rx: 1 }],
       };
+    case 'textHighlight':
+      /*
+       * **文字高亮**（"A" + 文字**后面**的色块）。
+       *
+       * ⚠️ **必须和 `textColor` / `clearFormat` 长得不一样**（用户反馈：
+       * "清空format这个功能的按钮和修改文字颜色的按钮一样 需要区分开"）。
+       *
+       * -> `textColor`     = "A" + **下面**的色条 ✅
+       * -> `textHighlight` = "A" + **背后**的色块（像马克笔涂在字上）✅
+       * -> `clearFormat`   = "A" + **斜杠**划掉 ✅
+       */
+      return {
+        paths: ['M8 17 12 5l4 12', 'M9.5 13h5'],
+        rects: [{ x: 6, y: 8, width: 12, height: 9, rx: 1.5 }],
+      };
     case 'comment':
       // 对话气泡
       return {
@@ -533,10 +550,15 @@ export function getIconShape(name: IconName): IconShape | null {
         paths: ['M7 7h4v5a4 4 0 0 1-4 4z', 'M15 7h4v5a4 4 0 0 1-4 4z'],
       };
     case 'clearFormat':
-      // 清除格式："A" + 斜杠（像 Photoshop 的橡皮擦）
+      /*
+       * **清除格式**："A" + **斜杠**划掉（像 Photoshop 的橡皮擦）。
+       *
+       * ⚠️ **之前和 `textColor` 的几何完全一样**（都是"A" + 下划线）❌
+       *    -> 用户反馈："清空format这个功能的按钮和修改文字颜色的按钮一样 需要区分开" ✅
+       */
       return {
         paths: ['M8 17 12 5l4 12', 'M9.5 13h5'],
-        lines: [{ x1: 4, y1: 20, x2: 20, y2: 20 }],
+        lines: [{ x1: 5, y1: 20, x2: 19, y2: 5 }],
       };
     case 'undo':
       // 撤销：左转箭头（带回转的横线）
@@ -549,10 +571,15 @@ export function getIconShape(name: IconName): IconShape | null {
         paths: ['M15 14l5-5-5-5', 'M20 9h-9a6 6 0 0 0 0 12h3'],
       };
     case 'textColor':
-      // "A" + 下划线
+      /*
+       * **文字颜色**："A" + **下面一条粗色带**。
+       *
+       * ⚠️ **之前和 `clearFormat` 的几何完全一样** ❌
+       *    -> 现在：**粗**色带（`clearFormat` 是斜杠，`textHighlight` 是背景块）✅
+       */
       return {
         paths: ['M8 17 12 5l4 12', 'M9.5 13h5'],
-        lines: [{ x1: 4, y1: 20, x2: 20, y2: 20 }],
+        lines: [{ x1: 4, y1: 19.5, x2: 20, y2: 19.5 }],
       };
     case 'list':
       return {

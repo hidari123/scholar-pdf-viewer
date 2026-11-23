@@ -637,6 +637,16 @@ export interface PdfViewerProps {
   annotationToolbar?: RichTextToolbarItem[];
   /** 批注面板的高亮色板 */
   annotationPalette?: RichTextPalette;
+  /**
+   * **批注编辑器的"文字颜色"色板**（**深色**）。
+   *
+   * ⚠️ **和 `annotationPalette` 分开**（用户反馈：
+   * "富文本的那个文字颜色 如果是放在文字上 就太浅了 文字可以适当加深颜色"）。
+   *
+   * -> `annotationPalette` = 浅色 -> 当**高亮底色** ✅
+   * -> **文字颜色必须深色** ✅
+   */
+  annotationTextPalette?: RichTextPalette;
   /** 换色 */
   onHighlightColorChange?: (id: string, color: string) => void;
   /** 复制高亮的文字 */
@@ -781,6 +791,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         selectionActions: props.selectionActions,
         annotationToolbar: props.annotationToolbar,
         annotationPalette: props.annotationPalette,
+        annotationTextPalette: props.annotationTextPalette,
         toolbar: props.toolbar,
         features: props.features,
         printPaper: props.printPaper,
@@ -798,6 +809,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       props.selectionActions,
       props.annotationToolbar,
       props.annotationPalette,
+      props.annotationTextPalette,
       props.toolbar,
       props.features,
       props.printPaper,
@@ -807,6 +819,26 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pageElementsRef = useRef(new Map<number, HTMLElement>());
+
+  /*
+   * ⚠️ **这次点击是不是来自浮层内部**（批注弹窗 / 便利贴面板）。
+   *
+   * ### 为什么需要它
+   *
+   * -> 浮层在 React 树里是 container 的后代 -> 点击会冒泡到容器 ✅
+   * -> 容器上有**高亮的点击委托**（按鼠标坐标命中）✅
+   * -> 在浮层里点按钮 -> 坐标可能正好落在**下面的高亮**上 ❌
+   *    -> 高亮被误激活 -> **蓝色选中态** ❌
+   *
+   * ### 为什么不能在捕获阶段 `stopPropagation`
+   *
+   * -> 捕获阶段 `stopPropagation()` -> 事件**到不了它自己的 target** ❌
+   *    -> 浮层里的"新建批注 / 关闭 / 取消 / 保存"**全部点不动** ❌
+   *    -> 用户反馈："新建批注这个按钮现在无法点击了" ✅
+   *
+   * -> 所以：**捕获阶段只打标记**，**冒泡阶段自己跳过** ✅
+   */
+  const clickFromFloatingRef = useRef(false);
 
   const [scale, setScale] = useState<number>(typeof initialScale === 'number' ? initialScale : 1);
   const [page, setPage] = useState(initialPage);
@@ -4393,12 +4425,42 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
            *    -> 浮层自己处理点击，不往上走 ✅
            */
           onClickCapture={(event) => {
+            /*
+             * ⚠️⚠️ **捕获阶段只"标记"，不能 `stopPropagation()`**（实测踩过的坑）。
+             *
+             * ### 为什么不能 stopPropagation
+             *
+             * -> 捕获阶段 `stopPropagation()` -> 事件**到不了它自己的 target** ❌
+             *    -> 弹窗里的"新建批注 / 关闭 / 取消 / 保存"**全部点不动** ❌
+             *    -> 用户反馈："新建批注这个按钮现在无法点击了" ✅
+             *
+             * ### 正确做法
+             *
+             * -> 捕获阶段**只打一个标记**（不改事件流）✅
+             * -> **冒泡阶段**的 `onClick` 看到标记 -> **自己跳过**高亮委托 ✅
+             * -> 事件**照常到达按钮** -> 按钮正常响应 ✅
+             */
             const target = event.target as HTMLElement | null;
             if (target?.closest?.('[data-scpdf-floating]')) {
-              event.stopPropagation();
+              clickFromFloatingRef.current = true;
             }
           }}
           onClick={(event) => {
+            /*
+             * ⚠️⚠️ **点击来自浮层内部 → 跳过链接 / 高亮的委托**（实测踩过的坑）。
+             *
+             * -> 批注弹窗 / 便利贴面板在 React 树里是 container 的后代 ✅
+             * -> 容器上有**高亮的点击委托**（按鼠标坐标命中）✅
+             * -> 在浮层里点按钮 -> 坐标可能正好落在**下面的高亮**上 ❌
+             *    -> 高亮被误激活 -> **蓝色选中态** ❌
+             * -> 捕获阶段打的标记在这里用上 -> **只跳过委托**，**不拦事件** ✅
+             *    -> 按钮**照常响应** ✅
+             */
+            if (clickFromFloatingRef.current) {
+              clickFromFloatingRef.current = false;
+              return;
+            }
+
             /*
              * ⚠️⚠️ **链接要"先"处理**（实测踩过的坑）。
              *
@@ -4604,6 +4666,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               }}
               toolbar={merged.annotationToolbar}
               palette={merged.annotationPalette}
+              textPalette={merged.annotationTextPalette}
               icons={merged.icons}
               locale={merged.locale ?? 'zh'}
               locales={merged.locales}
@@ -4651,6 +4714,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               }}
               toolbar={merged.annotationToolbar}
               palette={merged.annotationPalette}
+              textPalette={merged.annotationTextPalette}
               icons={merged.icons}
               locale={merged.locale ?? 'zh'}
               locales={merged.locales}
@@ -4670,6 +4734,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                 onClose={handleAnnotationClose}
                 toolbar={merged.annotationToolbar}
                 palette={merged.annotationPalette}
+                textPalette={merged.annotationTextPalette}
                 icons={merged.icons}
                 locale={merged.locale ?? 'zh'}
                 locales={merged.locales}

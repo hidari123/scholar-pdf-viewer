@@ -142,16 +142,33 @@ describe('defaultRichTextToolbar', () => {
     expect(commands).toContain('hiliteColor');
   });
 
-  it('**按钮顺序固定**（加粗 -> 斜体 -> 下划线 -> 删除线 -> 高亮 -> 文字颜色）', () => {
+  it('**按钮顺序固定**（加粗 -> 斜体 -> 下划线 -> 删除线 -> 高亮 -> 文字高亮 -> 文字颜色）', () => {
     const commands = defaultRichTextToolbar({ yellow: '#ff0' }).map((i) => i.command);
-    expect(commands.slice(0, 6)).toEqual([
+    expect(commands.slice(0, 7)).toEqual([
       'bold',
       'italic',
       'underline',
       'strikeThrough',
       'hiliteColor',
+      'textHighlight',
       'foreColor',
     ]);
+  });
+
+  /*
+   * ⚠️ **文字颜色必须用【深色】色板**（用户反馈：
+   * "富文本的那个文字颜色 如果是放在文字上 就太浅了 文字可以适当加深颜色"）。
+   */
+  it('**文字颜色用独立的深色板**（不复用浅色的高亮板）', () => {
+    const items = defaultRichTextToolbar({ yellow: '#fff3a3' }, { red: '#c62828' });
+    const fore = items.find((i) => i.command === 'foreColor');
+    expect(fore?.palette).toEqual({ red: '#c62828' });
+  });
+
+  it('**"文字高亮"用高亮板**（浅色 -> 适合当背景）', () => {
+    const items = defaultRichTextToolbar({ yellow: '#fff3a3' }, { red: '#c62828' });
+    const highlight = items.find((i) => i.command === 'textHighlight');
+    expect(highlight?.palette).toEqual({ yellow: '#fff3a3' });
   });
 
   it('每个按钮都有 i18n 占位符（宿主才能翻译）', () => {
