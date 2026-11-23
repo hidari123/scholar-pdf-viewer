@@ -413,10 +413,41 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                       }}
                       onClick={(event) => {
                         event.stopPropagation();
+                        /*
+                         * ⚠️⚠️ **点某一项 -> 打开"那一条"的详情**（用户反馈：
+                         * "点击每一项没反应 应该打开对应项的便签详情 然后可以编辑"）。
+                         *
+                         * -> 之前只调 \`onAnnotationClick\`（宿主的通知回调）❌
+                         *    -> demo 里只是 \`setHint(...)\` -> **看不到任何变化** ❌
+                         *    -> 用户以为"点了没反应" ❌
+                         *
+                         * -> 现在：**调 \`onAnnotationExpand\`**（包会打开详情面板）✅
+                         * -> **同时**通知宿主 ✅
+                         */
+                        onAnnotationExpand?.(record);
                         onAnnotationClick?.(record);
+                        // 关闭选择列表 -> 别挡住刚打开的详情 ✅
+                        setHoveredGroupKey(null);
+                        setHoveredId(null);
                       }}
                     >
-                      {record.content.slice(0, 60) || t('annotation.empty')}
+                      {/*
+                       * ⚠️⚠️ **渲染富文本**（用户反馈：
+                       * "第一展示有问题 没有渲染出html"）。
+                       *
+                       * -> 之前是 \`{record.content.slice(0, 60)}\` ❌
+                       *    -> React **转义** HTML -> 用户看到字面量 \`<p>第一条</p>\` ❌
+                       *    -> 实测：\`itemHTML: "&lt;p&gt;第一条&lt;/p&gt;"\` ❌
+                       *
+                       * -> 现在用 \`<RichTextPreview>\` ✅
+                       *    -> **渲染成排版好的富文本** ✅
+                       *    -> 而且**自带消毒**（白名单）✅
+                       *    -> 和单条便签的浮层**行为一致** ✅
+                       */}
+                      <RichTextPreview
+                        className="scpdf-sticky-note__picker-text"
+                        html={record.content}
+                      />
                     </button>
                   );
                 })}

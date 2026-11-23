@@ -676,8 +676,27 @@
   line-height: 1.5;
   text-align: left;
   cursor: pointer;
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+/*
+ * ⚠️ **选择列表里的每一项显示【富文本】**（用户反馈：
+ * "第一展示有问题 没有渲染出html"）。
+ *
+ * -> 之前直接渲染 HTML 字符串 -> React 转义 -> 用户看到 `<p>第一条</p>` ❌
+ * -> 现在用 `RichTextPreview` -> **排版好的富文本** ✅
+ * -> 限制高度 -> 只显示前 1~2 行（列表不会太长）✅
+ */
+.scpdf-sticky-note__picker-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.scpdf-sticky-note__picker-text p {
+  margin: 0;
 }
 
 .scpdf-sticky-note__picker-item:hover {

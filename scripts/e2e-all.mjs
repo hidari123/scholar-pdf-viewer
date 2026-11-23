@@ -78,6 +78,7 @@ const suites = [
   },
   { name: '编辑批注（锚点弹窗 + 保存按钮）', file: 'e2e-annotation-edit.mjs' },
   { name: '便签详情（展开 + 只读 + 编辑切换）', file: 'e2e-annotation-detail.mjs' },
+  { name: '合并组选择列表（渲染富文本 + 点项打开详情）', file: 'e2e-sticky-picker.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 
