@@ -328,17 +328,19 @@ Optional peers: `pdf-lib` (export annotated PDF), `@tiptap/*` (rich-text editor)
 > ⚠️ **When using the TipTap rich-text editor, the host must install these packages**
 > (missing one breaks a feature):
 >
-> | Package                         | What breaks without it                                                    |
-  > | ------------------------------- | ------------------------------------------------------------------------- |
-  > | `@tiptap/core`                  | The editor cannot start                                                   |
-  > | `@tiptap/starter-kit`           | Basic formats (bold, lists…) are gone                                     |
-  > | `@tiptap/extension-text-style`  | **Text color is completely broken** (the `Color` extension depends on it) |
-  > | `@tiptap/extension-color`       | Text color is gone                                                        |
-  > | `@tiptap/extension-highlight`   | Highlight background is gone                                              |
-  > | `@tiptap/extension-underline`   | Underline is gone                                                         |
-  > | `@tiptap/extension-link`        | Links are gone                                                            |
-  > | `@tiptap/extension-placeholder` | Placeholder is gone                                                       |
-  >
+
+| | Package |
+| | ------------------------------- |
+| | `@tiptap/core` |
+| | `@tiptap/starter-kit` |
+| | `@tiptap/extension-text-style` |
+| | `@tiptap/extension-color` |
+| | `@tiptap/extension-highlight` |
+| | `@tiptap/extension-underline` |
+| | `@tiptap/extension-link` |
+| | `@tiptap/extension-placeholder` |
+
+    >
 > -> **Without TipTap** the package **falls back to its built-in lightweight editor** ✅
 
 ## Minimal integration
