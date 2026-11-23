@@ -156,6 +156,29 @@ export interface RichTextToolbarItem {
  *
  * ⚠️ **必须在用户手势里调用**（`execCommand` 的限制）。
  *
+ * ## ⚠️⚠️ **颜色命令必须用 `styleWithCSS`**（审计发现的**真 bug**）
+ *
+ * ### 之前的问题
+ *
+ * ```tsx
+ * document.execCommand('foreColor', false, '#ff0000');
+ * // → 生成：<font color="#ff0000">文字</font>     ❌
+ * ```
+ *
+ * -> \`<font>\` **不在 \`sanitizeRichText\` 的白名单里** ❌
+ *   -> 清洗时**整个标签被替换成纯文本** ❌
+ *   -> 实测：\`"<font color="#ff0000">World</font>"\` -> \`"World"\` ❌
+ *      -> **颜色完全丢失** ❌
+ *   -> 用户看到：**点了"文字颜色"一点反应都没有** ✅
+ *
+ * ### 现在的做法
+ *
+ * -> \`styleWithCSS = true\` -> 浏览器生成 **\`<span style="color:#ff0000">\`** ✅
+ *   -> \`<span>\` **在白名单里** ✅
+ *   -> 而且 \`span\` 的 style **只保留 color / background-color** ✅
+ *   -> **颜色保住了** ✅
+ *   -> 顺带：**输出更干净**（不用为 \`<font>\` 破例）✅
+ *
  * @param command 命令
  * @param value 命令的值（颜色 / 链接地址 / 块类型）
  */
@@ -164,13 +187,39 @@ export function execRichTextCommand(command: RichTextCommand, value?: string): v
     return;
   }
 
+  /*
+   * ⚠️⚠️ **颜色命令要先开 \`styleWithCSS\`**（审计发现的**真 bug**）。
+   *
+   * -> 不开的话 \`foreColor\` 生成 **\`<font color="#ff0000">\`** ❌
+   *   -> \`<font>\` **不在 \`sanitizeRichText\` 的白名单里** ❌
+   *   -> 清洗时**整个标签被替换成纯文本** -> **颜色完全丢失** ❌
+   *   -> 用户看到：**点了"文字颜色"一点反应都没有** ✅
+   *
+   * -> 开了之后生成 **\`<span style="color: rgb(255,0,0)">\`** ✅
+   *   -> \`<span>\` **在白名单里** ✅
+   *   -> 而且 \`span\` 的 style **只保留 color / background-color** ✅
+   *   -> **颜色保住了** ✅
+   *
+   * ⚠️ **实测确认**（不是猜的）：
+   * ```
+   * execCommand('foreColor', false, '#ff0000')          → <font color="#ff0000">
+   * execCommand('styleWithCSS', false, 'true')  再执行  → <span style="color: rgb(255,0,0)">
+   * ```
+   */
+  if (command === 'hiliteColor' || command === 'foreColor') {
+    // ⚠️ **先开 CSS 模式**（全局状态，但只在执行前设置一次）
+    try {
+      document.execCommand('styleWithCSS', false, 'true');
+    } catch {
+      // 浏览器不支持 -> 退回默认（会生成 <font>，但至少不崩）
+    }
+    document.execCommand(command, false, value ?? '#ffff00');
+    return;
+  }
+
   switch (command) {
     case 'formatBlock':
       document.execCommand(command, false, value ?? 'blockquote');
-      break;
-    case 'hiliteColor':
-    case 'foreColor':
-      document.execCommand(command, false, value ?? '#ffff00');
       break;
     case 'createLink':
       document.execCommand(command, false, value ?? '');
