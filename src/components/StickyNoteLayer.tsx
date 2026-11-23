@@ -22,7 +22,7 @@
  */
 
 import type { ReactNode } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AnnotationGroup } from '../core/annotation/annotation-groups';
 import { groupAnnotations } from '../core/annotation/annotation-groups';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
@@ -111,6 +111,56 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
 
   /** 当前 hover 的**组**（合并的批注 → 显示选择列表） */
   const [hoveredGroupKey, setHoveredGroupKey] = useState<string | null>(null);
+
+  /*
+   * ⚠️⚠️ **关闭的延迟定时器**（用户反馈：
+   * "鼠标一移开批注按钮 批注内容区域就消失了 鼠标一移开就消失了"）。
+   *
+   * ### 问题
+   *
+   * -> 鼠标从**图标**移向**内容框** -> 图标触发 \`mouseleave\` ❌
+   * -> 之前**立刻**清掉 hover 状态 -> 内容框**瞬间消失** ❌
+   *    -> 用户根本**点不到**里面的按钮 ❌
+   *    -> 用户反馈："试了很多次都失败了 无法hover上" ✅
+   *
+   * ### 修法：**延迟关闭**
+   *
+   * -> \`mouseleave\` -> **等 200ms** 再关 ✅
+   * -> 这 200ms 里如果鼠标**进入了**内容框 -> **取消关闭** ✅
+   *    -> 内容框**不会消失** ✅
+   * -> 鼠标真的走了 -> 200ms 后**关掉** ✅（不会粘着不走）✅
+   */
+  const closeTimerRef = useRef(0);
+
+  /** 取消"即将关闭" */
+  const cancelClose = useCallback(() => {
+    if (closeTimerRef.current !== 0) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = 0;
+    }
+  }, []);
+
+  /** 延迟关闭（200ms） */
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = 0;
+      setHoveredGroupKey(null);
+      setHoveredId(null);
+      onAnnotationHover?.(null);
+    }, 200);
+  }, [cancelClose, onAnnotationHover]);
+
+  // 卸载时清理定时器
+  useEffect(
+    () => () => {
+      if (closeTimerRef.current !== 0) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = 0;
+      }
+    },
+    [],
+  );
 
   /** 高亮在页内的矩形（用来给便签找锚点） */
   const highlightRects = useMemo(() => {
@@ -224,6 +274,20 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
             data-group={isGroup ? 'true' : 'false'}
             style={{ left: pos.left, top: pos.top }}
           >
+            {/*
+             * ⚠️ **"桥接区"**（用户反馈："鼠标一移开批注按钮 批注内容区域就消失了"）。
+             *
+             * -> 内容框在 `left: 26px` -> 图标右边**有 4px 空隙** ❌
+             * -> 鼠标从图标移向内容框 -> **穿过**那 4px ❌
+             *    -> 图标触发 `mouseleave` -> 内容框消失 ❌
+             * -> 这个**透明**元素**盖住**那段空隙 ✅
+             *    -> 鼠标**不会**经过空隙 -> 不会触发 `mouseleave` ✅
+             */}
+            <span
+              className="scpdf-sticky-note__bridge"
+              onMouseEnter={cancelClose}
+              aria-hidden="true"
+            />
             <button
               type="button"
               className="scpdf-sticky-note__icon"
@@ -244,6 +308,8 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                   : t('annotation.withContent', { content: firstRecord.content.slice(0, 20) })
               }
               onMouseEnter={() => {
+                // ⚠️ **取消"即将关闭"**（延迟关闭的另一半）✅
+                cancelClose();
                 setHoveredGroupKey(group.key);
                 setHoveredId(first.id);
                 if (!isGroup) {
@@ -266,9 +332,9 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                 if (related && event.currentTarget.parentElement?.contains(related)) {
                   return;
                 }
-                setHoveredGroupKey(null);
-                setHoveredId(null);
-                onAnnotationHover?.(null);
+                // ⚠️ **延迟 200ms 再关**（而不是立刻关）✅
+                // -> 鼠标从图标移向内容框时，穿过空隙也不会消失 ✅
+                scheduleClose();
               }}
               onFocus={() => {
                 setHoveredGroupKey(group.key);
@@ -323,6 +389,8 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                  * → 用户能点里面的"编辑 / 展开"按钮 ✅
                  */
                 onMouseEnter={() => {
+                  // ⚠️ **取消"即将关闭"** -> 鼠标进来了，内容框**不会消失** ✅
+                  cancelClose();
                   setHoveredGroupKey(group.key);
                   setHoveredId(first.id);
                 }}
@@ -331,9 +399,8 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                   if (related && event.currentTarget.parentElement?.contains(related)) {
                     return;
                   }
-                  setHoveredGroupKey(null);
-                  setHoveredId(null);
-                  onAnnotationHover?.(null);
+                  // ⚠️ **延迟 200ms 再关** ✅
+                  scheduleClose();
                 }}
               >
                 {/* 富文本正文：渲染成 HTML，不是标签（用户需求） */}

@@ -428,9 +428,30 @@
 
 /*
  * ⚠️ **便签图标必须能点** → `pointer-events: auto`
- * ⚠️ **图标本身很小** → 加一圈"透明的热区"，方便鼠标命中（用户不好点 22px）
+ *
+ * ⚠️⚠️ **热区要够大**（用户反馈："批注还是很难hover上 试了很多次都失败了"）。
+ *
+ * ### 实测（修复前）
+ *
+ * ```
+ * 便签图标: 22 × 22 px
+ * 命中测试:
+ *   (+11, +11) -> SVG        ✅ 命中
+ *   (+2,  +2)  -> 图标       ✅ 命中
+ *   (-2,  -2)  -> 文本层     ❌ 差 2px 就落空
+ *   (+11, -3)  -> 文本层     ❌ 差 3px 就落空
+ * ```
+ *
+ * -> 目标**太小** -> 鼠标一抖就丢 ❌
+ *
+ * ### 修法
+ *
+ * -> 加一个 **36×36 的透明热区**（`::before` 伪元素）✅
+ *    -> **视觉大小不变**（22px）✅
+ *    -> 但**可命中范围**变成 36px ✅
  */
 .scpdf-sticky-note__icon {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -446,6 +467,25 @@
     background-color 0.12s ease;
 }
 
+/*
+ * ⚠️ **透明热区**（36×36）。
+ *
+ * -> 用 `::before` 伪元素 -> **不改变**图标的**视觉**大小 ✅
+ * -> 但把**鼠标命中范围**扩大 -> 用户好 hover ✅
+ */
+.scpdf-sticky-note__icon::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 36px;
+  height: 36px;
+  transform: translate(-50%, -50%);
+  /* 透明但**能接收鼠标事件** */
+  background: transparent;
+  pointer-events: auto;
+}
+
 .scpdf-sticky-note__icon:hover {
   transform: scale(1.12);
   background-color: rgb(255 255 255 / 55%);
@@ -454,6 +494,33 @@
 .scpdf-sticky-note__icon:focus-visible {
   outline: 2px solid var(--scpdf-primary, #2f6feb);
   outline-offset: 1px;
+}
+
+/*
+ * ⚠️⚠️ **"桥接区"**（用户反馈：
+ * "鼠标一移开批注按钮 批注内容区域就消失了"）。
+ *
+ * ### 问题
+ *
+ * -> 内容框在 \`left: 26px\` -> 图标右边**有 4px 空隙** ❌
+ * -> 鼠标从图标**移向**内容框 -> 会**穿过**那 4px ❌
+ *    -> 穿过时图标触发 \`mouseleave\` -> 内容框**立刻消失** ❌
+ *    -> 用户根本点不到里面的按钮 ❌
+ *
+ * ### 修法
+ *
+ * -> 加一个**透明桥接区**（覆盖图标到内容框之间的空隙）✅
+ * -> 鼠标**不会**经过空隙 -> 不会触发 \`mouseleave\` ✅
+ */
+.scpdf-sticky-note__bridge {
+  position: absolute;
+  top: 0;
+  left: 18px;
+  width: 14px;
+  height: 100%;
+  min-height: 22px;
+  background: transparent;
+  pointer-events: auto;
 }
 
 /*
