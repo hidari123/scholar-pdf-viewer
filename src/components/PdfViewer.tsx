@@ -71,7 +71,7 @@ import { useSelectionPreservation } from '../hooks/useSelectionPreservation';
 import { useTextSelection } from '../hooks/useTextSelection';
 import { useVisiblePages } from '../hooks/useVisiblePages';
 import { useZoom } from '../hooks/useZoom';
-import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { OutlinePanel } from './OutlinePanel';
@@ -239,8 +239,31 @@ export interface PdfViewerProps {
   features?: Partial<Features>;
   /** 语言 */
   locale?: Locale;
-  /** 文案覆盖（当前 locale） */
-  messages?: Partial<Messages>;
+  /**
+   * **文案覆盖（按语言绑定）**。
+   *
+   * ⚠️⚠️ **之前是"不绑语言"的**（审计发现的**真 bug**）：
+   *
+   * ```tsx
+   * // ❌ 之前：这些句子在【任何语言】下都生效
+   * <PdfViewer locale="en" messages={{ 'search.placeholder': '全文检索' }} />
+   * //   -> 切到 en 还是"全文检索"（中文）❌
+   * ```
+   *
+   * -> 宿主切语言 -> **被覆盖的 key 还是中文** -> **中英文混杂** ❌
+   * -> 而且宿主每次切换重建 `messages` 对象 -> **新引用** -> 重新渲染
+   *   -> **tooltip 在两次渲染之间取值不同** -> **"语言自己会动来动去"** ❌
+   *
+   * ⚠️ **现在按语言绑定**（和 `locales` 同一个概念）：
+   *
+   * ```tsx
+   * <PdfViewer
+   *   locale="en"
+   *   messages={{ en: { 'search.placeholder': 'Full-text search' } }}
+   * />
+   * ```
+   */
+  messages?: LocaleMessagesMap;
   /**
    * **宿主注册的语言表**（可添加任意语言）。
    *
@@ -290,7 +313,7 @@ export interface PdfViewerProps {
     icons?: Partial<Record<IconName, ReactNode>>;
     locale?: Locale;
     locales?: LocaleTable;
-    messages?: Partial<Messages>;
+    messages?: LocaleMessagesMap;
   }>;
   /**
    * **统一配置对象**（"万物可配置"）。
@@ -3138,6 +3161,14 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       onHighlightRemove: onHighlightRemove ? (id) => onHighlightRemove?.(id) : undefined,
       onHighlightCopy: onHighlightCopy,
       onHighlightMore,
+      /*
+       * ⚠️ **传 `t`**（审计发现的：之前标签是**硬编码中文**）。
+       *
+       * -> 不传 -> 高亮浮层的 5 个按钮**永远是中文** ❌
+       *   -> 选区浮层（选中文字）走 i18n -> 英文 ✅
+       *   -> **两个浮层并排 -> "中英文混杂"** ✅
+       */
+      t,
     });
   }, [
     highlightPopover,
@@ -3149,6 +3180,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onHighlightMore,
     highlights.find,
     findHighlightPosition,
+    t,
   ]);
 
   /** 高亮浮层：点动作 */

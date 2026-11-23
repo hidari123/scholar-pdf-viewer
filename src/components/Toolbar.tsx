@@ -127,7 +127,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('thumbnails.title')}
             title={t('thumbnails.title')}
           >
-            <Icon name={'thumbnails'} overrides={icons} />
+            <Icon name={'thumbnails'} title={t('thumbnails.title')} overrides={icons} />
           </button>
         ) : null}
 
@@ -139,7 +139,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('outline.title')}
             title={t('outline.title')}
           >
-            <Icon name={'outline'} overrides={icons} />
+            <Icon name={'outline'} title={t('outline.title')} overrides={icons} />
           </button>
         ) : null}
 
@@ -151,7 +151,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('search.placeholder')}
             title={t('search.placeholder')}
           >
-            <Icon name={'search'} overrides={icons} />
+            <Icon name={'search'} title={t('search.placeholder')} overrides={icons} />
           </button>
         ) : null}
       </div>
@@ -166,7 +166,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('page.prev')}
             title={t('page.prev')}
           >
-            <Icon name={'chevronLeft'} overrides={icons} />
+            <Icon name={'chevronLeft'} title={t('page.prev')} overrides={icons} />
           </button>
 
           <label className="scpdf-toolbar__pager">
@@ -208,7 +208,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('page.next')}
             title={t('page.next')}
           >
-            <Icon name={'chevronRight'} overrides={icons} />
+            <Icon name={'chevronRight'} title={t('page.next')} overrides={icons} />
           </button>
         </div>
       ) : null}
@@ -247,7 +247,7 @@ export function Toolbar(props: ToolbarProps) {
               aria-label={t('zoom.out')}
               title={t('zoom.out')}
             >
-              <Icon name={'zoomOut'} overrides={icons} />
+              <Icon name={'zoomOut'} title={t('zoom.out')} overrides={icons} />
             </button>
 
             <span className="scpdf-toolbar__scale" aria-live="polite">
@@ -262,7 +262,7 @@ export function Toolbar(props: ToolbarProps) {
               aria-label={t('zoom.in')}
               title={t('zoom.in')}
             >
-              <Icon name={'zoomIn'} overrides={icons} />
+              <Icon name={'zoomIn'} title={t('zoom.in')} overrides={icons} />
             </button>
 
             <button
@@ -272,7 +272,7 @@ export function Toolbar(props: ToolbarProps) {
               aria-label={t('zoom.fitWidth')}
               title={t('zoom.fitWidth')}
             >
-              <Icon name={'fitWidth'} overrides={icons} />
+              <Icon name={'fitWidth'} title={t('zoom.fitWidth')} overrides={icons} />
             </button>
 
             <button
@@ -282,7 +282,7 @@ export function Toolbar(props: ToolbarProps) {
               aria-label={t('zoom.fitPage')}
               title={t('zoom.fitPage')}
             >
-              <Icon name={'fitPage'} overrides={icons} />
+              <Icon name={'fitPage'} title={t('zoom.fitPage')} overrides={icons} />
             </button>
           </>
         ) : null}
@@ -295,7 +295,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('print.title')}
             title={t('print.title')}
           >
-            <Icon name={'print'} overrides={icons} />
+            <Icon name={'print'} title={t('print.title')} overrides={icons} />
           </button>
         ) : null}
 

@@ -24,6 +24,7 @@
  * **宿主没传回调 ⇒ 对应按钮不渲染**（和选区浮层一致）。
  */
 
+import type { MessageKey } from '../../i18n/messages';
 import type { SelectionAction } from './actions';
 
 /** 高亮动作的 key */
@@ -40,14 +41,33 @@ export const HIGHLIGHT_ACTION_KEYS = {
   more: 'highlight-more',
 } as const;
 
-/** 高亮动作的默认标签 */
-export const HIGHLIGHT_ACTION_LABELS: Record<string, string> = {
-  [HIGHLIGHT_ACTION_KEYS.comment]: '添加批注',
-  [HIGHLIGHT_ACTION_KEYS.color]: '选择高亮颜色',
-  [HIGHLIGHT_ACTION_KEYS.copy]: '复制',
-  [HIGHLIGHT_ACTION_KEYS.remove]: '删除',
-  [HIGHLIGHT_ACTION_KEYS.more]: '更多',
-};
+/**
+ * **高亮动作的文案 key**。
+ *
+ * ⚠️⚠️ **之前这里是硬编码的中文**（审计发现的**真 bug**）：
+ *
+ * ```ts
+ * export const HIGHLIGHT_ACTION_LABELS = {
+ *   [HIGHLIGHT_ACTION_KEYS.comment]: '添加批注',   // ← 永远是中文
+ *   ...
+ * };
+ * ```
+ *
+ * -> 高亮浮层（点高亮块）**永远是中文** ❌
+ * -> 选区浮层（选中文字）走 i18n -> **英文** ✅
+ * -> **两个浮层并排 -> "中英文混杂"** ✅
+ *   （用户反馈："语言他自己会动来动去的"）
+ *
+ * -> 现在：**改成 key -> MessageKey 的映射** ✅
+ *   -> 标签由**宿主的 `t()`** 解析 -> 跟着语言走 ✅
+ */
+export const HIGHLIGHT_ACTION_MESSAGE_KEYS = {
+  [HIGHLIGHT_ACTION_KEYS.comment]: 'highlight.actionComment',
+  [HIGHLIGHT_ACTION_KEYS.color]: 'highlight.actionColor',
+  [HIGHLIGHT_ACTION_KEYS.copy]: 'highlight.actionCopy',
+  [HIGHLIGHT_ACTION_KEYS.remove]: 'highlight.actionRemove',
+  [HIGHLIGHT_ACTION_KEYS.more]: 'highlight.actionMore',
+} as const satisfies Record<string, MessageKey>;
 
 /** 高亮动作的参数 */
 export interface HighlightActionOptions {
@@ -61,6 +81,13 @@ export interface HighlightActionOptions {
   onHighlightCopy?: (text: string) => void;
   /** 更多（宿主自定义动作） */
   onHighlightMore?: (id: string) => void;
+  /**
+   * **文案解析**（`key -> 当前语言的文案`）。
+   *
+   * ⚠️ **必须传** -> 否则标签会退化成 `key` 本身 ❌
+   * -> 宿主传 `t`（包内部已经有了）✅
+   */
+  t?: (key: MessageKey) => string;
 }
 
 /**
@@ -86,6 +113,21 @@ export function buildHighlightActions(
   const actions: SelectionAction[] = [];
 
   /*
+   * ⚠️ **标签解析**（跟着语言走）。
+   *
+   * -> 宿主没传 `t` -> 退化成 **`key` 本身**（而不是中文）✅
+   *   -> 宁可显示 `highlight.actionCopy`，也不显示错语言的中文 ✅
+   */
+  const resolveLabel = (actionKey: string): string => {
+    const messageKey =
+      HIGHLIGHT_ACTION_MESSAGE_KEYS[actionKey as keyof typeof HIGHLIGHT_ACTION_MESSAGE_KEYS];
+    if (!messageKey) {
+      return actionKey;
+    }
+    return options.t?.(messageKey) ?? messageKey;
+  };
+
+  /*
    * ① 添加批注（**宿主没传 `onHighlightComment` → 不显示**）。
    *
    * → 和 WPS 一致：在高亮旁边贴一个**小便签** → hover 显示内容。
@@ -94,7 +136,7 @@ export function buildHighlightActions(
     actions.push({
       key: HIGHLIGHT_ACTION_KEYS.comment,
       icon: 'stickyNote',
-      label: HIGHLIGHT_ACTION_LABELS[HIGHLIGHT_ACTION_KEYS.comment],
+      label: resolveLabel(HIGHLIGHT_ACTION_KEYS.comment),
       group: 'primary',
       order: 10,
       onSelect: () => {
@@ -113,7 +155,7 @@ export function buildHighlightActions(
     actions.push({
       key: HIGHLIGHT_ACTION_KEYS.color,
       icon: 'highlightColor',
-      label: HIGHLIGHT_ACTION_LABELS[HIGHLIGHT_ACTION_KEYS.color],
+      label: resolveLabel(HIGHLIGHT_ACTION_KEYS.color),
       group: 'primary',
       order: 20,
       onSelect: (ctx) => {
@@ -130,7 +172,7 @@ export function buildHighlightActions(
   actions.push({
     key: HIGHLIGHT_ACTION_KEYS.copy,
     icon: 'copy',
-    label: HIGHLIGHT_ACTION_LABELS[HIGHLIGHT_ACTION_KEYS.copy],
+    label: resolveLabel(HIGHLIGHT_ACTION_KEYS.copy),
     group: 'primary',
     order: 30,
     onSelect: () => {
@@ -147,7 +189,7 @@ export function buildHighlightActions(
     actions.push({
       key: HIGHLIGHT_ACTION_KEYS.remove,
       icon: 'trash',
-      label: HIGHLIGHT_ACTION_LABELS[HIGHLIGHT_ACTION_KEYS.remove],
+      label: resolveLabel(HIGHLIGHT_ACTION_KEYS.remove),
       group: 'primary',
       order: 40,
       onSelect: () => {
@@ -161,7 +203,7 @@ export function buildHighlightActions(
     actions.push({
       key: HIGHLIGHT_ACTION_KEYS.more,
       icon: 'more',
-      label: HIGHLIGHT_ACTION_LABELS[HIGHLIGHT_ACTION_KEYS.more],
+      label: resolveLabel(HIGHLIGHT_ACTION_KEYS.more),
       group: 'primary',
       order: 50,
       onSelect: () => {

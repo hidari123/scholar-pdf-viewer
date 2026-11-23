@@ -20,7 +20,7 @@ import { BUILTIN_ACTION_KEYS, isBuiltinIcon } from '../core/selection/actions';
 import { HIGHLIGHT_ACTION_KEYS } from '../core/selection/highlight-actions';
 import type { PopoverPosition } from '../core/selection/popover-position';
 import { computePopoverPosition } from '../core/selection/popover-position';
-import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { SelectionActionIconView } from './SelectionActionIcons';
@@ -109,7 +109,7 @@ export interface SelectionPopoverProps {
    * → 之前浮层的 title / aria-label 是**硬编码中文** → 切语言不变 ❌
    * → 现在全部走文案表 → 跟着语言走 ✅
    */
-  messages?: Partial<Messages>;
+  messages?: LocaleMessagesMap;
   /**
    * **图标覆盖**（宿主 → 包）。
    *

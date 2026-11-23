@@ -68,16 +68,24 @@ try {
   );
 
   // ② 内置英文（demo 的语言切换器）
+  /*
+   * ⚠️ **不能再按中文 aria-label 找**（审计修复后它也是本地化的了）。
+   * -> 在 en 模式下 aria-label 是 "Language" ❌
+   * -> 改成：**按选项里有 'en' 来找**（语言无关）✅
+   */
   const hasLangSelect = await page.evaluate(() =>
-    [...document.querySelectorAll('select')].some((s) => s.getAttribute('aria-label') === '语言'),
+    [...document.querySelectorAll('select')].some((s) =>
+      [...s.options].some((o) => o.value === 'en'),
+    ),
   );
   check('**demo 提供语言切换器**', hasLangSelect);
 
   /** 切换语言 */
   async function switchLocale(value) {
     await page.evaluate((v) => {
-      const select = [...document.querySelectorAll('select')].find(
-        (s) => s.getAttribute('aria-label') === '语言',
+      // ⚠️ 按【选项里有 en】找（语言无关）✅
+      const select = [...document.querySelectorAll('select')].find((s) =>
+        [...s.options].some((o) => o.value === 'en'),
       );
       if (!select) return;
       const setter = Object.getOwnPropertyDescriptor(

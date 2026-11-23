@@ -57,7 +57,7 @@
  */
 
 import type { ReactNode } from 'react';
-import type { Locale, LocaleMessages, LocaleTable, Messages } from '../../i18n/messages';
+import type { Locale, LocaleMessages, LocaleMessagesMap, LocaleTable } from '../../i18n/messages';
 import type { RichTextPalette, RichTextToolbarItem } from '../editor/rich-text';
 import type { HighlightPalette } from '../highlight/palette';
 import type { IconName } from '../icons/icons';
@@ -108,8 +108,39 @@ export interface PdfViewerConfig {
   locale?: Locale;
   /** 宿主注册的语言表（可添加任意语言） */
   locales?: LocaleTable;
-  /** 文案覆盖（当前 locale） */
-  messages?: Partial<Messages>;
+  /**
+   * **文案覆盖（按语言绑定）**。
+   *
+   * ⚠️⚠️ **之前是"不绑语言"的**（审计发现的**真 bug**）：
+   *
+   * ```tsx
+   * // ❌ 之前：这些句子在【任何语言】下都生效
+   * <PdfViewer locale="en" messages={{ 'search.placeholder': '全文检索' }} />
+   * //   -> 切到 en 还是"全文检索"（中文）❌
+   * ```
+   *
+   * -> 实测（`resolveMessage` 的第 1 层 \`overrides?.[key]\` **不带 locale 判断**）：
+   * ```
+   * zh + overrides -> "全文检索"
+   * en + overrides -> "全文检索"   ← ❌ 切语言也没用
+   * ```
+   * -> 宿主切语言 -> **被覆盖的 key 还是中文** -> **中英文混杂** ❌
+   * -> 而且宿主每次切换重建 \`messages\` 对象 -> **新引用** -> 重新渲染
+   *   -> **tooltip 在两次渲染之间取值不同** -> **"语言自己会动来动去"** ❌
+   *
+   * ⚠️ **现在改成按语言绑定**（和 \`locales\` 同一个概念）：
+   *
+   * ```tsx
+   * <PdfViewer
+   *   locale="en"
+   *   messages={{ en: { 'search.placeholder': 'Full-text search' } }}
+   * />
+   * ```
+   *
+   * → **换语言只影响对应语言的那份** ✅
+   * → **切换时引用稳定** -> 不会重新渲染 -> **tooltip 不再跳** ✅
+   */
+  messages?: LocaleMessagesMap;
 
   /* —— 交互 —— */
 
@@ -220,7 +251,7 @@ export function mergeConfig(
     highlightPalette?: HighlightPalette;
     locale?: Locale;
     locales?: LocaleTable;
-    messages?: Partial<Messages>;
+    messages?: LocaleMessagesMap;
     selectionActions?: SelectionAction[];
     annotationToolbar?: RichTextToolbarItem[];
     annotationPalette?: RichTextPalette;

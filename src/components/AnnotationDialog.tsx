@@ -31,7 +31,7 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
 import { richTextToPlain, sanitizeRichText } from '../core/editor/rich-text';
-import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
@@ -87,7 +87,7 @@ export interface AnnotationDialogProps {
   /** 宿主注册的语言表 */
   locales?: LocaleTable;
   /** 文案覆盖 */
-  messages?: Partial<Messages>;
+  messages?: LocaleMessagesMap;
   /**
    * **富文本编辑器**（宿主可换，比如 TipTapEditor）。
    *
@@ -102,7 +102,7 @@ export interface AnnotationDialogProps {
     icons?: Partial<Record<IconName, ReactNode>>;
     locale?: Locale;
     locales?: LocaleTable;
-    messages?: Partial<Messages>;
+    messages?: LocaleMessagesMap;
     onOverlayStateChange?: (hasOverlay: boolean) => void;
   }>;
 }

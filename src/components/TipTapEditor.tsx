@@ -50,7 +50,7 @@ import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-t
 import { defaultRichTextToolbar, richTextToPlain } from '../core/editor/rich-text';
 import type { ToolbarStateEditor } from '../core/editor/toolbar-state';
 import { computeToolbarActiveState } from '../core/editor/toolbar-state';
-import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
@@ -86,7 +86,7 @@ export interface TipTapEditorProps {
   /** 宿主注册的语言表 */
   locales?: LocaleTable;
   /** 文案覆盖 */
-  messages?: Partial<Messages>;
+  messages?: LocaleMessagesMap;
   /**
    * **嵌套弹窗的状态**（比如链接弹窗开没开）。
    *

@@ -25,7 +25,10 @@ describe('resolveToolbarLabel', () => {
   });
 
   it('**宿主覆盖文案优先**', () => {
-    expect(resolveToolbarLabel('{richtext.bold}', 'zh', { 'richtext.bold': '粗体' })).toBe('粗体');
+    // ⚠️ 覆盖现在是"按语言绑定"的（审计修复）
+    expect(resolveToolbarLabel('{richtext.bold}', 'zh', { zh: { 'richtext.bold': '粗体' } })).toBe(
+      '粗体',
+    );
   });
 
   it('**宿主注册的语言表生效**', () => {

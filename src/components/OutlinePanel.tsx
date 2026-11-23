@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { OutlineItemLike } from '../core/outline/outline';
 import { flattenOutline, visibleOutlineItems } from '../core/outline/outline';
-import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 
 /** OutlinePanel 参数 */
@@ -32,7 +32,7 @@ export interface OutlinePanelProps {
   /** 语言 */
   locale?: Locale;
   /** 文案覆盖 */
-  messages?: Partial<Messages>;
+  messages?: LocaleMessagesMap;
   /**
    * **宿主注册的语言表**（可添加任意语言）。
    *

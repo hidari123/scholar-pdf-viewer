@@ -66,9 +66,46 @@ describe('i18n 文案', () => {
 
   it('**单条覆盖优先级最高**', () => {
     const locales = { ja: { 'load.loading': '読み込み中…' } };
-    const overrides = { 'load.loading': '单独的覆盖' };
+    /*
+     * ⚠️ **覆盖现在是"按语言绑定"的**（审计修复）。
+     * -> 之前是 `{ 'load.loading': '…' }`（不绑语言）❌
+     *   -> 那个形状在**任何语言**下都生效 -> 切语言还是中文 ❌
+     * -> 现在：`{ ja: { ... } }` ✅
+     */
+    const overrides = { ja: { 'load.loading': '单独的覆盖' } };
 
     expect(resolveMessage('ja', 'load.loading', overrides, undefined, locales)).toBe('单独的覆盖');
+  });
+
+  /*
+   * ⚠️⚠️ **回归守卫**（审计发现的真 bug）。
+   *
+   * -> 之前 \`overrides?.[key]\` **不带 locale 判断** ❌
+   *   -> 实测：\`en + overrides\` 依然返回**中文** ❌
+   *   -> 宿主切语言 -> **被覆盖的 key 还是中文** -> **中英文混杂** ❌
+   */
+  it('**覆盖按语言绑定：换语言就不生效了**', () => {
+    const overrides = { en: { 'search.placeholder': 'Full-text search' } };
+
+    // 对应语言 -> 生效
+    expect(resolveMessage('en', 'search.placeholder', overrides)).toBe('Full-text search');
+    // 别的语言 -> **不生效**（回退到内置英文）✅
+    expect(resolveMessage('zh', 'search.placeholder', overrides)).toBe('搜索文档');
+    expect(resolveMessage('ja', 'search.placeholder', overrides)).toBe('Search document');
+  });
+
+  it('**覆盖和 locales 都能按语言分别设置**', () => {
+    const overrides = { en: { 'search.placeholder': 'From messages' } };
+    const locales = { en: { 'search.placeholder': 'From locales' } };
+
+    // messages 优先级高于 locales
+    expect(resolveMessage('en', 'search.placeholder', overrides, undefined, locales)).toBe(
+      'From messages',
+    );
+    // locales 也能单独生效
+    expect(resolveMessage('ja', 'search.placeholder', overrides, undefined, locales)).toBe(
+      'Search document',
+    );
   });
 
   it('**完全没注册的语言 → 回退英文**（不崩）', () => {

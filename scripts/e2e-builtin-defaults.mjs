@@ -50,7 +50,7 @@ try {
   await page.waitForTimeout(1500);
 
   // ① 内置的日文（宿主没写一整套 ja 文案，只覆盖了 thumbnails.title）
-  const localeSelect = page.locator('select[aria-label="语言"]');
+  const localeSelect = page.locator('select:has(option[value="en"])');
   if ((await localeSelect.count()) > 0) {
     await localeSelect.selectOption('ja');
     await page.waitForTimeout(1200);

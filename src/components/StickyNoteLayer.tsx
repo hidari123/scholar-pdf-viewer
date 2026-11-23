@@ -28,7 +28,7 @@ import { groupAnnotations } from '../core/annotation/annotation-groups';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import { STICKY_NOTE_SIZE, stickyNotePosition } from '../core/annotation/sticky-note';
 import type { HighlightRecord, ViewRect } from '../core/types';
-import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
@@ -73,7 +73,7 @@ export interface StickyNoteLayerProps {
   /** 宿主注册的语言表 */
   locales?: LocaleTable;
   /** 文案覆盖 */
-  messages?: Partial<Messages>;
+  messages?: LocaleMessagesMap;
 }
 
 /**

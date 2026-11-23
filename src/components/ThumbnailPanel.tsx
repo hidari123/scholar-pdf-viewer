@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { planThumbnails, ThumbnailCache, thumbnailSpec } from '../core/thumbnail/plan';
-import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 
 /** 渲染缩略图的函数（宿主注入） */
@@ -38,7 +38,7 @@ export interface ThumbnailPanelProps {
   /** 语言 */
   locale?: Locale;
   /** 文案覆盖 */
-  messages?: Partial<Messages>;
+  messages?: LocaleMessagesMap;
   /**
    * **宿主注册的语言表**（可添加任意语言）。
    *

@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PdfSearch, SearchHit } from '../core/search/search';
-import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 
 /** SearchPanel 参数 */
@@ -29,7 +29,7 @@ export interface SearchPanelProps {
   /** 语言 */
   locale?: Locale;
   /** 文案覆盖 */
-  messages?: Partial<Messages>;
+  messages?: LocaleMessagesMap;
   /**
    * **宿主注册的语言表**（可添加任意语言）。
    *

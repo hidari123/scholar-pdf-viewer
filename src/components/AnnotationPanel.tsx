@@ -33,7 +33,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
 import { richTextToPlain, sanitizeRichText } from '../core/editor/rich-text';
-import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
@@ -69,7 +69,7 @@ export interface AnnotationPanelProps {
   /** 宿主注册的语言表 */
   locales?: LocaleTable;
   /** 文案覆盖 */
-  messages?: Partial<Messages>;
+  messages?: LocaleMessagesMap;
   /**
    * **富文本编辑器**（宿主可换，比如 TipTapEditor）。
    *
@@ -84,7 +84,7 @@ export interface AnnotationPanelProps {
     icons?: Partial<Record<IconName, ReactNode>>;
     locale?: Locale;
     locales?: LocaleTable;
-    messages?: Partial<Messages>;
+    messages?: LocaleMessagesMap;
   }>;
 }
 

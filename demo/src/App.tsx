@@ -279,7 +279,7 @@ export default function App() {
       ),
       panel: (
         <aside className="demo-slot-panel" data-slot="panel">
-          <p style={{ padding: 8 }}>宿主侧栏（插槽）</p>
+          <p style={{ padding: 8 }}>{t('demo.sidebar')}</p>
         </aside>
       ),
       pageOverlay: (pageNumber: number) => (
@@ -301,7 +301,7 @@ export default function App() {
         </span>
       ),
     }),
-    [],
+    [t],
   );
 
   /** 当前页（宿主展示用） */
@@ -1083,7 +1083,7 @@ export default function App() {
             {Math.round(scale * 100)}%
           </span>
         ) : (
-          <span style={{ opacity: 0.6 }}>加载中…</span>
+          <span style={{ opacity: 0.6 }}>{t('demo.loading')}</span>
         )}
         {hint ? <span style={{ color: 'var(--scpdf-color-primary)' }}>{hint}</span> : null}
 
@@ -1100,7 +1100,7 @@ export default function App() {
           <select
             value={theme}
             onChange={(e) => setTheme(e.target.value as PdfViewerTheme)}
-            aria-label="主题"
+            aria-label={t('demo.aria.theme')}
           >
             {THEMES.map((t) => (
               <option key={t} value={t}>
@@ -1112,18 +1112,18 @@ export default function App() {
           <select
             value={locale}
             onChange={(e) => setLocale(e.target.value as 'zh' | 'en' | 'ja')}
-            aria-label="语言"
+            aria-label={t('demo.aria.locale')}
           >
-            <option value="zh">中文</option>
+            <option value="zh">{t('demo.localeName.zh')}</option>
             <option value="en">English</option>
             {/* 宿主通过 JSON 加的语言 */}
-            <option value="ja">日本語</option>
+            <option value="ja">{t('demo.localeName.ja')}</option>
           </select>
           <span style={{ opacity: 0.7, marginLeft: 12 }}>{t('demo.density')}</span>
           <select
             value={density}
             onChange={(e) => setDensity(e.target.value as PdfViewerDensity)}
-            aria-label="密度"
+            aria-label={t('demo.aria.density')}
           >
             <option value="compact">{t('demo.density.compact')}</option>
             <option value="cozy">{t('demo.density.cozy')}</option>
@@ -1139,10 +1139,10 @@ export default function App() {
           <select
             value={dir}
             onChange={(e) => setDir(e.target.value as 'ltr' | 'rtl')}
-            aria-label="文字方向"
+            aria-label={t('demo.aria.dir')}
           >
-            <option value="ltr">LTR（从左往右）</option>
-            <option value="rtl">RTL（从右往左）</option>
+            <option value="ltr">{t('demo.rtl.ltr')}</option>
+            <option value="rtl">{t('demo.rtl.rtl')}</option>
           </select>
         </span>
 

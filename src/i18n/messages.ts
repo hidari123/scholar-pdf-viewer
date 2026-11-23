@@ -118,6 +118,19 @@ export interface Messages {
   'richtext.linkHrefPlaceholder': string;
   'richtext.linkTextPlaceholder': string;
   'highlight.fullyCovered': string;
+  /*
+   * ⚠️ **高亮浮层的 5 个按钮**（审计发现的：之前**硬编码中文**）。
+   *
+   * -> 之前在 \`core/selection/highlight-actions.ts\` 里写死 ❌
+   *   -> 高亮浮层（点高亮块）**永远是中文** ❌
+   *   -> 选区浮层（选中文字）走 i18n -> 英文 ✅
+   *   -> **两个浮层并排 -> "中英文混杂"** ✅
+   */
+  'highlight.actionComment': string;
+  'highlight.actionColor': string;
+  'highlight.actionCopy': string;
+  'highlight.actionRemove': string;
+  'highlight.actionMore': string;
   'toast.close': string;
   'toast.copied': string;
   'toast.copyFailed': string;
@@ -175,6 +188,30 @@ export type LocaleMessages = Partial<Messages>;
  * ```
  */
 export type LocaleTable = Record<string, LocaleMessages>;
+
+/**
+ * **按语言绑定的文案覆盖表**（`messages` prop 的形状）。
+ *
+ * ⚠️⚠️ **之前 `messages` 是"不绑语言"的**（审计发现的**真 bug**）：
+ *
+ * ```tsx
+ * // ❌ 之前：这些句子在【任何语言】下都生效
+ * <PdfViewer locale="en" messages={{ 'search.placeholder': '全文检索' }} />
+ * //   -> 切到 en 还是"全文检索"（中文）❌
+ * ```
+ *
+ * -> 宿主切语言 -> **被覆盖的 key 还是中文** -> **中英文混杂** ❌
+ *
+ * ⚠️ **现在按语言绑定**（和 `LocaleTable` 同一个形状）：
+ *
+ * ```tsx
+ * <PdfViewer
+ *   locale="en"
+ *   messages={{ en: { 'search.placeholder': 'Full-text search' } }}
+ * />
+ * ```
+ */
+export type LocaleMessagesMap = Record<string, LocaleMessages>;
 
 /** 中文文案（默认） */
 export const ZH_MESSAGES: Messages = {
@@ -241,6 +278,11 @@ export const ZH_MESSAGES: Messages = {
   'richtext.linkHrefPlaceholder': '粘贴或输入链接',
   'richtext.linkTextPlaceholder': '默认显示链接地址',
   'highlight.fullyCovered': '这段已经被高亮了',
+  'highlight.actionComment': '批注',
+  'highlight.actionColor': '颜色',
+  'highlight.actionCopy': '复制',
+  'highlight.actionRemove': '删除',
+  'highlight.actionMore': '更多',
   'toast.close': '关闭',
   'toast.copied': '已复制到剪贴板',
   'toast.copyFailed': '复制失败，请手动复制',
@@ -340,6 +382,11 @@ export const EN_MESSAGES: Messages = {
   'richtext.linkHrefPlaceholder': 'Paste or type a link',
   'richtext.linkTextPlaceholder': 'Defaults to the link URL',
   'highlight.fullyCovered': 'This text is already highlighted',
+  'highlight.actionComment': 'Comment',
+  'highlight.actionColor': 'Color',
+  'highlight.actionCopy': 'Copy',
+  'highlight.actionRemove': 'Delete',
+  'highlight.actionMore': 'More',
   'toast.close': 'Close',
   'toast.copied': 'Copied to clipboard',
   'toast.copyFailed': 'Copy failed, please copy manually',
@@ -386,20 +433,26 @@ export const MESSAGES: Record<BuiltinLocale, Messages> = {
  * ## 回退链
  *
  * ```
- * ① overrides[key]                     —— 当前 locale 的覆盖（messages prop）
- * ② locales[locale][key]              —— 宿主注册的语言表
- * ③ MESSAGES[locale][key]              —— 内置（zh / en）
- * ④ MESSAGES.en[key]                   —— 内置英文（宿主语言没写全时的兜底）
- * ⑤ key 本身                            —— 最后兜底（不会返回 undefined）
+ * ① overrides[locale][key]              —— 宿主按语言绑定的覆盖（messages prop）
+ * ② locales[locale][key]               —— 宿主注册的语言表
+ * ③ MESSAGES[locale][key]               —— 内置（zh / en / ja / fr）
+ * ④ MESSAGES.en[key]                    —— 内置英文（宿主语言没写全时的兜底）
+ * ⑤ key 本身                             —— 最后兜底（不会返回 undefined）
  * ```
  *
  * ⚠️ **为什么最后兜底到英文而不是中文**：
  * → 一个没配置全的语言，用中文兜底会"中英混杂"，更糟
  * → 用英文兜底至少是**一致的一种语言** ✅
  *
+ * ⚠️⚠️ **① 现在是"按语言"的**（审计发现的**真 bug**）：
+ * -> 之前是 \`overrides?.[key]\`（**不带 locale 判断**）❌
+ *   -> 实测：\`en + overrides\` 依然返回**中文** ❌
+ *   -> 宿主切语言 -> **被覆盖的 key 还是中文** -> **中英文混杂** ❌
+ * -> 现在：\`overrides?.[locale]?.[key]\` ✅
+ *
  * @param locale 语言（可以是宿主的任意语言）
  * @param key 文案 key
- * @param overrides 当前 locale 的覆盖
+ * @param overrides 按语言绑定的覆盖
  * @param vars 占位符变量
  * @param locales 宿主注册的语言表
  * @returns 文案
@@ -407,12 +460,27 @@ export const MESSAGES: Record<BuiltinLocale, Messages> = {
 export function resolveMessage(
   locale: Locale,
   key: MessageKey,
-  overrides?: LocaleMessages,
+  overrides?: LocaleMessagesMap,
   vars?: Record<string, string | number>,
   locales?: LocaleTable,
 ): string {
+  /*
+   * ⚠️ **`overrides` 和 `locales` 现在是同一个形状**（都是"按语言"）。
+   *
+   * -> `overrides`（messages prop）：宿主的**覆盖**
+   * -> `locales`（locales prop）：宿主的**语言表**
+   * -> 两个都是 `Record<locale, Partial<Messages>>` ✅
+   *
+   * ⚠️ **为什么 `overrides` 优先**：
+   * -> `messages` 是"更细粒度的覆盖" -> 优先级更高 ✅
+   * -> （和之前的语义一致：覆盖 > 语言表 > 内置）
+   *
+   * ⚠️ **为什么 `locale` 在最前面查**：
+   * -> 之前 `overrides?.[key]` **不绑语言**（审计发现的真 bug）❌
+   * -> 现在 `overrides?.[locale]?.[key]` ✅
+   */
   const template =
-    overrides?.[key] ??
+    overrides?.[locale]?.[key] ??
     locales?.[locale]?.[key] ??
     MESSAGES[locale as BuiltinLocale]?.[key] ??
     MESSAGES.en[key] ??

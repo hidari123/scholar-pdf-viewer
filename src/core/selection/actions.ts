@@ -144,17 +144,13 @@ export const BUILTIN_ACTION_KEYS = {
 } as const;
 
 /**
- * 内置动作的默认标签（i18n 由宿主覆盖时可自行传 label）。
+ * ⚠️ **之前这里有 `BUILTIN_ACTION_LABELS`（硬编码中文）—— 已删除**（审计修复）。
+ *
+ * -> 它是**死代码**（全仓库零引用，且没从 `src/index.ts` 导出）❌
+ * -> 但它**误导人**：宿主以为"内置动作的标签就是它" ❌
+ *   -> 实际上内置动作走的是 `t('selection.actionCopy')` 等 ✅
+ * -> 现在：**没有这个误导源**了 ✅
  */
-export const BUILTIN_ACTION_LABELS: Record<string, string> = {
-  highlight: '高亮',
-  copy: '复制',
-  translate: '翻译',
-  note: '笔记',
-  ask: '提问',
-  explain: '解释',
-  delete: '删除',
-};
 
 /**
  * 内置图标名集合（用于判断某个 icon 是不是内置的）。

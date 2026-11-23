@@ -24,7 +24,7 @@
 import { useCallback, useMemo } from 'react';
 import type { LinkAnnotationLike } from '../core/annotation/links';
 import { linkToViewRect, normalizeLinks } from '../core/annotation/links';
-import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 
 /** LinkLayer 参数 */
@@ -50,7 +50,7 @@ export interface LinkLayerProps {
   /** 宿主注册的语言表 */
   locales?: LocaleTable;
   /** 文案覆盖 */
-  messages?: Partial<Messages>;
+  messages?: LocaleMessagesMap;
 }
 
 /**

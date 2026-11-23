@@ -1,155 +1,250 @@
 /**
- * **审计：有没有"硬编码的中文"漏在 i18n 之外**。
+ * i18n 审计 —— 检查"硬编码文案"和"文案表完整性"。
  *
- * ## 用户需求
+ * ## ⚠️⚠️ **之前这个工具漏报**（审计发现的真 bug）
  *
- * > "编辑批注啊 title啊 取消保存啊 这种文字都是要设置两套语言的哈
- * >  内置在包内 宿主通过接口输入进行切换
- * >  宿主也可以自己配置新的语言添加进来
- * >  宿主添加进来新的功能的时候 比如说新的工具栏配置按钮的时候
- * >  也要遵循这个规律 配置好切换的中英文或者其它语言
- * >  不止我说的这些 你整体排查一遍"
+ * -> 旧版的 `labelRe` 是 `/\blabel\s*:\s*(?:'([^']*)'|"([^"]*)")/g`
+ *   -> **只匹配"引号字面量"** ❌
+ *   -> 而源码写的是 **计算属性**：`label: HIGHLIGHT_ACTION_LABELS[HIGHLIGHT_ACTION_KEYS.comment]` ❌
+ *      -> **匹配不到** ❌
+ * -> 实测：旧版跑出来"0 个硬编码"，但源码里**实际有 5 处中文** ❌
+ *   （`highlight-actions.ts` 的 5 个高亮动作标签）
+ * -> 而且高亮浮层**永远是中文** -> 和选区浮层（英文）并排 -> **中英文混杂** ✅
  *
- * ## 检查什么
+ * ## 现在的做法
  *
- * 1. **所有内置语言（zh / en / ja / fr）都覆盖了全部文案 key** ✅
- * 2. **组件里没有硬编码的用户可见文案**（中文 / 英文都不该有）✅
- * 3. **宿主可以添加新语言**（`locales` prop）✅
- * 4. **宿主自定义的工具栏按钮也能走 i18n**（`{key}` 占位符）✅
+ * -> **扫所有 CJK 字符串字面量**（不管它在什么位置、什么写法）✅
+ * -> 加一条**交叉校验**：每个 `Messages` key 必须在**四套内置语言**里都存在 ✅
+ * -> 加一条**交叉校验**：每个 `Messages` key 必须在 **ZH / EN 两张表**里都存在 ✅
+ *
+ * 用法：`node scripts/audit-i18n.mjs`
  */
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const SRC = 'src';
-const problems = [];
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const SRC = join(ROOT, 'src');
 
-/** 递归列出所有 .ts / .tsx */
-function walk(dir, out = []) {
+/** 收集所有源文件 */
+function collect(dir) {
+  const out = [];
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
-    const st = statSync(p);
-    if (st.isDirectory()) {
-      walk(p, out);
-    } else if (/\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name)) {
+    if (statSync(p).isDirectory()) {
+      out.push(...collect(p));
+    } else if (/\.(ts|tsx)$/.test(name) && !/\.test\.|\.d\.ts/.test(name)) {
       out.push(p);
     }
   }
   return out;
 }
 
-const files = walk(SRC);
+const files = collect(SRC);
+const problems = [];
 
-// —— ① 内置语言的完整性 ——
-const messagesSrc = readFileSync(join(SRC, 'i18n/messages.ts'), 'utf8');
-const iface = messagesSrc.match(/export interface Messages \{([\s\S]*?)\n\}/)[1];
-const allKeys = [...iface.matchAll(/'([^']+)':/g)].map((m) => m[1]);
+// ————————————————————————————————————————————
+// ① 硬编码文案（**扫所有 CJK 字符串字面量**）
+// ————————————————————————————————————————————
 
-const builtinsSrc = readFileSync(join(SRC, 'core/config/builtin-defaults.ts'), 'utf8');
-for (const lang of ['zh', 'en', 'ja', 'fr']) {
-  const m = builtinsSrc.match(new RegExp(`\\n  ${lang}: \\{([\\s\\S]*?)\\n  \\},`));
-  if (!m) {
-    problems.push(`内置语言表缺少 ${lang}`);
-    continue;
-  }
-  const keys = new Set([...m[1].matchAll(/'([^']+)':/g)].map((x) => x[1]));
-  const missing = allKeys.filter((k) => !keys.has(k));
-  if (missing.length > 0) {
-    problems.push(`内置语言 ${lang} 缺 ${missing.length} 条：${missing.join(', ')}`);
-  }
+/**
+ * ⚠️ **匹配任何位置的 CJK 字符串字面量**。
+ *
+ * -> 不再限定是 `label:` / `title=` ✅
+ * -> 计算属性（`label: FOO[BAR]`）里的中文**也能抓到** ✅
+ * -> 模板字面量（`` `中文 ${x}` ``）也能抓到 ✅
+ */
+const cjkLiteralRe = /(['"`])([^'"`\\\n]*[一-鿿][^'"`\\\n]*)\1/g;
+
+/**
+ * **开发者向的中文**（不用翻译）。
+ *
+ * -> `throw new Error('...')` —— 给开发者看的 ❌
+ * -> 翻译了反而难排查 ✅
+ */
+function isDeveloperFacing(context) {
+  return (
+    context.includes('throw new Error') ||
+    context.includes('new TypeError') ||
+    context.includes('new RangeError') ||
+    /*
+     * ⚠️ `pdfViewerError('CODE', { message: '中文' })` —— **开发者向**。
+     *
+     * -> 这是 `PdfViewerError.message` 的**覆盖值**（排障用）❌
+     * -> **UI 层按 `error.code` 取 i18n 文案** ✅（`PdfViewer.tsx` 的 `t(\`error.\${error.code}\`)`）
+     * -> 所以这里的文案**不会显示给用户** ✅ -> 不用翻译 ✅
+     */
+    context.includes('pdfViewerError(')
+  );
 }
 
-// —— ② 组件里的硬编码文案 ——
 /**
- * **要检查的属性**（这些会显示给用户）。
+ * **整个对象/常量都是"开发者向"的**（整个文件里出现一次就整块放行）。
+ *
+ * ⚠️ `core/errors.ts` 的 `DEFAULT_MESSAGES`：
+ * -> 它是 `PdfViewerError.message` 的默认值 ❌
+ * -> **UI 层已经按 `error.code` 取 i18n 文案了** ✅（`PdfViewer.tsx:3982`）
+ * -> 所以这里的��文**只给宿主排障看** -> 不用翻译 ✅
  */
-const _USER_FACING_ATTRS = [
-  'aria-label',
-  'title',
-  'placeholder',
-  'alt',
-  'label',
-  'message',
-  'text',
-];
-
-/** 匹配 `attr="中文"` 或 `attr={'中文'}` 或 `attr="中文 {x}"` */
-const attrRe =
-  /\b(aria-label|title|placeholder|alt)\s*=\s*(?:"([^"]*)"|'([^']*)'|\{`([^`]*)`\}|\{'([^']*)'\})/g;
+const DEVELOPER_FACING_OBJECTS = ['DEFAULT_MESSAGES', 'THEME_LABELS'];
 
 /**
- * **匹配模板字面量里的中文**（`` `批注：${x}` ``）。
- *
- * ⚠️ **之前漏了这一类** -> 审计说"没有硬编码"，实际有 ❌
- *   （`aria-label={\`批注：${firstRecord.content.slice(0, 20)}\`}`）
- *
- * ⚠️ **要匹配"成对的反引号"**，否则会跨过代码里的反引号误报 ❌
- *   （比如 `const a = 1; \`中文\`; const b = 2;` 这种）
+ * **允许中文的位置**（有正当理由）。
  */
-const templateRe = /`([^`\n]*[一-龥][^`\n]*)`/g;
-
-/** 匹配 `label: '中文'` 这种配置项 */
-const labelRe = /\blabel\s*:\s*(?:'([^']*)'|"([^"]*)")/g;
+function isAllowedHere(file, context, lineText) {
+  // ① 文案表本身（zh 表就是中文的）
+  if (file.includes('i18n/messages.ts')) {
+    return true;
+  }
+  // ② 内置语言表（zh / ja / fr 的表里都有中文）
+  if (file.includes('builtin-defaults.ts')) {
+    return true;
+  }
+  // ③ 抛给开发者的错误（core + components 都有）
+  if (isDeveloperFacing(context)) {
+    return true;
+  }
+  // ④ core 层抛给开发者的错误
+  if (file.includes(`${join('core', '')}`) && isDeveloperFacing(context, lineText)) {
+    return true;
+  }
+  return false;
+}
 
 for (const file of files) {
   const src = readFileSync(file, 'utf8');
   // 去掉注释（避免把注释里的中文当成硬编码）
-  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const code = src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+    // 去掉 import 里的类型名（不会有中文，保险起见）
+    .replace(/^import[\s\S]*?;$/gm, '');
 
-  for (const re of [attrRe, labelRe, templateRe]) {
-    re.lastIndex = 0;
-    let m = re.exec(code);
-    while (m !== null) {
-      const value = m[2] ?? m[3] ?? m[4] ?? m[5] ?? m[1] ?? '';
-      // 含有中文 -> 硬编码（i18n 占位符 `{key}` 不算）
-      if (value && /[一-龥]/.test(value)) {
-        /*
-         * ⚠️ **区分"UI 文案"和"开发者错误信息"**。
-         *
-         * → `core/` 层里 `throw new Error('...')` 是**给开发者看的** ❌
-         *   -> 不用翻译（翻译了反而难排查）✅
-         * -> UI 层（`components/`）的必须翻译 ✅
-         */
-        const context = code.slice(Math.max(0, m.index - 80), m.index + 60);
-        const isDeveloperError =
-          file.includes(`${join('core', '')}`) &&
-          (context.includes('throw new Error') || context.includes('message:'));
-        if (!isDeveloperError) {
-          const line = code.slice(0, m.index).split('\n').length;
-          problems.push(`${file}:${line} 硬编码文案 -> ${m[0].slice(0, 80)}`);
-        }
-      }
-      m = re.exec(code);
+  // ⚠️ Windows 的 relative() 用反斜杠 -> 统一成正斜杠（好判断）✅
+  const rel = relative(ROOT, file).replace(/\\/g, '/');
+
+  /*
+   * ⚠️ **找出"开发者向的常量块"**（整个块都放行）。
+   *
+   * -> 比如 `DEFAULT_MESSAGES = { ... }` 里的每一行都放行 ✅
+   * -> 不用逐条判断（那个会漏）✅
+   */
+  const developerBlocks = [];
+  for (const name of DEVELOPER_FACING_OBJECTS) {
+    const idx = code.indexOf(`const ${name}`);
+    if (idx < 0) {
+      continue;
     }
+    const end = code.indexOf('};', idx);
+    developerBlocks.push([idx, end > 0 ? end : code.length]);
+  }
+
+  cjkLiteralRe.lastIndex = 0;
+  let m = cjkLiteralRe.exec(code);
+  while (m !== null) {
+    const value = m[2] ?? '';
+    // 含有中文 -> 硬编码
+    if (value && /[一-鿿]/.test(value)) {
+      const context = code.slice(Math.max(0, m.index - 100), m.index + 80);
+      const lineNo = code.slice(0, m.index).split('\n').length;
+      const lineText = code.split('\n')[lineNo - 1] ?? '';
+      const inDeveloperBlock = developerBlocks.some(
+        ([start, end]) => m.index >= start && m.index <= end,
+      );
+      if (!inDeveloperBlock && !isAllowedHere(rel, context, lineText)) {
+        problems.push(`${rel}:${lineNo}  硬编码中文 -> ${m[0].slice(0, 90)}`);
+      }
+    }
+    m = cjkLiteralRe.exec(code);
   }
 }
 
-// —— ③ 占位符 {key} 必须在 Messages 里 ——
+// ————————————————————————————————————————————
+// ② 文案表完整性（**交叉校验**）
+// ————————————————————————————————————————————
+
+const msgSrc = readFileSync(join(SRC, 'i18n/messages.ts'), 'utf8');
+
+/** 取一张表里的 key（`key: '...'` 的形式） */
+function keysOf(tableName) {
+  const m = msgSrc.match(new RegExp(`const ${tableName}[^=]*= \\{([\\s\\S]*?)\\n\\};`));
+  if (!m) {
+    return null;
+  }
+  return [...m[1].matchAll(/^\s{2}'([^']+)':/gm)].map((x) => x[1]);
+}
+
+/** `Messages` interface 的 key */
+const ifaceKeys = [
+  ...(msgSrc.match(/export interface Messages \{([\s\S]*?)\n\}/)?.[1] ?? '').matchAll(
+    /^\s{2}'([^']+)':/gm,
+  ),
+].map((x) => x[1]);
+
+const zhKeys = keysOf('ZH_MESSAGES');
+const enKeys = keysOf('EN_MESSAGES');
+
+/** 内置语言表（ja / fr）在 builtin-defaults.ts 里 */
+const builtinSrc = readFileSync(join(SRC, 'core/config/builtin-defaults.ts'), 'utf8');
+function builtinKeys(locale) {
+  // ⚠️ 内置表的缩进是 2 空格（`  ja: {`），key 是 4 空格
+  const m = builtinSrc.match(new RegExp(`^  ${locale}: \\{([\\s\\S]*?)^  },`, 'm'));
+  if (!m) {
+    return null;
+  }
+  return [...m[1].matchAll(/^ {4}'([^']+)':/gm)].map((x) => x[1]);
+}
+
+const tables = [
+  ['Messages interface', ifaceKeys],
+  ['ZH_MESSAGES', zhKeys],
+  ['EN_MESSAGES', enKeys],
+  ['BUILTIN_LOCALES.ja', builtinKeys('ja')],
+  ['BUILTIN_LOCALES.fr', builtinKeys('fr')],
+];
+
+for (const [name, keys] of tables) {
+  if (!keys) {
+    problems.push(`文案表 ${name} 没找到`);
+    continue;
+  }
+  const set = new Set(keys);
+  const missing = ifaceKeys.filter((k) => !set.has(k));
+  if (missing.length > 0) {
+    problems.push(
+      `文案表 ${name} 缺少 ${missing.length} 个 key -> ${missing.slice(0, 8).join(', ')}`,
+    );
+  }
+}
+
+// ————————————————————————————————————————————
+// ③ 工具栏占位符必须在 Messages 里
+// ————————————————————————————————————————————
+
 const toolbarSrc = readFileSync(join(SRC, 'core/editor/rich-text.ts'), 'utf8');
 const placeholders = [...toolbarSrc.matchAll(/label:\s*'\{([^']+)\}'/g)].map((m) => m[1]);
+const ifaceSet = new Set(ifaceKeys);
 for (const p of placeholders) {
-  if (!allKeys.includes(p)) {
-    problems.push(`工具栏占位符 {${p}} 在 Messages 里不存在`);
+  if (!ifaceSet.has(p)) {
+    problems.push(`工具栏占位符 {${p}} 不在 Messages 里`);
   }
 }
 
-// —— ④ 宿主自定义按钮也能走 i18n（label.ts 支持占位符）——
-const labelSrc = readFileSync(join(SRC, 'core/editor/label.ts'), 'utf8');
-if (!labelSrc.includes('resolveToolbarLabel')) {
-  problems.push('缺少 resolveToolbarLabel（宿主自定义按钮无法走 i18n）');
-}
+// ————————————————————————————————————————————
+// 输出
+// ————————————————————————————————————————————
 
-// —— 输出 ——
-if (problems.length === 0) {
-  console.log('✅ 没有发现问题');
-  console.log(`   文案 key 总数：${allKeys.length}`);
-  console.log('   内置语言：zh / en / ja / fr');
-  console.log('   组件里的硬编码文案：0');
-  console.log('   工具栏占位符：全部有效');
-} else {
-  console.log(`❌ 发现 ${problems.length} 个问题：`);
+console.log(`文案 key 总数：${ifaceKeys.length}`);
+console.log('内置语言：zh / en / ja / fr');
+console.log(`工具栏占位符：${placeholders.length} 个`);
+
+if (problems.length > 0) {
+  console.error(`\n❌ 发现 ${problems.length} 个问题：\n`);
   for (const p of problems) {
-    console.log(`   - ${p}`);
+    console.error(`  ${p}`);
   }
   process.exitCode = 1;
+} else {
+  console.log('✅ 没有发现问题');
 }

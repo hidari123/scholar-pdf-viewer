@@ -101,7 +101,12 @@ try {
   );
 
   // ③ 内置的英文在 UI 上生效
-  const localeSelect = page.locator('select[aria-label="语言"]');
+  /*
+   * ⚠️ **不能再按中文 aria-label 找**（审计修复后 aria-label 也是本地化的）。
+   * -> 在 en 模式下它是 "Language" ❌
+   * -> 改成：**按选项里有 'en' 来找**（语言无关）✅
+   */
+  const localeSelect = page.locator('select:has(option[value="en"])');
   if ((await localeSelect.count()) > 0) {
     await localeSelect.selectOption('en');
     await page.waitForTimeout(1200);

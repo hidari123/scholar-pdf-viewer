@@ -116,16 +116,21 @@ try {
     });
     console.log(`  浮层按钮: ${JSON.stringify(labels)}`);
 
-    check('**有"添加批注"按钮**', labels.includes('添加批注'), labels.join(' / '));
-    check('**有"选择高亮颜色"按钮**', labels.includes('选择高亮颜色'), labels.join(' / '));
+    /*
+     * ⚠️ **按钮名现在是 i18n 的**（审计修复：之前是硬编码中文）。
+     * -> "添加批注" -> **"批注"** ✅
+     * -> "选择高亮颜色" -> **"颜色"** ✅
+     */
+    check('**有"批注"按钮**', labels.includes('批注'), labels.join(' / '));
+    check('**有"颜色"按钮**', labels.includes('颜色'), labels.join(' / '));
     check('**有"复制"按钮**', labels.includes('复制'), labels.join(' / '));
     check('**有"删除"按钮**', labels.includes('删除'), labels.join(' / '));
 
     // 顺序：添加批注 → 选择高亮颜色 → 复制 → 删除
-    const wanted = ['添加批注', '选择高亮颜色', '复制', '删除'];
+    const wanted = ['批注', '颜色', '复制', '删除'];
     const filtered = labels.filter((l) => wanted.includes(l ?? ''));
     check(
-      '**顺序是：添加批注 / 选择高亮颜色 / 复制 / 删除**',
+      '**顺序是：批注 / 颜色 / 复制 / 删除**',
       JSON.stringify(filtered) === JSON.stringify(wanted),
       filtered.join(' → '),
     );
@@ -155,9 +160,9 @@ try {
   page.once('dialog', async (d) => {
     await d.accept('这是测试批注内容');
   });
-  const commentBtn = page.getByRole('button', { name: '添加批注', exact: true });
+  const commentBtn = page.getByRole('button', { name: '批注', exact: true });
   if ((await commentBtn.count()) === 0) {
-    check('找到"添加批注"按钮', false);
+    check('找到"批注"按钮', false);
   } else {
     await commentBtn.first().click();
     await page.waitForTimeout(900);

@@ -260,7 +260,7 @@ try {
         .map((b) => b.textContent.trim())
         .find((t) => t === '保存' || t === 'Save') ?? '',
   }));
-  await page.locator('select[aria-label="语言"]').selectOption('en');
+  await page.locator('select:has(option[value="en"])').selectOption('en');
   await page.waitForTimeout(1500);
   const enText = await page.evaluate(() => ({
     toolbar: document.querySelector('.scpdf-annotation-dialog__title')?.textContent ?? '',

@@ -9,7 +9,7 @@
  * → 抽出来 → 两边行为**完全一致** ✅
  */
 
-import type { Locale, LocaleTable, Messages } from '../../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../../i18n/messages';
 import { resolveMessage } from '../../i18n/messages';
 
 /**
@@ -28,7 +28,7 @@ import { resolveMessage } from '../../i18n/messages';
 export function resolveToolbarLabel(
   label: string,
   locale: Locale,
-  messages?: Partial<Messages>,
+  messages?: LocaleMessagesMap,
   locales?: LocaleTable,
   vars?: Record<string, string | number>,
 ): string {

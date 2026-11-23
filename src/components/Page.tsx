@@ -20,7 +20,7 @@ import type { PageSelectionShape } from '../core/selection/shape';
 import type { PositionedTextItem } from '../core/text-layer/layout';
 import { layoutTextItemsWithIndexOffsets } from '../core/text-layer/layout';
 import type { HighlightRecord } from '../core/types';
-import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable } from '../i18n/messages';
 import { AnnotationLayer } from './AnnotationLayer';
 import { LinkLayer } from './LinkLayer';
 import type { PageProxyLike, TextContentLike } from './PageCanvas';
@@ -117,7 +117,7 @@ export interface PageProps {
   /** 宿主注册的语言表 */
   locales?: LocaleTable;
   /** 文案覆盖 */
-  messages?: Partial<Messages>;
+  messages?: LocaleMessagesMap;
   /** 点"编辑"按钮（宿主实现：打开编辑框） */
   onAnnotationEdit?: (annotation: AnnotationRecord, element?: HTMLElement) => void;
   /** 点"展开"按钮（宿主实现：打开详情） */

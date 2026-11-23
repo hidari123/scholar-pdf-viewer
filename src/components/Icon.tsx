@@ -149,7 +149,44 @@ export function Icon({ name, size = 18, title, className, overrides }: IconProps
     return null;
   }
 
-  const label = title ?? name;
+  /*
+   * ⚠️⚠️ **SVG 的 `<title>` 只能是"传进来的本地化文案"**（审计发现的真 bug）。
+   *
+   * ### 之前的问题
+   *
+   * ```tsx
+   * const label = title ?? name;      // ← 没传 title 时用【图标名】
+   * <title>{label}</title>            // → <title>highlight</title>
+   * ```
+   *
+   * -> 生成的 DOM 是这样（用户实测贴出来的）：
+   * ```html
+   * <button title="添加高亮" aria-label="添加高亮">
+   *   <svg aria-hidden="true"><title>highlight</title>...</svg>
+   * </button>
+   * ```
+   *
+   * -> **同一个按钮里有两个 title** ❌
+   *   -> 按钮的 \`title\` 是**中文**（宿主传的消息）✅
+   *   -> SVG 的 \`title\` 是**英文图标名**（\`highlight\`）❌
+   *   -> 浏览器/AT/扩展**可能取 SVG 的那个** -> 悬浮显示英文 ❌
+   *
+   * ### ⚠️⚠️ **更糟的是它会"跳来跳去"**（用户反馈：
+   * "语言他自己会动来动去的 有时候第一次悬浮上去显示中文 鼠标移开再上去就英文了"）
+   *
+   * -> \`Icon\` 的几何数据是**懒加载**的（见文件头）❌
+   *   -> **没加载完时整个 SVG 都不渲染**（\`if (!shape) return null\`）❌
+   *   -> 于是 DOM 里**一会儿有 \`<title>highlight</title>\`、一会儿没有** ❌
+   *   -> 悬浮提示的**来源在两个值之间来回切** -> **"跳来跳去"** ✅
+   *
+   * ### 现在的做法
+   *
+   * -> **没传 \`title\` 就不渲染 \`<title>\`** ✅
+   *    -> 按钮自己的 \`title\` / \`aria-label\` 是唯一来源 -> 不会冲突 ✅
+   * -> 传了 \`title\` 就用它（**本地化后的文案**）✅
+   * -> 图标名**永远不作为 title 出现** ✅
+   */
+  const label = title;
 
   return (
     <svg
@@ -167,7 +204,7 @@ export function Icon({ name, size = 18, title, className, overrides }: IconProps
       role="presentation"
       className={className}
     >
-      <title>{label}</title>
+      {label ? <title>{label}</title> : null}
       {shape.fills?.map((d) => (
         <path key={`f-${d}`} d={d} fill="currentColor" stroke="none" />
       ))}
@@ -197,15 +234,10 @@ export function Icon({ name, size = 18, title, className, overrides }: IconProps
   );
 }
 
-/**
- * **图标覆盖表**（宿主 → 包）。
+/*
+ * ⚠️ **之前这里有 `resolveIcon`** —— 已删除（审计修复）。
  *
- * ⚠️ **只用宿主给了的图标覆盖**，其余用内置的。
- *
- * @param name 图标名
- * @param overrides 宿主的覆盖表
- * @returns 宿主的图标（没有则 `null`）
+ * -> **零引用的死代码** ❌（全仓库只有它自己的定义）
+ * -> 而且它**和 `Icon` 组件重复**（宿主覆盖的判断逻辑）❌
+ * -> 删掉 -> **省体积** ✅
  */
-export function resolveIcon(name: IconName, overrides?: Partial<Record<IconName, ReactNode>>) {
-  return overrides?.[name] ?? null;
-}

@@ -30,7 +30,7 @@ import {
   execRichTextCommand,
   richTextToPlain,
 } from '../core/editor/rich-text';
-import type { Locale, LocaleTable, Messages } from '../i18n/messages';
+import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
@@ -61,7 +61,7 @@ export interface RichTextEditorProps {
   /** 宿主注册的语言表 */
   locales?: LocaleTable;
   /** 文案覆盖 */
-  messages?: Partial<Messages>;
+  messages?: LocaleMessagesMap;
   /** 嵌套弹窗的状态（透传给 TipTap 编辑器） */
   onOverlayStateChange?: (hasOverlay: boolean) => void;
 }

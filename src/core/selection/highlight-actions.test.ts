@@ -27,10 +27,41 @@ describe('buildHighlightActions', () => {
     ]);
   });
 
-  it('**标签是中文**（添加批注 / 选择高亮颜色 / 复制 / 删除）', () => {
+  /*
+   * ⚠️⚠️ **审计修复**：标签**不再是硬编码中文**（这是"中英文混杂"的根因）。
+   *
+   * -> 之前：\`label: HIGHLIGHT_ACTION_LABELS[...]\`（写死中文）❌
+   *   -> 高亮浮层永远中文，选区浮层永远英文 -> **混杂** ✅
+   * -> 现在：**由宿主的 \`t\` 解析** ✅
+   */
+  it('**标签由 `t` 解析**（跟着语言走）', () => {
+    const actions = buildHighlightActions('h1', '文字', {
+      ...all,
+      t: (key) => `T:${key}`,
+    });
+
+    expect(actions.map((a) => a.label)).toEqual([
+      'T:highlight.actionComment',
+      'T:highlight.actionColor',
+      'T:highlight.actionCopy',
+      'T:highlight.actionRemove',
+    ]);
+  });
+
+  it('**没传 `t` -> 退化成 key（不是中文）**', () => {
     const actions = buildHighlightActions('h1', '文字', all);
 
-    expect(actions.map((a) => a.label)).toEqual(['添加批注', '选择高亮颜色', '复制', '删除']);
+    // ⚠️ 宁可显示 key，也不显示错语言的中文 ✅
+    expect(actions.map((a) => a.label)).toEqual([
+      'highlight.actionComment',
+      'highlight.actionColor',
+      'highlight.actionCopy',
+      'highlight.actionRemove',
+    ]);
+    // 断言：**不含中文**（这是"中英文混杂"的根因）✅
+    for (const a of actions) {
+      expect(a.label ?? '').not.toMatch(/[一-鿿]/);
+    }
   });
 
   it('**没传 `onHighlightComment` → 不显示"添加批注"**', () => {

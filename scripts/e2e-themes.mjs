@@ -40,7 +40,7 @@ page.on('pageerror', (e) => errors.push(String(e).slice(0, 120)));
 
 /** 切主题（demo 里有主题下拉框） */
 const setTheme = async (theme) => {
-  await page.selectOption('select[aria-label="主题"]', theme);
+  await page.selectOption('select:has(option[value="paper"])', theme);
   await page.waitForTimeout(400);
 };
 
@@ -57,7 +57,7 @@ try {
 
   // ---- 1. 7 套主题都在下拉框里 ----
   const options = await page.evaluate(() =>
-    [...document.querySelectorAll('select[aria-label="主题"] option')].map((o) => o.value),
+    [...document.querySelectorAll('select:has(option[value="paper"]) option')].map((o) => o.value),
   );
   check('**下拉框里有 7 套主题**', options.length === 7, options.join(', '));
   for (const t of ['light', 'dark', 'auto', 'paper', 'sepia', 'contrast', 'minimal']) {
@@ -116,7 +116,7 @@ try {
   const densityClass = async () =>
     page.evaluate(() => document.querySelector('.scpdf-root')?.className ?? '');
 
-  await page.selectOption('select[aria-label="密度"]', 'compact');
+  await page.selectOption('select:has(option[value="compact"])', 'compact');
   await page.waitForTimeout(300);
   const compact = await densityClass();
   check(
@@ -131,7 +131,7 @@ try {
   });
   console.log(`  紧凑密度下侧栏宽度: ${panelWidth}`);
 
-  await page.selectOption('select[aria-label="密度"]', 'comfortable');
+  await page.selectOption('select:has(option[value="comfortable"])', 'comfortable');
   await page.waitForTimeout(300);
   const comfortable = await densityClass();
   check(
