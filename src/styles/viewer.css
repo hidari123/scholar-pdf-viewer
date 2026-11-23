@@ -161,6 +161,14 @@
   overflow: auto;
   outline: none;
   /*
+   * ⚠️ **默认光标是 `text`**（审计修复）。
+   *
+   * -> JS 命中链接时会把**这个元素**的 \`style.cursor\` 改成 \`pointer\` ✅
+   * -> 文本层用 \`cursor: inherit\` -> **跟着变** ✅
+   * -> 之前文本层写死 \`cursor: text\` -> 容器改什么都没用 ❌
+   */
+  cursor: text;
+  /*
    * 注意：**不要**在这里加 padding。
    *
    * 原因：页顶边数组（pageTops）是以"容器内容原点"为基准算的，
@@ -231,7 +239,26 @@
   /* 允许选中（这是文本层存在的全部意义） */
   user-select: text;
   -webkit-user-select: text;
-  cursor: text;
+  /*
+   * ⚠️⚠️ **光标要"继承"**，不能写死 `text`（审计发现的真 bug）。
+   *
+   * ### 问题
+   *
+   * -> 之前是 `cursor: text` ❌
+   *   -> \`.scpdf-text-layer\` 是 \`position: absolute; inset: 0\` -> **铺满整页** ❌
+   *   -> 鼠标停在哪，命中的**一定是文本层里的某个 span** ❌
+   *   -> **cursor 是继承属性，但子元素的显式声明会覆盖继承值** ❌
+   *   -> 所以容器上的 \`cursor: pointer\`（JS 命中链接时设的）**永远传不下去** ❌
+   *   -> 用户反馈：**"光标也还是文字光标 没有变成小手"** ✅
+   *
+   * ### 现在的做法
+   *
+   * -> 文本层用 \`cursor: inherit\` ✅
+   *   -> 继承容器的 cursor ✅
+   *   -> 容器默认是 \`text\`（在 \`.scpdf-container\` 上设）✅
+   *   -> JS 命中链接时把容器改成 \`pointer\` -> **文本层跟着变** ✅
+   */
+  cursor: inherit;
 }
 
 .scpdf-text-layer__item {
@@ -277,8 +304,50 @@
  *
  * 颜色可配：宿主覆盖 `--scpdf-selection-color` 即可（伪元素里 CSS 变量可用）。
  */
-.scpdf-text-layer ::selection {
+
+/*
+ * ⚠️⚠️ **`::selection` 的重置范围之前太小**（审计发现的**真 bug**）。
+ *
+ * ### 问题
+ *
+ * -> 之前**只**重置了 \`.scpdf-text-layer ::selection\` ❌
+ *   -> 而**高亮块**是 \`<button class="scpdf-annotation">\` ✅
+ *   -> 它在 **\`.scpdf-annotations\`**（**兄弟节点**）里 ❌
+ *   -> **兄弟节点不继承 \`::selection\` 的重置** ❌
+ *   -> Chrome 用**系统 Highlight 色**把它画上 ❌
+ *   -> 用户反馈：**"在批注中增加文字时 下方高亮区域也会 ::active"** ✅
+ *
+ * ⚠️ **实测排除法**：
+ * -> \`pointer-events: none\` 的元素**不会**匹配 \`:hover\`（背景色没变）❌
+ *    -> 所以**不是 hover 描边**那条路 ✅
+ * -> \`data-dialog-open\` + \`user-select: none\` 只挡"**开始**选中" ✅
+ *    -> 不挡"**画**已有选区" ✅
+ * -> **唯一的解释就是 \`::selection\` 漏了标注层** ✅
+ *
+ * ### 现在的做法
+ *
+ * -> **重置整个根节点** ✅
+ *   -> 文本层 / 标注层 / 便签层 / 自绘选区层 **全都覆盖** ✅
+ *   -> 用户在批注编辑器里打字 -> **下面的高亮块不会"被选中"** ✅
+ *
+ * ⚠️ **例外：批注编辑器自己的选区要保留** ✅
+ *   -> 编辑器是宿主的内容区 -> 用户选中自己的文字**应该有高亮** ✅
+ *   -> 所以用 \`.scpdf-root ::selection\` 之后，**要给编辑器补回来** ✅
+ */
+.scpdf-root ::selection {
   background: transparent;
+}
+
+/*
+ * ⚠️ **批注编辑器（宿主的内容）保留原生选区高亮**。
+ *
+ * -> 编辑器在**弹窗里**（不在 \`.scpdf-root\` 内部）✅
+ * -> 但为了稳妥（宿主也可能把编辑器放在插槽里）✅
+ * -> 这里**显式恢复** ✅
+ */
+.scpdf-annotation-dialog ::selection,
+.scpdf-rich-text-editor ::selection {
+  background: var(--scpdf-editor-selection-color, rgba(0, 90, 255, 0.22));
 }
 
 /*

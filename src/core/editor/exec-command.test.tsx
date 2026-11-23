@@ -95,7 +95,7 @@ describe('execRichTextCommand（颜色）', () => {
   beforeEach(() => {
     styleWithCss = false;
     document.body.innerHTML = '<div id="ed" contenteditable>Hello World</div>';
-    // @ts-expect-error jsdom 没有这个 API -> 用桩
+    // ⚠️ jsdom 没有这个 API -> 用桩
     document.execCommand = vi.fn(execCommandStub) as unknown as typeof document.execCommand;
   });
 

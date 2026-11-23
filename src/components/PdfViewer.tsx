@@ -1728,8 +1728,20 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   const handleContainerMouseMove = useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
       const container = event.currentTarget;
-      // ⚠️ **直接改 style** -> 不 setState -> 不会重渲染 -> 不会打断拖选 ✅
-      const cursor = findLinkAtPoint(event.clientX, event.clientY) ? 'pointer' : '';
+      /*
+       * ⚠️ **直接改 style** -> 不 setState -> 不会重渲染 -> 不会打断拖选 ✅
+       *
+       * ⚠️⚠️ **离开链接时要恢复成 `text`，不能设成空字符串**（审计修复）。
+       *
+       * -> 之前是 \`cursor = ''\` ❌
+       *   -> **空字符串 = 清掉内联样式** -> **CSS 里的默认值失效** ❌
+       *   -> 而文本层是 \`cursor: inherit\` -> 继承到"浏览器默认"（箭头）❌
+       *   -> 用户看到：**光标在文字上变成了箭头** ❌
+       *
+       * -> 现在：离开链接时显式设 \`'text'\` ✅
+       *   -> 和 CSS 里 \`.scpdf-container { cursor: text }\` 一致 ✅
+       */
+      const cursor = findLinkAtPoint(event.clientX, event.clientY) ? 'pointer' : 'text';
       if (container.style.cursor !== cursor) {
         container.style.cursor = cursor;
       }
