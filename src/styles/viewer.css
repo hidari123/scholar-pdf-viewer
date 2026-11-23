@@ -814,7 +814,20 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  width: min(480px, 100%);
+  /*
+   * ⚠️⚠️ **宽度要给"安全边距"留位置**（用户反馈：
+   * "如果批注在这一行最右边 打开编辑批注的框过于靠右 已经贴着最右边了 需要往中间来点"）。
+   *
+   * -> 之前是 \`min(480px, 100%)\` ❌
+   *   -> \`100%\` 是**父容器**的宽度 -> 贴着锚点模式下父容器是 \`body\` ❌
+   *   -> 480px + 24px 边距 -> **几乎贴着屏幕边** ❌
+   *
+   * -> 现在：**预留 96px 的总安全区**（左右各 48px）✅
+   *   -> \`calc(100vw - 96px)\` ✅
+   *   -> 小屏上也不会超出 ✅
+   *   -> 配合 JS 的**比例安全边距**（max 96px）-> 弹窗明显往中间来 ✅
+   */
+  width: min(480px, calc(100vw - 96px));
   max-height: min(560px, 100%);
   border-radius: 12px;
   border: 1px solid var(--scpdf-border, #d9dde3);

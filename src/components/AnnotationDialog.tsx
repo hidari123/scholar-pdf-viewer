@@ -31,6 +31,7 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
 import { richTextToPlain, sanitizeRichText } from '../core/editor/rich-text';
+import { computeDialogPosition } from '../core/selection/dialog-position';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
@@ -168,57 +169,19 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
       anchor: { left: number; top: number; right: number; bottom: number },
       size: { width: number; height: number },
     ) => {
-      const gap = 8;
-      const margin = 12;
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-
-      // 默认：贴在锚点**下方**
-      let left = anchor.left;
-      let top = anchor.bottom + gap;
-
-      // 下面放不下 → 放**上面**
-      if (top + size.height > vh - margin) {
-        const above = anchor.top - gap - size.height;
-        if (above >= margin) {
-          top = above;
-        } else {
-          // 上下都放不下 → 贴着可视区中间
-          top = Math.max(margin, Math.min((vh - size.height) / 2, vh - size.height - margin));
-        }
-      }
-
       /*
-       * ⚠️⚠️ **水平：别贴着视口右边**（用户反馈：
-       * "如果批注在这一行最右边 打开编辑批注的框过于靠右 已经贴着最右边了 需要往中间来点"）。
+       * ⚠️ **定位逻辑抽到 core 的纯函数**（审计修复）。
        *
-       * → 之前只是"超出就夹回来" -> 贴边时**刚好卡在边上** ❌
-       * -> 现在：**留出额外的安全边距**（`margin * 2`）✅
-       *   -> 弹窗不会紧贴屏幕边缘 -> **往中间来一点** ✅
+       * -> 之前内嵌在组件里 ❌
+       *   -> jsdom **没有布局** -> `getBoundingClientRect()` 返回 0×0 ❌
+       *   -> **没法写单测** ❌
+       * -> 现在：`computeDialogPosition()` ✅ -> **可单测** ✅
        */
-      const safeMargin = margin * 2;
-      if (left + size.width > vw - safeMargin) {
-        left = vw - size.width - safeMargin;
-      }
-      if (left < safeMargin) {
-        left = safeMargin;
-      }
-
-      /*
-       * ⚠️⚠️ **垂直：也保证整个弹窗在视口内**（实测踩过的坑）。
-       *
-       * → 弹窗高度会**变**（编辑器加载完才变高）-> 位置要跟着重算 ✅
-       * -> 但万一还是超出 -> **夹回视口内** ✅
-       *   （不然「保存」按钮在屏幕外 -> 点都点不到 ❌）
-       */
-      if (top + size.height > vh - margin) {
-        top = Math.max(margin, vh - size.height - margin);
-      }
-      if (top < margin) {
-        top = margin;
-      }
-
-      return { left, top };
+      return computeDialogPosition({
+        anchor,
+        size,
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+      });
     },
     [],
   );
