@@ -167,13 +167,56 @@ import '@scholar-club/pdf-viewer/themes.css'; // 可选
 
 ### 2.10 链接 / 密码 / Toast
 
-| Prop                 | 类型                                                      | 说明                           |
-| -------------------- | --------------------------------------------------------- | ------------------------------ |
-| `onExternalLink`     | `(url: string) => void`                                   | 外部链接点击（宿主决定怎么开） |
-| `onInternalLink`     | `(dest: string \| unknown[], pageNumber: number) => void` | 内部链接点击                   |
-| `onRequestPassword`  | `(info: { retry(pw), cancel() }) => void`                 | **宿主接管**密码输入           |
-| `showPasswordDialog` | `boolean`                                                 | 用包内置密码框                 |
-| `onToast`            | `(toast: ToastController) => void`                        | **宿主完全接管** toast         |
+| Prop                 | 类型                                      | 说明                                  |
+| -------------------- | ----------------------------------------- | ------------------------------------- |
+| `onExternalLink`     | `(url: string) => void`                   | 外部链接点击（宿主决定怎么开）        |
+| `onInternalLink`     | `(ctx: InternalLinkContext) => void`      | 内部链接（**包自己跳** + 宿主可拦截） |
+| `onRequestPassword`  | `(info: { retry(pw), cancel() }) => void` | **宿主接管**密码输入                  |
+| `showPasswordDialog` | `boolean`                                 | 用包内置密码框                        |
+| `onToast`            | `(toast: ToastController) => void`        | **宿主完全接管** toast                |
+
+#### `onInternalLink` 的契约（**重要**）
+
+> ⚠️ **语义变更**：之前是 `onInternalLink(dest, pageNumber)`，其中 `pageNumber`
+> 是**链接所在的页**（没用）。现在是**一个上下文对象**。
+
+```ts
+export interface InternalLinkContext {
+  /** 原始 dest（数组 `[ref, '/XYZ', left, top, zoom]` 或命名目标字符串） */
+  dest: string | unknown[];
+  /** **目标页**（包解析出来的；解析不出时 `null`） */
+  targetPage: number | null;
+  /** 链接**所在**的页 */
+  currentPage: number;
+  /** 目标在这一页内的 y 坐标（PDF 点坐标） */
+  targetY: number | null;
+  /** **取消这次跳转**（宿主调用它 -> 包就不跳了） */
+  cancel: () => void;
+}
+```
+
+**跳转只有一个执行者（不会跳两次）**：
+
+```
+点内部链接
+  → 包解析 dest -> targetPage
+  → 调 onInternalLink(ctx)
+      → 宿主不调 cancel() -> **包跳** ✅
+      → 宿主调 cancel()     -> **包不跳** ✅
+```
+
+> ⚠️ **宿主在回调里**不要**再调 `goToPage`**（包已经跳了 -> 会跳两次）。
+> 想自己接管（比如弹确认框）-> 调 `ctx.cancel()`。
+
+**鲁棒性**：
+
+| 情况                                          | 处理                                             |
+| --------------------------------------------- | ------------------------------------------------ |
+| 宿主没给 `resolvePageRef` / `pageRefToNumber` | 解析不出 -> **toast 提示**（不静默）             |
+| dest 是**数组** `[ref, ...]`                  | `resolveDestPageAsync` 支持 ✅                   |
+| dest 是**字符串**（具名目标 `"section.1"`）   | 走宿主的 `resolvePageRef`（异步展开）✅          |
+| **目标页 == 当前页**                          | **照样跳**，而且滚到**那一行**（用 `targetY`）✅ |
+| 同一目标页 200ms 内重复触发                   | **幂等锁** -> 只跳一次 ✅                        |
 
 ---
 

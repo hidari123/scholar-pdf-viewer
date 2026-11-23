@@ -118,7 +118,14 @@ export function Reader({ url, paperId }: { url: string; paperId: string }) {
       highlights={highlights}
       onHighlight={handleHighlight}
       onExternalLink={(u) => window.open(u, '_blank', 'noopener')}
-      onInternalLink={(_d, p) => viewerRef.current?.goToPage(p)}
+      /*
+       * ⚠️ **包自己跳** -> 这里只被"通知"，**不要再调 goToPage**（会跳两次）。
+       * -> ctx.targetPage = 目标页（不是链接所在页）
+       * -> 想自己接管（比如弹确认框）-> 调 ctx.cancel()
+       */
+      onInternalLink={(ctx) => {
+        console.log('跳到第', ctx.targetPage, '页');
+      }}
       onError={(e) => console.error(e.code, e.message)}
     />
   );
@@ -227,7 +234,7 @@ viewerRef.current?.clearSelection();
 <PdfViewer locale="de" locales={{ de: { 'load.loading': 'Wird geladen…' } }} />
 
 // 覆盖一两句
-<PdfViewer messages={{ 'load.loading': '正在打开…' }} />
+<PdfViewer messages={{ zh: { 'load.loading': '正在打开…' } }} />
 ```
 
 > ⚠️ `locales` = **加一整个语言**；`messages` = **覆盖当前语言的个别句子**。
@@ -354,7 +361,15 @@ export function Reader({ url, paperId }: { url: string; paperId: string }) {
       highlights={highlights}
       onHighlight={handleHighlight}
       onExternalLink={(u) => window.open(u, '_blank', 'noopener')}
-      onInternalLink={(_d, p) => viewerRef.current?.goToPage(p)}
+      /*
+       * ⚠️ **The package jumps by itself** -> this is only a notification,
+       *    do NOT call goToPage again (it would jump twice).
+       * -> ctx.targetPage = the target page (not the page the link is on)
+       * -> To take over (e.g. show your own confirmation) -> call ctx.cancel()
+       */
+      onInternalLink={(ctx) => {
+        console.log('jumping to page', ctx.targetPage);
+      }}
       onError={(e) => console.error(e.code, e.message)}
     />
   );
@@ -463,7 +478,7 @@ See [Extending](./docs/EXTENDING.md#2-加一个工具栏按钮).
 <PdfViewer locale="de" locales={{ de: { 'load.loading': 'Wird geladen…' } }} />
 
 // override a couple of strings
-<PdfViewer messages={{ 'load.loading': 'Loading…' }} />
+<PdfViewer messages={{ en: { 'load.loading': 'Loading…' } }} />
 ```
 
 > ⚠️ `locales` = **add a whole language**; `messages` = **override individual strings** for the current locale.

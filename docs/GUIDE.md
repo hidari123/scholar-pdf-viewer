@@ -124,7 +124,14 @@ export function PaperReader({ paperId, fileUrl }: Props) {
       onAnnotationDelete={(id) => setAnnotations((prev) => prev.filter((a) => a.id !== id))}
       // 链接
       onExternalLink={(url) => window.open(url, '_blank', 'noopener')}
-      onInternalLink={(_dest, pageNumber) => viewerRef.current?.goToPage(pageNumber)}
+      /*
+       * ⚠️ **包自己跳** -> 这里只被"通知"，**不要再调 goToPage**（会跳两次）。
+       * -> ctx.targetPage = 目标页（不是链接所在页）
+       * -> 想自己接管 -> 调 ctx.cancel()
+       */
+      onInternalLink={(ctx) => {
+        console.log('跳到第', ctx.targetPage, '页');
+      }}
       // 错误
       onError={(error) => console.error(error.code, error.message)}
     />
@@ -368,8 +375,14 @@ const es = {
 
 ### 覆盖一两个句子
 
+> ⚠️ **`messages` 是【按语言绑定】的**（和 `locales` 同一个概念）。
+>
+> -> 之前是 `messages={{ 'load.loading': '…' }}`（**不绑语言**）❌
+>   -> 那些句子在**任何语言**下都生效 -> 切语言还是中文 -> **中英文混杂** ❌
+> -> 现在：`messages={{ zh: { … } }}` ✅ -> **换语言只影响对应语言的那份** ✅
+
 ```tsx
-<PdfViewer messages={{ 'load.loading': '正在打开…' }} />;
+<PdfViewer locale="zh" messages={{ zh: { 'load.loading': '正在打开…' } }} />;
 ```
 
 ### 自定义按钮也要能翻译
@@ -377,8 +390,11 @@ const es = {
 ```tsx
 const toolbar = [{ command: 'bold' as const, label: '{my.bold}', icon: 'bold' as const }];
 
-<PdfViewer annotationToolbar={toolbar} messages={{ 'my.bold': '加粗' }} />;
+<PdfViewer annotationToolbar={toolbar} messages={{ zh: { 'my.bold': '加粗' } }} />;
 ```
+
+> ⚠️ **宿主自己的 UI 也要自己接 `locale`**（包的 i18n 只管包里的文字）。
+> -> demo 里演示了正确的做法（见 `demo/src/demo-i18n.ts`）✅
 
 > 💡 `label` 写 `{xxx.yyy}` 形式 → 包会拿 `xxx.yyy` 去查文案表。
 
