@@ -219,6 +219,8 @@ export default function App() {
 
   /** 主题（宿主可切换） */
   const [theme, setTheme] = useState<PdfViewerTheme>('light');
+  /** 文字方向（RTL 支持） */
+  const [dir, setDir] = useState<'ltr' | 'rtl'>('ltr');
 
   /** 密度（appearance 的结构开关） */
   const [density, setDensity] = useState<PdfViewerDensity>('cozy');
@@ -1127,6 +1129,21 @@ export default function App() {
             <option value="cozy">{t('demo.density.cozy')}</option>
             <option value="comfortable">{t('demo.density.comfortable')}</option>
           </select>
+          {/*
+           * ⚠️ **RTL 开关**（审计新增的能力）。
+           *
+           * -> 之前**完全没有 RTL 支持** -> 阿拉伯语 / 希伯来语的宿主没法用 ❌
+           * -> 现在：\`dir\` prop + CSS 镜像 ✅
+           */}
+          <span style={{ opacity: 0.7, marginLeft: 12 }}>RTL</span>
+          <select
+            value={dir}
+            onChange={(e) => setDir(e.target.value as 'ltr' | 'rtl')}
+            aria-label="文字方向"
+          >
+            <option value="ltr">LTR（从左往右）</option>
+            <option value="rtl">RTL（从右往左）</option>
+          </select>
         </span>
 
         {/*
@@ -1154,6 +1171,7 @@ export default function App() {
           file={sampleUrl}
           documentId={documentId}
           theme={theme}
+          dir={dir}
           appearance={{ density }}
           slots={useSlots ? demoSlots : undefined}
           highlights={highlights}

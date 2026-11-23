@@ -59,6 +59,7 @@ const suites = [
   { name: '第 21 轮（链接弹窗 / 删除线 / 缩放 / 跳转）', file: 'e2e-round21.mjs' },
   { name: '键盘导航（翻页 / Home / End / 缩放）', file: 'e2e-keyboard.mjs' },
   { name: 'Ctrl + 滚轮缩放', file: 'e2e-wheel-zoom.mjs' },
+  { name: 'RTL（从右往左）', file: 'e2e-rtl.mjs' },
   { name: '内置的语言和高亮色', file: 'e2e-builtin-defaults.mjs' },
   { name: '内置配置（色板 + 语言）可被宿主覆盖', file: 'e2e-builtin-config.mjs' },
   { name: '目录的异步页码解析', file: 'e2e-outline-resolve.mjs' },

@@ -2278,3 +2278,63 @@
   user-select: none;
   -webkit-user-select: none;
 }
+
+/*
+ * ============================================================================
+ * RTL（从右往左）
+ * ============================================================================
+ *
+ * ⚠️ **之前完全没有 RTL 支持**（审计发现的）：
+ * -> 阿拉伯语 / 希伯来语的宿主**没法用** ❌
+ *
+ * ### 镜像策略
+ *
+ * -> **文字方向** -> 靠根节点的 \`dir="rtl"\` 属性（浏览器自己处理）✅
+ * -> **界面布局**（工具栏左右、侧栏在左还是右）-> 靠 CSS 镜像 ✅
+ * -> **翻页箭头** -> **要单独反过来**（RTL 里"下一页"朝左）✅
+ * -> **PDF 页面本身** -> **不镜像**（PDF 的内容方向是它自己的事）✅
+ */
+
+/*
+ * ⚠️ **翻页箭头镜像**（这是 RTL 最容易被忽略的一处）。
+ *
+ * -> 在 RTL 里，"上一页"应该朝**右**，"下一页"朝**左** ❌
+ * -> 之前的图标是固定的（chevronLeft = 上一页）-> **方向是反的** ❌
+ * -> 现在：**用 CSS 翻转** ✅
+ */
+.scpdf-root--rtl .scpdf-toolbar__btn--prev svg,
+.scpdf-root--rtl .scpdf-toolbar__btn--next svg {
+  transform: scaleX(-1);
+}
+
+/*
+ * ⚠️ **侧栏的边框**（在 RTL 里侧栏在**左边** -> 边框要换边）。
+ */
+.scpdf-root--rtl .scpdf-panel {
+  border-right: none;
+  border-left: 1px solid var(--scpdf-color-border);
+}
+
+/*
+ * ⚠️ **弹窗 / 浮层的定位**（用 \`left\` / \`right\` 的要换边）。
+ *
+ * -> 选区浮层在文字的哪一侧 -> RTL 里应该反过来 ✅
+ */
+.scpdf-root--rtl .scpdf-popover {
+  transform-origin: right center;
+}
+
+/*
+ * ⚠️ **文字对齐**（RTL 里默认应该右对齐）。
+ */
+.scpdf-root--rtl .scpdf-toolbar__page-input,
+.scpdf-root--rtl .scpdf-dialog__input {
+  text-align: right;
+}
+
+/*
+ * ⚠️ **便签（小便签）的偏移**（RTL 里应该在另一侧）。
+ */
+.scpdf-root--rtl .scpdf-annotation {
+  direction: rtl;
+}

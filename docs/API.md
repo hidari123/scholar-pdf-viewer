@@ -8,16 +8,16 @@
 
 ## 目录 / Table of Contents
 
-- [1. 包入口 / Package entry points](#1-包入口--package-entry-points)
-- [2. `<PdfViewer />` props](#2-pdfviewer--props)
+- [1. 包入口 / Package entry points](#1-包入口-package-entry-points)
+- [2. `<PdfViewer />` props](#2-pdfviewer-props)
 - [3. `PdfViewerHandle`（命令式句柄）](#3-pdfviewerhandle命令式句柄)
 - [4. `config`（统一配置对象）](#4-config统一配置对象)
-- [5. 功能开关 / 工具栏 / 外观 / 插槽](#5-功能开关--工具栏--外观--插槽)
+- [5. 功能开关 / 工具栏 / 外观 / 插槽](#5-功能开关-工具栏-外观-插槽)
 - [6. 宿主回调契约](#6-宿主回调契约)
 - [7. 选区动作（自定义浮层按钮）](#7-选区动作自定义浮层按钮)
 - [8. 富文本工具栏](#8-富文本工具栏)
 - [9. 图标](#9-图标)
-- [10. 多语言 / i18n](#10-多语言--i18n)
+- [10. 多语言 / i18n](#10-多语言-i18n)
 - [11. 主题与 CSS 变量](#11-主题与-css-变量)
 - [12. 错误码](#12-错误码)
 - [13. 数据类型](#13-数据类型)

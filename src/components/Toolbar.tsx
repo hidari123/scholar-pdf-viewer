@@ -160,7 +160,7 @@ export function Toolbar(props: ToolbarProps) {
         <div className="scpdf-toolbar__center">
           <button
             type="button"
-            className="scpdf-toolbar__btn"
+            className="scpdf-toolbar__btn scpdf-toolbar__btn--prev"
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1}
             aria-label={t('page.prev')}
@@ -202,7 +202,7 @@ export function Toolbar(props: ToolbarProps) {
 
           <button
             type="button"
-            className="scpdf-toolbar__btn"
+            className="scpdf-toolbar__btn scpdf-toolbar__btn--next"
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages}
             aria-label={t('page.next')}

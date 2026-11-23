@@ -54,6 +54,8 @@ import { measureAscentRatio } from '../core/text-layer/font-metrics';
 import type { PositionedTextItem } from '../core/text-layer/layout';
 import type { PdfViewerAppearance, PdfViewerSlots, PdfViewerTheme } from '../core/theme';
 import { appearanceStyles, themeClasses } from '../core/theme';
+import type { Direction } from '../core/theme/direction';
+import { resolveDirection } from '../core/theme/direction';
 import type {
   HighlightRecord,
   NewHighlight,
@@ -332,6 +334,25 @@ export interface PdfViewerProps {
    *    （见 `@media print` 里的隐藏规则）。
    */
   printMode?: 'with-highlights' | 'original';
+  /**
+   * **文字方向**（`'ltr' | 'rtl'`）。
+   *
+   * ⚠️ **之前完全没有 RTL 支持**（审计发现的）：
+   * -> 阿拉伯语 / 希伯来语的宿主**没法用** ❌
+   *   -> 界面还是从左往右 ❌
+   *   -> **上一页 / 下一页的箭头方向也是反的** ❌
+   * -> 现在：**镜像整个界面** ✅
+   *
+   * ```tsx
+   * <PdfViewer dir="rtl" locale="ar" />
+   * ```
+   *
+   * ⚠️ **不传 = 自动判断**：
+   * -> 先看 `locale`（阿拉伯语 / 希伯来语等 -> rtl）✅
+   * -> 再看 `document.dir` ✅
+   * -> 都没有 -> `'ltr'` ✅
+   */
+  dir?: 'ltr' | 'rtl';
   /**
    * **打印纸张**（默认 `'A4'`）。
    *
@@ -636,6 +657,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     initialPage = 1,
     initialScale = 'width',
     printMode = 'with-highlights',
+    dir,
     printPaper = 'A4',
     printMargin,
     slots,
@@ -3652,8 +3674,22 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     [],
   );
 
+  /*
+   * ⚠️ **文字方向**（审计发现的：之前**完全没有 RTL 支持**）。
+   *
+   * -> 阿拉伯语 / 希伯来语的宿主**没法用** ❌
+   * -> 现在：**自动判断**（显式 prop > locale > 宿主的 `document.dir` > ltr）✅
+   */
+  const direction: Direction = resolveDirection(
+    dir,
+    merged.locale,
+    typeof document === 'undefined' ? undefined : document.dir,
+  );
+
   const className = [
     'scpdf-root',
+    // ⚠️ RTL -> 加一个 class -> CSS 镜像整个界面 ✅
+    direction === 'rtl' ? 'scpdf-root--rtl' : '',
     // ⚠️ 主题 + 外观 → class 名（见 `core/theme` 的 `themeClasses`）
     ...themeClasses(merged.theme ?? 'auto', merged.appearance),
     // ⚠️ "只打印原 PDF"模式（不带高亮）
@@ -3676,6 +3712,13 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     <div
       className={className}
       style={appearanceStyle}
+      /*
+       * ⚠️ **\`dir\` 属性**（RTL 支持）。
+       *
+       * -> 不只是加 class -> **浏览器会自己镜像文字和内边距** ✅
+       * -> 阿拉伯语 / 希伯来语的正文**方向本来就该由浏览器决定** ✅
+       */
+      dir={direction}
       data-testid="pdf-viewer"
       /*
        * ⚠️ **弹窗打开时** -> 标记一下（用户反馈：

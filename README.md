@@ -142,7 +142,7 @@ export function Reader({ url, paperId }: { url: string; paperId: string }) {
 | 7 套主题 + CSS 变量     | ✅   |                                                                |
 | 加密文档                | ✅   | 内置密码框 or 宿主接管                                         |
 | 键盘快捷键              | ✅   | 翻页 / Home / End / 缩放                                       |
-| RTL                     | ❌   | 暂无 `dir` 支持                                                |
+| RTL                     | ✅   | `dir="rtl"` / `locale="ar"` 自动判断；界面镜像 + 箭头翻转      |
 | 拖放文件                | ❌   | 全在宿主                                                       |
 
 ## 坐标三空间（**存数据必看**）
@@ -206,6 +206,19 @@ viewerRef.current?.clearSelection();
 ```
 
 > ✅ 打印按钮和缩放按钮**互相独立**（`showZoom: false` 不会隐藏打印按钮）。
+
+## RTL（从右往左）
+
+```tsx
+// 显式指定
+<PdfViewer dir="rtl" locale="ar" />
+
+// 或者**自动判断**（locale 是阿拉伯语 / 希伯来语 -> 自动 rtl）
+<PdfViewer locale="ar" />
+```
+
+> ✅ **自动判断顺序**：显式 `dir` > `locale` > 宿主页面的 `document.dir` > `ltr`。
+> 界面会**镜像**（工具栏、侧栏），**翻页箭头也会翻转**。
 
 ## 多语言
 
@@ -365,7 +378,7 @@ export function Reader({ url, paperId }: { url: string; paperId: string }) {
 | 7 themes + CSS variables         | ✅     |                                                                                     |
 | Encrypted documents              | ✅     | Built-in dialog or host-handled                                                     |
 | Keyboard shortcuts               | ✅     | Navigate / Home / End / zoom                                                        |
-| RTL                              | ❌     | No `dir` support yet                                                                |
+| RTL (right-to-left)              | ✅     | `dir="rtl"` / `locale="ar"` auto-detected; layout mirrored, arrows flipped          |
 | Drag & drop files                | ❌     | Entirely the host's job                                                             |
 
 ## Three coordinate spaces (read before persisting)
@@ -429,6 +442,19 @@ See [Extending](./docs/EXTENDING.md#2-加一个工具栏按钮).
 ```
 
 > ✅ The print button and the zoom controls are **independent** (`showZoom: false` does not hide print).
+
+## RTL (right-to-left)
+
+```tsx
+// explicit
+<PdfViewer dir="rtl" locale="ar" />
+
+// or **auto-detected** (an Arabic / Hebrew locale turns it on)
+<PdfViewer locale="ar" />
+```
+
+> ✅ **Detection order**: explicit `dir` > `locale` > the host page's `document.dir` > `ltr`.
+> The layout is **mirrored** (toolbar, side panels) and the **page arrows are flipped**.
 
 ## Multiple languages
 
