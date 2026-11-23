@@ -316,6 +316,12 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
     <div
       className="scpdf-annotation-dialog__backdrop"
       /*
+       * ⚠️ **给容器的点击委托一个"我是浮层"的标记**。
+       * -> 容器上挂了高亮的点击委托（按鼠标坐标命中）✅
+       * -> 浮层里的点击**不能**触发它（否则下面的高亮会被误激活）✅
+       */
+      data-scpdf-floating="true"
+      /*
        * ⚠️ **有锚点时 → 不要遮罩**（用户需求：弹窗要贴着批注，不要挡住整页）。
        * -> 没锚点 → 保留遮罩（居中模式的老行为）✅
        */

@@ -2552,6 +2552,34 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     [],
   );
 
+  /*
+   * ⚠️⚠️ **安全网：高亮激活态最多存在 1.5s**（实测踩过的坑）。
+   *
+   * ### 问题
+   *
+   * -> 高亮的"激活态"（`.scpdf-annotation--active` → **蓝色边框**）❌
+   * -> 之前只有 `handleHighlightClick` 里那条路径会**设置定时器** ✅
+   * -> 别的路径（比如浮层里的点击冒泡到容器）设了激活态却**没有定时器** ❌
+   *    -> 高亮**一直蓝着** -> 用户以为"被选中了" ❌
+   *    -> 用户反馈："我在上面的批注上输入 但是下面的高亮也变成选中态了" ✅
+   *
+   * ### 现在的做法
+   *
+   * -> **只要 `activeHighlightId` 非空，就保证 1.5s 后清掉** ✅
+   * -> 任何代码路径都不可能留下"永久蓝着"的高亮 ✅
+   */
+  useEffect(() => {
+    if (!activeHighlightId) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setActiveHighlightId(null);
+    }, 1500);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [activeHighlightId]);
+
   /**
    * 高亮完成后**清掉选区**。
    *
@@ -2877,9 +2905,24 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        * -> 不正在批注 -> 行为**完全不变** ✅
        */
       if (isPendingNoteRef.current) {
-        // ⚠️ **只高亮它**，不清选区、不弹操作条
-        setActiveHighlightId(highlight.id);
-        onHighlightClick?.(highlight);
+        /*
+         * ⚠️⚠️ **正在批注时 → 什么都不做**（实测踩过的坑）。
+         *
+         * ### 之前为什么写了 `setActiveHighlightId(highlight.id)`
+         *
+         * -> 上一次修"点高亮会清掉选区"时，我在这个 early-return 里
+         *    **顺手保留了** `setActiveHighlightId` ❌
+         * -> 结果：**批注弹窗盖在高亮上**时，用户在弹窗里点工具栏按钮 ❌
+         *    -> 点击冒泡到 container -> 高亮的点击委托按坐标命中 ❌
+         *    -> 高亮加上 `.scpdf-annotation--active` -> **蓝色选中边框** ❌
+         *    -> 用户反馈："我在上面的批注上输入 但是下面的高亮也变成选中态了" ✅
+         *
+         * ### 现在的做法
+         *
+         * -> **不设置激活态**（高亮不该有"被选中"的样子）✅
+         * -> 也**不弹**高亮的操作条（免得和批注弹窗打架）✅
+         * -> 也**不清**选区（蓝色框要留着）✅
+         */
         return;
       }
 
@@ -2947,6 +2990,29 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       }
 
       const target = event.target as HTMLElement | null;
+
+      /*
+       * ⚠️⚠️ **点击来自弹窗内部 → 直接忽略**（实测踩过的坑）。
+       *
+       * ### 问题
+       *
+       * -> 批注弹窗 / 便利贴面板在 **React 树里是 container 的后代** ✅
+       *    （DOM 上靠 `position: fixed` 浮着，但 React 的合成事件照样冒泡）✅
+       * -> 容器上挂了**高亮的点击委托**，按**鼠标坐标**命中高亮 ✅
+       * -> 用户在弹窗里打字 / 点工具栏按钮 -> 坐标正好落在**下面的高亮**上 ❌
+       *    -> 高亮被误判成"被点击" -> 变成**蓝色选中态** ❌
+       *    -> 用户反馈："我在上面的批注上输入 但是下面的高亮也变成选中态了" ✅
+       *
+       * ### 三层防御
+       *
+       * 1. 弹窗内部 `stopPropagation`（`AnnotationDialog` / `AnnotationPanel`）✅
+       * 2. **这里再挡一次**（防止将来新增的浮窗忘了加）✅
+       * 3. 正在批注时**根本不设置**激活态（见 `handleHighlightClick`）✅
+       */
+      if (target?.closest?.('[data-scpdf-floating]')) {
+        return;
+      }
+
       const highlightEl =
         findHighlightAtPoint(event.clientX, event.clientY) ??
         target?.closest?.('[data-highlight-id]');
@@ -4307,6 +4373,31 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
             event.currentTarget.style.cursor = '';
           }}
           onMouseMove={handleContainerMouseMove}
+          /*
+           * ⚠️⚠️ **捕获阶段就拦掉"来自浮层内部"的点击**（实测踩过的坑）。
+           *
+           * ### 问题
+           *
+           * -> 批注弹窗 / 便利贴面板在 **React 树里是 container 的后代** ✅
+           *    （DOM 上靠 `position: fixed` 浮着，但 React 的合成事件照样冒泡）✅
+           * -> 容器上有**高亮的点击委托**（按鼠标坐标命中）✅
+           * -> 用户在弹窗里打字 / 点工具栏按钮 -> 坐标正好落在**下面的高亮**上 ❌
+           *    -> 高亮被误判成"被点击" -> **蓝色选中态** ❌
+           *    -> 用户反馈："我在上面的批注上输入 但是下面的高亮也变成选中态了" ✅
+           *
+           * ### 为什么用**捕获阶段**
+           *
+           * -> 冒泡阶段拦截的话，浮层内部的 `stopPropagation` 就够了 ✅
+           *    但**万一将来新增的浮层忘了加** -> 又会漏 ❌
+           * -> **捕获阶段**在浮层之前跑 -> **一网打尽** ✅
+           *    -> 浮层自己处理点击，不往上走 ✅
+           */
+          onClickCapture={(event) => {
+            const target = event.target as HTMLElement | null;
+            if (target?.closest?.('[data-scpdf-floating]')) {
+              event.stopPropagation();
+            }
+          }}
           onClick={(event) => {
             /*
              * ⚠️⚠️ **链接要"先"处理**（实测踩过的坑）。

@@ -201,6 +201,12 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
     <div
       ref={panelRef}
       className="scpdf-annotation-panel"
+      /*
+       * ⚠️ **给容器的点击委托一个"我是浮层"的标记**。
+       * -> 容器上挂了高亮的点击委托（按鼠标坐标命中）✅
+       * -> 浮层里的点击**不能**触发它（否则下面的高亮会被误激活）✅
+       */
+      data-scpdf-floating="true"
       style={{ left, top, width: ANNOTATION_PANEL_WIDTH }}
       role="dialog"
       aria-label={t('annotation.title')}
