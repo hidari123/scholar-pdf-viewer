@@ -155,8 +155,12 @@ try {
       viewportHeight: window.innerHeight,
       fullyVisible:
         r.left >= 0 && r.right <= window.innerWidth && r.top >= 0 && r.bottom <= window.innerHeight,
-      // 在"中间偏右"？（左边缘 > 视口中线）
-      middleRight: r.left > window.innerWidth * 0.4,
+      // 贴在便签旁边？（不是离得很远）
+      nearNote: (() => {
+        const n = document.querySelector('.scpdf-sticky-note__icon')?.getBoundingClientRect();
+        if (!n) return false;
+        return Math.abs(r.left - n.right) < 120;
+      })(),
       hasEditor: !!el.querySelector('.scpdf-rich-text__editor'),
       toolbarButtons: el.querySelectorAll('.scpdf-rich-text__btn').length,
     };
@@ -173,14 +177,36 @@ try {
     }),
   );
   check(
-    '**便利贴面板在"页面中间偏右"**',
-    panel?.middleRight === true,
+    '**便利贴面板贴在便签旁边**（用户需求："打开一个稍微大一点的便利贴的样式"）',
+    panel?.nearNote === true,
     `left=${panel?.left} viewport=${panel?.viewportWidth}`,
   );
   check(
-    '**面板里有富文本编辑器（工具栏 + 编辑区）**',
-    panel?.hasEditor === true && (panel?.toolbarButtons ?? 0) >= 4,
-    `按钮 ${panel?.toolbarButtons} 个`,
+    '**面板默认是只读的**（点"编辑"才进编辑器）',
+    panel?.hasEditor === false,
+    `hasEditor=${panel?.hasEditor}`,
+  );
+
+  // 点"编辑" -> 就地变成编辑器
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('.scpdf-annotation-panel__btn')].find((x) =>
+      (x.getAttribute('aria-label') ?? '').includes('编辑'),
+    );
+    b?.click();
+  });
+  await page.waitForTimeout(900);
+  const afterEdit = await page.evaluate(() => {
+    const el = document.querySelector('.scpdf-annotation-panel');
+    if (!el) return null;
+    return {
+      hasEditor: !!el.querySelector('.scpdf-rich-text__editor'),
+      toolbarButtons: el.querySelectorAll('.scpdf-rich-text__btn').length,
+    };
+  });
+  check(
+    '**点"编辑"后有富文本编辑器（工具栏 + 编辑区）**',
+    afterEdit?.hasEditor === true && (afterEdit?.toolbarButtons ?? 0) >= 4,
+    `按钮 ${afterEdit?.toolbarButtons} 个`,
   );
 
   // ④ 富文本能真的格式化（加粗）

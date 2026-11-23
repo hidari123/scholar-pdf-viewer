@@ -29,10 +29,11 @@
  */
 
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
 import { richTextToPlain, sanitizeRichText } from '../core/editor/rich-text';
+import { computeDialogPosition } from '../core/selection/dialog-position';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
@@ -48,6 +49,16 @@ export interface AnnotationPanelProps {
   annotation: AnnotationRecord | null;
   /** 容器尺寸（用来算位置） */
   container: { width: number; height: number };
+  /**
+   * **便签的视口矩形**（用来把面板贴在便签旁边）。
+   *
+   * ⚠️ **之前面板固定在"页面中间偏右"** ❌
+   *    -> 便签在 \`x=571\`，面板在 \`x=918\` -> **离得很远** ❌
+   *    -> 用户反馈："打开详细按钮目前是失效的 需要点击能打开一个稍微大一点的便利贴的样式" ✅
+   *
+   * -> 传了 -> **贴在便签旁边**（优先放右边，放不下就翻到左边）✅
+   */
+  anchorRect?: { left: number; top: number; right: number; bottom: number } | null;
   /** 批注内容变化（HTML + 纯文本） */
   onChange?: (id: string, html: string, plain: string) => void;
   /** 保存 */
@@ -106,6 +117,7 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
   const {
     annotation,
     container,
+    anchorRect,
     onChange,
     onSubmit,
     onDelete,
@@ -179,6 +191,29 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
     [annotation, onChange],
   );
 
+  /*
+   * ⚠️ **是不是在"编辑模式"**（用户需求）。
+   *
+   * ### 用户反馈
+   *
+   * > "便签详情打开的时候也是要有按钮可以选编辑的 选择编辑的时候便签详情就消失隐藏"
+   *
+   * ### 现在的做法（用户选的 **B 方案**："先试试B的效果"）
+   *
+   * -> **默认只读**（显示排版好的富文本）✅
+   * -> 点"编辑" -> **就地变成编辑器**（**不弹窗**）✅
+   * -> 点"完成" -> 回到只读 ✅
+   *
+   * -> 之前是**直接进编辑器**（没这一步）❌
+   *   -> 打开详情就看到一个工具栏 -> 不像"详情" ❌
+   */
+  const [editing, setEditing] = useState(false);
+
+  // 切换批注 -> 退出编辑模式
+  useEffect(() => {
+    setEditing(false);
+  }, []);
+
   /** 提交（**顺带清洗 HTML**，防 XSS） */
   const handleSubmit = useCallback(
     (html: string, plain: string) => {
@@ -187,25 +222,48 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
       }
       const safe = sanitizeRichText(html);
       onSubmit?.(annotation.id, safe, plain);
+      setEditing(false);
     },
     [annotation, onSubmit],
   );
 
+  /*
+   * ⚠️ **位置：贴着便签**（用户需求："打开一个稍微大一点的便利贴的样式"）。
+   *
+   * ### 之前
+   *
+   * -> 固定在**页面中间偏右** -> 便签在 `x=571`、面板在 `x=918` -> **离得很远** ❌
+   *
+   * ### 现在
+   *
+   * -> **复用 `computeDialogPosition`**（和编辑弹窗同一套定位规则）✅
+   * -> 有锚点（便签）-> **贴在便签旁边** ✅
+   * -> 放不下 -> **自动翻边** ✅
+   * -> 没锚点 -> 退回"中间偏右" ✅
+   */
+  const position = useMemo(() => {
+    if (!anchorRect) {
+      return {
+        left: Math.max(
+          8,
+          container.width * 0.5 + (container.width * 0.5 - ANNOTATION_PANEL_WIDTH) * 0.5,
+        ),
+        top: Math.max(8, container.height * 0.18),
+      };
+    }
+    return computeDialogPosition({
+      anchor: anchorRect,
+      size: { width: ANNOTATION_PANEL_WIDTH, height: 320 },
+      viewport: { width: container.width, height: container.height },
+    });
+  }, [anchorRect, container.width, container.height]);
+
+  const left = position.left;
+  const top = position.top;
+
   if (!annotation) {
     return null;
   }
-
-  /*
-   * ⚠️ **位置：页面中间偏右**（用户明确要求）。
-   *
-   * → 之前贴在便签图标旁边 → 在页面最右边 → **被容器裁掉**（用户反馈）
-   * → 现在落在**可视区中间偏右** → 完整可见 ✅
-   */
-  const left = Math.max(
-    8,
-    container.width * 0.5 + (container.width * 0.5 - ANNOTATION_PANEL_WIDTH) * 0.5,
-  );
-  const top = Math.max(8, container.height * 0.18);
 
   return (
     <div
@@ -228,6 +286,25 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
           {t('annotation.title')}
         </span>
         <span className="scpdf-annotation-panel__actions">
+          {/*
+           * ⚠️ **"编辑"按钮**（用户需求：
+           * "便签详情打开的时候也是要有按钮可以选编辑的"）。
+           *
+           * -> **默认只读**（详情）✅
+           * -> 点"编辑" -> **就地变成编辑器**（B 方案：不弹窗）✅
+           * -> 编辑中 -> 按钮变成"完成" ✅
+           */}
+          {!readOnly ? (
+            <button
+              type="button"
+              className="scpdf-annotation-panel__btn"
+              title={editing ? t('annotation.done') : t('annotation.edit')}
+              aria-label={editing ? t('annotation.done') : t('annotation.edit')}
+              onClick={() => setEditing((v) => !v)}
+            >
+              <Icon name={editing ? 'check' : 'edit'} size={14} overrides={icons} />
+            </button>
+          ) : null}
           {onDelete ? (
             <button
               type="button"
@@ -255,7 +332,7 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
 
       {/* 内容（只读 → 显示 HTML；可编辑 → 富文本编辑器） */}
       <div className="scpdf-annotation-panel__body">
-        {readOnly ? (
+        {readOnly || !editing ? (
           <ReadOnlyContent html={draft} />
         ) : (
           (() => {

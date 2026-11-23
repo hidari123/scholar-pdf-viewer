@@ -77,6 +77,7 @@ const suites = [
     file: 'e2e-annotation-dialog-highlight-activate.mjs',
   },
   { name: '编辑批注（锚点弹窗 + 保存按钮）', file: 'e2e-annotation-edit.mjs' },
+  { name: '便签详情（展开 + 只读 + 编辑切换）', file: 'e2e-annotation-detail.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

@@ -4097,6 +4097,33 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     return stickyNotes?.find((a) => a.id === activeAnnotationId) ?? null;
   }, [activeAnnotationId, stickyNotes]);
 
+  /**
+   * **当前打开的便签的视口矩形**（给便利贴详情面板当锚点）。
+   *
+   * ⚠️ **之前面板固定在"页面中间偏右"** ❌
+   *    -> 便签在 \`x=571\`、面板在 \`x=918\` -> **离得很远** ❌
+   *    -> 用户反馈："打开详细按钮目前是失效的 需要点击能打开一个稍微大一点的便利贴的样式" ✅
+   *
+   * -> 现在：**量便签图标的位置** -> 面板**贴在它旁边** ✅
+   */
+  const activeAnnotationAnchor = useMemo(() => {
+    if (!activeAnnotationId) {
+      return null;
+    }
+    const container = containerRef.current;
+    if (!container) {
+      return null;
+    }
+    const el = container.querySelector<HTMLElement>(
+      `.scpdf-sticky-note__icon[data-note-id="${CSS.escape(activeAnnotationId)}"]`,
+    );
+    if (!el) {
+      return null;
+    }
+    const r = el.getBoundingClientRect();
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  }, [activeAnnotationId]);
+
   /** 批注的删除（宿主实现） */
   const handleAnnotationDelete = useCallback(
     (id: string) => {
@@ -4728,6 +4755,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               <AnnotationPanel
                 annotation={activeAnnotation}
                 container={{ width: containerSize.width, height: containerSize.height }}
+                anchorRect={activeAnnotationAnchor}
                 onChange={onAnnotationChange}
                 onSubmit={onAnnotationSave}
                 onDelete={onAnnotationDelete ? handleAnnotationDelete : undefined}

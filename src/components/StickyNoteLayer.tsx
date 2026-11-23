@@ -227,6 +227,11 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
             <button
               type="button"
               className="scpdf-sticky-note__icon"
+              /*
+               * ⚠️ **带上批注 id**（给"便利贴详情面板"当锚点用）。
+               * -> 面板要**贴在便签旁边** -> 要找到便签的位置 ✅
+               */
+              data-note-id={first.id}
               style={{ width: STICKY_NOTE_SIZE, height: STICKY_NOTE_SIZE }}
               title={
                 isGroup

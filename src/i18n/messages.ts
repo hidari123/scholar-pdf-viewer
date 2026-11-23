@@ -155,6 +155,8 @@ export interface Messages {
   'annotation.withContent': string;
   'annotation.selectGroup': string;
   'annotation.edit': string;
+  /** 完成编辑（便签详情的"编辑"按钮切换后） */
+  'annotation.done': string;
   'annotation.expand': string;
   'annotation.empty': string;
   'link.internal': string;
@@ -312,6 +314,7 @@ export const ZH_MESSAGES: Messages = {
   'annotation.withContent': '批注：{content}',
   'annotation.selectGroup': '选择批注（{count}）',
   'annotation.edit': '编辑批注',
+  'annotation.done': '完成',
   'annotation.expand': '展开批注',
   'annotation.empty': '（空批注）',
   'link.internal': '内部链接',
@@ -420,6 +423,7 @@ export const EN_MESSAGES: Messages = {
   'annotation.withContent': 'Annotation: {content}',
   'annotation.selectGroup': 'Select annotation ({count})',
   'annotation.edit': 'Edit annotation',
+  'annotation.done': 'Done',
   'annotation.expand': 'Expand annotation',
   'annotation.empty': '(Empty annotation)',
   'link.internal': 'Internal link',

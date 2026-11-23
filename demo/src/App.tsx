@@ -1233,6 +1233,26 @@ export default function App() {
             );
             setHint(t('demo.savedNote'));
           }}
+          /*
+           * ⚠️ **批注内容变化**（"编辑"按钮改完内容时触发）。
+           *
+           * -> 不传 -> 便签详情的"编辑"按钮**点不动**（面板永远是只读）❌
+           * -> 用户反馈："便签详情打开的时候也是要有按钮可以选编辑的" ✅
+           */
+          onAnnotationChange={(id, html) => {
+            setStickyNotes((prev) =>
+              prev.map((note) => (note.id === id ? { ...note, content: html } : note)),
+            );
+          }}
+          /*
+           * ⚠️ **"展开"按钮**（打开便利贴详情）。
+           *
+           * -> 不传 -> 包**不渲染**"展开"按钮 ❌
+           * -> 用户反馈："批注的打开详细按钮目前是失效的" ✅
+           */
+          onAnnotationExpand={(note) => {
+            setHint(`【展开批注】${note.content.slice(0, 30)}`);
+          }}
           onAnnotationDelete={(id) => {
             setStickyNotes((prev) => prev.filter((note) => note.id !== id));
             setHint(t('demo.deletedNote'));
