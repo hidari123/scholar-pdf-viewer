@@ -67,6 +67,21 @@ pnpm add @scholar-club/pdf-viewer
 Peer：`react >=18 <20`（由宿主提供）。
 可选 peer：`pdf-lib`（导出带高亮的 PDF）、`@tiptap/*`（富文本编辑器）、`react-dom`。
 
+> ⚠️ **用 TipTap 富文本编辑器时，宿主要装这些包**（少一个都会导致某个功能失效）：
+>
+> | 包                              | 少了会怎样                                 |
+> | ------------------------------- | ------------------------------------------ |
+> | `@tiptap/core`                  | 编辑器起不来                               |
+> | `@tiptap/starter-kit`           | 基础格式（加粗/列表…）没了                 |
+> | `@tiptap/extension-text-style`  | **文字颜色完全失效**（`Color` 扩展依赖它） |
+> | `@tiptap/extension-color`       | 文字颜色没了                               |
+> | `@tiptap/extension-highlight`   | 高亮底色没了                               |
+> | `@tiptap/extension-underline`   | 下划线没了                                 |
+> | `@tiptap/extension-link`        | 链接没了                                   |
+> | `@tiptap/extension-placeholder` | 占位符没了                                 |
+>
+> -> **没装 TipTap** 时会自动**回退到包内置的轻量编辑器** ✅（功能少一点，但能用）
+
 ## 最小接入
 
 ```tsx
@@ -309,6 +324,22 @@ pnpm add @scholar-club/pdf-viewer
 
 Peer: `react >=18 <20` (provided by the host).
 Optional peers: `pdf-lib` (export annotated PDF), `@tiptap/*` (rich-text editor), `react-dom`.
+
+> ⚠️ **When using the TipTap rich-text editor, the host must install these packages**
+> (missing one breaks a feature):
+>
+> | Package                         | What breaks without it                                                    |
+  > | ------------------------------- | ------------------------------------------------------------------------- |
+  > | `@tiptap/core`                  | The editor cannot start                                                   |
+  > | `@tiptap/starter-kit`           | Basic formats (bold, lists…) are gone                                     |
+  > | `@tiptap/extension-text-style`  | **Text color is completely broken** (the `Color` extension depends on it) |
+  > | `@tiptap/extension-color`       | Text color is gone                                                        |
+  > | `@tiptap/extension-highlight`   | Highlight background is gone                                              |
+  > | `@tiptap/extension-underline`   | Underline is gone                                                         |
+  > | `@tiptap/extension-link`        | Links are gone                                                            |
+  > | `@tiptap/extension-placeholder` | Placeholder is gone                                                       |
+  >
+> -> **Without TipTap** the package **falls back to its built-in lightweight editor** ✅
 
 ## Minimal integration
 

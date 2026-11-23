@@ -297,6 +297,23 @@ import { TipTapEditor } from '@scholar-club/pdf-viewer/editor';
 ```
 
 > ⚠️ 需要装 `@tiptap/react` `@tiptap/starter-kit` 等（可选 peer）。
+>
+> ⚠️⚠️ **`@tiptap/extension-text-style` 一定要装**（审计发现的**真 bug**）：
+>
+> -> TipTap 的 `Color` 扩展是**基于 `textStyle` 实现的** ✅
+> -> 但 **StarterKit v3 不包含 `TextStyle`** ❌
+> -> 少了它 -> `setColor` 直接抛错 ❌
+>   -> 报错：`There is no mark type named 'textStyle'` ❌
+>   -> -> **文字颜色功能 100% 失效** ❌
+>
+> ```sh
+> pnpm add @tiptap/core @tiptap/starter-kit @tiptap/react \
+>   @tiptap/extension-text-style @tiptap/extension-color \
+>   @tiptap/extension-highlight @tiptap/extension-underline \
+>   @tiptap/extension-link @tiptap/extension-placeholder
+> ```
+>
+> -> **没装 TipTap** -> 自动**回退到包内置的轻量编辑器** ✅（功能少一点，但能用）
 
 ### 用自己的编辑器
 
