@@ -124,6 +124,38 @@ export interface SelectionPopoverProps {
  * ⚠️ 为什么不用传进来的 `selectionRect`：
  * 它是"选区变化那一刻"的快照，滚动/缩放后就是**过期坐标**。
  *
+ * ## ⚠️⚠️ **跨页选区必须用"最后一个 client rect"**（审计发现的**真 bug**）
+ *
+ * ### 问题
+ *
+ * -> 之前用 \`getRangeAt(0).getBoundingClientRect()\` ❌
+ *   -> **跨页时返回的是【并集矩形】** ❌
+ *   -> 实测（视口 1500×1000，跨第 1→2 页）：
+ * ```
+ * unionBBox:  top=-1571, bottom=2247     ← 巨大的并集 ❌
+ * clientRects: 113 个（每行一个）        ← 真正的数据 ✅
+ * 最后一行:    top=943, bottom=972       ← 用户最后选到的位置 ✅
+ * ```
+ * -> 然后 \`computePopoverPosition\` 算：
+ * ```
+ * below = 2247 + 8 = 2255  → 远超视口底 → 判"下方放不下" ❌
+ * above = -1571 - 46 = -1617 → 也放不下 ❌
+ * → 两边都不行 → 取空间大的一边 → 再 clamp → top=954（贴视口底）❌
+ * ```
+ * -> 用户看到：**浮层孤零零挂在屏幕最下面** ❌
+ *   -> 和"单页时贴在选区旁边"完全不一样 ❌
+ *
+ * ### 现在的做法
+ *
+ * -> **取 \`getClientRects()\` 的【最后一个】** ✅
+ *   -> 那是**用户最后选到的那一行** ✅
+ *   -> 浮层贴在**手指刚松开的地方** ✅
+ *   -> **和单页完全一致** ✅
+ *
+ * ⚠️ **为什么是"最后一个"而不是"第一个"**：
+ * -> 用户是从上往下拖的 -> 最后一行 = 拖拽终点 ✅
+ * -> 浮层应该出现在**终点旁边**（用户的手还在那儿）✅
+ *
  * @returns 选区矩形；没有选区时返回 null
  */
 function readLiveAnchor(): {
@@ -136,7 +168,26 @@ function readLiveAnchor(): {
   if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
     return null;
   }
-  const rect = selection.getRangeAt(0).getBoundingClientRect();
+  const range = selection.getRangeAt(0);
+
+  /*
+   * ⚠️ **优先用"最后一个 client rect"**（跨页的关键）。
+   */
+  const rects = range.getClientRects();
+  for (let i = rects.length - 1; i >= 0; i -= 1) {
+    const rect = rects[i];
+    if (rect && rect.width > 0 && rect.height > 0) {
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+      };
+    }
+  }
+
+  // 退化：没有有效的 client rect -> 用整体包围盒
+  const rect = range.getBoundingClientRect();
   if (rect.width <= 0 && rect.height <= 0) {
     return null;
   }
@@ -541,9 +592,27 @@ export function SelectionPopover({
   return (
     <div
       ref={rootRef}
-      className="scpdf-selection-popover"
+      className={[
+        'scpdf-selection-popover',
+        /*
+         * ⚠️⚠️ **吸附（sticky）模式的 class**（审计修复）。
+         *
+         * -> 用户反馈："往下滚动页面工具栏也会消失" ❌
+         * -> 跨页选完往下滚 -> 选区滚出视野 -> 浮层跟着消失 ❌
+         *
+         * -> 现在：选区滚出视野 -> 浮层**吸到容器边缘**（不消失）✅
+         *   -> 加 \`--sticky\` class -> CSS 给它**不透明 + 阴影**（和普通态区分）✅
+         *   -> 用户知道"选区在别处，但工具条还在" ✅
+         */
+        position?.placement === 'sticky-top' || position?.placement === 'sticky-bottom'
+          ? 'scpdf-selection-popover--sticky'
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       role="toolbar"
       aria-label={t('selection.actions')}
+      data-placement={position?.placement ?? 'bottom'}
       style={{
         /*
          * 位置还没算出来时（第一帧）：先渲染到 0,0 但**不可见**。

@@ -52,7 +52,27 @@ page.on('pageerror', (e) => jsErrors.push(e.message));
 const readGap = async () =>
   page.evaluate(() => {
     const sel = window.getSelection();
-    const nb = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
+    const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
+    /*
+     * ⚠️⚠️ **要用"最后一个 client rect"，不是并集 bbox**（审计修复后浮层改了锚点）。
+     *
+     * -> 浮层现在锚定在**用户最后选到的那一行** ✅
+     * -> 而 \`getBoundingClientRect()\` 返回的是**并集**（多行时 bottom 差很多）❌
+     * -> 缩放后选区变成多行 -> **并集的 bottom 远低于最后一行** ❌
+     * -> 测出来"距离 42px" -> **误报** ❌
+     *
+     * -> 和浮层用**同一个锚点** -> 测出来才是真实间距 ✅
+     */
+    const rects = range ? [...range.getClientRects()] : [];
+    let nb = null;
+    for (let i = rects.length - 1; i >= 0; i -= 1) {
+      const r = rects[i];
+      if (r && r.width > 0 && r.height > 0) {
+        nb = r;
+        break;
+      }
+    }
+    nb = nb ?? range?.getBoundingClientRect() ?? null;
     const pop = document.querySelector('.scpdf-selection-popover');
     const pr = pop?.getBoundingClientRect();
     if (!nb || !pr) {

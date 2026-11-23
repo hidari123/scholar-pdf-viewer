@@ -50,14 +50,29 @@ export interface PopoverPosition {
   /** 浮层左上角（视口坐标，配合 position: fixed） */
   top: number;
   left: number;
-  /** 浮层在选区的上方还是下方 */
-  placement: 'top' | 'bottom';
+  /**
+   * 浮层的位置模式。
+   *
+   * - `top` / `bottom` —— 正常贴着选区
+   * - `sticky-top` —— **选区滚出视野上方** -> 浮层吸到容器顶部（不消失）
+   * - `sticky-bottom` —— **选区滚出视野下方** -> 浮层吸到容器底部（不消失）
+   */
+  placement: PopoverPlacement;
   /** 箭头（指示器）的 x 坐标（相对浮层左边缘） */
   arrowLeft: number;
 }
 
 const DEFAULT_GAP = 8;
 const DEFAULT_MARGIN = 8;
+
+/**
+ * **吸附（sticky）模式**。
+ *
+ * - `attached` —— 正常贴着选区
+ * - `sticky-top` —— 选区滚出视野上方 -> 浮层吸到**容器可视区顶部**
+ * - `sticky-bottom` —— 选区滚出视野下方 -> 浮层吸到**容器可视区底部**
+ */
+export type PopoverPlacement = 'top' | 'bottom' | 'sticky-top' | 'sticky-bottom';
 
 /**
  * 计算选区浮层的位置。
@@ -83,12 +98,8 @@ export function computePopoverPosition(input: PopoverPositionInput): PopoverPosi
   // 箭头位置：指向选区中心（相对于浮层左边缘，并 clamp 在浮层内部）
   const arrowLeft = Math.max(8, Math.min(toolbar.width - 8, selectionCenterX - left));
 
-  // 垂直：优先放在下方
-  const below = selection.bottom + gap;
-  const above = selection.top - gap - toolbar.height;
-
   /*
-   * ⚠️ **垂直边界用"视口"，不是"容器"**。
+   * ⚠️⚠️ **垂直边界用"视口"，不是"容器"**。
    *
    * 实测（真实 PDF，缩放后）：
    * ```
@@ -105,28 +116,64 @@ export function computePopoverPosition(input: PopoverPositionInput): PopoverPosi
   const viewportBottom = viewport?.bottom ?? container.bottom;
   const viewportTop = viewport?.top ?? container.top;
 
+  /*
+   * ⚠️⚠️ **吸附（sticky）模式**（审计修复：用户反馈"往下滚动工具栏也会消失"）。
+   *
+   * ### 问题
+   *
+   * -> 用户跨页选完 -> 往下滚动 -> **浮层跟着消失** ❌
+   *   -> 因为锚点滚出了视野 -> 浮层被 clamp 到视口边缘 -> 或者干脆画在看不见的地方 ❌
+   *
+   * ### 现在的做法
+   *
+   * -> **锚点完全在视口上方** -> 浮层吸到**容器可视区顶部** ✅
+   *    -> 加 `sticky-top` 标记 -> 组件可以画一条"选区在上面"的指示 ✅
+   * -> **锚点完全在视口下方** -> 浮层吸到**容器可视区底部** ✅
+   *    -> 加 `sticky-bottom` 标记 ✅
+   * -> 锚点**部分可见** -> 正常贴着 ✅
+   *
+   * -> **效果和单页一样**（用户要的）：单页时往下滚，选区还在屏幕上 -> 浮层跟着走；
+   *   跨页时选区滚出去了 -> 浮层**吸住**不消失 ✅
+   */
   let top: number;
-  let placement: 'top' | 'bottom';
+  let placement: PopoverPlacement;
 
-  if (below + toolbar.height <= viewportBottom - margin) {
-    // 下方放得下 → 放下方
-    top = below;
-    placement = 'bottom';
-  } else if (above >= viewportTop + margin) {
-    // 下方放不下但上方放得下 → **真的翻转**到上方
-    top = above;
-    placement = 'top';
+  const stickyTop = container.top + margin;
+  const stickyBottom = container.bottom - toolbar.height - margin;
+
+  if (selection.bottom < viewportTop) {
+    // ⚠️ 选区**完全在视口上方** -> 吸到顶部
+    top = stickyTop;
+    placement = 'sticky-top';
+  } else if (selection.top > viewportBottom) {
+    // ⚠️ 选区**完全在视口下方** -> 吸到底部
+    top = stickyBottom;
+    placement = 'sticky-bottom';
   } else {
-    // 两边都放不下 → 选空间较大的一边，再 clamp
-    const spaceBelow = viewportBottom - margin - selection.bottom;
-    const spaceAbove = selection.top - (viewportTop + margin);
+    // 正常：优先放在下方
+    const below = selection.bottom + gap;
+    const above = selection.top - gap - toolbar.height;
 
-    if (spaceAbove > spaceBelow) {
+    if (below + toolbar.height <= viewportBottom - margin) {
+      // 下方放得下 → 放下方
+      top = below;
+      placement = 'bottom';
+    } else if (above >= viewportTop + margin) {
+      // 下方放不下但上方放得下 → **真的翻转**到上方
       top = above;
       placement = 'top';
     } else {
-      top = below;
-      placement = 'bottom';
+      // 两边都放不下 → 选空间较大的一边，再 clamp
+      const spaceBelow = viewportBottom - margin - selection.bottom;
+      const spaceAbove = selection.top - (viewportTop + margin);
+
+      if (spaceAbove > spaceBelow) {
+        top = above;
+        placement = 'top';
+      } else {
+        top = below;
+        placement = 'bottom';
+      }
     }
   }
 
