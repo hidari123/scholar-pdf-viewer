@@ -138,6 +138,52 @@ describe('Toolbar', () => {
     expect(screen.getByText('分享')).toBeTruthy();
   });
 
+  /*
+   * ⚠️⚠️ **审计发现的两个 bug 的回归守卫**。
+   */
+
+  it('**打印按钮和缩放按钮互相独立**（showZoom: false 也要有打印）', () => {
+    setup({ toolbar: { showZoom: false }, onPrint: vi.fn() });
+
+    // 打印按钮**在**（之前它被 showZoom 连带隐藏了）
+    expect(screen.queryByLabelText('打印')).toBeTruthy();
+    // 缩放按钮**不在**
+    expect(screen.queryByLabelText('放大')).toBeNull();
+    expect(screen.queryByText('150%')).toBeNull();
+  });
+
+  it('**showZoom: false 时宿主的 rightSlot 照样渲染**', () => {
+    setup({
+      toolbar: {
+        showZoom: false,
+        rightSlot: <button type="button">分享</button>,
+      },
+    });
+
+    expect(screen.getByText('分享')).toBeTruthy();
+  });
+
+  it('**rightSlot 只渲染一次**（不能出现两个"分享"）', () => {
+    setup({
+      toolbar: { rightSlot: <button type="button">分享</button> },
+      onPrint: vi.fn(),
+    });
+
+    // ⚠️ 有打印按钮 + 有缩放 -> 也不能重复
+    expect(screen.getAllByText('分享')).toHaveLength(1);
+  });
+
+  it('**leftSlot 也和 showZoom 独立**', () => {
+    setup({
+      toolbar: {
+        showZoom: false,
+        leftSlot: <button type="button">历史</button>,
+      },
+    });
+
+    expect(screen.getByText('历史')).toBeTruthy();
+  });
+
   it('搜索按钮回调（未提供时不显示）', async () => {
     const onToggleSearch = vi.fn();
     setup({ onToggleSearch });

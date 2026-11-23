@@ -213,69 +213,94 @@ export function Toolbar(props: ToolbarProps) {
         </div>
       ) : null}
 
-      {showZoom ? (
-        <div className="scpdf-toolbar__right">
-          <button
-            type="button"
-            className="scpdf-toolbar__btn"
-            onClick={onZoomOut}
-            disabled={scale <= 0.2}
-            aria-label={t('zoom.out')}
-            title={t('zoom.out')}
-          >
-            <Icon name={'zoomOut'} overrides={icons} />
-          </button>
-
-          <span className="scpdf-toolbar__scale" aria-live="polite">
-            {Math.round(scale * 100)}%
-          </span>
-
-          <button
-            type="button"
-            className="scpdf-toolbar__btn"
-            onClick={onZoomIn}
-            disabled={scale >= 2.5}
-            aria-label={t('zoom.in')}
-            title={t('zoom.in')}
-          >
-            <Icon name={'zoomIn'} overrides={icons} />
-          </button>
-
-          <button
-            type="button"
-            className="scpdf-toolbar__btn"
-            onClick={onFitWidth}
-            aria-label={t('zoom.fitWidth')}
-            title={t('zoom.fitWidth')}
-          >
-            <Icon name={'fitWidth'} overrides={icons} />
-          </button>
-
-          <button
-            type="button"
-            className="scpdf-toolbar__btn"
-            onClick={onFitPage}
-            aria-label={t('zoom.fitPage')}
-            title={t('zoom.fitPage')}
-          >
-            <Icon name={'fitPage'} overrides={icons} />
-          </button>
-
-          {onPrint ? (
+      {/*
+       * ⚠️⚠️ **右侧区域合并成一个**（审计发现两个 bug）。
+       *
+       * ### ① 打印按钮在 `showZoom` 块里（bug）
+       *
+       * -> 之前打印按钮**在 `showZoom ? (...)` 里面** ❌
+       *   -> 宿主写 `toolbar={{ showZoom: false }}`（不要缩放按钮）❌
+       *     -> **打印按钮跟着一起消失** ❌
+       *   -> 但"打印"和"缩放"是**两个独立的功能** ❌
+       * -> 现在：**独立** ✅
+       *
+       * ### ② `rightSlot` 也在 `showZoom` 块里（bug）
+       *
+       * -> 之前宿主插槽**也在 `showZoom` 块里** ❌
+       *   -> 宿主写 `showZoom: false` -> **自己的插槽也没了** ❌
+       *   -> 宿主只想去掉缩放按钮，结果**自己的按钮也没了** ❌
+       *
+       * ### ③ 但只能渲染一次
+       *
+       * -> 拆成两个 div 会让 `rightSlot` **渲染两次** ❌
+       *   -> 出现两个"分享"按钮 ❌
+       * -> 现在：**一个 div** -> 缩放 + 打印 + 插槽**各一次** ✅
+       */}
+      <div className="scpdf-toolbar__right">
+        {showZoom ? (
+          <>
             <button
               type="button"
               className="scpdf-toolbar__btn"
-              onClick={onPrint}
-              aria-label={t('print.title')}
-              title={t('print.title')}
+              onClick={onZoomOut}
+              disabled={scale <= 0.2}
+              aria-label={t('zoom.out')}
+              title={t('zoom.out')}
             >
-              <Icon name={'print'} overrides={icons} />
+              <Icon name={'zoomOut'} overrides={icons} />
             </button>
-          ) : null}
 
-          {toolbar.rightSlot}
-        </div>
-      ) : null}
+            <span className="scpdf-toolbar__scale" aria-live="polite">
+              {Math.round(scale * 100)}%
+            </span>
+
+            <button
+              type="button"
+              className="scpdf-toolbar__btn"
+              onClick={onZoomIn}
+              disabled={scale >= 2.5}
+              aria-label={t('zoom.in')}
+              title={t('zoom.in')}
+            >
+              <Icon name={'zoomIn'} overrides={icons} />
+            </button>
+
+            <button
+              type="button"
+              className="scpdf-toolbar__btn"
+              onClick={onFitWidth}
+              aria-label={t('zoom.fitWidth')}
+              title={t('zoom.fitWidth')}
+            >
+              <Icon name={'fitWidth'} overrides={icons} />
+            </button>
+
+            <button
+              type="button"
+              className="scpdf-toolbar__btn"
+              onClick={onFitPage}
+              aria-label={t('zoom.fitPage')}
+              title={t('zoom.fitPage')}
+            >
+              <Icon name={'fitPage'} overrides={icons} />
+            </button>
+          </>
+        ) : null}
+
+        {onPrint ? (
+          <button
+            type="button"
+            className="scpdf-toolbar__btn"
+            onClick={onPrint}
+            aria-label={t('print.title')}
+            title={t('print.title')}
+          >
+            <Icon name={'print'} overrides={icons} />
+          </button>
+        ) : null}
+
+        {toolbar.rightSlot}
+      </div>
     </div>
   );
 }
