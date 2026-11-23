@@ -4074,3 +4074,71 @@ All files | 51.35% lines | 46.53% functions | 41.96% branches
 6. `printMode` 的**CSS 变量维护** -> `Ctrl+P` 和工具栏按钮**行为一致** ✅
 7. `onHighlight`（可返回新 id）vs `onHighlightCreate` vs `onHighlightCreated` 的**微妙区别**，
    连"**别两个都调**"都写进注释了 ✅
+
+---
+
+# 第 23 轮（把文档里写的"已知限制"真的修掉）
+
+## 背景
+
+> 第 22 轮写文档时，把两个**当时确实是问题**的点写进了 README / GUIDE：
+> 1. "打印纸张写死 A4" -> 美洲市场要用 Letter 的话宿主只能自己 `window.print()`
+> 2. "`showZoom: false` 会连带隐藏打印按钮"
+>
+> 既然写出来了，**就该修掉** —— 而不是永远挂在文档里当免责声明。
+
+## ① 打印纸张不再写死 A4
+
+### 问题
+
+-> `usePrint` **本来就支持** `paper` 和 `margin`（`core/print` 有 `PAPER_SIZES`：A4/A3/Letter/Legal）✅
+-> 但 `PdfViewer` 调用时是 **`paper: 'A4'` 写死的** ❌
+-> 美洲市场用 **Letter**（215.9 × 279.4mm）❌
+-> 包按 A4 算缩放 -> **打印可能超出页面** ❌
+-> 宿主只能自己 `window.print()` -> **完全丢掉包的高亮打印能力** ❌
+
+### 修法
+
+- 新增 `printPaper` prop（`'A4' | 'A3' | 'Letter' | 'Legal' | { width, height }`）✅
+- 新增 `printMargin` prop（`Partial<PrintMargin>`，mm，部分覆盖）✅
+- 也加进 `config`（**prop > config > 默认**，和其他配置一致）✅
+- 透传给 `usePrint` ✅
+
+## ② 工具栏：打印按钮和宿主插槽被 `showZoom` 连带隐藏
+
+### 问题（其实是**两个**）
+
+1. **打印按钮在 `showZoom` 块里**
+   -> 宿主写 `toolbar={{ showZoom: false }}`（只想去掉缩放按钮）
+   -> **打印按钮跟着一起消失**
+   -> 但"打印"和"缩放"是**两个独立的功能**
+
+2. **`rightSlot` 也在 `showZoom` 块里**（顺带发现的）
+   -> 宿主写 `showZoom: false` -> **自己的插槽也没了**
+   -> 宿主只想去掉缩放按钮，结果**自己的按钮也没了**
+
+3. **但不能拆成两个 div**
+   -> 拆开会让 `rightSlot` **渲染两次** -> 出现**两个"分享"按钮**
+
+### 修法
+
+-> **右侧区域合并成一个 `div`** ✅
+-> 缩放按钮 + 打印按钮 + `rightSlot` **各渲染一次** ✅
+-> `showZoom: false` 只影响缩放那几个 ✅
+
+## 测试
+
+| 文件                              | 新增 | 内容                                                                         |
+| --------------------------------- | ---- | ---------------------------------------------------------------------------- |
+| `src/components/Toolbar.test.tsx` | +4   | 打印和缩放独立 / `rightSlot` 独立 / `rightSlot` 只渲染一次 / `leftSlot` 独立 |
+| `src/core/config/index.test.ts`   | +4   | `printPaper` 能配 / prop 覆盖 config / `printMargin` / 不配是 undefined      |
+
+## 文档同步
+
+-> README（**中英双语**）都加了「打印」小节 ✅
+-> `docs/API.md` 的 props 表 + `config` 表都加了 `printPaper` / `printMargin` ✅
+-> `docs/GUIDE.md` 删掉了"当前已知问题"那段，改成正常的用法说明 ✅
+
+## 验证
+
+- `pnpm test` -> **689 passed**（54 files，+8）

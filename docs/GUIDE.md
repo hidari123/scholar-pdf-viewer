@@ -404,25 +404,28 @@ const toolbar = [{ command: 'bold' as const, label: '{my.bold}', icon: 'bold' as
 <PdfViewer printMode="original" />         // 只打印原 PDF
 ```
 
-### ⚠️ 打印按钮需要两件事
+### 打印按钮
 
 ```tsx
-<PdfViewer
-  features={{ print: true }} // 默认就是 true
-  toolbar={{ showZoom: true }} // ⚠️ 打印按钮在 showZoom 块里
-/>;
+<PdfViewer features={{ print: true }} />; // 默认就是 true
 ```
 
-> ⚠️ **当前已知问题**：`showZoom: false` 会**连带隐藏打印按钮**（因为打印按钮在缩放块里）。
-> 需要打印但不要缩放按钮 → 用 `slots.toolbar` 自己排。
+> ✅ 打印按钮和缩放按钮**互相独立** —— `toolbar={{ showZoom: false }}` **不会**隐藏打印按钮。
 
 ### 打印纸张
 
 ```tsx
-<PdfViewer
-// ⚠️ 目前写死 A4，美洲市场需要 Letter 的宿主要自己 window.print()
-/>;
+// 内置：A4 / A3 / Letter / Legal
+<PdfViewer printPaper="Letter" />
+
+// 自定义（mm）
+<PdfViewer printPaper={{ width: 210, height: 297 }} />
+
+// 边距（mm，部分覆盖；默认四边 12mm）
+<PdfViewer printMargin={{ top: 20, bottom: 20 }} />
 ```
+
+> ✅ 也可以写进 `config`：`config={{ printPaper: 'Letter' }}`（prop 优先）。
 
 ---
 

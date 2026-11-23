@@ -127,23 +127,23 @@ export function Reader({ url, paperId }: { url: string; paperId: string }) {
 
 ## 能力清单
 
-| 能力                    | 状态 | 说明                                             |
-| ----------------------- | ---- | ------------------------------------------------ |
-| 渲染（canvas + 文字层） | ✅   | 逐 item 渲染，`scaleX` 精确对齐 pdf.js           |
-| 高亮 / 批注绘制         | ✅   | 正片叠底（`multiply`），和 WPS 一致              |
-| 选区浮层                | ✅   | 自研定位（不用 UI 库）                           |
-| 高亮浮层                | ✅   | 点高亮块出现的 4 个按钮                          |
-| 缩放                    | ✅   | 适应宽度 / 适应整页 / Ctrl+滚轮 / 就近取整到 10% |
-| 跳页                    | ✅   | 精确（靠 `getPageSizes`）                        |
-| 缩略图 / 目录 / 搜索    | ✅   | 宿主注入渲染函数                                 |
-| 打印                    | ✅   | 保留高亮 / 只打原 PDF 两种模式                   |
-| 导出带高亮的 PDF        | ✅   | 真 PDF 批注（`/Subtype /Highlight`）             |
-| 多语言                  | ✅   | 内置 zh/en/ja/fr，宿主可加任意语言               |
-| 7 套主题 + CSS 变量     | ✅   |                                                  |
-| 加密文档                | ✅   | 内置密码框 or 宿主接管                           |
-| 键盘快捷键              | ✅   | 翻页 / Home / End / 缩放                         |
-| RTL                     | ❌   | 暂无 `dir` 支持                                  |
-| 拖放文件                | ❌   | 全在宿主                                         |
+| 能力                    | 状态 | 说明                                                           |
+| ----------------------- | ---- | -------------------------------------------------------------- |
+| 渲染（canvas + 文字层） | ✅   | 逐 item 渲染，`scaleX` 精确对齐 pdf.js                         |
+| 高亮 / 批注绘制         | ✅   | 正片叠底（`multiply`），和 WPS 一致                            |
+| 选区浮层                | ✅   | 自研定位（不用 UI 库）                                         |
+| 高亮浮层                | ✅   | 点高亮块出现的 4 个按钮                                        |
+| 缩放                    | ✅   | 适应宽度 / 适应整页 / Ctrl+滚轮 / 就近取整到 10%               |
+| 跳页                    | ✅   | 精确（靠 `getPageSizes`）                                      |
+| 缩略图 / 目录 / 搜索    | ✅   | 宿主注入渲染函数                                               |
+| 打印                    | ✅   | 保留高亮 / 只打原 PDF 两种模式；纸张可配（A4/A3/Letter/Legal） |
+| 导出带高亮的 PDF        | ✅   | 真 PDF 批注（`/Subtype /Highlight`）                           |
+| 多语言                  | ✅   | 内置 zh/en/ja/fr，宿主可加任意语言                             |
+| 7 套主题 + CSS 变量     | ✅   |                                                                |
+| 加密文档                | ✅   | 内置密码框 or 宿主接管                                         |
+| 键盘快捷键              | ✅   | 翻页 / Home / End / 缩放                                       |
+| RTL                     | ❌   | 暂无 `dir` 支持                                                |
+| 拖放文件                | ❌   | 全在宿主                                                       |
 
 ## 坐标三空间（**存数据必看**）
 
@@ -189,6 +189,23 @@ viewerRef.current?.clearSelection();
 ```
 
 详见 [扩展开发](./docs/EXTENDING.md#2-加一个工具栏按钮)。
+
+## 打印
+
+```tsx
+// 两种模式
+<PdfViewer printMode="with-highlights" />  // 默认：打印带高亮
+<PdfViewer printMode="original" />         // 只打印原 PDF
+
+// 纸张（A4 / A3 / Letter / Legal，或自定义 mm）
+<PdfViewer printPaper="Letter" />
+<PdfViewer printPaper={{ width: 210, height: 297 }} />
+
+// 边距（mm，部分覆盖；默认四边 12mm）
+<PdfViewer printMargin={{ top: 20, bottom: 20 }} />
+```
+
+> ✅ 打印按钮和缩放按钮**互相独立**（`showZoom: false` 不会隐藏打印按钮）。
 
 ## 多语言
 
@@ -333,23 +350,23 @@ export function Reader({ url, paperId }: { url: string; paperId: string }) {
 
 ## Feature matrix
 
-| Feature                          | Status | Notes                                              |
-| -------------------------------- | ------ | -------------------------------------------------- |
-| Rendering (canvas + text layer)  | ✅     | Per-item rendering, `scaleX` aligned to pdf.js     |
-| Highlight / annotation rendering | ✅     | Multiply blend mode, matches WPS                   |
-| Selection popover                | ✅     | Hand-rolled positioning (no UI library)            |
-| Highlight popover                | ✅     | The 4 buttons that appear on click                 |
-| Zoom                             | ✅     | Fit width / fit page / Ctrl+wheel / snapped to 10% |
-| Page navigation                  | ✅     | Accurate (needs `getPageSizes`)                    |
-| Thumbnails / outline / search    | ✅     | Host injects the render functions                  |
-| Print                            | ✅     | Keep-highlights or original-PDF modes              |
-| Export annotated PDF             | ✅     | Real PDF annotations (`/Subtype /Highlight`)       |
-| i18n                             | ✅     | zh/en/ja/fr built in, hosts can add any language   |
-| 7 themes + CSS variables         | ✅     |                                                    |
-| Encrypted documents              | ✅     | Built-in dialog or host-handled                    |
-| Keyboard shortcuts               | ✅     | Navigate / Home / End / zoom                       |
-| RTL                              | ❌     | No `dir` support yet                               |
-| Drag & drop files                | ❌     | Entirely the host's job                            |
+| Feature                          | Status | Notes                                                                               |
+| -------------------------------- | ------ | ----------------------------------------------------------------------------------- |
+| Rendering (canvas + text layer)  | ✅     | Per-item rendering, `scaleX` aligned to pdf.js                                      |
+| Highlight / annotation rendering | ✅     | Multiply blend mode, matches WPS                                                    |
+| Selection popover                | ✅     | Hand-rolled positioning (no UI library)                                             |
+| Highlight popover                | ✅     | The 4 buttons that appear on click                                                  |
+| Zoom                             | ✅     | Fit width / fit page / Ctrl+wheel / snapped to 10%                                  |
+| Page navigation                  | ✅     | Accurate (needs `getPageSizes`)                                                     |
+| Thumbnails / outline / search    | ✅     | Host injects the render functions                                                   |
+| Print                            | ✅     | Keep-highlights or original-PDF modes; paper size configurable (A4/A3/Letter/Legal) |
+| Export annotated PDF             | ✅     | Real PDF annotations (`/Subtype /Highlight`)                                        |
+| i18n                             | ✅     | zh/en/ja/fr built in, hosts can add any language                                    |
+| 7 themes + CSS variables         | ✅     |                                                                                     |
+| Encrypted documents              | ✅     | Built-in dialog or host-handled                                                     |
+| Keyboard shortcuts               | ✅     | Navigate / Home / End / zoom                                                        |
+| RTL                              | ❌     | No `dir` support yet                                                                |
+| Drag & drop files                | ❌     | Entirely the host's job                                                             |
 
 ## Three coordinate spaces (read before persisting)
 
@@ -395,6 +412,23 @@ All 11 methods: [API Reference](./docs/API.md#3-pdfviewerhandle命令式句柄).
 ```
 
 See [Extending](./docs/EXTENDING.md#2-加一个工具栏按钮).
+
+## Print
+
+```tsx
+// two modes
+<PdfViewer printMode="with-highlights" />  // default: keep highlights
+<PdfViewer printMode="original" />         // print the original PDF only
+
+// paper size (A4 / A3 / Letter / Legal, or custom mm)
+<PdfViewer printPaper="Letter" />
+<PdfViewer printPaper={{ width: 210, height: 297 }} />
+
+// margins (mm, partial override; default 12mm on all sides)
+<PdfViewer printMargin={{ top: 20, bottom: 20 }} />
+```
+
+> ✅ The print button and the zoom controls are **independent** (`showZoom: false` does not hide print).
 
 ## Multiple languages
 

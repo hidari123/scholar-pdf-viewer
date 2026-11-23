@@ -99,17 +99,19 @@ import '@scholar-club/pdf-viewer/themes.css'; // 可选
 
 ### 2.5 外观 / 结构
 
-| Prop         | 类型                                   | 默认                | 说明                                                             |
-| ------------ | -------------------------------------- | ------------------- | ---------------------------------------------------------------- |
-| `theme`      | `PdfViewerTheme`                       | `'light'`           | 主题：`light` `dark` `auto` `paper` `sepia` `contrast` `minimal` |
-| `appearance` | `PdfViewerAppearance`                  | —                   | 外观（密度 / 外壳 / 页阴影…）                                    |
-| `config`     | `PdfViewerConfig`                      | —                   | 统一配置对象（见 §4）                                            |
-| `toolbar`    | `ToolbarConfig`                        | —                   | 工具栏开关 + 左右插槽                                            |
-| `features`   | `Partial<Features>`                    | 全开                | 功能开关（**opt-out**：只有显式 `false` 才关）                   |
-| `printMode`  | `'with-highlights' \| 'original'`      | `'with-highlights'` | 打印模式                                                         |
-| `slots`      | `PdfViewerSlots`                       | —                   | 插槽（完全替换内置 UI）                                          |
-| `icons`      | `Partial<Record<IconName, ReactNode>>` | —                   | 逐个图标覆盖                                                     |
-| `children`   | `ReactNode`                            | —                   | 渲染在工具栏下方                                                 |
+| Prop          | 类型                                               | 默认                | 说明                                                             |
+| ------------- | -------------------------------------------------- | ------------------- | ---------------------------------------------------------------- |
+| `theme`       | `PdfViewerTheme`                                   | `'light'`           | 主题：`light` `dark` `auto` `paper` `sepia` `contrast` `minimal` |
+| `appearance`  | `PdfViewerAppearance`                              | —                   | 外观（密度 / 外壳 / 页阴影…）                                    |
+| `config`      | `PdfViewerConfig`                                  | —                   | 统一配置对象（见 §4）                                            |
+| `toolbar`     | `ToolbarConfig`                                    | —                   | 工具栏开关 + 左右插槽                                            |
+| `features`    | `Partial<Features>`                                | 全开                | 功能开关（**opt-out**：只有显式 `false` 才关）                   |
+| `printMode`   | `'with-highlights' \| 'original'`                  | `'with-highlights'` | 打印模式                                                         |
+| `printPaper`  | `'A4' \| 'A3' \| 'Letter' \| 'Legal' \| PaperSize` | `'A4'`              | 打印纸张（mm）                                                   |
+| `printMargin` | `Partial<PrintMargin>`                             | 四边 12mm           | 打印边距（mm，部分覆盖）                                         |
+| `slots`       | `PdfViewerSlots`                                   | —                   | 插槽（完全替换内置 UI）                                          |
+| `icons`       | `Partial<Record<IconName, ReactNode>>`             | —                   | 逐个图标覆盖                                                     |
+| `children`    | `ReactNode`                                        | —                   | 渲染在工具栏下方                                                 |
 
 ### 2.6 多语言
 
@@ -222,19 +224,21 @@ undefined                      ←  用内置默认值
 
 ### `PdfViewerConfig` 的字段
 
-| 字段                | 类型                    | 说明       |
-| ------------------- | ----------------------- | ---------- |
-| `theme`             | `PdfViewerTheme`        | 主题       |
-| `appearance`        | `PdfViewerAppearance`   | 外观       |
-| `highlightPalette`  | `HighlightPalette`      | 高亮色板   |
-| `locale`            | `Locale`                | 语言       |
-| `locales`           | `LocaleTable`           | 语言表     |
-| `messages`          | `Partial<Messages>`     | 文案覆盖   |
-| `selectionActions`  | `SelectionAction[]`     | 选区动作   |
-| `annotationToolbar` | `RichTextToolbarItem[]` | 批注工具栏 |
-| `annotationPalette` | `RichTextPalette`       | 批注色板   |
-| `toolbar`           | `ToolbarConfig`         | 工具栏     |
-| `features`          | `Partial<Features>`     | 功能开关   |
+| 字段                | 类型                                    | 说明       |
+| ------------------- | --------------------------------------- | ---------- |
+| `theme`             | `PdfViewerTheme`                        | 主题       |
+| `appearance`        | `PdfViewerAppearance`                   | 外观       |
+| `highlightPalette`  | `HighlightPalette`                      | 高亮色板   |
+| `locale`            | `Locale`                                | 语言       |
+| `locales`           | `LocaleTable`                           | 语言表     |
+| `messages`          | `Partial<Messages>`                     | 文案覆盖   |
+| `selectionActions`  | `SelectionAction[]`                     | 选区动作   |
+| `annotationToolbar` | `RichTextToolbarItem[]`                 | 批注工具栏 |
+| `annotationPalette` | `RichTextPalette`                       | 批注色板   |
+| `toolbar`           | `ToolbarConfig`                         | 工具栏     |
+| `features`          | `Partial<Features>`                     | 功能开关   |
+| `printPaper`        | `keyof typeof PAPER_SIZES \| PaperSize` | 打印纸张   |
+| `printMargin`       | `Partial<PrintMargin>`                  | 打印边距   |
 
 > ⚠️ `config` **不覆盖** `file` / `highlights` / `stickyNotes` / `slots` / `printMode` / 所有 `onXxx` —— 那些只能单独传。
 
