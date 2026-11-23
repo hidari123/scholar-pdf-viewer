@@ -33,6 +33,7 @@ import { Color } from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
+import { TextStyle } from '@tiptap/extension-text-style';
 import Underline from '@tiptap/extension-underline';
 import StarterKit from '@tiptap/starter-kit';
 
@@ -120,6 +121,20 @@ export function createTipTapEditor(host: HTMLElement | null, options: CreateTipT
         strike: {},
       }),
       Underline,
+      /*
+       * ⚠️⚠️ **必须注册 `TextStyle`**（审计发现的**真 bug**）。
+       *
+       * -> TipTap 的 `Color` 扩展是**基于 `textStyle` 实现的** ✅
+       *   -> `setColor` 内部会 `setMark('textStyle', { color })` ✅
+       * -> 但 **StarterKit v3 不包含 `TextStyle`** ❌（实测它的 dist 里只有 18 个扩展，没有 textStyle）
+       * -> 只注册 `Color` 不注册 `TextStyle` -> **调用 setColor 直接抛错** ❌
+       *   -> 浏览器控制台："There is no mark type named 'textStyle'" ❌
+       *   -> -> **文字颜色功能完全失效** ❌
+       *   ->   -> 用户反馈："富文本修改文字颜色的功能还是没有实现 点击会打开一个空的窄的框" ✅
+       *
+       * -> 现在：**显式注册 `TextStyle`** ✅ -> `setColor` 正常工作 ✅
+       */
+      TextStyle,
       Highlight.configure({ multicolor: true }),
       Color,
       /*

@@ -297,6 +297,7 @@ export function TipTapEditor(props: TipTapEditorProps) {
         hostRef={hostRef}
         items={items}
         icons={icons}
+        palette={palette}
         t={t}
         onOverlayStateChange={onOverlayStateChange}
       />
@@ -328,11 +329,25 @@ function TipTapToolbar(props: {
   hostRef: React.RefObject<HTMLDivElement | null>;
   items: RichTextToolbarItem[];
   icons?: Partial<Record<IconName, ReactNode>>;
+  /** 颜色面板（文字颜色 / 高亮底色共用） */
+  palette?: RichTextPalette;
   t: (key: keyof Messages, vars?: Record<string, string | number>) => string;
   /** 嵌套弹窗的状态（通知外层） */
   onOverlayStateChange?: (hasOverlay: boolean) => void;
 }) {
-  const { hostRef, items, icons, t, onOverlayStateChange } = props;
+  const { hostRef, items, icons, palette, t, onOverlayStateChange } = props;
+
+  /**
+   * **当前展开的颜色面板**（命令名）。
+   *
+   * ⚠️⚠️ **TipTap 这边之前【完全没有】颜色面板**（审计发现的**真 bug**）。
+   *
+   * -> 之前点"文字颜色"-> **直接应用第一个颜色** ❌
+   *   -> 用户反馈："点击会打开一个空的窄的框" ❌
+   * -> 内置编辑器（`RichTextEditor`）**有**面板 ✅ -> 两边行为不一致 ❌
+   * -> 现在：**两边一致** ✅
+   */
+  const [openPalette, setOpenPalette] = useState<string | null>(null);
 
   /**
    * **拿到编辑器实例**。
@@ -613,11 +628,28 @@ function TipTapToolbar(props: {
       return;
     }
 
+    /*
+     * ⚠️⚠️ **颜色命令要带颜色值**（审计修复）。
+     *
+     * -> `foreColor` -> `setColor(value)` ✅
+     * -> `hiliteColor` -> `toggleHighlight({ color: value })` ✅
+     *   （之前没传 value -> **高亮用的是默认色** -> 选哪个都一样 ❌）
+     * -> 没传值 -> `unsetColor` / `unsetHighlight`（清除）✅
+     */
     if (command === 'foreColor') {
       if (value) {
         fn(value as never).run();
       } else {
         c.unsetColor?.().run();
+      }
+      return;
+    }
+
+    if (command === 'hiliteColor') {
+      if (value) {
+        fn({ color: value } as never).run();
+      } else {
+        c.unsetHighlight?.().run();
       }
       return;
     }
@@ -811,6 +843,12 @@ function TipTapToolbar(props: {
           const active = state?.active ?? false;
           const disabled = state?.disabled ?? false;
           const isLink = item.command === 'createLink';
+          /*
+           * ⚠️ **颜色命令**（文字颜色 / 高亮底色）-> 要弹**颜色面板**。
+           *
+           * -> 和内置编辑器（`RichTextEditor`）**保持一致** ✅
+           */
+          const hasPalette = item.command === 'hiliteColor' || item.command === 'foreColor';
           return (
             <button
               key={item.command}
@@ -845,8 +883,20 @@ function TipTapToolbar(props: {
               onMouseDown={(event) => {
                 event.preventDefault();
               }}
+              /*
+               * ⚠️⚠️ **颜色命令要"开面板"**，不是直接应用（审计修复）。
+               *
+               * -> 之前直接应用 `Object.values(item.palette)[0]` ❌
+               *   -> 用户只能用一个颜色 -> **没法选** ❌
+               *   -> 用户反馈："点击会打开一个空的窄的框" ❌
+               * -> 现在：**和内置编辑器一致** -> 弹出**颜色面板** ✅
+               */
               onClick={() => {
-                run(item.command, item.palette ? Object.values(item.palette)[0] : undefined);
+                if (hasPalette) {
+                  setOpenPalette(openPalette === item.command ? null : item.command);
+                  return;
+                }
+                run(item.command);
               }}
             >
               {item.icon ? (
@@ -858,6 +908,32 @@ function TipTapToolbar(props: {
           );
         })}
       </div>
+
+      {/* 颜色面板（和内置编辑器用同一套 CSS） */}
+      {openPalette ? (
+        <span className="scpdf-rich-text__palette">
+          {Object.entries(
+            items.find((i) => i.command === openPalette)?.palette ?? palette ?? {},
+          ).map(([key, color]) => (
+            <button
+              key={key}
+              type="button"
+              className="scpdf-rich-text__swatch"
+              style={{ background: color }}
+              title={key}
+              aria-label={key}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                /*
+                 * ⚠️ **类型安全**：`openPalette` 是 `string`，要转成命令类型。
+                 */
+                run(openPalette as RichTextToolbarItem['command'], color);
+                setOpenPalette(null);
+              }}
+            />
+          ))}
+        </span>
+      ) : null}
 
       {/*
        **链接弹窗**（自己写的，不用 `window.prompt`）✅

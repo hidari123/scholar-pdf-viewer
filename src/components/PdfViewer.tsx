@@ -2854,6 +2854,35 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    */
   const handleHighlightClick = useCallback(
     (highlight: HighlightRecord) => {
+      /*
+       * ⚠️⚠️ **"正在批注"时不能清选区**（审计发现的**真 bug**）。
+       *
+       * ### 问题
+       *
+       * -> 场景：**已经高亮了一块** -> 再对**另一块**写批注 ❌
+       *   -> 批注弹窗**刚好盖在那个高亮上** ❌
+       *   -> 用户在弹窗里操作（比如点工具栏）❌
+       *   -> **点到了下面的高亮块** -> `handleHighlightClick` 被触发 ❌
+       *   -> 它无条件 `setSelectionShapes(new Map())` -> **原来的蓝色选区框消失** ❌
+       *   -> 用户反馈："原来的准备进行批注的已经选择的区域会消失选区的蓝色框选的底" ✅
+       *
+       * -> 而且：高亮块被点 -> **浏览器把它"选中"** ❌
+       *   -> 用户反馈："下面的高亮会选中" ✅
+       *
+       * ### 现在的做法
+       *
+       * -> **正在批注** -> **不清**选区 ✅
+       *   -> 蓝色框保留 ✅
+       *   -> 也不弹高亮的操作条（免得和批注弹窗打架）✅
+       * -> 不正在批注 -> 行为**完全不变** ✅
+       */
+      if (isPendingNoteRef.current) {
+        // ⚠️ **只高亮它**，不清选区、不弹操作条
+        setActiveHighlightId(highlight.id);
+        onHighlightClick?.(highlight);
+        return;
+      }
+
       // 清掉旧选区（原生 + 包内），避免"选不掉"
       textSelection.clearNativeSelection();
       textSelection.clearState();

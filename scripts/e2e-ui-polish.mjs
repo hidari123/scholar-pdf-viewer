@@ -131,7 +131,16 @@ try {
   await page.waitForTimeout(300);
   await page.keyboard.press('Shift+Home');
   await page.waitForTimeout(500);
+  /*
+   * ⚠️ **颜色按钮现在是"弹面板"**（审计修复：之前直接应用第一个颜色 -> 用户没法选）。
+   * -> 所以测试要：**点按钮 -> 选一个色块** ✅
+   */
   await page.locator('.scpdf-annotation-dialog button[aria-label="高亮"]').first().click();
+  await page.waitForTimeout(600);
+  await page
+    .locator('.scpdf-annotation-dialog .scpdf-rich-text__palette .scpdf-rich-text__swatch')
+    .first()
+    .click();
   await page.waitForTimeout(900);
   // 引用：在后面新起一段
   await page.locator('.scpdf-annotation-dialog .ProseMirror').click();

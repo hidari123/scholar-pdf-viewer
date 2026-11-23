@@ -66,6 +66,8 @@ const suites = [
   { name: '退格删高亮', file: 'e2e-highlight-delete-key.mjs' },
   { name: '批注 hover 的操作按钮 + 富文本预览', file: 'e2e-annotation-hover.mjs' },
   { name: '批注弹窗的定位 + 编辑器的样子', file: 'e2e-annotation-dialog-anchor.mjs' },
+  { name: '富文本：文字颜色 + 清空格式', file: 'e2e-richtext-color.mjs' },
+  { name: '批注期间点到底下的高亮', file: 'e2e-annotation-highlight-under.mjs' },
   { name: '编辑批注（锚点弹窗 + 保存按钮）', file: 'e2e-annotation-edit.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
