@@ -843,6 +843,29 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   const [pendingNote, setPendingNote] = useState<SelectionActionContext | null>(null);
 
   /**
+   * **批注期间冻结的选区形状**（自绘层）。
+   *
+   * ⚠️⚠️ **必须是 ref，不能是 state**（审计修复的关键细节）。
+   *
+   * -> 用途：编辑器 focus 会塌缩原生选区 -> \`selectionchange\` -> 清形状 ❌
+   *    -> 批注期间**不清** -> 蓝色块保留 ✅
+   *
+   * ⚠️ **为什么不能加进 \`handleSelectionChange\` 的依赖数组**：
+   * -> \`handleSelectionChange\` 是 \`useTextSelection\` 的回调 ❌
+   * -> 加进去 -> 每次批注开关都**重新绑定 document 监听器** ❌
+   *    -> 监听器反复解绑/重绑 -> 选区状态错乱 ❌
+   * -> 用 ref -> **不触发重渲染** -> 依赖数组不动 ✅
+   */
+  const pendingNoteShapesRef = useRef<Map<number, PageSelectionShape> | null>(null);
+
+  /**
+   * **"正在批注"的标志**（ref，不参与渲染）。
+   *
+   * ⚠️ 同样**不能进依赖数组**（理由同 \`pendingNoteShapesRef\`）✅
+   */
+  const isPendingNoteRef = useRef(false);
+
+  /**
    * **批注弹窗的锚点**（视口坐标）。
    *
    * ⚠️ 用户反馈："这个富文本编辑框没有定位到批注旁边啊
@@ -2115,7 +2138,22 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
          * 旧实现只设不清 → 旧选区的蓝色块**一直留在页面上**，
          * 和用户的高亮叠在一起（实测：取消选区后 `.scpdf-selection-layer` 仍=1）。
          */
-        setSelectionShapes(new Map());
+        /*
+         * ⚠️⚠️ **但"正在批注"时不能清**（审计发现的**真 bug**）。
+         *
+         * -> 打开批注弹窗 -> 编辑器 `focus()` -> **浏览器塌缩原生选区** ✅
+         * -> `selectionchange` -> 这里收到 `null` ✅
+         * -> 如果照常 `setSelectionShapes(new Map())` -> **自绘的蓝色块被擦掉** ❌
+         * -> 而原生 `::selection` 是 transparent（我们自己关的）❌
+         *   -> 用户看到的**只有自绘层** -> 一擦就消失 ❌
+         *   -> 用户反馈：**"选中文字的选中效果会消失"** ✅
+         *
+         * -> 所以：**批注期间保留冻结的形状** ✅
+         * -> 用户点 X 取消 -> 主动清掉（用户要的"取消就把高亮取消掉"）✅
+         */
+        if (!isPendingNoteRef.current) {
+          setSelectionShapes(new Map());
+        }
         onSelectionChange?.(selection);
         return;
       }
@@ -2872,6 +2910,34 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               }
             : null,
         );
+        /*
+         * ⚠️⚠️ **冻结当前的选区形状**（审计发现的**真 bug**）。
+         *
+         * ### 问题
+         *
+         * -> 打开批注弹窗 -> 编辑器 \`focus()\` ❌
+         *   -> **浏览器会塌缩原生选区** ✅
+         *   -> 触发 \`selectionchange\` ✅
+         *   -> \`computeGeometry()\` 返回 false ✅
+         *   -> \`clearSelection()\` ✅
+         *   -> \`onSelectionChange(null)\` ✅
+         *   -> **\`setSelectionShapes(new Map())\` -> 自绘的蓝色选区块被擦掉** ❌
+         *
+         * -> 而原生 \`::selection\` 本来就是 transparent（我们自己关的）❌
+         *   -> 用户看到的**只有自绘层** ❌
+         *   -> 一擦就没了 ❌
+         *   -> 用户反馈：**"在选中文字进行批注的时候 选中文字的选中效果会消失"** ✅
+         *
+         * ### 现在的做法
+         *
+         * -> **冻结**一份形状（\`pendingNoteShapesRef\`）✅
+         * -> \`handleSelectionChange\` 在"正在批注"时**不清**形状 ✅
+         * -> 用户点 X 取消 -> 清掉冻结形状 ✅（用户要的"取消就把高亮取消掉"）
+         * -> 保存成功 -> 走已有的 \`clearSelectionAfterHighlight()\` ✅
+         */
+        pendingNoteShapesRef.current = new Map(selectionShapes);
+        // ⚠️ **标记"正在批注"** -> handleSelectionChange 不清自绘层 ✅
+        isPendingNoteRef.current = true;
         // 打开包自带的富文本弹窗
         setPendingNote(ctx);
       },
@@ -2897,6 +2963,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     t,
     toast.info,
     isFullyCoveredByExistingHighlight,
+    selectionShapes,
   ]);
 
   /** 合并后的动作列表（宿主覆盖 + 追加） */
@@ -4085,11 +4152,26 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                */
               anchorRect={noteAnchor}
               onClose={() => {
+                /*
+                 * ⚠️⚠️ **用户点了 X 取消** -> **取消这次高亮**（用户要的）。
+                 *
+                 * -> 清掉"正在批注"的标志 ✅
+                 * -> 清掉冻结的选区形状 -> **蓝色块消失** ✅
+                 *   （用户反馈："如果批注用户选择取消（点击x）就把这个高亮取消调"）
+                 * -> 顺便把原生选区也收掉 ✅
+                 */
+                isPendingNoteRef.current = false;
+                pendingNoteShapesRef.current = null;
+                setSelectionShapes(new Map());
+                clearNativeSelection();
                 setPendingNote(null);
                 setNoteAnchor(null);
               }}
               onSubmit={(html, plain) => {
                 const note = pendingNote;
+                // ⚠️ **批注结束** -> 恢复"选区变化会清自绘层"的行为 ✅
+                isPendingNoteRef.current = false;
+                pendingNoteShapesRef.current = null;
                 setPendingNote(null);
                 setNoteAnchor(null);
                 if (!note) {
