@@ -31,6 +31,7 @@ import {
   NO_COLOR,
   richTextToPlain,
 } from '../core/editor/rich-text';
+import { FORMAT_COMMANDS } from '../core/editor/toolbar-state';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
@@ -254,6 +255,28 @@ export function RichTextEditor(props: RichTextEditorProps) {
    * → `document.queryCommandState('bold')` -> 内置编辑器（execCommand）能问出结果 ✅
    * → 浏览器不支持 -> 返回 false（按钮不高亮，不影响使用）✅
    */
+  /**
+   * ⚠️⚠️ **"当前有没有选中文字"**（用户需求：
+   * "清除格式按钮如果没有选择文字 应该置灰"✅）。
+   *
+   * -> 内置编辑器用 `window.getSelection()` ✅
+   *    -> `isCollapsed = true` 表示**没有选区**（只有光标）✅
+   *    -> `isCollapsed = false` 表示**选中了文字** ✅
+   * -> **拿不到选区** -> 当成"有选区"（不误伤）✅
+   */
+  const hasSelection = useCallback((): boolean => {
+    const selection = window.getSelection();
+    if (!selection) {
+      return true;
+    }
+    // ⚠️ **选区在别的地方**（比如用户选中了 PDF 上的字）-> 不算 ✅
+    const anchor = selection.anchorNode;
+    if (anchor && !editorRef.current?.contains(anchor)) {
+      return true;
+    }
+    return !selection.isCollapsed;
+  }, []);
+
   const queryCommandActive = useCallback((command: string): boolean => {
     /*
      * ⚠️ **只有部分命令能问状态**。
@@ -456,6 +479,17 @@ export function RichTextEditor(props: RichTextEditorProps) {
            * → 选区变化时 React 不一定重渲染 -> 用 `onFocus/onBlur` + 一个 tick 强制刷新 ✅
            */
           const active = queryCommandActive(item.command);
+          /*
+           * ⚠️⚠️ **没选文字 -> 格式按钮置灰**（用户需求：
+           * "清除格式按钮如果没有选择文字 应该置灰"✅）。
+           *
+           * -> `hasSelection` 跟着 `selectionTick` 一起刷新 ✅
+           *    -> 用户选中文字 -> 立刻可用 ✅
+           *    -> 取消选择 -> 立刻置灰 ✅
+           */
+          const selectionEmpty = !hasSelection();
+          const isFormatCommand = FORMAT_COMMANDS.has(item.command);
+          const disabled = isFormatCommand && selectionEmpty;
 
           return (
             <span key={item.command} className="scpdf-rich-text__tool">
@@ -471,6 +505,11 @@ export function RichTextEditor(props: RichTextEditorProps) {
                 aria-expanded={hasPalette ? paletteOpen : undefined}
                 data-active={active ? 'true' : 'false'}
                 aria-pressed={active}
+                /*
+                 * ⚠️⚠️ **没选文字 -> 置灰**（用户需求：
+                 * "清除格式按钮如果没有选择文字 应该置灰"✅）。
+                 */
+                disabled={disabled}
                 onMouseDown={(event) => {
                   // ⚠️ **阻止默认行为** → 不然编辑区会失焦 → 光标丢失
                   event.preventDefault();

@@ -54,7 +54,7 @@ import {
   richTextToPlain,
 } from '../core/editor/rich-text';
 import type { ToolbarStateEditor } from '../core/editor/toolbar-state';
-import { computeToolbarActiveState } from '../core/editor/toolbar-state';
+import { computeToolbarActiveState, FORMAT_COMMANDS } from '../core/editor/toolbar-state';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
@@ -559,6 +559,21 @@ function TipTapToolbar(props: {
       can: () => Boolean(raw.can?.().undo?.()),
       canUndo: () => Boolean(raw.can?.().undo?.()),
       canRedo: () => Boolean(raw.can?.().redo?.()),
+      /*
+       * ⚠️⚠️ **"当前有没有选中文字"**（用户需求：
+       * "清除格式按钮如果没有选择文字 应该置灰"✅）。
+       *
+       * -> TipTap 的 `editor.state.selection.empty` ✅
+       *    -> `empty = true` 表示**没有选区**（光标在那儿）✅
+       *    -> `empty = false` 表示**选中了文字** ✅
+       * -> 没选文字 -> 格式按钮**置灰** ✅
+       */
+      hasSelection: () => {
+        const state = (raw as unknown as { state?: { selection?: { empty?: boolean } } }).state;
+        const empty = state?.selection?.empty;
+        // ⚠️ **拿不到就当成"有选区"**（不误伤）✅
+        return empty === undefined ? true : !empty;
+      },
     };
     return computeToolbarActiveState(
       items.map((item) => item.command),
@@ -927,7 +942,17 @@ function TipTapToolbar(props: {
         {items.map((item, index) => {
           const state = activeStates[index];
           const active = state?.active ?? false;
-          const disabled = state?.disabled ?? false;
+          /*
+           * ⚠️⚠️ **"没选文字 -> 格式按钮置灰**（用户需求：
+           * "清除格式按钮如果没有选择文字 应该置灰"✅）。
+           *
+           * -> `state.disabled` 是 TipTap 自己的判断（撤销/重做）✅
+           * -> **再合并**"格式类命令 + 没选文字" ✅
+           * -> ⚠️ **撤销/重做不受影响**（它们不是格式类）✅
+           */
+          const tipTapDisabled = state?.disabled ?? false;
+          const disabled =
+            tipTapDisabled || (state?.hasSelection === false && FORMAT_COMMANDS.has(item.command));
           const isLink = item.command === 'createLink';
           /*
            * ⚠️ **颜色命令**（文字颜色 / 高亮底色）-> 要弹**颜色面板**。

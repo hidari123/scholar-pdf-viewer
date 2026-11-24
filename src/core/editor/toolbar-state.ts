@@ -29,6 +29,12 @@ export interface ToolbarStateEditor {
     nameOrAttrs: string | Record<string, unknown>,
     attributes?: Record<string, unknown>,
   ) => boolean;
+  /**
+   * **当前有没有选中文字**（没选 -> 格式按钮应该置灰）。
+   *
+   * ⚠️ 用户需求："清除格式按钮如果没有选择文字 应该置灰"✅
+   */
+  hasSelection?: () => boolean;
   /** 编辑器能不能撤销 / 重做 */
   can: () => boolean;
   /** 撤销命令（配合 `can()` 用） */
@@ -47,6 +53,14 @@ export interface ToolbarActiveState {
   active: boolean;
   /** 是否**不可用**（比如没有可撤销的历史） */
   disabled: boolean;
+  /**
+   * **当前有没有选中文字**。
+   *
+   * ⚠️ 用户需求："清除格式按钮如果没有选择文字 应该置灰"✅
+   * -> 没选文字 -> 格式类命令（清除格式 / 文字颜色 / 高亮）**置灰** ✅
+   * -> 选中了 -> 正常 ✅
+   */
+  hasSelection: boolean;
 }
 
 /**
@@ -80,30 +94,68 @@ export function computeToolbarActiveState(
   commands: readonly string[],
   editor: ToolbarStateEditor | null,
 ): ToolbarActiveState[] {
+  /*
+   * ⚠️⚠️ **"当前有没有选中文字"**（用户需求：
+   * "清除格式按钮如果没有选择文字 应该置灰"✅）。
+   *
+   * -> 编辑器不提供这个能力 -> **默认当成"有选区"** ✅
+   *    -> 不影响老宿主（不知道有没有选区）✅
+   */
+  const hasSelection = safeHasSelection(editor);
+
   return commands.map((command) => {
     if (!editor) {
-      return { command, active: false, disabled: false };
+      return { command, active: false, disabled: false, hasSelection };
     }
 
     /*
      * ⚠️ **撤销 / 重做**不是"格式"，是"有没有历史" -> 单独判断 ✅
+     *
+     * ⚠️⚠️ **不受"有没有选区"影响** ❌
+     * -> 没选文字时**撤销依然可用** ✅（用户想撤销的是上一步操作，不是格式）
      */
     if (command === 'undo') {
-      return { command, active: false, disabled: !safeCan(editor, 'undo') };
+      return {
+        command,
+        active: false,
+        disabled: !safeCan(editor, 'undo'),
+        hasSelection,
+      };
     }
     if (command === 'redo') {
-      return { command, active: false, disabled: !safeCan(editor, 'redo') };
-    }
-    /*
-     * ⚠️ **清除格式**没有"激活态" -> 永远不高亮 ✅
-     */
-    if (command === 'removeFormat') {
-      return { command, active: false, disabled: false };
+      return {
+        command,
+        active: false,
+        disabled: !safeCan(editor, 'redo'),
+        hasSelection,
+      };
     }
 
     const check = ACTIVE_CHECKS[command];
+
+    /*
+     * ⚠️⚠️ **格式类命令：没选文字 -> 置灰** ✅
+     *
+     * -> 用户需求："清除格式按钮如果没有选择文字 应该置灰"✅
+     * -> **清除格式** / **文字颜色** / **高亮底色** / **文字高亮** 都算"格式类" ✅
+     * -> **加粗/斜体/下划线** 也一样（没选字就没法加粗）✅
+     *
+     * ⚠️ **"清除格式"没有激活态** -> 永远不高亮 ✅
+     *    -> 它不在 `ACTIVE_CHECKS` 里 -> `check` 是 undefined ✅
+     */
+    if (FORMAT_COMMANDS.has(command)) {
+      return {
+        command,
+        // ⚠️ **有检查的格式命令**（加粗等）-> **激活态照常算** ✅
+        //    -> 没选文字时**只是置灰**，不是"取消高亮" ✅
+        active: check ? safeIsActive(editor, check) : false,
+        disabled: !hasSelection,
+        hasSelection,
+      };
+    }
+
     if (!check) {
-      return { command, active: false, disabled: false };
+      return { command, active: false, disabled: false, hasSelection };
     }
 
     /*
@@ -114,13 +166,62 @@ export function computeToolbarActiveState(
      * → 但我们**不知道当前 mark 的具体值** -> 只判断"有没有这个 mark" ✅
      *   （够用：只要这段有文字颜色，按钮就亮）
      */
-    try {
-      return { command, active: editor.isActive(check), disabled: false };
-    } catch {
-      /* 编辑器还没准备好 -> 当成没激活 */
-      return { command, active: false, disabled: false };
-    }
+    return {
+      command,
+      active: safeIsActive(editor, check),
+      disabled: false,
+      hasSelection,
+    };
   });
+}
+
+/**
+ * **安全地问"这个 mark 是不是激活的"**（编辑器没准备好时当成 false）。
+ */
+function safeIsActive(
+  editor: ToolbarStateEditor,
+  check: string | Record<string, unknown>,
+): boolean {
+  try {
+    return editor.isActive(check);
+  } catch {
+    /* 编辑器还没准备好 -> 当成没激活 */
+    return false;
+  }
+}
+
+/**
+ * **"格式类"命令**（没选文字时应该置灰）。
+ *
+ * ⚠️ **不包含 `undo` / `redo`** ✅
+ * -> 撤销是"撤销上一步操作"，和选区无关 ✅
+ */
+export const FORMAT_COMMANDS = new Set([
+  'removeFormat',
+  'bold',
+  'italic',
+  'underline',
+  'strikeThrough',
+  'foreColor',
+  'hiliteColor',
+  'textHighlight',
+]);
+
+/**
+ * **安全地判断"当前有没有选中文字"**（编辑器没提供 / 没准备好时当成"有"）。
+ *
+ * ⚠️ **默认 `true`** ✅
+ * -> 不认识这个能力的宿主 -> **行为不变**（不会突然全部置灰）✅
+ */
+function safeHasSelection(editor: ToolbarStateEditor | null): boolean {
+  if (!editor?.hasSelection) {
+    return true;
+  }
+  try {
+    return editor.hasSelection();
+  } catch {
+    return true;
+  }
 }
 
 /**

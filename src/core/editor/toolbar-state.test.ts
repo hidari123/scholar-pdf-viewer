@@ -22,8 +22,8 @@ describe('computeToolbarActiveState', () => {
   it('**编辑器还没挂载 -> 全部不激活**', () => {
     const states = computeToolbarActiveState(['bold', 'italic'], null);
     expect(states).toEqual([
-      { command: 'bold', active: false, disabled: false },
-      { command: 'italic', active: false, disabled: false },
+      { command: 'bold', active: false, disabled: false, hasSelection: true },
+      { command: 'italic', active: false, disabled: false, hasSelection: true },
     ]);
   });
 
@@ -36,6 +36,7 @@ describe('computeToolbarActiveState', () => {
   it('**选区是加粗 -> 加粗按钮激活**', () => {
     const editor = makeEditor({
       isActive: (name) => name === 'bold',
+      hasSelection: () => true,
     });
     const states = computeToolbarActiveState(['bold', 'italic'], editor);
     expect(states[0]?.active).toBe(true);
@@ -61,6 +62,48 @@ describe('computeToolbarActiveState', () => {
     for (const s of states) {
       expect(s.active).toBe(true);
     }
+  });
+
+  /*
+   * ⚠️ **没选文字 -> 格式按钮置灰**（用户需求：
+   * "清除格式按钮如果没有选择文字 应该置灰"✅）。
+   */
+  it('**没选文字 -> 格式类命令 disabled**', () => {
+    const editor = makeEditor({ hasSelection: () => false });
+    const states = computeToolbarActiveState(
+      ['removeFormat', 'bold', 'foreColor', 'hiliteColor'],
+      editor,
+    );
+    for (const s of states) {
+      expect(s.disabled, s.command).toBe(true);
+      expect(s.hasSelection, s.command).toBe(false);
+    }
+  });
+
+  it('**选了文字 -> 格式类命令不 disabled**', () => {
+    const editor = makeEditor({ hasSelection: () => true });
+    const states = computeToolbarActiveState(['removeFormat', 'bold'], editor);
+    for (const s of states) {
+      expect(s.disabled, s.command).toBe(false);
+      expect(s.hasSelection, s.command).toBe(true);
+    }
+  });
+
+  it('**撤销/重做不受"有没有选区"影响**', () => {
+    const editor = makeEditor({
+      hasSelection: () => false,
+      canUndo: () => true,
+      canRedo: () => true,
+    });
+    const states = computeToolbarActiveState(['undo', 'redo'], editor);
+    expect(states[0]?.disabled).toBe(false);
+    expect(states[1]?.disabled).toBe(false);
+  });
+
+  it('**编辑器不提供 hasSelection -> 默认当成"有选区"**（不误伤老宿主）', () => {
+    const states = computeToolbarActiveState(['removeFormat'], makeEditor());
+    expect(states[0]?.disabled).toBe(false);
+    expect(states[0]?.hasSelection).toBe(true);
   });
 
   it('**"清除格式"永远不激活**（它不是一种格式）', () => {

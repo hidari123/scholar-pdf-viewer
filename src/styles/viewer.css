@@ -1301,6 +1301,18 @@
   color: var(--scpdf-text-muted, #6b7280);
 }
 
+/*
+ * ⚠️ **置灰**（没选文字时的格式按钮）。
+ *
+ * -> 用户需求："清除格式按钮如果没有选择文字 应该置灰"✅
+ * -> `disabled` 是**原生属性** -> 浏览器**自带**`:disabled` 样式 ✅
+ * -> 但要**明确**一点（不然不同浏览器差别很大）✅
+ */
+.scpdf-rich-text__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .scpdf-rich-text__btn:focus-visible {
   outline: 2px solid var(--scpdf-primary, #2f6feb);
   outline-offset: 1px;

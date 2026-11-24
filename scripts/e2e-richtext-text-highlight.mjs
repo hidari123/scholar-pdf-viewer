@@ -376,6 +376,69 @@ try {
     afterHighlight ?? '',
   );
 
+  // ---- ⑤.3 没选文字时格式按钮置灰（用户需求："清除格式按钮如果没有选择文字 应该置灰"）----
+  // 光标在末尾（没有选区）
+  await page.evaluate(() => {
+    const ed = document.querySelector('.scpdf-annotation-dialog .ProseMirror');
+    ed?.focus();
+    // 光标移到**最后**（不选任何字）✅
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(ed);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
+  await page.waitForTimeout(600);
+
+  const noSelection = await page.evaluate(() =>
+    [...document.querySelectorAll('.scpdf-annotation-dialog .scpdf-rich-text__btn')].map((b) => ({
+      label: b.getAttribute('aria-label'),
+      disabled: b.disabled,
+    })),
+  );
+  const findBtn = (list, label) => list.find((b) => b.label === label);
+  check(
+    '**没选字时"清除格式"置灰**',
+    findBtn(noSelection, '清除格式')?.disabled === true,
+    JSON.stringify(findBtn(noSelection, '清除格式')),
+  );
+  check(
+    '**没选字时"文字颜色"置灰**',
+    findBtn(noSelection, '文字颜色')?.disabled === true,
+    JSON.stringify(findBtn(noSelection, '文字颜色')),
+  );
+  check(
+    '**没选字时"加粗"置灰**',
+    findBtn(noSelection, '加粗')?.disabled === true,
+    JSON.stringify(findBtn(noSelection, '加粗')),
+  );
+  check(
+    '**没选字时"撤销"不禁用**（撤销和选区无关）',
+    findBtn(noSelection, '撤销')?.disabled === false,
+    JSON.stringify(findBtn(noSelection, '撤销')),
+  );
+
+  // 选中文字 -> 都恢复
+  await selectAll();
+  await page.waitForTimeout(600);
+  const withSelection = await page.evaluate(() =>
+    [...document.querySelectorAll('.scpdf-annotation-dialog .scpdf-rich-text__btn')].map((b) => ({
+      label: b.getAttribute('aria-label'),
+      disabled: b.disabled,
+    })),
+  );
+  check(
+    '**选了字后"清除格式"可用**',
+    findBtn(withSelection, '清除格式')?.disabled === false,
+    JSON.stringify(findBtn(withSelection, '清除格式')),
+  );
+  check(
+    '**选了字后"文字颜色"可用**',
+    findBtn(withSelection, '文字颜色')?.disabled === false,
+    JSON.stringify(findBtn(withSelection, '文字颜色')),
+  );
+
   // ---- ⑤.5 "无背景色"选项（用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"）----
   await selectAll();
   await page.waitForTimeout(300);
