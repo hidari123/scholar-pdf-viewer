@@ -165,6 +165,29 @@ export interface ExportHighlightedPdfOptions {
    * ⚠️ PDF 的高亮批注是**半透明叠加**在文字上的 → 不透明会挡住正文。
    */
   opacity?: number;
+  /**
+   * **要不要把高亮的文字写进批注**（默认 **false**）。
+   *
+   * ⚠️⚠️ **默认不写**（实测踩到的坑，用户反馈）：
+   *
+   * > "在导出的pdf上hover到高亮上还是会出现黄色便签"
+   *
+   * -> PDF 的 `/Contents` 是**批注的弹出文字** ✅
+   * -> Chrome 的 PDF 阅读器：**hover 到高亮上就显示一个黄色的便签框** ❌
+   *    -> 里面显示的就是 `/Contents` 的内容 ❌
+   *    -> 用户看到"一个大黄框" ❌
+   *    -> 用户反馈："不要这个" ✅
+   *
+   * -> **A/B 对照实验**（实测，在 Chrome 里 hover 同一个位置）：
+   *    - 原始（有 `/Contents`）-> **出黄色便签** ❌
+   *    - 变体 A（删 `/Contents`）-> **没有便签** ✅
+   *    - 变体 B（只加 `/F` 标志位）-> **还是出便签** ❌
+   *    -> **真凶是 `/Contents`**，不是 `/F` ✅
+   *
+   * -> 高亮本身**不需要**文字 ✅ -> 默认不写 ✅
+   * -> 宿主如果**确实要**批注文字（比如给 Acrobat/WPS 看）-> 打开 ✅
+   */
+  includeAnnotationText?: boolean;
 }
 
 /**
@@ -188,7 +211,13 @@ export interface ExportHighlightedPdfOptions {
 export async function exportHighlightedPdf(
   options: ExportHighlightedPdfOptions,
 ): Promise<Uint8Array> {
-  const { pdfBytes, highlights, pageSizesPt, opacity = 0.4 } = options;
+  const {
+    pdfBytes,
+    highlights,
+    pageSizesPt,
+    opacity = 0.4,
+    includeAnnotationText = false,
+  } = options;
 
   /*
    * ⚠️ **动态 import**（可选依赖）。
@@ -348,9 +377,36 @@ export async function exportHighlightedPdf(
     dict.set(pdfLib.PDFName.of('CA'), pdfLib.PDFNumber.of(opacity));
     dict.set(pdfLib.PDFName.of('ca'), pdfLib.PDFNumber.of(opacity));
 
-    // 批注文字（/Contents）
+    /*
+     * ⚠️ **批注标志位（/F）**。
+     *
+     * -> PDF 的 `/F` 是**标志位**（位掩码）✅
+     *    - 位 1（值 1）= Invisible（完全不可见）✅
+     *    - 位 2（值 2）= Hidden（不显示，但打印）✅
+     *    - 位 3（值 4）= Print（打印时显示）✅
+     *    - 位 4（值 8）= NoZoom ✅
+     * -> 高亮批注：**不显示图标、但要能打印** ✅
+     *    -> `/F = 4`（Print）✅
+     *    -> 阅读器**不画便签图标** ✅
+     *
+     * ⚠️ **但这不是"黄色便签"的真凶**（实测）✅
+     * -> A/B 对照：只加 `/F` -> **还是出便签** ❌
+     * -> **真凶是 `/Contents`** ✅（见上面的说明）
+     * -> `/F` 还是要加（规范 + 部分阅读器认它）✅
+     */
+    dict.set(pdfLib.PDFName.of('F'), pdfLib.PDFNumber.of(4));
+
+    /*
+     * ⚠️⚠️ **批注文字（/Contents）默认【不写】**（实测踩到的坑）✅
+     *
+     * -> `/Contents` 是**批注的弹出文字** ✅
+     * -> Chrome 的 PDF 阅读器 hover 到高亮上就显示**一个黄色便签框** ❌
+     *    -> 用户反馈："导出后 hover 高亮还是会出现黄色便签 不要这个" ✅
+     * -> A/B 对照实验证明：**真凶是 `/Contents`**（不是 `/F`）✅
+     * -> 宿主确实要批注文字 -> `includeAnnotationText: true` ✅
+     */
     const contents = (first?.text ?? '').slice(0, 2000);
-    if (contents) {
+    if (contents && includeAnnotationText) {
       /*
        * ⚠️⚠️ **必须用 `fromText`**（实测踩过的坑：用户反馈"导出带高亮的 PDF 后
        * hover 上去会出来乱码批注 明明没有批注"）。

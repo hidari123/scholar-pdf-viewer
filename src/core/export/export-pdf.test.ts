@@ -241,6 +241,13 @@ describe('exportHighlightedPdf（真 pdf-lib）', async () => {
       pdfBytes: original,
       highlights: [chinese],
       pageSizesPt,
+      /*
+       * ⚠️ **要显式开启批注文字**（第 27 轮改成默认不写）✅
+       *
+       * -> 用户反馈："导出后 hover 高亮还是会出现黄色便签" ✅
+       * -> A/B 对照：**真凶是 `/Contents`** ✅
+       */
+      includeAnnotationText: true,
       pdfLib: pdfLib as unknown as PdfLibLike,
     });
 
@@ -269,5 +276,97 @@ describe('exportHighlightedPdf（真 pdf-lib）', async () => {
     expect(/[一-龥]/.test(contents)).toBe(false);
     // ✅ "中" = U+4E2D → UTF-16BE 是 4E2D
     expect(contents).toContain('4E2D');
+  });
+});
+
+/*
+ * ⚠️⚠️ **导出的高亮【默认不带批注文字】**（实测踩到的坑）。
+ *
+ * 用户反馈：
+ * > "在导出的pdf上hover到高亮上还是会出现黄色便签"
+ *
+ * -> PDF 的 `/Contents` 是**批注的弹出文字** ✅
+ * -> Chrome 的 PDF 阅读器：hover 到高亮上就显示**一个黄色便签框** ❌
+ * -> A/B 对照实验：**真凶是 `/Contents`**（不是 `/F`）✅
+ */
+
+/** 记录写到字典里的 key */
+function makeRecordingPdfLib() {
+  const written: { name: string; value: unknown }[] = [];
+  const dict = {
+    set(key: { toString(): string }, value: unknown) {
+      written.push({ name: key.toString(), value });
+    },
+  };
+  const fakePdfLib = {
+    PDFDocument: {
+      async load() {
+        return {
+          getPages: () => [
+            {
+              node: {
+                get: () => undefined,
+                set: () => undefined,
+              },
+            },
+          ],
+          context: {
+            obj: (v: unknown) => v,
+            register: (v: unknown) => v,
+          },
+          async save() {
+            return new Uint8Array([1]);
+          },
+        };
+      },
+    },
+    PDFDict: { withContext: () => dict },
+    PDFArray: { withContext: () => ({ push: () => undefined }) },
+    PDFName: { of: (n: string) => ({ toString: () => `/${n}` }) },
+    PDFNumber: { of: (n: number) => n },
+    PDFHexString: { fromText: (t: string) => t, of: (t: string) => t },
+  };
+  return { fakePdfLib, written };
+}
+
+describe('导出 PDF 的批注字典', () => {
+  it('**默认不写 /Contents**（Chrome hover 时不出黄色便签）', async () => {
+    const { fakePdfLib, written } = makeRecordingPdfLib();
+
+    await exportHighlightedPdf({
+      pdfBytes: new Uint8Array([1]),
+      highlights: [makeHighlight()],
+      pageSizesPt,
+      pdfLib: fakePdfLib as unknown as PdfLibLike,
+    });
+
+    expect(written.some((w) => w.name === '/Contents')).toBe(false);
+  });
+
+  it('**显式开启后才写 /Contents**', async () => {
+    const { fakePdfLib, written } = makeRecordingPdfLib();
+
+    await exportHighlightedPdf({
+      pdfBytes: new Uint8Array([1]),
+      highlights: [makeHighlight()],
+      pageSizesPt,
+      includeAnnotationText: true,
+      pdfLib: fakePdfLib as unknown as PdfLibLike,
+    });
+
+    expect(written.some((w) => w.name === '/Contents')).toBe(true);
+  });
+
+  it('**写 /F 标志位**（Print）', async () => {
+    const { fakePdfLib, written } = makeRecordingPdfLib();
+
+    await exportHighlightedPdf({
+      pdfBytes: new Uint8Array([1]),
+      highlights: [makeHighlight()],
+      pageSizesPt,
+      pdfLib: fakePdfLib as unknown as PdfLibLike,
+    });
+
+    expect(written.some((w) => w.name === '/F')).toBe(true);
   });
 });
