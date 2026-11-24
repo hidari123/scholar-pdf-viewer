@@ -256,45 +256,98 @@
 }
 
 /*
- * ⚠️ **主题色板小方块**。
+ * ⚠️⚠️ **主题的迷你预览色块**（实测踩到的坑，用户反馈：
+ * "主题的下拉框里高对比色和暗色的展示的前面框的颜色是一样的
+ *  极简和亮色也是一样的 需要区分开"）。
  *
- * -> 每个主题给一个**代表色** ✅
- * -> 用户不用记住名字 -> **看颜色就知道** ✅
+ * ### 修复前（只画一个纯色方块）
+ *
+ * ```
+ * light    #ffffff   ┐
+ * minimal  #fafafa   ┘ 肉眼分不出 ❌
+ * dark     #1f2933   ┐
+ * contrast #000000   ┘ 太像 ❌
+ * paper    #f5f0e6   ┐
+ * sepia    #f4ecd8   ┘ 几乎一样 ❌
+ * ```
+ *
+ * ### 根因
+ *
+ * -> 这些主题的差别**本来就不在背景色上**（背景差 1~2%）✅
+ * -> 差别在 **主色调** + **圆角** + **阴影** ✅
+ * -> 只画一个纯背景 -> **看起来全都一样** ❌
+ *
+ * ### 修法
+ *
+ * -> 画成**迷你预览卡**：上半 = 主色调，下半 = 背景色 ✅
+ * -> 颜色**靠 CSS 变量**（\`--scpdf-color-primary\` / \`--scpdf-color-surface\`）✅
+ *    -> **不在 CSS 里再抄一份色值** ✅（避免两处不一致 ❌）
+ * -> 圆角也画上（\`minimal\` / \`contrast\` 是 0，\`paper\` 是 6px）✅
  */
 .scpdf-theme-picker__swatch {
-  width: 14px;
-  height: 14px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 16px;
+  height: 18px;
   border: 1px solid var(--scpdf-color-border);
   border-radius: 3px;
   flex: none;
+  overflow: hidden;
 }
 
-.scpdf-theme-picker__swatch[data-theme="light"] {
-  background: #ffffff;
+/* 上半：主题的主色调（accent） */
+.scpdf-theme-picker__swatch-bar {
+  display: block;
+  height: 6px;
+  background: var(--scpdf-color-primary, currentColor);
+  flex: none;
 }
 
-.scpdf-theme-picker__swatch[data-theme="dark"] {
-  background: #1f2933;
+/* 下半：主题的背景色 */
+.scpdf-theme-picker__swatch-bg {
+  display: block;
+  flex: 1;
+  background: var(--scpdf-color-surface, transparent);
 }
 
-.scpdf-theme-picker__swatch[data-theme="auto"] {
-  background: linear-gradient(135deg, #ffffff 50%, #1f2933 50%);
+/*
+ * ⚠️ **主题自己的圆角**（预览卡要体现出来）。
+ *
+ * -> \`minimal\` / \`contrast\` 的 \`--scpdf-radius-page\` 是 0 ✅
+ * -> \`paper\` 是 6px ✅
+ * -> 不体现的话这两个主题还是**看起来一样** ❌
+ */
+.scpdf-theme-picker__swatch.scpdf-root--minimal,
+.scpdf-theme-picker__swatch.scpdf-root--contrast {
+  border-radius: 0;
 }
 
-.scpdf-theme-picker__swatch[data-theme="paper"] {
-  background: #f5f0e6;
+/*
+ * ⚠️ **高对比度主题**：主色调是黄色 ✅
+ * -> 在黑色底上很显眼 ✅
+ * -> 不特殊处理的话，黄色条 + 白底会**看不清边界** ❌
+ */
+.scpdf-theme-picker__swatch.scpdf-root--contrast {
+  border-color: #ffffff;
 }
 
-.scpdf-theme-picker__swatch[data-theme="sepia"] {
-  background: #f4ecd8;
+/*
+ * ⚠️⚠️ **"跟随系统"主题要画成【一半亮一半暗】**（实测踩到的坑）。
+ *
+ * -> \`auto\` 跟随系统的深浅色设置 ✅
+ * -> 但预览卡只画**一种**颜色 ❌
+ *    -> 和普通的 \`light\` / \`dark\` **看起来一样** ❌
+ *    -> 用户分不清"跟随系统"和"固定亮色" ❌
+ * -> -> 画成**左上亮 / 右下暗的对角渐变** ✅
+ *    -> 一眼就知道"这个是两色自适应" ✅
+ */
+.scpdf-theme-picker__swatch.scpdf-root--auto .scpdf-theme-picker__swatch-bg {
+  background: linear-gradient(135deg, #ffffff 50%, #1f1f1f 50%);
 }
 
-.scpdf-theme-picker__swatch[data-theme="contrast"] {
-  background: #000000;
-}
-
-.scpdf-theme-picker__swatch[data-theme="minimal"] {
-  background: #fafafa;
+.scpdf-theme-picker__swatch.scpdf-root--auto .scpdf-theme-picker__swatch-bar {
+  background: linear-gradient(135deg, #2f6fed 50%, #4c8dff 50%);
 }
 
 .scpdf-toolbar__page-input {

@@ -151,7 +151,7 @@ export function ThemePicker(props: ThemePickerProps) {
                 setOpen(false);
               }}
             >
-              <span className="scpdf-theme-picker__swatch" data-theme={key} aria-hidden="true" />
+              <ThemeSwatch theme={key} />
               <span className="scpdf-theme-picker__label">{labelFor(key)}</span>
               {key === theme ? (
                 <Icon name="check" title={t('theme.current')} overrides={icons} />
@@ -161,5 +161,67 @@ export function ThemePicker(props: ThemePickerProps) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * **主题的迷你预览**（色块）。
+ *
+ * ## 为什么不能只画一个纯色方块（实测踩到的坑，用户反馈）
+ *
+ * > "主题的下拉框里高对比色和暗色的展示的前面框的颜色是一样的
+ * >  极简和亮色也是一样的 需要区分开"
+ *
+ * ### 实测（修复前的色值）
+ *
+ * | 主题 | 色块 | 问题 |
+ * |---|---|---|
+ * | `light` 亮色 | `#ffffff` | vs `minimal` 的 `#fafafa` -> **肉眼分不出** ❌ |
+ * | `minimal` 极简 | `#fafafa` | ❌ |
+ * | `dark` 暗色 | `#1f2933` | vs `contrast` 的 `#000000` -> **太像** ❌ |
+ * | `contrast` 高对比 | `#000000` | ❌ |
+ * | `paper` 纸张 | `#f5f0e6` | vs `sepia` 的 `#f4ecd8` -> **几乎一样** ❌ |
+ * | `sepia` 深色护眼 | `#f4ecd8` | ❌ |
+ *
+ * ### 根因
+ *
+ * -> 这些主题的差别**本来就不在背景色上**（背景差 1~2%）✅
+ * -> 差别在 **主色调** + **圆角** + **阴影** ✅
+ * -> 只画一个纯背景 -> **看起来全都一样** ❌
+ *
+ * ### 修法
+ *
+ * -> 画成**迷你预览卡**（上半 = 主色调，下半 = 背景色）✅
+ * -> **颜色从 CSS 变量取** ✅
+ *    -> \`--scpdf-color-primary\` / \`--scpdf-color-surface\` ✅
+ *    -> **不在 TS 里再抄一份色值** ✅（避免两处不一致 ❌）
+ * -> 每个主题在自己的 class 下 -> 变量天然是对应的 ✅
+ *
+ * @param props 参数
+ */
+function ThemeSwatch({ theme }: { theme: PdfViewerTheme }) {
+  return (
+    /*
+     * ⚠️⚠️ **色块要带上主题自己的 class**（实测踩到的坑）。
+     *
+     * -> 主题的颜色是**CSS 变量**定义的 ✅
+     *    -> \`.scpdf-root--paper\` 里定义 \`--scpdf-color-primary: #b45309\` ✅
+     * -> 色块在**下拉菜单里**（不在 \`.scpdf-root--paper\` 下面）❌
+     *    -> **拿不到那个主题的变量** ❌ -> 只能用写死的颜色 ❌
+     *    -> -> 写死的颜色**和主题对不上** ❌（而且两处维护 ❌）
+     *
+     * -> 修法：色块**自己也挂上主题的 class** ✅
+     *    -> \`.scpdf-root--paper\` 里的变量定义**照样生效** ✅
+     *    -> 变量是**按 class 选择器**定义的，不是按祖先 ❌ -> 只要元素自己带这个 class 就行 ✅
+     */
+    <span className={`scpdf-root--${theme} scpdf-theme-picker__swatch`} aria-hidden="true">
+      {/*
+       * ⚠️ **颜色靠 CSS 变量**（不在 TS 里写死色值）✅
+       * -> 每个主题在自己的 class 下 -> 变量天然对应 ✅
+       * -> 宿主改主题的色 -> 这里**自动跟着变** ✅
+       */}
+      <span className="scpdf-theme-picker__swatch-bar" />
+      <span className="scpdf-theme-picker__swatch-bg" />
+    </span>
   );
 }
