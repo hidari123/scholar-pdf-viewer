@@ -1287,6 +1287,11 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         return getDocInfo(bytes);
       }
       /*
+       * ⚠️ **加密文档要把密码传给桥接** ✅
+       * -> 不传 -> 加密 PDF 打不开 ❌
+       */
+      const password = currentPassword;
+      /*
        * ⚠️ **等桥接就绪**（实测踩到的坑）✅
        * -> 加载 effect 只跑一次 ❌ -> 桥接没好就**永远失败** ❌
        * -> -> 这里 **await** 桥接的 promise ✅
@@ -1297,13 +1302,13 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           message: 'PDF 引擎还没准备好（pdfjs-dist 加载失败）',
         });
       }
-      const info = await bridge.open(bytes);
+      const info = await bridge.open(bytes, password);
       return {
         numPages: info.numPages,
         metadata: info.metadata,
       };
     },
-    [getDocInfo, defaultBridge],
+    [getDocInfo, defaultBridge, currentPassword],
   );
 
   /**

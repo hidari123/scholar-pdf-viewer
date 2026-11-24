@@ -62,8 +62,13 @@ export interface DefaultDocInfo {
 
 /** 一份已经接好的 pdf.js 上下文 */
 export interface PdfJsBridge {
-  /** 打开文档 */
-  open: (data: Uint8Array) => Promise<DefaultDocInfo & { doc: unknown }>;
+  /**
+   * 打开文档。
+   *
+   * @param data PDF 字节
+   * @param password 密码（**加密文档**要用 ✅）
+   */
+  open: (data: Uint8Array, password?: string) => Promise<DefaultDocInfo & { doc: unknown }>;
   /** 取第 n 页（1 起） */
   getPage: (pageNumber: number) => Promise<unknown>;
   /** 各页尺寸（pt） */
@@ -118,13 +123,23 @@ export async function createDefaultPdfJsBridge(): Promise<PdfJsBridge> {
       } | null = null;
 
       return {
-        async open(data: Uint8Array) {
+        async open(data: Uint8Array, password?: string) {
           /*
            * ⚠️ **必须传副本**（pdf.js 会把 buffer 交给 worker ❌）
            * -> 不 copy 的话 -> worker 拿到的是**已经被 detach 的** buffer ❌
            * -> -> 随机报"message length does not match" ❌
            */
-          const doc = await pdfjs.getDocument({ data: data.slice() }).promise;
+          /*
+           * ⚠️ **加密文档要传密码**（审核发现的功能缺口）✅
+           *
+           * -> 不传 -> pdf.js 抛 `PasswordException` ❌
+           * -> -> 加密 PDF 在**默认接线**下打不开 ❌
+           * -> -> 这里把密码传进去 ✅
+           */
+          const doc = await pdfjs.getDocument({
+            data: data.slice(),
+            ...(password ? { password } : {}),
+          }).promise;
           currentDoc = doc as never;
 
           const numPages = doc.numPages;
