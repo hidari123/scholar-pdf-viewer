@@ -142,3 +142,32 @@ describe('默认高亮色', () => {
     expect(merged.defaultHighlightColor).toBe('my');
   });
 });
+
+/*
+ * ⚠️ **`features.themePicker` 必须能被宿主用**（审核发现的真 bug）。
+ *
+ * -> 代码里一直在读 `features?.themePicker` ✅
+ * -> 但 `Features` 接口**没声明它** ❌
+ * -> -> 宿主写 `features={{ themePicker: false }}` **TS 报错** ❌
+ * -> -> "不显示主题按钮"这个能力**用不了** ❌
+ */
+describe('features.themePicker', () => {
+  it('**类型上存在**（宿主能传）', () => {
+    const merged = mergeConfig({}, { features: { themePicker: false } });
+    expect(merged.features?.themePicker).toBe(false);
+  });
+
+  it('**默认不传 -> undefined（= 显示）**', () => {
+    const merged = mergeConfig({}, {});
+    expect(merged.features?.themePicker).toBeUndefined();
+  });
+
+  it('**单独 prop 优先于 config**', () => {
+    // ⚠️ **签名是 (config, props)** ✅ -> 单独 prop 优先 ✅
+    const merged = mergeConfig(
+      { features: { themePicker: false } },
+      { features: { themePicker: true } },
+    );
+    expect(merged.features?.themePicker).toBe(true);
+  });
+});

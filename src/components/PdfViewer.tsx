@@ -32,6 +32,7 @@ import type { DocumentCache } from '../core/cache/store';
 import type { Features, PdfViewerConfig } from '../core/config';
 import { mergeConfig } from '../core/config';
 import type { DocumentSource, LoadOptions } from '../core/document/loader';
+import { createDefaultPdfJsBridge, type PdfJsBridge } from '../core/document/pdfjs-bridge';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
 import type { PdfViewerError } from '../core/errors';
 import { pdfViewerError } from '../core/errors';
@@ -1196,6 +1197,132 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   );
 
   // 1) 加载文档
+  /*
+   * ⚠️⚠️ **pdf.js 的默认接线**（审核发现的最重要的易用性问题）。
+   *
+   * ### 问题
+   *
+   * -> README 的"最小接入"是 `<PdfViewer file={url} />` ✅
+   * -> 但**照抄是不工作的** ❌（实测 `pages: 0` + **无任何报错** ❌）
+   * -> 因为宿主必须自己接 pdf.js（`getDocInfo` / `getPage` / `getPageSizes`）✅
+   * -> 漏了就**白屏且不知道原因** ❌
+   *
+   * ### 修法
+   *
+   * -> 宿主**不传** -> 用**包内置的默认接线** ✅ -> **开箱即用** ✅
+   * -> 宿主**传了** -> 用**宿主的** ✅（完全覆盖 ✅）
+   *
+   * ⚠️ **默认接线是【动态 import】的** ✅
+   * -> `pdfjs-dist` 体积不小 ✅ -> 不该拖慢没用 PDF 的页面 ✅
+   */
+  const [defaultBridge, setDefaultBridge] = useState<PdfJsBridge | null>(null);
+
+  /**
+   * ⚠️ **默认桥接的"就绪"信号**。
+   *
+   * ### 为什么需要（实测踩到的坑）
+   *
+   * -> 加载文档的 effect 依赖是 `[file, documentId, reloadSignal]` ❌
+   *    -> 它**只跑一次** ✅
+   * -> 如果这时候**桥接还没加载好** ❌
+   *    -> `getDocInfo` 会抛"引擎没准备好" ❌
+   *    -> -> 加载**失败** ❌ -> **永远不重试** ❌ -> **白屏** ❌
+   *
+   * -> 修法：**让加载等桥接** ✅
+   *    -> `defaultBridgePromise` 是**模块级**的 ✅
+   *    -> `effectiveGetDocInfo` 里 **await 它** ✅
+   *    -> -> 不管加载时机如何，都能拿到桥接 ✅
+   */
+  const defaultBridgePromise = useRef<Promise<PdfJsBridge> | null>(null);
+
+  /**
+   * ⚠️ **只在宿主没传自己的接线时**才加载默认的 ✅
+   */
+  useEffect(() => {
+    if (getDocInfo) {
+      // 宿主有自己的 -> 不用默认的 ✅
+      return;
+    }
+    let cancelled = false;
+    if (!defaultBridgePromise.current) {
+      defaultBridgePromise.current = createDefaultPdfJsBridge();
+    }
+    void defaultBridgePromise.current
+      .then((bridge) => {
+        if (!cancelled) {
+          setDefaultBridge(bridge);
+        }
+      })
+      .catch(() => {
+        // ⚠️ **加载失败也不要炸**（宿主可能自己有别的方案）✅
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [getDocInfo]);
+
+  /**
+   * ⚠️ **实际的"取页"回调**（宿主的优先）✅
+   */
+  const effectiveGetPage = useCallback(
+    async (pageNumber: number) => {
+      if (getPage) {
+        return getPage(pageNumber);
+      }
+      const bridge = defaultBridge ?? (await defaultBridgePromise.current?.catch(() => null));
+      if (!bridge) {
+        return undefined;
+      }
+      return (await bridge.getPage(pageNumber)) as PageProxyLike | undefined;
+    },
+    [getPage, defaultBridge],
+  );
+
+  /**
+   * ⚠️ **实际的"取文档信息"回调** ✅
+   */
+  const effectiveGetDocInfo = useCallback(
+    async (bytes: Uint8Array) => {
+      if (getDocInfo) {
+        return getDocInfo(bytes);
+      }
+      /*
+       * ⚠️ **等桥接就绪**（实测踩到的坑）✅
+       * -> 加载 effect 只跑一次 ❌ -> 桥接没好就**永远失败** ❌
+       * -> -> 这里 **await** 桥接的 promise ✅
+       */
+      const bridge = defaultBridge ?? (await defaultBridgePromise.current?.catch(() => null));
+      if (!bridge) {
+        throw pdfViewerError('E_LOAD_NETWORK', {
+          message: 'PDF 引擎还没准备好（pdfjs-dist 加载失败）',
+        });
+      }
+      const info = await bridge.open(bytes);
+      return {
+        numPages: info.numPages,
+        metadata: info.metadata,
+      };
+    },
+    [getDocInfo, defaultBridge],
+  );
+
+  /**
+   * ⚠️ **实际的"取各页尺寸"回调** ✅
+   */
+  const effectiveGetPageSizes = useCallback(
+    async (numPages: number) => {
+      if (getPageSizes) {
+        return getPageSizes(numPages);
+      }
+      const bridge = defaultBridge ?? (await defaultBridgePromise.current?.catch(() => null));
+      if (!bridge) {
+        return [];
+      }
+      return bridge.getPageSizes(numPages);
+    },
+    [getPageSizes, defaultBridge],
+  );
+
   const { data, loading, progress, error, reload } = usePdfDocument({
     file,
     documentId,
@@ -1218,7 +1345,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         setPasswordOpen(true);
       }
     },
-    getDocInfo,
+    getDocInfo: effectiveGetDocInfo,
     onDocumentLoad: (doc) => {
       setNumPages(doc.numPages);
       onDocumentLoad?.(doc);
@@ -1450,7 +1577,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
     let cancelled = false;
 
-    void getPageSizes(numPages)
+    void effectiveGetPageSizes(numPages)
       .then((sizes) => {
         if (!cancelled && Array.isArray(sizes)) {
           setPageSizesPt(sizes);
@@ -1463,7 +1590,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     return () => {
       cancelled = true;
     };
-  }, [getPageSizes, numPages]);
+  }, [effectiveGetPageSizes, numPages, getPageSizes]);
 
   /**
    * 取页（可见页才取，懒加载）。
@@ -1498,7 +1625,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           continue;
         }
         try {
-          const proxy = await getPage(pageNumber);
+          const proxy = await effectiveGetPage(pageNumber);
           if (proxy && !cancelled) {
             next.set(pageNumber, proxy);
           }
@@ -1517,7 +1644,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     return () => {
       cancelled = true;
     };
-  }, [getPage, visiblePages, pageProxies, data, printing, numPages]);
+  }, [effectiveGetPage, visiblePages, pageProxies, data, printing, numPages, getPage]);
 
   /**
    * 取链接注解（可见页才取）。

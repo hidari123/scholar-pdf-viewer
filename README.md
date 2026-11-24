@@ -94,6 +94,12 @@ import '@scholar-club/pdf-viewer/styles.css';
 **就这样**——没有 provider、没有 store 初始化、没有后端配置。
 
 > ⚠️ **容器必须有高度**（包会填满父容器）。
+>
+> 💡 **pdf.js 的接线是【内置的】** ✅
+> -> 包会**自动加载** `pdfjs-dist` 并设好 worker ✅
+> -> 宿主**什么都不用做** ✅
+> -> 想自己控制（版本 / worker / 沙箱）-> 传 `getPage` / `getDocInfo` / `getPageSizes` ✅
+> -> **完全覆盖**内置的 ✅
 
 ## 三条消费契约
 

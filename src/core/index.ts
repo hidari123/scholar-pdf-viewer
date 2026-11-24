@@ -16,6 +16,7 @@ export * from './export';
 export * from './geometry';
 export * from './highlight';
 export * from './outline';
+export * from './print';
 export * from './search';
 export * from './selection';
 export * from './store';

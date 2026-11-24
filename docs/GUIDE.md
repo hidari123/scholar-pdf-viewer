@@ -157,6 +157,41 @@ export function PaperReader({ paperId, fileUrl }: Props) {
 
 ## 4. 加载文档
 
+### pdf.js 的接线（**内置的**）
+
+> 💡 **宿主什么都不用做** ✅
+> -> 包会**自动加载** `pdfjs-dist` 并设好 worker ✅
+> -> 上面这段代码**直接就能跑** ✅（实测：18 页正常渲染 ✅）
+
+#### 想自己控制 pdf.js？
+
+-> 传 `getDocInfo` / `getPage` / `getPageSizes` ✅
+-> **完全覆盖**内置的 ✅
+-> 什么时候需要：
+- 想用**别的 pdf.js 版本** ✅
+- 想自己配 **worker**（比如 CDN / 跨域）✅
+- 想用 **CMaps / 标准字体**（中文 PDF 常见）✅
+
+```tsx
+import * as pdfjs from 'pdfjs-dist';
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).href;
+
+<PdfViewer
+  file={url}
+  getDocInfo={async (data) => {
+    const doc = await pdfjs.getDocument({ data: data.slice() }).promise;
+    return { numPages: doc.numPages };
+  }}
+  getPage={(n) => docRef.current?.getPage(n)}
+  getPageSizes={async (n) => {
+    /* 每页的 pt 尺寸 */
+  }}
+/>;
+```
+
 ### `file` 支持什么
 
 ```ts

@@ -67,6 +67,24 @@
 
 /* ---------- 工具栏 ---------- */
 
+/*
+ * ⚠️⚠️ **工具栏在窄屏下会溢出**（审核发现的真 bug）。
+ *
+ * ### 实测
+ *
+ * ```
+ * 容器宽 304px（窄屏）
+ * 工具栏内容宽 675px   <- ❌ 溢出了 371px
+ * -> 按钮被【直接裁掉】❌
+ * -> 用户**点不到**被裁掉的按钮 ❌（比如"打印"、"主题"）
+ * ```
+ *
+ * ### 修法
+ *
+ * -> 三组（left / center / right）**各自能横向滚动** ✅
+ *    -> 空间不够时**滚动**就能看到 ✅ -> 不丢按钮 ✅
+ * -> 滚动条**细一点**（不抢视觉）✅
+ */
 .scpdf-toolbar {
   display: flex;
   align-items: center;
@@ -79,6 +97,12 @@
   flex: 0 0 auto;
   /* 高度走变量（内容决定实际高度，这里只给个下限） */
   min-height: var(--scpdf-toolbar-height, 40px);
+  /*
+   * ⚠️ **工具栏本身不能溢出**（否则整页出现横向滚动条）❌
+   * -> 三组各自滚动 ✅
+   */
+  min-width: 0;
+  overflow: hidden;
 }
 
 .scpdf-toolbar__left,
@@ -87,6 +111,26 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  /*
+   * ⚠️ **窄屏时各自横向滚动** ✅
+   * -> `min-width: 0` 让 flex 子项能收缩到内容以下 ✅（否则不收缩 ❌）
+   * -> `overflow-x: auto` 放不下就滚动 ✅
+   */
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  /* ⚠️ **不显示滚动条也能滚**（触控板 / 键盘）✅ */
+  scroll-behavior: smooth;
+}
+
+/*
+ * ⚠️ **按钮不能被压扁** ✅
+ */
+.scpdf-toolbar__btn,
+.scpdf-toolbar__scale,
+.scpdf-toolbar__page-input {
+  flex: none;
 }
 
 .scpdf-toolbar__btn {

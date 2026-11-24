@@ -115,6 +115,34 @@ import '@scholar-club/pdf-viewer/themes.css'; // 可选
 | `icons`            | `Partial<Record<IconName, ReactNode>>`             | —                   | 逐个图标覆盖                                                     |
 | `children`         | `ReactNode`                                        | —                   | 渲染在工具栏下方                                                 |
 
+### 2.5b 缩放
+
+| Prop              | 类型                      | 默认   | 说明                       |
+| ----------------- | ------------------------- | ------ | -------------------------- |
+| `initialScale`    | `number`                  | —      | 初始缩放（默认"适合宽度"） |
+| `minScale`        | `number`                  | `0.2`  | **最小缩放**（20%）        |
+| `maxScale`        | `number`                  | `2.5`  | **最大缩放**（250%）       |
+| `allowScaleInput` | `boolean`                 | `true` | 能不能**填写**缩放比例     |
+| `onZoomChange`    | `(scale: number) => void` | —      | 缩放变化（宿主可自己存）   |
+
+> ⚠️ **工具栏的比例可以点一下就填** ✅
+> -> 填的值会**夹到上下限** + **量化到 10%**（和 +/- 按钮一致）✅
+> -> 上下限**宿主可配** ✅
+
+### 2.5c 主题
+
+| Prop            | 类型                              | 默认      | 说明                           |
+| --------------- | --------------------------------- | --------- | ------------------------------ |
+| `theme`         | `PdfViewerTheme`                  | —         | 当前主题                       |
+| `onThemeChange` | `(theme: PdfViewerTheme) => void` | —         | **传了**才显示工具栏的 🎨 按钮 |
+| `themeOptions`  | `readonly PdfViewerTheme[]`       | 内置 7 个 | 主题列表（宿主可自定义）       |
+
+> ⚠️ **不传 `onThemeChange` -> 不显示主题按钮** ✅
+> -> 宿主自己已经有主题切换 UI -> 不重复 ✅
+
+> ⚠️ 主题是**受控**的 ✅
+> -> 包**不自己存**主题状态 ✅ -> 调 `onThemeChange` -> **宿主**改 `theme` prop ✅
+
 ### 2.6 多语言
 
 | Prop       | 类型                | 默认       | 说明                                     |

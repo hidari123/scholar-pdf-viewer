@@ -257,6 +257,14 @@ export interface Features {
   keyboard?: boolean;
   /** 打印 */
   print?: boolean;
+  /**
+   * **工具栏的主题选择按钮**（🎨）。
+   *
+   * ⚠️ **不传 `onThemeChange` -> 本来就不显示** ✅
+   * -> 这个开关是给"**已经传了 `onThemeChange`** 但临时想关掉"的场景用的 ✅
+   * -> `false` -> 按钮**不显示**（但 `onThemeChange` 回调依然有效）✅
+   */
+  themePicker?: boolean;
 }
 
 /**

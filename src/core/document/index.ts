@@ -5,3 +5,4 @@
  */
 export * from './download';
 export * from './loader';
+export * from './pdfjs-bridge';
