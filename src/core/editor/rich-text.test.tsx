@@ -16,7 +16,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { defaultRichTextToolbar, richTextToPlain, sanitizeRichText } from './rich-text';
+import {
+  defaultRichTextToolbar,
+  isNoColor,
+  NO_COLOR,
+  richTextToPlain,
+  sanitizeRichText,
+} from './rich-text';
 
 describe('sanitizeRichText（XSS 防线）', () => {
   it('去掉 on* 事件属性', () => {
@@ -163,6 +169,18 @@ describe('defaultRichTextToolbar', () => {
   it('**默认工具栏没有"文字高亮"**（功能和高亮重复）', () => {
     const commands = defaultRichTextToolbar({ yellow: '#ff0' }).map((i) => i.command);
     expect(commands).not.toContain('textHighlight');
+  });
+
+  /*
+   * ⚠️ **"无背景色"标记**（用户需求：
+   * "高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"）。
+   */
+  it('**"无背景色"能被识别**（NO_COLOR / transparent / none）', () => {
+    expect(isNoColor(NO_COLOR)).toBe(true);
+    expect(isNoColor('transparent')).toBe(true);
+    expect(isNoColor('none')).toBe(true);
+    expect(isNoColor('#ff0000')).toBe(false);
+    expect(isNoColor(undefined)).toBe(false);
   });
 
   it('**"文字高亮"命令仍然保留**（宿主可以自己加回来）', () => {

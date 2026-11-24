@@ -47,7 +47,12 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { resolveToolbarLabel } from '../core/editor/label';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
-import { defaultRichTextToolbar, richTextToPlain } from '../core/editor/rich-text';
+import {
+  defaultRichTextToolbar,
+  isNoColor,
+  NO_COLOR,
+  richTextToPlain,
+} from '../core/editor/rich-text';
 import type { ToolbarStateEditor } from '../core/editor/toolbar-state';
 import { computeToolbarActiveState } from '../core/editor/toolbar-state';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
@@ -708,8 +713,17 @@ function TipTapToolbar(props: {
      *   （之前没传 value -> **高亮用的是默认色** -> 选哪个都一样 ❌）
      * -> 没传值 -> `unsetColor` / `unsetHighlight`（清除）✅
      */
+    /*
+     * ⚠️⚠️ **"无背景色"（`NO_COLOR`）-> 当成"清除"** ✅
+     *
+     * -> 用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"✅
+     * -> `unsetHighlight()` / `unsetColor()` **比 `transparent` 干净** ✅
+     *    -> `transparent` 会留一个 `background-color: transparent` 在 HTML 里 ❌
+     */
+    const isNone = isNoColor(value);
+
     if (command === 'foreColor') {
-      if (value) {
+      if (value && !isNone) {
         fn(value as never).run();
       } else {
         c.unsetColor?.().run();
@@ -718,7 +732,7 @@ function TipTapToolbar(props: {
     }
 
     if (command === 'hiliteColor' || command === 'textHighlight') {
-      if (value) {
+      if (value && !isNone) {
         fn({ color: value } as never).run();
       } else {
         c.unsetHighlight?.().run();
@@ -995,6 +1009,29 @@ function TipTapToolbar(props: {
       {/* 颜色面板（和内置编辑器用同一套 CSS） */}
       {openPalette ? (
         <span className="scpdf-rich-text__palette">
+          {/*
+           * ⚠️⚠️ **"无背景色"色块**（第一个，斜杠）——
+           * 用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"✅
+           *
+           * -> 点它 -> **清除**这个颜色/高亮 ✅
+           * -> TipTap 用 `unsetHighlight()` / `unsetColor()` ✅（比 transparent 干净）
+           */}
+          <button
+            type="button"
+            className="scpdf-rich-text__swatch scpdf-rich-text__swatch--none"
+            title={t('richtext.noColor')}
+            aria-label={t('richtext.noColor')}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              const cmd = openPalette as RichTextToolbarItem['command'];
+              if (cmd === 'foreColor') {
+                run(cmd, NO_COLOR);
+              } else {
+                run(cmd, NO_COLOR);
+              }
+              setOpenPalette(null);
+            }}
+          />
           {Object.entries(
             items.find((i) => i.command === openPalette)?.palette ??
               (openPalette === 'foreColor' ? textPalette : palette) ??

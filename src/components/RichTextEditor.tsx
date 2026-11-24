@@ -28,6 +28,7 @@ import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-t
 import {
   defaultRichTextToolbar,
   execRichTextCommand,
+  NO_COLOR,
   richTextToPlain,
 } from '../core/editor/rich-text';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
@@ -494,6 +495,20 @@ export function RichTextEditor(props: RichTextEditorProps) {
               {/* 颜色面板 */}
               {hasPalette && paletteOpen ? (
                 <span className="scpdf-rich-text__palette">
+                  {/*
+                   * ⚠️⚠️ **"无背景色"色块**（第一个，斜杠）——
+                   * 用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"✅
+                   *
+                   * -> 点它 -> **清除**这个颜色/高亮 ✅
+                   */}
+                  <button
+                    type="button"
+                    className="scpdf-rich-text__swatch scpdf-rich-text__swatch--none"
+                    title={resolveLabel('{richtext.noColor}')}
+                    aria-label={resolveLabel('{richtext.noColor}')}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => pickColor(item.command, NO_COLOR)}
+                  />
                   {Object.entries(
                     item.palette ?? (item.command === 'foreColor' ? textPalette : palette) ?? {},
                   ).map(([key, color]) => (

@@ -376,6 +376,39 @@ try {
     afterHighlight ?? '',
   );
 
+  // ---- ⑤.5 "无背景色"选项（用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"）----
+  await selectAll();
+  await page.waitForTimeout(300);
+  await clickBtn('高亮');
+  const swatches = await page.evaluate(() => {
+    const p = document.querySelector('.scpdf-annotation-dialog .scpdf-rich-text__palette');
+    if (!p) return [];
+    return [...p.querySelectorAll('.scpdf-rich-text__swatch')].map((s) => ({
+      label: s.getAttribute('aria-label'),
+      isNone: s.classList.contains('scpdf-rich-text__swatch--none'),
+      bg: s.style.background,
+    }));
+  });
+  check(
+    '**色板第一个是"无背景色"**（斜杠色块）',
+    swatches[0]?.isNone === true && swatches[0]?.label === '无背景色',
+    JSON.stringify(swatches[0]),
+  );
+  check(
+    '**色板里既有"无背景色"又有真实颜色**',
+    swatches.length >= 5 && swatches.filter((s) => !s.isNone).length >= 4,
+    String(swatches.length),
+  );
+
+  // 点斜杠 -> 清除高亮
+  await clickSwatch(0);
+  const afterNone = await html();
+  check(
+    '**点"无背景色"清除了高亮**',
+    !(afterNone ?? '').includes('background-color') && !(afterNone ?? '').includes('<mark'),
+    afterNone ?? '',
+  );
+
   // ---- ⑥ "文字颜色"：深色 ----
   await selectAll();
   await page.waitForTimeout(300);

@@ -232,6 +232,25 @@ export interface RichTextToolbarItem {
  * @param command 命令
  * @param value 命令的值（颜色 / 链接地址 / 块类型）
  */
+/**
+ * **"无背景色"色块的标记值**。
+ *
+ * ⚠️ **用一个不可能是合法颜色的字符串** ✅
+ * -> 避免和真实颜色值冲突 ✅
+ * -> 宿主也可以传这个值来清除颜色 ✅
+ */
+export const NO_COLOR = '__none__';
+
+/**
+ * 判断一个颜色值是不是"**无背景色**"（清除标记）。
+ *
+ * @param value 颜色值
+ * @returns 是"无背景色"则 true
+ */
+export function isNoColor(value: string | undefined | null): boolean {
+  return value === NO_COLOR || value === 'transparent' || value === 'none';
+}
+
 export function execRichTextCommand(command: RichTextCommand, value?: string): void {
   if (typeof document === 'undefined') {
     return;
@@ -270,6 +289,24 @@ export function execRichTextCommand(command: RichTextCommand, value?: string): v
      * -> `hiliteColor` 在浏览器里就是**设置背景色** ✅
      * -> **不会改字色** ✅ -> 正好是"文字高亮"要的效果 ✅
      */
+    /*
+     * ⚠️⚠️ **"无背景色"**（用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"）。
+     *
+     * -> 浏览器没有"清除背景色"的命令 ❌
+     * -> **办法**：用 `removeFormat` 会把**所有**格式都清掉 ❌（太粗暴）
+     * -> **办法**：传 `transparent` -> 浏览器会设 `background-color: transparent` ✅
+     *    -> 视觉上**等于没有底色** ✅
+     * -> TipTap 用 `unsetHighlight()` / `unsetColor()` ✅（更干净）
+     */
+    if (isNoColor(value)) {
+      document.execCommand(
+        command === 'foreColor' ? 'foreColor' : 'hiliteColor',
+        false,
+        'transparent',
+      );
+      return;
+    }
+
     document.execCommand(
       command === 'textHighlight' ? 'hiliteColor' : command,
       false,

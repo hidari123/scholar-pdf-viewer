@@ -1477,6 +1477,27 @@
   cursor: pointer;
 }
 
+/*
+ * ⚠️⚠️ **"无背景色"色块**（斜杠）—— 用户需求：
+ * "高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"✅
+ *
+ * -> 用**伪元素的斜线**画 ✅（不用图片 -> 不增加体积）✅
+ * -> 背景**半透明白** -> 和真实色块**区分开** ✅
+ */
+.scpdf-rich-text__swatch--none {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      to top left,
+      transparent calc(50% - 1px),
+      var(--scpdf-danger, #e5484d) calc(50% - 1px),
+      var(--scpdf-danger, #e5484d) calc(50% + 1px),
+      transparent calc(50% + 1px)
+    ),
+    var(--scpdf-surface, #fff);
+}
+
 .scpdf-rich-text__swatch:hover {
   transform: scale(1.12);
 }
