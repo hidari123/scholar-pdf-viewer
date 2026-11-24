@@ -2365,11 +2365,51 @@
 @media print {
   /* ---------- 该藏的藏起来 ---------- */
 
+  /*
+   * ⚠️⚠️⚠️ **打印时不能出现任何"浮层"和"便签"**（实测踩到的坑）。
+   *
+   * ### 用户反馈
+   *
+   * > "导出带高亮的pdf的时候 如果悬浮在pdf上 会有黄色框的便签展示出高亮pdf的内容
+   *   不要这个 排查一下是什么问题"
+   *
+   * ### 实测（打印媒体下）
+   *
+   * ```
+   * stickyNotes:  { display: "block", visibility: "visible" }  ❌ 没藏
+   * stickyIcon:   { display: "flex",  visibility: "visible" }  ❌ 黄色便签框会印出来
+   * annotations:  { display: "none" }                         ✅ 高亮藏对了
+   * ```
+   *
+   * -> 打印 CSS 的隐藏清单里**有** `.scpdf-annotations`（高亮）✅
+   * -> 但**没有** `.scpdf-sticky-notes`（便签）❌
+   * -> 便签的**内容**（批注正文）会**跟着印出去** ❌
+   *    -> **隐私泄露**（用户的批注被打印出来）❌
+   *
+   * ### 修法
+   *
+   * -> 把**所有浮层**都加进隐藏清单 ✅
+   */
   .scpdf-toolbar,
   .scpdf-panel,
   .scpdf-selection-popover,
   .scpdf-selection-layer,
   .scpdf-annotations,
+  /*
+   * ⚠️ **便签（批注）必须藏**——
+   * -> 它带着**批注正文**（用户写的私人内容）❌
+   * -> 打印出来 = **隐私泄露** ❌
+   */
+  .scpdf-sticky-notes,
+  /*
+   * ⚠️ **其余的浮层**（详情面板 / 批注弹窗 / 链接弹窗 / 颜色面板）——
+   * -> 它们都是**屏幕上的交互 UI** -> 打印出来**没意义** ❌
+   */
+  .scpdf-annotation-panel,
+  .scpdf-annotation-dialog,
+  .scpdf-rich-text__palette,
+  .scpdf-link-popover,
+  .scpdf-toast,
   /*
    * ⚠️ **文本层必须隐藏**。
    *
