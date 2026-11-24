@@ -336,6 +336,21 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                * -> 面板要**贴在便签旁边** -> 要找到便签的位置 ✅
                */
               data-note-id={first.id}
+              /*
+               * ⚠️⚠️ **带上【整组】的 id**（实测踩到的坑，用户反馈：
+               * "如果同一位置两个批注 那么第一个批注点击之后展示位置正常
+               *  第二个批注详情点击之后还是会出现在pdf的首页位置"）。
+               *
+               * -> 合并组**只渲染 1 个图标** ✅
+               * -> DOM 上只有 \`data-note-id={first.id}\` ❌
+               * -> 选**第二条**批注 -> 按第二条的 id **找不到元素** ❌
+               * -> -> 锚点**保持上一次的旧值** ❌
+               * -> -> 面板停在上次的位置（第一次是**首页**）❌
+               *
+               * -> 现在把**整组的 id** 都写上 ✅
+               * -> 面板找"包含这个 id 的图标" ✅ -> 任何一条都能定位 ✅
+               */
+              data-note-ids={group.annotations.map((a) => a.id).join(',')}
               style={{ width: STICKY_NOTE_SIZE, height: STICKY_NOTE_SIZE }}
               title={
                 isGroup

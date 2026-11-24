@@ -1453,15 +1453,41 @@
   gap: 8px;
 }
 
+/*
+ * ⚠️⚠️ **工具栏【不换行】**（实测踩到的坑，用户需求：
+ * "希望和编辑页面保持一致 宽度也一直吧
+ *  这样转成编辑页面的时候 工具栏不会分成两行展示"）。
+ *
+ * -> 之前 `flex-wrap: wrap` ❌
+ *    -> 实测：13 个按钮在 320px 的面板里**占 2 行** ❌
+ *    -> 转成编辑页时**工具栏突然变两行** ❌ -> 视觉上"跳"了 ❌
+ * -> -> 面板宽度提到 **360px** ✅
+ * -> -> 工具栏**不换行**，放不下就**横向滚动** ✅
+ *    -> 始终**一行** ✅ -> 切换时**不跳** ✅
+ */
 .scpdf-rich-text__toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 2px;
   padding: 4px;
   border-radius: 7px;
   border: 1px solid var(--scpdf-border, #d9dde3);
   background: var(--scpdf-surface-alt, #f7f8fa);
+  /*
+   * ⚠️ **放不下就横向滚动**（不换行）✅
+   * -> `overflow-x: auto` + `flex: none`（按钮不缩）✅
+   */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+/*
+ * ⚠️ **按钮不能被压扁**（否则文字/图标变形）✅
+ */
+.scpdf-rich-text__toolbar > * {
+  flex: none;
 }
 
 .scpdf-rich-text__tool {

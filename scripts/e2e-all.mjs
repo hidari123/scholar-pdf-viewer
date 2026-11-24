@@ -91,6 +91,7 @@ const suites = [
   { name: '跨页选择高亮（两页都有）', file: 'e2e-cross-page-highlight.mjs' },
   { name: '选区浮层的 tooltip 本地化', file: 'e2e-i18n-titles.mjs' },
   { name: '主题下拉的色块能区分开', file: 'e2e-theme-swatches.mjs' },
+  { name: '批注详情的位置 / 宽度 / 工具栏', file: 'e2e-annotation-panel-anchor.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

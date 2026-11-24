@@ -25,6 +25,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { findStickyNoteIcon } from '../core/annotation/anchor';
 import type { LinkAnnotationLike } from '../core/annotation/links';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import type { DocumentCache } from '../core/cache/store';
@@ -4474,14 +4475,21 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       return;
     }
 
+    /*
+     * ⚠️⚠️⚠️ **锚点查找要支持"合并组"**（实测踩到的坑，用户反馈：
+     * "如果同一位置两个批注 那么第一个批注点击之后展示位置正常
+     *  第二个批注详情点击之后还是会出现在pdf的首页位置"）。
+     *
+     * -> 同一位置的多个批注**合并成一个图标** ✅
+     * -> 那个图标上只有 `data-note-id={first.id}`（第一条）❌
+     * -> 选**第二条** -> 精确匹配**找不到** ❌
+     * -> -> 锚点**保持旧值** ❌ -> 面板停在**首页** ❌
+     *
+     * -> 现在用 `findStickyNoteIcon` -> 找"**包含这个 id**"的图标 ✅
+     * -> 合并组用 `data-note-ids` 匹配 ✅
+     */
     const measure = () => {
-      const container = containerRef.current;
-      if (!container) {
-        return;
-      }
-      const el = container.querySelector<HTMLElement>(
-        `.scpdf-sticky-note__icon[data-note-id="${CSS.escape(activeAnnotationId)}"]`,
-      );
+      const el = findStickyNoteIcon(containerRef.current, activeAnnotationId);
       if (!el) {
         return;
       }
@@ -4495,71 +4503,55 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     };
 
     /*
-     * ⚠️ **先量一次**（便签已经在了）
-     */
-    measure();
-
-    /*
-     * ⚠️⚠️ **量不到就【多试几次】**（实测踩到的坑）。
+     * ⚠️⚠️ **一个 rAF 循环干两件事**（实测踩到的坑）。
      *
-     * -> 便签是**这一帧**才画出来的 ❌
-     * -> 只试一次（下一帧）**可能还是量不到** ❌
-     *    -> 量不到 -> `anchorRect = null` ❌
-     *    -> 面板**用旧锚点**（上一次的！）❌
-     *    -> 用户反馈："不管在哪个页面点击批注按钮
-     *      批注详情都会出现在pdf首页的位置" ✅
-     *    -> 实测：第 1 页有一条 -> 第 4 页打开详情 -> 用的是**第 1 页的锚点** ❌
-     *      -> 面板被 clamp 到视口顶部（top=12）❌
+     * -> 之前是**两套逻辑** ❌
+     *    1. rAF 重试（最多 10 帧）-> 为了等便签画出来 ✅
+     *    2. `scroll` 事件监听 -> 为了滚动时重新量 ✅
+     * -> 两套**各自独立** ❌ -> 会**打架** ❌
+     *    -> 用户反馈："滚动的时候 定位也跑来跑去的" ✅
      *
-     * -> -> **重试到量到为止**（最多 ~10 帧）✅
+     * -> 现在：**一个循环**负责"量到为止 + 一直跟随" ✅
+     *    -> 便签还没画出来 -> **继续等** ✅
+     *    -> 便签画出来了 -> **每一帧都跟着** ✅
+     *    -> 用户滚动 -> 面板**贴着便签走** ✅（不抖 ✅）
      */
     let raf = 0;
     let tries = 0;
-    const retry = () => {
+
+    const tick = () => {
       tries += 1;
-      const el2 = containerRef.current?.querySelector<HTMLElement>(
-        `.scpdf-sticky-note__icon[data-note-id="${CSS.escape(activeAnnotationId)}"]`,
-      );
-      if (el2) {
-        const r2 = el2.getBoundingClientRect();
+      const el = findStickyNoteIcon(containerRef.current, activeAnnotationId);
+      if (el) {
+        const r = el.getBoundingClientRect();
         setActiveAnnotationAnchor({
-          left: r2.left,
-          top: r2.top,
-          right: r2.right,
-          bottom: r2.bottom,
+          left: r.left,
+          top: r.top,
+          right: r.right,
+          bottom: r.bottom,
         });
+      } else if (tries >= 10) {
+        // ⚠️ **量不到 -> 放弃**（不让 rAF 一直跑）✅
         return;
       }
-      if (tries < 10) {
-        raf = requestAnimationFrame(retry);
-      }
+
+      /*
+       * ⚠️ **量到了就继续跑**（跟随模式）✅
+       * -> 滚动时便签在视口里的位置变了 ✅ -> 面板要跟着 ✅
+       * -> 组件卸载时 cleanup 会 cancel ✅
+       */
+      raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(retry);
 
     /*
-     * ⚠️⚠️ **容器滚动时要重新量**（实测踩到的坑）。
-     *
-     * -> 便签是 `position: absolute` -> 在**容器的内容坐标系**里 ✅
-     * -> 容器滚动 -> 便签在**视口里**的位置变了 ❌
-     *    -> 但**视口矩形**变了 -> 锚点得跟着变 ✅
-     * -> 实测：先在第 1 页建一条 -> 再滚到第 4 页建第二条 ✅
-     *    -> 打开详情时，锚点还是**滚动前**量的（旧的）❌
-     *    -> `computeDialogPosition` 以为"下面放不下" -> clamp 到视口顶部 ❌
-     *    -> 实测：`panelY = 12`（应该是 194）❌
-     *    -> 用户反馈："不管在哪个页面点击批注按钮
-     *      批注详情都会出现在pdf首页的位置" ✅
-     *
-     * -> -> **滚动时重新量锚点** ✅
+     * ⚠️ **先量一次**（便签可能已经在）
      */
-    const container = containerRef.current;
-    const onScroll = () => {
-      measure();
-    };
-    container?.addEventListener('scroll', onScroll, { passive: true });
+    measure();
+
+    raf = requestAnimationFrame(tick);
 
     return () => {
       cancelAnimationFrame(raf);
-      container?.removeEventListener('scroll', onScroll);
     };
   }, [activeAnnotationId]);
 

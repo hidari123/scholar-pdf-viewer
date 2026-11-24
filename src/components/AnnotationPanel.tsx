@@ -41,7 +41,17 @@ import { Icon } from './Icon';
 import { RichTextEditor } from './RichTextEditor';
 
 /** 面板的默认宽度（px） */
-export const ANNOTATION_PANEL_WIDTH = 320;
+/**
+ * **批注详情面板的宽度**（px）。
+ *
+ * ⚠️ **为什么是 360**（用户需求）：
+ * > "希望和编辑页面保持一致 宽度也一直吧
+ * >  这样转成编辑页面的时候 工具栏不会分成两行展示"
+ *
+ * -> 实测：面板 320px 时，13 个按钮的工具栏**占 2 行** ❌
+ * -> -> 宽度不够 ✅ -> 提到 360px ✅
+ */
+export const ANNOTATION_PANEL_WIDTH = 360;
 
 /** AnnotationPanel 参数 */
 export interface AnnotationPanelProps {
