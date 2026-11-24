@@ -1773,7 +1773,16 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     requestAnimationFrame(() => {
       const domSelection = window.getSelection();
       if (domSelection && domSelection.rangeCount > 0 && !domSelection.isCollapsed) {
-        const rect = domSelection.getRangeAt(0).getBoundingClientRect();
+        const range = domSelection.getRangeAt(0);
+        /*
+         * ⚠️ **防一手**（审核补测发现的健壮性问题）✅
+         * -> `Range.getBoundingClientRect` 在某些环境里**不存在** ❌
+         * -> 抛在 rAF 回调里 ❌ -> **没人接** ❌ -> unhandled error ❌
+         */
+        if (typeof range.getBoundingClientRect !== 'function') {
+          return;
+        }
+        const rect = range.getBoundingClientRect();
         if (rect.width > 0 || rect.height > 0) {
           setPopoverAnchor({
             left: rect.left,

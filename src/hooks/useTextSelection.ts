@@ -523,6 +523,14 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
        *    → 那会**强制重排** → 比 `intersectsNode` 还贵（实测没提速）。
        *    → 页的位置在滚动/缩放时才变 → 用 `pageFrames` 推算。
        */
+      /*
+       * ⚠️ **防一手**（审核补测发现的健壮性问题）✅
+       * -> `Range.getClientRects` 在某些环境里**不存在** ❌
+       * -> 抛在 `selectionchange` 处理器里 ❌ -> **整个选区链断掉** ❌
+       */
+      if (typeof range.getClientRects !== 'function') {
+        return [];
+      }
       const rects = range.getClientRects();
       const candidates = new Set<number>();
 
@@ -705,6 +713,9 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
        * 导致"选整页时选区丢失"）。
        */
       const rects: { top: number; left: number; width: number; height: number }[] = [];
+      if (typeof range.getClientRects !== 'function') {
+        return false;
+      }
       for (const clientRect of range.getClientRects()) {
         if (clientRect.width > 0 && clientRect.height > 0) {
           rects.push({
