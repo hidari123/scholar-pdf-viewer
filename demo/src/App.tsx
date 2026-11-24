@@ -117,6 +117,41 @@ export default function App() {
   const [stickyNotes, setStickyNotes] = useState<AnnotationRecord[]>([]);
 
   /**
+   * **给 E2E 用的全局 API**（造数据）。
+   *
+   * ⚠️ **之前是靠工具栏里那个"造两个同一行的批注"按钮** ❌
+   * -> 那个按钮第 27 轮**被删了**（用户说"不需要这个按钮"）✅
+   * -> E2E 就没法造"同一行的两条批注"了 ❌
+   * -> -> 这里暴露一个**测试专用**的 API ✅
+   */
+  useEffect(() => {
+    // @ts-expect-error 调试用的全局句柄
+    window.__scpdfDemo = {
+      /**
+       * 造两条锚定**同一条高亮**的批注（用来测"合并成一个图标"）。
+       */
+      makeSameLineNotes(highlightId: string) {
+        const now = Date.now();
+        setStickyNotes((prev) => [
+          ...prev,
+          {
+            id: `note-a-${now}`,
+            highlightId,
+            content: '第一条批注',
+            createdAt: now,
+          },
+          {
+            id: `note-b-${now}`,
+            highlightId,
+            content: '第二条批注',
+            createdAt: now,
+          },
+        ]);
+      },
+    };
+  }, []);
+
+  /**
    * **待写的批注草稿**（demo 侧的富文本弹窗）。
    *
    * → 选区浮层的"加批注"用的是**包自带**的弹窗

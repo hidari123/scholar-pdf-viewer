@@ -727,24 +727,32 @@ interface AnnotationRecord {
 
 ## 14. 工具函数导出
 
-| 函数                                                  | 说明                                                        |
-| ----------------------------------------------------- | ----------------------------------------------------------- |
-| `exportHighlightedPdf`                                | 把高亮导出成**真正的 PDF 批注**（Acrobat / Preview 都能看） |
-| `sanitizeRichText`                                    | 清洗富文本 HTML（**XSS 防线**）                             |
-| `richTextToPlain`                                     | HTML → 纯文本                                               |
-| `defaultRichTextToolbar`                              | 默认工具栏                                                  |
-| `execRichTextCommand`                                 | 执行一个富文本命令                                          |
-| `pdfViewerError`                                      | 构造标准错误对象                                            |
-| `isRetryable`                                         | 判断错误可不可重试                                          |
-| `resolveMessage`                                      | 解析一条文案（走完整回退链）                                |
-| `detectDefaultLocale`                                 | 按浏览器语言推断                                            |
-| `mergeLocales`                                        | 合并语言表（宿主覆盖内置）                                  |
-| `isLocaleSupported` / `buildLocaleTable`              | 语言表工具                                                  |
-| `layoutTextItems` / `layoutTextItemsWithIndexOffsets` | pdf.js 文本项排版                                           |
-| `buildSelectionShapes` / `extractSelection`           | 选区几何                                                    |
-| `searchDocument` / `alignSearchRects`                 | 搜索与命中高亮定位                                          |
-| `planThumbnails`                                      | 缩略图排布                                                  |
-| `anchoredScrollTop`                                   | 缩放时的锚点保持                                            |
+| 函数                   | 说明                                                        |
+| ---------------------- | ----------------------------------------------------------- |
+| `exportHighlightedPdf` | 把高亮导出成**真正的 PDF 批注**（Acrobat / Preview 都能看） |
+
+> ⚠️ **导出的高亮【默认不带批注文字】** ✅
+> -> 选项：`includeAnnotationText`（默认 `false`）✅
+> -> **为什么**：Chrome 的 PDF 阅读器里，**hover 到高亮上会弹出黄色便签框** ❌
+>    -> 那个框显示的就是批注的 `/Contents`（弹出文字）✅
+>    -> A/B 对照实验证明：**真凶是 `/Contents`**（不是 `/F` 标志位）✅
+> -> 高亮本身**不需要**文字 ✅ -> 默认不写 ✅
+> -> 宿主确实要（给 Acrobat / WPS 看）-> `includeAnnotationText: true` ✅
+> | `sanitizeRichText`                                    | 清洗富文本 HTML（**XSS 防线**）                             |
+> | `richTextToPlain`                                     | HTML → 纯文本                                               |
+> | `defaultRichTextToolbar`                              | 默认工具栏                                                  |
+> | `execRichTextCommand`                                 | 执行一个富文本命令                                          |
+> | `pdfViewerError`                                      | 构造标准错误对象                                            |
+> | `isRetryable`                                         | 判断错误可不可重试                                          |
+> | `resolveMessage`                                      | 解析一条文案（走完整回退链）                                |
+> | `detectDefaultLocale`                                 | 按浏览器语言推断                                            |
+> | `mergeLocales`                                        | 合并语言表（宿主覆盖内置）                                  |
+> | `isLocaleSupported` / `buildLocaleTable`              | 语言表工具                                                  |
+> | `layoutTextItems` / `layoutTextItemsWithIndexOffsets` | pdf.js 文本项排版                                           |
+> | `buildSelectionShapes` / `extractSelection`           | 选区几何                                                    |
+> | `searchDocument` / `alignSearchRects`                 | 搜索与命中高亮定位                                          |
+> | `planThumbnails`                                      | 缩略图排布                                                  |
+> | `anchoredScrollTop`                                   | 缩放时的锚点保持                                            |
 
 ---
 

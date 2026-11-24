@@ -137,6 +137,49 @@ import '@scholar-club/pdf-viewer/styles.css';
 > ⚠️ **`onAnnotationChange` 不传 → 详情面板永远是只读**（"编辑"按钮点不动）。
 > ⚠️ **`onAnnotationExpand` 不传 → 便签上没有"展开"按钮**（用户会以为按钮坏了）。
 
+### 主题：内置 7 个，工具栏就能切
+
+-> 包**内置** 7 个主题（`light` / `dark` / `auto` / `paper` / `sepia` / `contrast` / `minimal`）✅
+-> 传 `onThemeChange` -> 工具栏出现 **🎨 按钮** -> 点它选主题 ✅
+-> 不传 -> **不显示**（宿主自己已经有切换 UI -> 不重复）✅
+-> 主题列表宿主可自定义（`themeOptions`）✅
+
+```tsx
+<PdfViewer
+  theme={theme}
+  onThemeChange={setTheme}
+  themeOptions={['light', 'dark', 'sepia']} // ← 只给这三个
+/>;
+```
+
+### 缩放：比例可以**填写**，上下限宿主可配
+
+-> 工具栏的比例**点一下就能填**（回车生效，Esc 放弃）✅
+-> 填的值会**夹到上下限** + **量化到 10% 一档**（和 +/- 按钮一致）✅
+-> 上下限**宿主可配** ✅
+
+```tsx
+<PdfViewer
+  minScale={0.1} // ← 最小 10%（默认 20%）
+  maxScale={4} // ← 最大 400%（默认 250%）
+  allowScaleInput={false} // ← 不让用户填（默认 true）
+/>;
+```
+
+### 高亮：不用每次都选颜色
+
+-> 选区浮层的 **🖍 按钮** = **直接用"当前色"高亮** ✅
+-> 旁边的 **▾ 箭头** = 展开颜色下拉 ✅
+-> "当前色" = 上次选的；没选过 = **默认色** ✅
+-> 默认色**宿主可配** ✅
+
+```tsx
+<PdfViewer
+  highlightPalette={{ yellow: '#ffd54a', green: '#c8e6c9' }}
+  defaultHighlightColor="green" // ← 不选颜色时用这个
+/>;
+```
+
 ### ⚠️ **高亮的 id 必须唯一**
 
 -> 用户的反馈："有时候点击一个高亮 两个高亮都会被选中"✅

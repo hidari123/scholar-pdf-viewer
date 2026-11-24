@@ -78,15 +78,22 @@ async function makeHighlight() {
   await page.waitForTimeout(900);
 }
 
-/** 造两个同一行的批注 */
+/**
+ * 造两个同一行的批注。
+ *
+ * ⚠️ **之前是靠工具栏里那个"造两个同一行的批注"按钮** ❌
+ * -> 那个按钮第 27 轮**被删了**（用户说"不需要这个按钮"）✅
+ * -> -> 改成调 demo 暴露的**测试 API** ✅
+ */
 async function makeSameLineNotes() {
-  for (const b of await page.locator('.scpdf-toolbar__btn').all()) {
-    const label = await b.getAttribute('aria-label');
-    if (label?.includes('同一行')) {
-      await b.click();
-      break;
-    }
-  }
+  await page.evaluate(() => {
+    // @ts-expect-error 测试用的全局句柄
+    const api = window.__scpdfDemo;
+    const highlightId = document
+      .querySelector('.scpdf-annotation')
+      ?.getAttribute('data-highlight-id');
+    api?.makeSameLineNotes(highlightId ?? '');
+  });
   await page.waitForTimeout(900);
 }
 

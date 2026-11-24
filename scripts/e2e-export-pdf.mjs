@@ -169,7 +169,15 @@ try {
 
       check('**PDF 里有高亮批注**（/Subtype /Highlight）', annotCount > 0, `${annotCount} 个`);
       check('**批注带 QuadPoints**（每行一个矩形，8 个数一行）', quadCount > 0, `${quadCount} 个`);
-      check('**批注带文字**（/Contents）', hasContents);
+      /*
+       * ⚠️ **默认【不带文字】**（第 27 轮改的）✅
+       *
+       * -> 用户反馈："导出后 hover 高亮还是会出现黄色便签" ✅
+       * -> A/B 对照：**真凶是 `/Contents`** ✅
+       * -> -> 默认不写 ✅
+       * -> -> 宿主要用 -> `includeAnnotationText: true` ✅
+       */
+      check('**批注默认【不带文字】**（hover 不会出黄色便签）', !hasContents);
     }
   }
 
