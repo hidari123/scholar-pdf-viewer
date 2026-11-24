@@ -137,9 +137,14 @@ try {
    */
   await page.locator('.scpdf-annotation-dialog button[aria-label="高亮"]').first().click();
   await page.waitForTimeout(600);
+  /*
+   * ⚠️ **色板第一个是"无背景色"（斜杠）**（第 27 轮加的）✅
+   * -> 点**第一个** = **清除高亮** ❌
+   * -> 要点**第二个**（第一个真实颜色）✅
+   */
   await page
     .locator('.scpdf-annotation-dialog .scpdf-rich-text__palette .scpdf-rich-text__swatch')
-    .first()
+    .nth(1)
     .click();
   await page.waitForTimeout(900);
   // 引用：在后面新起一段

@@ -174,7 +174,12 @@ try {
     await selectHello();
     await page.waitForTimeout(200);
     await page.evaluate(() => {
-      const sw = document.querySelector('.scpdf-rich-text__palette .scpdf-rich-text__swatch');
+      /*
+       * ⚠️ **色板第一个是"无背景色"（斜杠）**（第 27 轮加的）✅
+       * -> 点**第一个** = **清除颜色** ❌
+       * -> 要点**第二个**（第一个真实颜色）✅
+       */
+      const sw = document.querySelectorAll('.scpdf-rich-text__palette .scpdf-rich-text__swatch')[1];
       sw?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
       sw?.click();
     });
