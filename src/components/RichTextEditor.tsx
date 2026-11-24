@@ -523,17 +523,14 @@ export function RichTextEditor(props: RichTextEditorProps) {
                 aria-pressed={active}
                 /*
                  * ⚠️⚠️ **没选文字 -> 置灰**（用户需求：
-                 * "清除格式按钮如果没有选择文字 应该置灰"✅）。
-                 */
-                /*
-                 * ⚠️⚠️ **颜色按钮即使置灰，也要能点开面板** ✅
+                 * "没选字时格式按钮置灰这个你修错了 应该是没选字的时候
+                 *  清除格式按钮置灰 其他的还是可以用的"✅）。
                  *
-                 * -> 用户没选文字时，按钮是灰的 ❌
-                 * -> 但**颜色面板还得能打开** ❌
-                 *    -> 否则用户**没法选颜色**（选了字才能用，但用户不知道）✅
-                 * -> -> **颜色命令不禁用**（只用视觉上的"灰"表示不可用）✅
+                 * -> \`FORMAT_COMMANDS\` 现在**只有 \`removeFormat\`** ✅
+                 * -> 所以这里**只会**把"清除格式"置灰 ✅
+                 * -> 其余按钮（加粗 / 颜色 / 高亮…）**永远可用** ✅
                  */
-                disabled={disabled && !hasPalette}
+                disabled={disabled}
                 onMouseDown={(event) => {
                   // ⚠️ **阻止默认行为** → 不然编辑区会失焦 → 光标丢失
                   event.preventDefault();

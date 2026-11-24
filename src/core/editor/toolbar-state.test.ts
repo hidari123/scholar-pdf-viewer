@@ -65,28 +65,61 @@ describe('computeToolbarActiveState', () => {
   });
 
   /*
-   * ⚠️ **没选文字 -> 格式按钮置灰**（用户需求：
-   * "清除格式按钮如果没有选择文字 应该置灰"✅）。
+   * ⚠️⚠️ **没选文字 -> 只有"清除格式"置灰**（用户第 27 轮的更正）：
+   *
+   * > "没选字时格式按钮置灰这个你修错了 应该是没选字的时候清除格式按钮置灰
+   * >  其他的还是可以用的"
+   * >
+   * > "其余按钮都是可以点击的"
    */
-  it('**没选文字 -> 格式类命令 disabled**', () => {
+  it('**没选文字 -> 只有"清除格式"置灰**', () => {
     const editor = makeEditor({ hasSelection: () => false });
     const states = computeToolbarActiveState(
       ['removeFormat', 'bold', 'foreColor', 'hiliteColor'],
       editor,
     );
-    for (const s of states) {
-      expect(s.disabled, s.command).toBe(true);
-      expect(s.hasSelection, s.command).toBe(false);
+    // 只有"清除格式"置灰 ✅
+    expect(states[0]?.disabled, 'removeFormat').toBe(true);
+    expect(states[0]?.hasSelection, 'removeFormat').toBe(false);
+    // 其余按钮**永远可用** ✅
+    for (const s of states.slice(1)) {
+      expect(s.disabled, s.command).toBe(false);
     }
   });
 
-  it('**选了文字 -> 格式类命令不 disabled**', () => {
+  it('**选了文字 -> 清除格式恢复可用**', () => {
     const editor = makeEditor({ hasSelection: () => true });
     const states = computeToolbarActiveState(['removeFormat', 'bold'], editor);
     for (const s of states) {
       expect(s.disabled, s.command).toBe(false);
       expect(s.hasSelection, s.command).toBe(true);
     }
+  });
+
+  it('**加粗/颜色/高亮等按钮：有没有选区都可用**', () => {
+    const noSel = computeToolbarActiveState(
+      ['bold', 'italic', 'underline', 'strikeThrough', 'foreColor', 'hiliteColor'],
+      makeEditor({ hasSelection: () => false }),
+    );
+    const withSel = computeToolbarActiveState(
+      ['bold', 'italic', 'underline', 'strikeThrough', 'foreColor', 'hiliteColor'],
+      makeEditor({ hasSelection: () => true }),
+    );
+    for (const s of noSel) {
+      expect(s.disabled, s.command).toBe(false);
+    }
+    for (const s of withSel) {
+      expect(s.disabled, s.command).toBe(false);
+    }
+  });
+
+  it('**撤销/重做按现有逻辑**（刚进去没有历史 -> 置灰）', () => {
+    const states = computeToolbarActiveState(
+      ['undo', 'redo'],
+      makeEditor({ canUndo: () => false, canRedo: () => false }),
+    );
+    expect(states[0]?.disabled).toBe(true);
+    expect(states[1]?.disabled).toBe(true);
   });
 
   it('**撤销/重做不受"有没有选区"影响**', () => {
