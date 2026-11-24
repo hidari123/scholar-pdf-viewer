@@ -30,3 +30,4 @@ export * from './TextLayer';
 export * from './ThemePicker';
 export * from './ThumbnailPanel';
 export * from './Toolbar';
+export * from './ToolbarHighlightButton';

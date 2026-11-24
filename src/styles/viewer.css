@@ -350,6 +350,84 @@
   background: linear-gradient(135deg, #2f6fed 50%, #4c8dff 50%);
 }
 
+/*
+ * ⚠️ **工具栏的分裂按钮**（"高亮"按钮：主按钮 + ▾ 颜色下拉）。
+ *
+ * -> 和**选区浮层**的分裂按钮同一套交互 ✅（飞书 / WPS）
+ * -> 主按钮：用**当前色**高亮 ✅
+ * -> ▾ 箭头：展开颜色下拉 ✅
+ */
+
+/* 分裂按钮的容器（两个按钮挨着） */
+.scpdf-toolbar__split {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  flex: none;
+}
+
+/* 主按钮（左边） */
+.scpdf-toolbar__btn--split-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+  /* ⚠️ **当前色的小色条**（飞书样式）✅ */
+  position: relative;
+}
+
+/* 箭头按钮（右边） */
+.scpdf-toolbar__btn--split-arrow {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding: 0 4px;
+}
+
+/* ⚠️ **当前色的小色条** */
+.scpdf-toolbar__current-color {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* 颜色下拉菜单 */
+.scpdf-toolbar__color-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 156px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--scpdf-color-border);
+  background: var(--scpdf-color-surface);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 18%);
+}
+
+/* 颜色小方块 */
+.scpdf-toolbar__color-swatch {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--scpdf-color-border);
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 0;
+  flex: none;
+}
+
+/* ⚠️ **当前选中的色块要标出来** ✅ */
+.scpdf-toolbar__color-swatch[data-active="true"] {
+  outline: 2px solid var(--scpdf-color-primary);
+  outline-offset: 1px;
+}
+
 .scpdf-toolbar__page-input {
   width: 44px;
   padding: 3px 6px;

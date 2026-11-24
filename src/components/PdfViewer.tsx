@@ -685,6 +685,17 @@ export interface PdfViewerProps {
    * -> 不传 -> 用**内置的全部 7 个** ✅
    */
   themeOptions?: readonly PdfViewerTheme[];
+  /**
+   * **点工具栏的"高亮"按钮**（用户需求：
+   * "包工具栏的高亮也需要加个下拉箭头 可以选择颜色
+   *  如果没有选就是默认的高亮色"）。
+   *
+   * ⚠️ **不传 -> 不显示** ✅（用户确认："默认隐藏吧"）
+   * -> 宿主自己已经有"加高亮"按钮 -> 不要重复 ✅
+   *
+   * @param color 语义 key（宿主用 key 存"用户选的颜色"）
+   */
+  onToolbarHighlight?: (color: string) => void;
   /** 复制高亮的文字 */
   onHighlightCopy?: (text: string) => void;
   /** 更多（宿主自定义） */
@@ -797,6 +808,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onHighlightColorChange,
     onThemeChange,
     themeOptions,
+    onToolbarHighlight,
     onHighlightCopy,
     onHighlightMore,
     onPageChange,
@@ -4778,6 +4790,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           theme={merged.theme}
           onThemeChange={merged.features?.themePicker === false ? undefined : onThemeChange}
           themeOptions={themeOptions}
+          onToolbarHighlight={onToolbarHighlight}
+          highlightPalette={merged.highlightPalette}
+          defaultHighlightColor={merged.defaultHighlightColor}
         />
       )}
 

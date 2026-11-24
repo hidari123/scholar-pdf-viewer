@@ -130,6 +130,12 @@ export default function App() {
       /**
        * 造两条锚定**同一条高亮**的批注（用来测"合并成一个图标"）。
        */
+      /**
+       * **打开工具栏的"高亮"按钮**（E2E 用）✅
+       */
+      enableToolbarHighlight() {
+        setShowToolbarHighlight(true);
+      },
       makeSameLineNotes(highlightId: string) {
         const now = Date.now();
         setStickyNotes((prev) => [
@@ -213,6 +219,15 @@ export default function App() {
 
   /** 当前选中的高亮颜色 key（宿主的 UI 状态） */
   const [highlightColor, setHighlightColor] = useState('yellow');
+  /**
+   * **要不要显示工具栏的"高亮"按钮**（E2E 用）。
+   *
+   * ⚠️ 包的工具栏高亮按钮是**默认隐藏**的 ✅
+   * -> 宿主传 `onToolbarHighlight` 才出现 ✅
+   * -> demo 平时**不传** ✅ -> 保持"默认隐藏"的样子 ✅
+   * -> E2E 里**打开**它来测 ✅
+   */
+  const [showToolbarHighlight, setShowToolbarHighlight] = useState(false);
 
   /**
    * **语言（宿主可切换）**。
@@ -1221,6 +1236,25 @@ export default function App() {
             setHint(`已高亮（${h.color ?? '默认'}）`);
           }}
           onHighlightColorChange={handleHighlightColorChange}
+          /*
+           * ⚠️ **工具栏的"高亮"按钮**（E2E 才打开）✅
+           *
+           * -> 包的这个按钮**默认隐藏** ✅（用户确认："默认隐藏吧"）
+           * -> demo 平时**不传** ✅ -> 保持默认的样子 ✅
+           */
+          onToolbarHighlight={
+            showToolbarHighlight
+              ? (color: string) => {
+                  setHighlightColor(color);
+                  if (!selection) {
+                    setHint('（先选中一段文字）');
+                    return;
+                  }
+                  createHighlight(color, selection.text, selection.norm);
+                  setHint(t('demo.savedHighlight'));
+                }
+              : undefined
+          }
           onHighlightRemove={handleHighlightRemove}
           onHighlightComment={handleHighlightComment}
           stickyNotes={stickyNotes}

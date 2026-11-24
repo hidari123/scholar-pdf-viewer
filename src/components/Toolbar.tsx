@@ -10,6 +10,7 @@
 
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
+import type { HighlightPalette } from '../core/highlight/palette';
 import type { PdfViewerTheme, ToolbarConfig } from '../core/theme';
 import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
@@ -17,6 +18,7 @@ import type { IconName } from './Icon';
 import { Icon } from './Icon';
 import { ScaleInput } from './ScaleInput';
 import { ThemePicker } from './ThemePicker';
+import { ToolbarHighlightButton } from './ToolbarHighlightButton';
 
 /**
  * **工具栏配置**。
@@ -92,6 +94,21 @@ export interface ToolbarProps {
    */
   onThemeChange?: (theme: PdfViewerTheme) => void;
   /**
+   * **点工具栏的"高亮"按钮**（用户需求：
+   * "包工具栏的高亮也需要加个下拉箭头 可以选择颜色
+   *  如果没有选就是默认的高亮色"）。
+   *
+   * -> ⚠️ **不传 -> 不渲染** ✅（用户确认："默认隐藏吧"）
+   * -> 宿主自己已经有"加高亮"按钮 -> 不重复 ✅
+   *
+   * @param color 语义 key（宿主用 key 存"用户选的颜色"）
+   */
+  onToolbarHighlight?: (color: string) => void;
+  /** 高亮色板（工具栏的按钮用） */
+  highlightPalette?: HighlightPalette;
+  /** **默认色**的 key（没选过颜色时用） */
+  defaultHighlightColor?: string;
+  /**
    * **可选的主题列表**（宿主可自定义）。
    *
    * -> 不传 -> 用**内置的全部 7 个** ✅
@@ -134,6 +151,9 @@ export function Toolbar(props: ToolbarProps) {
     theme,
     onThemeChange,
     themeOptions,
+    onToolbarHighlight,
+    highlightPalette,
+    defaultHighlightColor,
     icons,
   } = props;
 
@@ -354,6 +374,27 @@ export function Toolbar(props: ToolbarProps) {
          * -> 宿主不传 \`onThemeChange\` -> **不渲染** ✅
          *    -> 宿主自己已经有主题切换 UI -> 不重复 ✅
          */}
+        {/*
+         * ⚠️⚠️ **工具栏的"高亮"按钮**（用户需求：
+         * "包工具栏的高亮也需要加个下拉箭头 可以选择颜色
+         *  如果没有选就是默认的高亮色"）。
+         *
+         * -> **分裂按钮**：主按钮 = 用当前色高亮，▾ = 选颜色 ✅
+         * -> **不传 `onToolbarHighlight` -> 不渲染** ✅
+         *    -> 用户确认："默认隐藏吧" ✅
+         */}
+        {onToolbarHighlight ? (
+          <ToolbarHighlightButton
+            onHighlight={onToolbarHighlight}
+            palette={highlightPalette}
+            defaultColor={defaultHighlightColor}
+            locale={locale}
+            locales={locales}
+            messages={messages}
+            icons={icons}
+          />
+        ) : null}
+
         {onThemeChange ? (
           <>
             <span className="scpdf-toolbar__divider" aria-hidden="true" />
