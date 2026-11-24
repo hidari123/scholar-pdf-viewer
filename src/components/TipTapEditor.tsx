@@ -360,6 +360,53 @@ function TipTapToolbar(props: {
    */
   const [openPalette, setOpenPalette] = useState<string | null>(null);
 
+  /*
+   * ⚠️ **工具栏【外层容器】的 ref**（点外面关闭面板时判断"点在哪儿"）。
+   *
+   * -> ⚠️ **必须是 `.scpdf-rich-text__toolbar-wrap`**（不是 `.scpdf-rich-text__toolbar`）❌
+   *    -> **颜色面板是 toolbar 的【兄弟节点】**（都在 wrap 里）✅
+   *    -> 用 toolbar 判断 -> `contains(panel)` = false ❌ -> 点面板里也会关 ❌
+   */
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+
+  /*
+   * ⚠️⚠️ **点面板外面要关闭颜色面板**（用户反馈：
+   * "富文本编辑框里的文字颜色和高亮这两个按钮选择完颜色之后
+   *  如果点击非选择颜色框的区域 是需要关闭这个选择框的 目前没有关闭"）。
+   *
+   * -> 和内置编辑器（`RichTextEditor`）**行为一致** ✅
+   * -> 点**面板外面** -> 关闭 ✅
+   * -> 点**面板里面** -> **不关** ✅
+   * -> **Esc** -> 也关闭 ✅
+   */
+  useEffect(() => {
+    if (!openPalette) {
+      return;
+    }
+
+    const onMouseDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      // 点在工具栏里（含面板）-> 不关 ✅
+      if (target && toolbarRef.current?.contains(target)) {
+        return;
+      }
+      setOpenPalette(null);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpenPalette(null);
+      }
+    };
+
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [openPalette]);
+
   /**
    * **拿到编辑器实例**。
    *
@@ -541,12 +588,25 @@ function TipTapToolbar(props: {
    *   别把整个批注弹窗也关了 ❌（实测踩过的坑）
    */
   const linkOverlayOpen = linkState.open;
+  /*
+   * ⚠️⚠️ **"有嵌套浮层"= 链接弹窗【或】颜色面板**（Esc 的行为要靠它）。
+   *
+   * -> 外层（`AnnotationDialog`）有自己的 **Esc -> 关自己** ❌
+   * -> 嵌套浮层开着时按 Esc -> **整个弹窗被关掉** ❌
+   *    （实测：Esc 之后 `.scpdf-annotation-dialog` 整个消失了）
+   * -> 通知外层 -> 外层在 Esc 时**让出** Esc ✅
+   *
+   * ⚠️ **必须合并成一个 effect** ❌
+   * -> 两个 effect 都调 `onOverlayStateChange` -> **后写的覆盖先写的** ❌
+   *    -> 颜色面板开着 -> 链接弹窗的 effect 把它设成 false -> Esc 还是会关弹窗 ❌
+   */
+  const anyOverlayOpen = linkOverlayOpen || openPalette !== null;
   useEffect(() => {
-    onOverlayStateChange?.(linkOverlayOpen);
+    onOverlayStateChange?.(anyOverlayOpen);
     return () => {
       onOverlayStateChange?.(false);
     };
-  }, [linkOverlayOpen, onOverlayStateChange]);
+  }, [anyOverlayOpen, onOverlayStateChange]);
 
   /**
    * **打开链接弹窗**（记下当前的选区和按钮位置）。
@@ -848,7 +908,7 @@ function TipTapToolbar(props: {
   }
 
   return (
-    <div className="scpdf-rich-text__toolbar-wrap">
+    <div className="scpdf-rich-text__toolbar-wrap" ref={toolbarRef}>
       <div className="scpdf-rich-text__toolbar">
         {items.map((item, index) => {
           const state = activeStates[index];

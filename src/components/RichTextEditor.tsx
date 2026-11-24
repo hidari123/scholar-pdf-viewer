@@ -93,6 +93,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
     locale = 'zh',
     locales,
     messages,
+    onOverlayStateChange,
   } = props;
 
   /**
@@ -113,6 +114,60 @@ export function RichTextEditor(props: RichTextEditorProps) {
   const [openPalette, setOpenPalette] = useState<string | null>(null);
 
   /*
+   * **工具栏的 ref**（点外面关闭颜色面板时判断"点在哪儿"）。
+   *
+   * ⚠️ **内置编辑器的面板在 `.scpdf-rich-text__tool` 里** -> 是 toolbar 的**后代** ✅
+   *    -> 用 toolbar 判断 `contains(panel)` = true ✅ -> 点面板里不会误关 ✅
+   */
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+
+  /*
+   * ⚠️⚠️ **点面板外面要关闭颜色面板**（用户反馈：
+   * "富文本编辑框里的文字颜色和高亮这两个按钮选择完颜色之后
+   *  如果点击非选择颜色框的区域 是需要关闭这个选择框的 目前没有关闭"）。
+   *
+   * ### 之前为什么不行
+   *
+   * -> 只有"点色块"和"再点一次按钮"会关闭 ❌
+   * -> 点**页面其它地方** -> 面板**一直挂在那** ❌
+   *
+   * ### 修法
+   *
+   * -> 面板开着时，在 `document` 上挂 `mousedown` ✅
+   * -> 点在**工具栏外面**（含面板外面）-> 关闭 ✅
+   * -> 点在**面板里面** -> **不关**（在选颜色）✅
+   * -> **Esc** -> 也关闭 ✅
+   * -> 面板关闭 / 组件卸载 -> 卸载监听 ✅
+   */
+  useEffect(() => {
+    if (!openPalette) {
+      return;
+    }
+
+    const onMouseDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      // 点在工具栏里（含面板）-> 不关 ✅
+      if (target && toolbarRef.current?.contains(target)) {
+        return;
+      }
+      setOpenPalette(null);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpenPalette(null);
+      }
+    };
+
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [openPalette]);
+
+  /*
    * **链接弹窗**（用户反馈："现在点击链接按钮 弹框不出现了"）。
    *
    * ⚠️⚠️ **之前内置编辑器根本没有链接弹窗** ❌
@@ -127,6 +182,25 @@ export function RichTextEditor(props: RichTextEditorProps) {
     to: number;
     text: string;
   }>({ open: false, anchor: null, from: 0, to: 0, text: '' });
+
+  /*
+   * ⚠️⚠️ **"有嵌套浮层"= 链接弹窗【或】颜色面板**（Esc 的行为要靠它）。
+   *
+   * -> 外层（`AnnotationDialog`）有自己的 **Esc -> 关自己** ❌
+   * -> 嵌套浮层开着时按 Esc -> **整个弹窗被关掉** ❌
+   *    （实测：Esc 之后 `.scpdf-annotation-dialog` 整个消失了）
+   * -> 通知外层 -> 外层在 Esc 时**让出** Esc ✅
+   *
+   * ⚠️ **必须把两种浮层【合并】成一个状态** ❌
+   * -> 两个 effect 都调 `onOverlayStateChange` -> **后写的覆盖先写的** ❌
+   */
+  const anyOverlayOpen = linkState.open || openPalette !== null;
+  useEffect(() => {
+    onOverlayStateChange?.(anyOverlayOpen);
+    return () => {
+      onOverlayStateChange?.(false);
+    };
+  }, [anyOverlayOpen, onOverlayStateChange]);
 
   /** 链接按钮的 ref（用来算弹窗的锚点） */
   const linkButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -356,7 +430,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
   return (
     <div className="scpdf-rich-text">
       {/* 工具栏（宿主完全可配） */}
-      <div className="scpdf-rich-text__toolbar" role="toolbar">
+      <div className="scpdf-rich-text__toolbar" role="toolbar" ref={toolbarRef}>
         {items.map((item) => {
           /*
            * ⚠️ **三个颜色命令都会弹面板**（用户需求）。

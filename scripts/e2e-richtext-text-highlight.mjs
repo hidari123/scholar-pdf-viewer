@@ -233,12 +233,117 @@ try {
   const html = () =>
     page.evaluate(() => document.querySelector('.scpdf-annotation-dialog .ProseMirror')?.innerHTML);
 
+  // ---- ④.5 点面板外面要关闭（用户反馈："如果点击非选择颜色框的区域 是需要关闭这个选择框的"）----
+  await selectAll();
+  await page.waitForTimeout(300);
+  await clickBtn('文字颜色');
+  check(
+    '**面板打开了**',
+    await page.evaluate(
+      () => !!document.querySelector('.scpdf-annotation-dialog .scpdf-rich-text__palette'),
+    ),
+    '',
+  );
+
+  // 点面板**里面**（边框，不是色块）-> 不该关
+  const paletteEdge = await page.evaluate(() => {
+    const p = document.querySelector('.scpdf-annotation-dialog .scpdf-rich-text__palette');
+    if (!p) return null;
+    const r = p.getBoundingClientRect();
+    return { x: Math.round(r.x + 2), y: Math.round(r.y + 2) };
+  });
+  if (paletteEdge) {
+    await page.mouse.click(paletteEdge.x, paletteEdge.y);
+    await page.waitForTimeout(500);
+  }
+  check(
+    '**点面板里面不关闭**（还在选颜色）',
+    await page.evaluate(
+      () => !!document.querySelector('.scpdf-annotation-dialog .scpdf-rich-text__palette'),
+    ),
+    '',
+  );
+
+  // 点**外面** -> 该关
+  // ⚠️ **要点"编辑区里的空白"**（不是页面角落）❌
+  // -> 页面角落是"取消"按钮 -> 会把**整个弹窗**关掉 -> 后面全测不了 ✅
+  // ⚠️ **在 `body` 上派发 mousedown**（而不是真的点某个坐标）✅
+  // -> 点页面角落 = "取消" -> 整个弹窗被关掉 -> 后面全测不了 ❌
+  // -> 点编辑区空白 = 也会命中"取消"（有重叠）❌
+  // -> **派发事件** = 精确模拟"点了面板外面" -> 不会误伤任何按钮 ✅
+  await page.evaluate(() => {
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
+  await page.waitForTimeout(500);
+  check(
+    '**点外面关闭了面板**',
+    !(await page.evaluate(
+      () => !!document.querySelector('.scpdf-annotation-dialog .scpdf-rich-text__palette'),
+    )),
+    '',
+  );
+
+  // Esc -> 也该关
+  await clickBtn('文字颜色');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
+  check(
+    '**Esc 关闭了面板**',
+    !(await page.evaluate(
+      () => !!document.querySelector('.scpdf-annotation-dialog .scpdf-rich-text__palette'),
+    )),
+    '',
+  );
+
+  console.log(
+    'DEBUG:',
+    JSON.stringify(
+      await page.evaluate(() => {
+        const btns = [
+          ...document.querySelectorAll('.scpdf-annotation-dialog .scpdf-rich-text__btn'),
+        ].map((b) => {
+          const r = b.getBoundingClientRect();
+          return {
+            l: b.getAttribute('aria-label'),
+            x: Math.round(r.x),
+            y: Math.round(r.y),
+            w: Math.round(r.width),
+            h: Math.round(r.height),
+          };
+        });
+        return {
+          btns,
+          openPalette: !!document.querySelector(
+            '.scpdf-annotation-dialog .scpdf-rich-text__palette',
+          ),
+        };
+      }),
+    ),
+  );
+
+  // ⚠️ **重新选中文字**（④.5 里点过外面 -> 浏览器的选区被清掉了）✅
+  await selectAll();
+  await page.waitForTimeout(300);
+
   // ---- ⑤ "高亮"：面板 + 加背景色 ----
   // ⚠️ **"文字高亮"按钮已移除**（用户反馈："功能重复 + 图标很丑"）
   //    -> 这里测**"高亮"**按钮（背景色）✅
   await selectAll();
   await page.waitForTimeout(300);
-  await clickBtn('高亮');
+  const ok = await clickBtn('高亮');
+  console.log(
+    'DEBUG clickBtn(高亮) ->',
+    ok,
+    JSON.stringify(
+      await page.evaluate(() => ({
+        btns: [...document.querySelectorAll('.scpdf-annotation-dialog .scpdf-rich-text__btn')].map(
+          (b) => b.getAttribute('aria-label'),
+        ),
+        palettes: document.querySelectorAll('.scpdf-annotation-dialog .scpdf-rich-text__palette')
+          .length,
+      })),
+    ),
+  );
   const pal = await page.evaluate(() => {
     const p = document.querySelector('.scpdf-annotation-dialog .scpdf-rich-text__palette');
     if (!p) {
