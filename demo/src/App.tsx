@@ -92,6 +92,16 @@ export default function App() {
   const [documentId, setDocumentId] = useState('local');
 
   /**
+   * **功能开关的演示**（第 29 轮审核补的 ✅）。
+   *
+   * -> 之前 demo **完全没用过** `features` ❌
+   * -> 宿主看不到【怎么关掉某个功能】❌
+   * -> 现在：**可交互地开关** ✅
+   * -> 搜索 / 缩略图 / 目录 / 打印 / 键盘 / 主题按钮 ✅
+   */
+  const [disabledFeatures, setDisabledFeatures] = useState<string[]>([]);
+
+  /**
    * **防抖保存器**（宿主的持久化）。
    *
    * ⚠️ **放在组件外** → 不会因为重渲染而重建（重建会丢掉待保存的数据）。
@@ -147,6 +157,12 @@ export default function App() {
        */
       enableToolbarHighlight() {
         setShowToolbarHighlight(true);
+      },
+      /**
+       * **开关功能**（第 29 轮新增 ✅）。
+       */
+      setDisabledFeatures(list: string[]) {
+        setDisabledFeatures(list);
       },
       makeSameLineNotes(highlightId: string) {
         const now = Date.now();
@@ -1196,6 +1212,30 @@ export default function App() {
            * -> 之前**完全没有 RTL 支持** -> 阿拉伯语 / 希伯来语的宿主没法用 ❌
            * -> 现在：\`dir\` prop + CSS 镜像 ✅
            */}
+          {/*
+           * ⚠️ **功能开关的演示**（第 29 轮审核补的 ✅）。
+           *
+           * -> 演示宿主怎么**按需关掉**包的功能 ✅
+           * -> 选【全部开启】= 默认行为 ✅
+           */}
+          <span style={{ opacity: 0.7, marginLeft: 12, whiteSpace: 'nowrap' }}>功能</span>
+          <select
+            value={disabledFeatures.join(',') || 'all'}
+            onChange={(e) => {
+              const value = e.target.value;
+              setDisabledFeatures(value === 'all' ? [] : value.split(','));
+            }}
+            aria-label="功能开关"
+            style={{ maxWidth: 160 }}
+          >
+            <option value="all">全部开启</option>
+            <option value="search">关掉搜索</option>
+            <option value="thumbnails">关掉缩略图</option>
+            <option value="outline">关掉目录</option>
+            <option value="print">关掉打印</option>
+            <option value="keyboard">关掉键盘</option>
+            <option value="themePicker">关掉主题按钮</option>
+          </select>
           <span style={{ opacity: 0.7, marginLeft: 12, whiteSpace: 'nowrap' }}>RTL</span>
           <select
             value={dir}
@@ -1241,6 +1281,20 @@ export default function App() {
           onThemeChange={setTheme}
           dir={dir}
           appearance={{ density }}
+          /*
+           * ⚠️ **功能开关**（演示宿主的【按需关闭】✅）。
+           *
+           * -> `features` 是 **opt-out** ✅：只有显式 `false` 才关 ✅
+           * -> 这里只把【关掉的】设成 false ✅
+           */
+          features={{
+            search: !disabledFeatures.includes('search'),
+            thumbnails: !disabledFeatures.includes('thumbnails'),
+            outline: !disabledFeatures.includes('outline'),
+            keyboard: !disabledFeatures.includes('keyboard'),
+            print: !disabledFeatures.includes('print'),
+            themePicker: !disabledFeatures.includes('themePicker'),
+          }}
           slots={useSlots ? demoSlots : undefined}
           highlights={highlights}
           highlightPalette={highlightPalette}

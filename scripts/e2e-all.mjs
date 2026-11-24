@@ -31,6 +31,7 @@ const suites = [
   { name: '切换文档时重置高亮/选区', file: 'e2e-document-switch.mjs' },
   { name: '打印效果', file: 'e2e-print.mjs' },
   { name: '主题与外观', file: 'e2e-themes.mjs' },
+  { name: '功能开关（features）', file: 'e2e-features-toggle.mjs' },
   { name: '侧栏开合时自动重适配', file: 'e2e-sidebar-fit.mjs' },
   { name: '多行选择的覆盖率', file: 'e2e-selection-coverage.mjs' },
   { name: '跨页选择', file: 'e2e-cross-page-selection.mjs' },
