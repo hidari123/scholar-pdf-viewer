@@ -863,41 +863,6 @@ export default function App() {
   }, [setHighlights]);
 
   /**
-   * **造两个"同一行"的批注**（演示用）。
-   *
-   * → 用户需求："多批注如果位置重叠，比如说都是从某一行出发的多行，
-   *   按钮就会重叠在最右边"
-   * → 这两个批注锚定**同一条高亮** → 会挤在一起
-   * → 包应该把它们**合并成一个图标**（带数量角标）→ hover 能选具体哪条 ✅
-   */
-  const handleAddSameLineNotes = useCallback(() => {
-    const target = highlights[0];
-    if (!target) {
-      setHint(t('demo.needHighlight'));
-      return;
-    }
-
-    const now = Date.now();
-    setStickyNotes((prev) => [
-      ...prev,
-      {
-        id: `note-a-${now}`,
-        highlightId: target.id,
-        content: '这是第一条批注：<b>加粗</b>、<mark style="background-color: #ffe58f">高亮</mark>',
-        createdAt: now,
-      },
-      {
-        id: `note-b-${now}`,
-        highlightId: target.id,
-        content:
-          '这是第二条批注：看看它们会不会挤在一起 → <a href="https://example.com">一个链接</a>',
-        createdAt: now,
-      },
-    ]);
-    setHint(t('demo.savedNotes'));
-  }, [highlights, t]);
-
-  /**
    * **下载 PDF**。
    *
    * ⚠️ 包**不负责取文件**（文件是宿主的）→ 只提供 `downloadFile` 这个纯 DOM 工具。
@@ -1014,16 +979,6 @@ export default function App() {
         <button
           type="button"
           className="scpdf-toolbar__btn"
-          onClick={handleAddSameLineNotes}
-          title={t('demo.makeNotes')}
-          aria-label={t('demo.makeNotes')}
-        >
-          <Icon name="comment" />
-        </button>
-
-        <button
-          type="button"
-          className="scpdf-toolbar__btn"
           onClick={handleImportHighlights}
           title={t('demo.importJson')}
           aria-label={t('demo.importJson')}
@@ -1049,7 +1004,6 @@ export default function App() {
       handleImportHighlights,
       handleDownloadPdf,
       handleExportAnnotatedPdf,
-      handleAddSameLineNotes,
       t,
     ],
   );
