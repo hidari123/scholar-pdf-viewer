@@ -51,10 +51,10 @@ export default defineConfig({
          * -> 补了测试就会**超过** -> 再往上调 ✅
          * -> 少写测试就**立刻红** ✅
          */
-        lines: 50,
-        functions: 45,
-        branches: 40,
-        statements: 50,
+        lines: 51,
+        functions: 47,
+        branches: 41,
+        statements: 51,
       },
     },
   },

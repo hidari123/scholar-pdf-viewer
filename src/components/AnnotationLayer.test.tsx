@@ -161,7 +161,41 @@ describe('AnnotationLayer', () => {
     expect(screen.getByRole('button').className).toContain('scpdf-annotation--active');
   });
 
-  it('无障碍标签是选中的文本', () => {
+  /*
+   * ⚠️⚠️ **重复 id 时只能激活"点到的那一个"**（实测踩到的坑）。
+   *
+   * -> 宿主可能传了**重复的 id** ❌
+   *    （实测：刷新页面 -> 旧高亮从持久化恢复 -> 新建的高亮**又拿到同一个 id**）
+   * -> 只按 id 判断 -> **两个都加 active** ❌
+   *    -> 用户反馈："点击一个高亮 两个高亮都会被选中" ✅
+   * -> 加上**矩形** -> **只激活真正点到的那一个** ✅
+   */
+  it('**给了激活矩形时，只有对得上的那个才激活**', () => {
+    setup({
+      activeHighlightId: 'h1',
+      activeHighlightRect: { left: 10, top: 20, width: 100, height: 20 },
+    });
+
+    expect(screen.getByRole('button').className).toContain('scpdf-annotation--active');
+  });
+
+  it('**给了激活矩形但对不上 -> 不激活**', () => {
+    setup({
+      activeHighlightId: 'h1',
+      // ⚠️ **位置对不上** -> 不是它 ❌
+      activeHighlightRect: { left: 500, top: 500, width: 100, height: 20 },
+    });
+
+    expect(screen.getByRole('button').className).not.toContain('scpdf-annotation--active');
+  });
+
+  it('**没给激活矩形 -> 退回按 id 判断**（老调用方不受影响）', () => {
+    setup({ activeHighlightId: 'h1' });
+
+    expect(screen.getByRole('button').className).toContain('scpdf-annotation--active');
+  });
+
+  it('无障碍标签是选中的文字', () => {
     setup();
 
     expect(screen.getByRole('button').getAttribute('aria-label')).toBe('选中的文字');

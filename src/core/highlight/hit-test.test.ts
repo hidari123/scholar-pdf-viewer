@@ -13,7 +13,9 @@ import {
   hitsAtPoint,
   isFullyOverlapping,
   isPartiallyOverlapping,
+  isSameRect,
   pickHighlightAtPoint,
+  pickHighlightByRect,
 } from './hit-test';
 
 describe('hitsAtPoint（点命中了哪些高亮）', () => {
@@ -41,6 +43,111 @@ describe('hitsAtPoint（点命中了哪些高亮）', () => {
     expect(hits).toHaveLength(2);
     expect(hits.every((h) => h.isOverlapping)).toBe(true);
     expect(hits[0]?.overlappingIds).toEqual(['a', 'b']);
+  });
+
+  /*
+   * ⚠️ **命中结果要带上【矩形】**（第 27 轮加的）。
+   *
+   * -> 宿主可能传了**重复的 id** ❌
+   * -> 按 id 找 DOM 元素 -> 找到**第一个** ❌
+   * -> 按**矩形**找 -> **精确到那一个** ✅
+   */
+  it('**命中结果带上那个矩形**（用来精确定位 DOM 元素）', () => {
+    const rect = { id: 'a', left: 100, top: 100, width: 100, height: 20, zIndex: 0 };
+    const hits = hitsAtPoint(150, 110, [rect]);
+    expect(hits[0]?.rect).toEqual(rect);
+  });
+
+  it('**重复 id 的两个高亮 -> 各自的矩形不同**', () => {
+    // ⚠️ **两个矩形有重叠** -> 同一个点能同时命中两个 ✅
+    const rects = [
+      { id: 'dup', left: 100, top: 100, width: 200, height: 20, zIndex: 0 },
+      { id: 'dup', left: 200, top: 100, width: 200, height: 20, zIndex: 1 },
+    ];
+    const hits = hitsAtPoint(250, 110, rects);
+    expect(hits).toHaveLength(2);
+    // ⚠️ **id 相同，但矩形不同** -> 靠矩形区分 ✅
+    expect(hits[0]?.rect.left).not.toBe(hits[1]?.rect.left);
+  });
+
+  /*
+   * ⚠️ **`isSameRect`**（用来消歧重复 id 的高亮）。
+   */
+  it('**同一个矩形 -> true**', () => {
+    expect(
+      isSameRect(
+        { left: 100, top: 100, width: 50, height: 20 },
+        { left: 100, top: 100, width: 50, height: 20 },
+      ),
+    ).toBe(true);
+  });
+
+  it('**位置差 1px 以内 -> true**（容差）', () => {
+    expect(
+      isSameRect(
+        { left: 100, top: 100, width: 50, height: 20 },
+        { left: 100.5, top: 99.8, width: 50, height: 20 },
+      ),
+    ).toBe(true);
+  });
+
+  it('**位置差超过容差 -> false**', () => {
+    expect(
+      isSameRect(
+        { left: 100, top: 100, width: 50, height: 20 },
+        { left: 300, top: 100, width: 50, height: 20 },
+      ),
+    ).toBe(false);
+  });
+
+  it('**尺寸不同 -> false**', () => {
+    expect(
+      isSameRect(
+        { left: 100, top: 100, width: 50, height: 20 },
+        { left: 100, top: 100, width: 80, height: 20 },
+      ),
+    ).toBe(false);
+  });
+
+  /*
+   * ⚠️ **`pickHighlightByRect`**（消歧重复 id 的高亮）。
+   */
+  it('**只有一个候选 -> 直接返回它**', () => {
+    const result = pickHighlightByRect(
+      [{ name: 'a' }],
+      { left: 0, top: 0, width: 1, height: 1 },
+      () => null,
+    );
+    expect(result?.name).toBe('a');
+  });
+
+  it('**多个候选 -> 按矩形挑出对得上的那个**', () => {
+    const candidates = [
+      { name: 'a', x: 100 },
+      { name: 'b', x: 300 },
+    ];
+    const result = pickHighlightByRect(
+      candidates,
+      { left: 300, top: 0, width: 50, height: 20 },
+      (c) => ({ left: c.x, top: 0, width: 50, height: 20 }),
+    );
+    // ⚠️ **必须挑 "b"**（不是第一个）✅
+    expect(result?.name).toBe('b');
+  });
+
+  it('**都对不上 -> 退回第一个**（老行为）', () => {
+    const candidates = [{ name: 'a' }, { name: 'b' }];
+    const result = pickHighlightByRect(
+      candidates,
+      { left: 999, top: 999, width: 1, height: 1 },
+      () => ({ left: 0, top: 0, width: 1, height: 1 }),
+    );
+    expect(result?.name).toBe('a');
+  });
+
+  it('**没有候选 -> undefined**', () => {
+    const result = pickHighlightByRect([], { left: 0, top: 0, width: 1, height: 1 }, () => null);
+    expect(result).toBeUndefined();
   });
 
   it('**结果按"从上到下"排序**（zIndex 大的在前）', () => {

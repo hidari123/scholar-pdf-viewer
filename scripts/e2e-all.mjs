@@ -80,6 +80,7 @@ const suites = [
   { name: '便签详情（展开 + 只读 + 编辑切换）', file: 'e2e-annotation-detail.mjs' },
   { name: '合并组选择列表（渲染富文本 + 点项打开详情）', file: 'e2e-sticky-picker.mjs' },
   { name: '便签好 hover（热区 + 不移开就消失）', file: 'e2e-sticky-hover.mjs' },
+  { name: '重复的高亮 id（只激活点到的那一个）', file: 'e2e-highlight-duplicate-id.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

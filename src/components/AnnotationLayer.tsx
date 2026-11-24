@@ -11,6 +11,7 @@
  */
 
 import { useMemo } from 'react';
+import { isSameRect } from '../core/highlight/hit-test';
 import type { HighlightPalette } from '../core/highlight/palette';
 import { paletteToCssVars, resolveHighlightColor } from '../core/highlight/palette';
 import type { SearchHitRect } from '../core/search/highlight';
@@ -34,6 +35,18 @@ export interface AnnotationLayerProps {
   onHighlightClick?: (highlight: HighlightRecord) => void;
   /** 激活的高亮 id */
   activeHighlightId?: string | null;
+  /**
+   * **当前激活的那个矩形**（视口 px）。
+   *
+   * ⚠️ **为什么需要它**（实测踩到的坑）：
+   *
+   * -> 宿主可能传了**重复的 id** ❌
+   *    （实测：刷新后旧高亮恢复，新建的高亮**又拿到同一个 id** -> 两个高亮同 id）
+   * -> 激活态只按 id 判断 -> **两个都加激活态** ❌
+   *    -> 用户反馈："点击一个高亮 两个高亮都会被选中" ✅
+   * -> 加上**矩形** -> **只激活真正点到的那一个** ✅
+   */
+  activeHighlightRect?: { left: number; top: number; width: number; height: number } | null;
   /**
    * 搜索命中（归一化矩形，当前页的）。
    *
@@ -63,6 +76,7 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
     highlights,
     viewport,
     activeHighlightId,
+    activeHighlightRect,
     searchRects = [],
     activeSearchRectIndex = null,
     palette,
@@ -168,7 +182,19 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
       ))}
 
       {rects.map(({ highlight, rect }) => {
-        const isActive = activeHighlightId === highlight.id;
+        /*
+         * ⚠️⚠️ **激活态要按【矩形】判断**（不能只按 id）✅
+         *
+         * -> 宿主可能传了**重复的 id** ❌
+         *    -> 只按 id -> **两个都激活** ❌
+         *    -> 用户反馈："点击一个高亮 两个高亮都会被选中" ✅
+         * -> 有矩形 -> **只激活点到的那一个** ✅
+         * -> 没矩形（老调用方）-> 退回按 id ✅
+         */
+        const isActive =
+          activeHighlightRect !== undefined && activeHighlightRect !== null
+            ? isSameRect(activeHighlightRect, rect)
+            : activeHighlightId === highlight.id;
         const isMine = highlight.source !== 'others';
 
         return (

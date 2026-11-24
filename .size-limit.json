@@ -2,7 +2,7 @@
   {
     "name": "主入口（组件 + hooks）",
     "path": "dist/index.js",
-    "limit": "33.5 kB",
+    "limit": "34 kB",
     "import": "{ PdfViewer }",
     "entry": "index"
   },

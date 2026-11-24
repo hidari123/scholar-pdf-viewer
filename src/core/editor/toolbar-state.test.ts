@@ -100,6 +100,28 @@ describe('computeToolbarActiveState', () => {
     expect(states[1]?.disabled).toBe(false);
   });
 
+  it('**hasSelection 抛异常 -> 当成"有选区"**（不误伤）', () => {
+    const editor = makeEditor({
+      hasSelection: () => {
+        throw new Error('还没准备好');
+      },
+    });
+    const states = computeToolbarActiveState(['removeFormat'], editor);
+    expect(states[0]?.disabled).toBe(false);
+    expect(states[0]?.hasSelection).toBe(true);
+  });
+
+  it('**列表类命令不受"有没有选区"影响**（列表不需要选文字）', () => {
+    const editor = makeEditor({ hasSelection: () => false });
+    const states = computeToolbarActiveState(
+      ['insertUnorderedList', 'insertOrderedList', 'createLink'],
+      editor,
+    );
+    for (const s of states) {
+      expect(s.disabled, s.command).toBe(false);
+    }
+  });
+
   it('**编辑器不提供 hasSelection -> 默认当成"有选区"**（不误伤老宿主）', () => {
     const states = computeToolbarActiveState(['removeFormat'], makeEditor());
     expect(states[0]?.disabled).toBe(false);

@@ -726,9 +726,24 @@ export default function App() {
        * → 实测：点一次"高亮" → **3 条** + "Encountered two children with the same key"。
        *
        * → ID 在外面生成 → updater 是**纯函数** → 调几次结果都一样。
+       *
+       * ⚠️⚠️⚠️ **ID 必须用 `crypto.randomUUID()`**（第 27 轮修的真 bug）。
+       *
+       * ### 之前的计数器为什么会撞
+       *
+       * -> `highlightSeq` 在**文档加载完成时归零** ❌
+       * -> 但**持久化恢复**的高亮还带着原来的 id（`h-1`、`h-2`…）✅
+       * -> 刷新页面 -> 建一个新高亮 -> 计数器又是 1 -> **又是 `h-1`** ❌
+       * -> **两个高亮同 id** ❌
+       *    -> 点击一个 -> **两个都变成激活态** ❌
+       *    -> 用户反馈："有时候点击一个高亮 两个高亮都会被选中" ✅
+       *
+       * ### 修法
+       *
+       * -> `crypto.randomUUID()` -> **绝对不会重复** ✅
+       * -> 不依赖任何状态 -> 刷新、恢复、多标签页都安全 ✅
        */
-      highlightSeq += 1;
-      const id = `h-${highlightSeq}`;
+      const id = `h-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${highlightSeq++}`}`;
       setHighlights((prev) => [
         ...prev,
         {

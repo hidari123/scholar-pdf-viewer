@@ -35,7 +35,7 @@ import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-t
 import type { PdfViewerError } from '../core/errors';
 import { pdfViewerError } from '../core/errors';
 import type { HighlightRect as HitRect } from '../core/highlight/hit-test';
-import { pickHighlightAtPoint } from '../core/highlight/hit-test';
+import { pickHighlightAtPoint, pickHighlightByRect } from '../core/highlight/hit-test';
 import type { HighlightPalette } from '../core/highlight/palette';
 import type { InternalLinkContext } from '../core/outline/link-context';
 import type { OutlineItemLike } from '../core/outline/outline';
@@ -845,6 +845,24 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   const [numPages, setNumPages] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
+
+  /*
+   * ⚠️⚠️ **当前激活的那个矩形**（视口 px）。
+   *
+   * ### 为什么需要（实测踩到的坑）
+   *
+   * -> 宿主可能传了**重复的 id** ❌
+   *    （实测：刷新页面 -> 旧高亮从持久化恢复 -> 新建的高亮**又拿到同一个 id**）
+   * -> 激活态只按 id 判断 -> **两个高亮都加激活态** ❌
+   *    -> 用户反馈："点击一个高亮 两个高亮都会被选中" ✅
+   * -> 加上**矩形** -> **只激活真正点到的那一个** ✅
+   */
+  const [activeHighlightRect, setActiveHighlightRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   /*
    * ⚠️ **激活高亮的自动消失定时器**。
@@ -2165,7 +2183,6 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     }
     const elements = [...container.querySelectorAll<HTMLElement>('[data-highlight-id]')];
     const rects: HitRect[] = [];
-    const seen = new Map<string, number>();
 
     for (const el of elements) {
       const id = el.getAttribute('data-highlight-id');
@@ -2177,19 +2194,23 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         continue;
       }
       /*
-       * ⚠️ **同一个高亮可能有多行**（多个 DOM 元素）
-       * → 层级用"第一次出现"的顺序 → 保持稳定 ✅
+       * ⚠️ **层级必须按【DOM 顺序】**（不能按 id）✅
+       *
+       * -> 之前按 id 去重：`seen.set(id, seen.size)` ❌
+       * -> **重复 id** 时两个元素拿到**同一个 zIndex** ❌
+       *    -> `pickHighlightAtPoint` 排序后取第一个 ❌
+       *    -> **永远只能点到第一个** ❌
+       * -> 直接用**数组下标**（DOM 顺序 = 渲染顺序 = 层级）✅
+       *    -> 每个元素**层级唯一** ✅
+       *    -> 重叠时选**最上面**的那个 ✅
        */
-      if (!seen.has(id)) {
-        seen.set(id, seen.size);
-      }
       rects.push({
         id,
         left: r.left,
         top: r.top,
         width: r.width,
         height: r.height,
-        zIndex: seen.get(id) ?? 0,
+        zIndex: rects.length,
       });
     }
 
@@ -2232,7 +2253,39 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         return null;
       }
 
+      /*
+       * ⚠️⚠️ **必须按【几何】找元素，不能按 id**（实测踩到的坑）。
+       *
+       * ### 问题：宿主传了**重复的 id**
+       *
+       * -> 用户反馈："有时候会出现有时候点击一个高亮 两个高亮都会被选中的情况"✅
+       * -> 复现：刷新页面（旧高亮从持久化恢复，id 还是 `h-1`）-> 新建一个高亮
+       *    -> demo 的计数器归零 -> 新高亮**又拿到 `h-1`** ❌
+       *    -> **两个高亮同 id** ❌
+       * -> 按 id 找 -> `querySelectorAll` 返回**两个** -> 返回**第一个** ❌
+       *    -> 点的是**第二个**，激活的却是**第一个** ❌
+       * -> 而且 `activeHighlightId === highlight.id` -> **两个都激活** ❌
+       *
+       * ### 修法
+       *
+       * -> `pickHighlightAtPoint` 已经返回了**命中的矩形** ✅
+       * -> 按**矩形的位置**找元素 -> **精确到那一个** ✅
+       */
+      const hitRect = hit.rect;
       const elements = container.querySelectorAll<HTMLElement>('[data-highlight-id]');
+      for (const el of elements) {
+        const r = el.getBoundingClientRect();
+        // ⚠️ **位置对得上**（允许 1px 的误差）-> 就是它 ✅
+        if (
+          Math.abs(r.left - hitRect.left) < 1 &&
+          Math.abs(r.top - hitRect.top) < 1 &&
+          Math.abs(r.width - hitRect.width) < 1 &&
+          Math.abs(r.height - hitRect.height) < 1
+        ) {
+          return el;
+        }
+      }
+      // ⚠️ **兜底**：几何对不上 -> 退回按 id（老行为）✅
       for (const el of elements) {
         if (el.getAttribute('data-highlight-id') === hit.id) {
           return el;
@@ -2997,6 +3050,57 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   );
 
   /**
+   * **按 DOM 元素找到"真正点到的那一条高亮"**。
+   *
+   * ⚠️⚠️ **不能只按 id 找**（实测踩到的坑）：
+   *
+   * -> 宿主可能传了**重复的 id** ❌
+   *    （实测：刷新后旧高亮恢复 -> 新建的高亮**又拿到同一个 id** -> 两个同 id）
+   * -> `highlights.find(h => h.id === id)` -> 永远找到**第一个** ❌
+   *    -> 点第二个 -> 操作条弹在第一个上 ❌
+   *    -> 改色 / 删除也**改错那条** ❌
+   *
+   * ### 修法
+   *
+   * -> 用元素的**视口矩形**和高亮的 `position.rects`（归一化）比对 ✅
+   * -> 归一化 -> 视口 px 的换算：`norm × (viewport / reference)` ✅
+   * -> 对上了 -> 就是它 ✅
+   */
+  const findHighlightByElement = useCallback(
+    (element: HTMLElement, id: string): HighlightRecord | undefined => {
+      const r = element.getBoundingClientRect();
+      const candidates = highlights.filter((h) => h.id === id);
+
+      // ⚠️ **多个同 id** -> 按**几何**挑 ✅
+      return pickHighlightByRect(candidates, r, (candidate) => {
+        const position = candidate.position;
+        if (!position) {
+          return null;
+        }
+        const ratioX = position.boundingRect.width > 0 ? r.width / position.boundingRect.width : 1;
+        const ratioY =
+          position.boundingRect.height > 0 ? r.height / position.boundingRect.height : 1;
+        for (const norm of position.rects) {
+          const left = norm.x1 * ratioX;
+          const top = norm.y1 * ratioY;
+          const width = Math.abs(norm.x2 - norm.x1) * ratioX;
+          const height = Math.abs(norm.y2 - norm.y1) * ratioY;
+          if (
+            Math.abs(left - r.left) < 2 &&
+            Math.abs(top - r.top) < 2 &&
+            Math.abs(width - r.width) < 2 &&
+            Math.abs(height - r.height) < 2
+          ) {
+            return { left, top, width, height };
+          }
+        }
+        return null;
+      });
+    },
+    [highlights],
+  );
+
+  /**
    * **容器上的高亮点击委托**。
    *
    * ⚠️ 为什么需要事件委托（而不是在 `<button>` 上绑 onClick）：
@@ -3083,22 +3187,45 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       if (!id) {
         return;
       }
-      const highlight = highlights.find((h) => h.id === id);
+
+      /*
+       * ⚠️⚠️ **要找到"真正点到的那一条"**（不能只按 id 找）✅
+       *
+       * -> 宿主可能传了**重复的 id** ❌
+       *    （实测：刷新页面 -> 旧高亮从持久化恢复 -> 新建的高亮**又拿到同一个 id**）
+       * -> `highlights.find(h => h.id === id)` -> 找到的是**第一个** ❌
+       *    -> 点的是第二个 -> 操作条弹在**错的那条**上 ❌
+       *    -> 改色 / 删除也会**改错那条** ❌
+       * -> 用**几何位置**（`position.rects`）匹配 -> **精确** ✅
+       */
+      const highlight = findHighlightByElement(highlightEl, id);
       if (!highlight) {
         return;
       }
 
       event.preventDefault();
       event.stopPropagation();
+
+      /*
+       * ⚠️ **记录"点到的是哪个矩形"** -> 激活态**只给那一个** ✅
+       */
+      const elRect = highlightEl.getBoundingClientRect();
+      setActiveHighlightRect({
+        left: elRect.left,
+        top: elRect.top,
+        width: elRect.width,
+        height: elRect.height,
+      });
+
       handleHighlightClick(highlight);
     },
     [
       onHighlightClick,
       findHighlightAtPoint,
-      highlights,
       handleHighlightClick,
       highlightPopover,
       activeHighlightId,
+      findHighlightByElement,
     ],
   );
 
@@ -3522,13 +3649,53 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * ---------------- 高亮块操作条 ----------------
    */
 
-  /** 找一条高亮的归一化位置（换色时回传用） */
+  /**
+   * 找一条高亮的归一化位置（换色时回传用）。
+   *
+   * ⚠️⚠️ **同 id 时要用"激活的矩形"消歧**（实测踩到的坑）：
+   *
+   * -> 宿主可能传了**重复的 id** ❌
+   * -> `highlights.find(h => h.id === id)` -> 永远找到**第一个** ❌
+   * -> 换色 / 删除 -> **改错那条高亮** ❌
+   * -> 有 `activeHighlightRect` -> 按**几何**挑到真正的那条 ✅
+   */
   const findHighlightPosition = useCallback(
     (id: string): NormPosition | undefined => {
-      const found = highlights.find((h) => h.id === id);
-      return found?.position;
+      const candidates = highlights.filter((h) => h.id === id);
+      if (candidates.length <= 1) {
+        return candidates[0]?.position;
+      }
+
+      /*
+       * ⚠️ **按"激活的矩形"消歧** ✅
+       *
+       * -> `activeHighlightRect` 是**视口 px** ✅
+       * -> 高亮的 `position.boundingRect` 是**归一化** ✅
+       * -> 换算：`norm.width * (视口宽 / 归一化宽)` ✅
+       */
+      const active = activeHighlightRect;
+      if (active) {
+        for (const candidate of candidates) {
+          const position = candidate.position;
+          if (!position) {
+            continue;
+          }
+          const ratioX =
+            position.boundingRect.width > 0 ? active.width / position.boundingRect.width : 1;
+          const ratioY =
+            position.boundingRect.height > 0 ? active.height / position.boundingRect.height : 1;
+          const left = position.boundingRect.x1 * ratioX;
+          const top = position.boundingRect.y1 * ratioY;
+          if (Math.abs(left - active.left) < 2 && Math.abs(top - active.top) < 2) {
+            return position;
+          }
+        }
+      }
+
+      // ⚠️ **消歧不了** -> 退回第一个（老行为）✅
+      return candidates[0]?.position;
     },
-    [highlights],
+    [highlights, activeHighlightRect],
   );
 
   /** 高亮浮层：关闭 */

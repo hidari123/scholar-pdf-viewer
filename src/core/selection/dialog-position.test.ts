@@ -149,6 +149,40 @@ describe('computeDialogPosition', () => {
     expect(result.top).toBe(392);
   });
 
+  /*
+   * ⚠️ **"高度"决定贴上面还是贴下面**（第 27 轮实测踩到的坑）。
+   *
+   * -> 便利贴详情面板的**真实高度**不是固定的（`min(460px, 70%)`）❌
+   * -> 之前写死 **320** -> 算"下面放不下" -> 面板被放到**上面** ❌
+   *    -> 实测：`anchor.bottom(391) + 30 + 320 = 741 > 732 - 12` ❌
+   *    -> -> `top = anchor.top - 30 - 320 = 16` -> **贴在 PDF 最上方** ✅
+   * -> 用 **200**（比"锚点下面能放下的高度"小）-> **正常贴在下面** ✅
+   */
+  it('**高度够小 -> 贴在锚点下面**（不会翻到上面）', () => {
+    const result = computeDialogPosition({
+      anchor: { left: 539, top: 367, right: 563, bottom: 391 },
+      size: { width: 322, height: 200 },
+      viewport: { width: 1442, height: 732 },
+      gap: 30,
+    });
+
+    // 391 + 30 = 421 -> 下面放得下（421 + 200 = 621 < 720）✅
+    expect(result.top).toBe(421);
+  });
+
+  it('**高度太大 -> 翻到上面**（这正是之前的 bug）', () => {
+    const result = computeDialogPosition({
+      anchor: { left: 539, top: 367, right: 563, bottom: 391 },
+      size: { width: 322, height: 320 },
+      viewport: { width: 1442, height: 732 },
+      gap: 30,
+    });
+
+    // 391 + 30 + 320 = 741 > 720 -> 翻到上面
+    // above = 367 - 30 - 320 = 17
+    expect(result.top).toBe(17);
+  });
+
   it('**垂直：整个弹窗都在视口内**', () => {
     const cases = [
       { left: 300, top: 0, right: 500, bottom: 10 },

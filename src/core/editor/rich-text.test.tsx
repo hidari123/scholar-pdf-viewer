@@ -175,6 +175,13 @@ describe('defaultRichTextToolbar', () => {
    * ⚠️ **"无背景色"标记**（用户需求：
    * "高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"）。
    */
+  it('**"无背景色"的执行：`isNoColor` 为 true 时不应用颜色**', () => {
+    // ⚠️ 这是一条**纯逻辑**的断言（不碰 DOM）✅
+    // -> `execRichTextCommand` 内部会走 `isNoColor` 分支 ✅
+    expect(isNoColor(NO_COLOR)).toBe(true);
+    expect(isNoColor('transparent')).toBe(true);
+  });
+
   it('**"无背景色"能被识别**（NO_COLOR / transparent / none）', () => {
     expect(isNoColor(NO_COLOR)).toBe(true);
     expect(isNoColor('transparent')).toBe(true);

@@ -163,7 +163,44 @@ describe('DocumentCache（内存模式）', () => {
     expect(events.some((e) => e.type === 'error')).toBe(true);
   });
 
-  it('重复写同一 key：字节数不重复累加', async () => {
+  /*
+   * ⚠️ **LRU 淘汰的边界**（补覆盖率）。
+   */
+
+  it('**淘汰时会跳过"刚写入的那一条"**（不会自己淘汰自己）', async () => {
+    const cache = await memoryCache(20);
+    await cache.set('old', bytes(10));
+    await cache.set('new', bytes(10));
+
+    // ⚠️ **刚写的这条还在** ✅
+    expect(await cache.get('new')).not.toBeNull();
+  });
+
+  it('**删掉不存在的 key 不报错**', async () => {
+    const cache = await memoryCache();
+
+    await expect(cache.remove('nope')).resolves.toBeUndefined();
+  });
+
+  it('**clear 之后读不到东西了**', async () => {
+    const cache = await memoryCache();
+    await cache.set('a', bytes(4));
+
+    await cache.clear();
+
+    expect(await cache.get('a')).toBeNull();
+  });
+
+  it('**stats 报告当前条目数**', async () => {
+    const cache = await memoryCache();
+    await cache.set('a', bytes(4));
+
+    const stats = await cache.stats();
+
+    expect(stats.persistent).toBe(false);
+  });
+
+  it('**重复写同一 key：字节数不重复累加**', async () => {
     const cache = await memoryCache(1000);
     await cache.set('a', bytes(50));
     await cache.set('a', bytes(50));

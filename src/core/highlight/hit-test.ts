@@ -60,6 +60,17 @@ export interface HighlightHit {
   /** 命中的高亮 id */
   id: string;
   /**
+   * **命中的那个矩形**（视口 px）。
+   *
+   * ⚠️ **用来精确找到 DOM 元素** ✅
+   *
+   * -> 宿主可能传了**重复的 id** ❌（实测：刷新后新建高亮 -> id 撞了）
+   * -> 按 id 找元素 -> `querySelectorAll` 返回**多个** -> 找到**第一个** ❌
+   * -> 点的是第二个，激活的却是第一个 ❌
+   * -> 按**矩形位置**找 -> **精确到那一个** ✅
+   */
+  rect: HighlightRect;
+  /**
    * **是不是"重叠部分"**。
    *
    * → `false` = 点的位置只属于这一个高亮 ✅
@@ -88,7 +99,12 @@ export function hitsAtPoint(x: number, y: number, rects: readonly HighlightRect[
       y >= rect.top &&
       y <= rect.top + rect.height
     ) {
-      hit.push({ id: rect.id, isOverlapping: false, overlappingIds: [rect.id] });
+      hit.push({
+        id: rect.id,
+        rect,
+        isOverlapping: false,
+        overlappingIds: [rect.id],
+      });
     }
   }
 
@@ -136,6 +152,71 @@ export function pickHighlightAtPoint(
   const hits = hitsAtPoint(x, y, rects);
   // ⚠️ **第一个就是最上面的**（已排序）→ 重叠时选它 ✅
   return hits[0] ?? null;
+}
+
+/**
+ * **两个矩形是不是"同一个"**（用来消歧重复 id 的高亮）。
+ *
+ * ⚠️ **为什么需要**（实测踩到的坑）：
+ *
+ * -> 宿主可能传了**重复的 id** ❌
+ *    （实测：刷新页面 -> 旧高亮从持久化恢复 -> 新建的高亮**又拿到同一个 id**）
+ * -> 按 id 找 DOM 元素 -> `querySelectorAll` 返回**多个** -> 找到**第一个** ❌
+ *    -> 点第二个 -> 操作条弹在**第一个**上 ❌
+ *    -> 激活态也**两个都亮** ❌
+ * -> 按**矩形**比对 -> **精确到那一个** ✅
+ *
+ * @param a 矩形 A
+ * @param b 矩形 B
+ * @param tolerance 容差（px）
+ * @returns 是同一个则 true
+ */
+export function isSameRect(
+  a: { left: number; top: number; width: number; height: number },
+  b: { left: number; top: number; width: number; height: number },
+  tolerance = 1,
+): boolean {
+  return (
+    Math.abs(a.left - b.left) <= tolerance &&
+    Math.abs(a.top - b.top) <= tolerance &&
+    Math.abs(a.width - b.width) <= tolerance &&
+    Math.abs(a.height - b.height) <= tolerance
+  );
+}
+
+/**
+ * **在一组高亮里找到"矩形对得上"的那一个**（用来消歧重复 id）。
+ *
+ * ⚠️ **为什么需要**（实测踩到的坑）：
+ *
+ * -> 宿主可能传了**重复的 id** ❌
+ *    （实测：刷新页面 -> 旧高亮从持久化恢复 -> 新建的高亮**又拿到同一个 id**）
+ * -> `highlights.find(h => h.id === id)` -> 永远找到**第一个** ❌
+ *    -> 点第二个 -> 操作条弹在**第一个**上 ❌
+ *    -> 激活态也**两个都亮** ❌
+ * -> 按**矩形**比对 -> **精确到那一个** ✅
+ *
+ * @param candidates 同 id 的候选高亮
+ * @param target 目标矩形（视口 px）
+ * @param toRect 把候选的归一化矩形换算成视口 px
+ * @returns 找到的那个（找不到就返回第一个）
+ */
+export function pickHighlightByRect<T>(
+  candidates: readonly T[],
+  target: { left: number; top: number; width: number; height: number },
+  toRect: (candidate: T) => { left: number; top: number; width: number; height: number } | null,
+): T | undefined {
+  if (candidates.length <= 1) {
+    return candidates[0];
+  }
+  for (const candidate of candidates) {
+    const rect = toRect(candidate);
+    if (rect && isSameRect(rect, target, 2)) {
+      return candidate;
+    }
+  }
+  // ⚠️ **对不上** -> 退回第一个（老行为）✅
+  return candidates[0];
 }
 
 /**

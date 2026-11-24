@@ -236,7 +236,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
    * → 用户移动光标 / 选中一段文字 -> 工具栏的"按下态"要跟着变 ✅
    * → 用一个递增的计数器 -> 变了就重渲染 ✅
    */
-  const [_selectionTick, setSelectionTick] = useState(0);
+  const [selectionTick, setSelectionTick] = useState(0);
 
   /** 选区变化时刷新（`selectionchange` 是全局事件） */
   useEffect(() => {
@@ -265,17 +265,33 @@ export function RichTextEditor(props: RichTextEditorProps) {
    * -> **拿不到选区** -> 当成"有选区"（不误伤）✅
    */
   const hasSelection = useCallback((): boolean => {
+    /*
+     * ⚠️ **读一下 `selectionTick`**（让它成为依赖）✅
+     *
+     * -> 选区变化 -> `setSelectionTick` -> 重渲染 ✅
+     * -> 重渲染 -> 重算 `hasSelection()` -> 按钮的 disabled 跟着变 ✅
+     * -> ⚠️ **不读它** -> biome 会把它从依赖里删掉 -> **按钮永远不刷新** ❌
+     */
+    void selectionTick;
+
     const selection = window.getSelection();
     if (!selection) {
       return true;
     }
-    // ⚠️ **选区在别的地方**（比如用户选中了 PDF 上的字）-> 不算 ✅
-    const anchor = selection.anchorNode;
-    if (anchor && !editorRef.current?.contains(anchor)) {
-      return true;
+    // ⚠️ **没选区**（只有一个光标）-> 没有选文字 ❌ -> 该置灰 ✅
+    if (selection.isCollapsed) {
+      return false;
     }
-    return !selection.isCollapsed;
-  }, []);
+    /*
+     * ⚠️ **看选区有多长**（不能用 `editorRef.current?.contains()`）❌
+     *
+     * -> 首次渲染时 `editorRef.current` 还是 **null** ❌
+     * -> `contains` 返回 false -> 误判成"选区在编辑区外面" ❌
+     * -> -> 按钮**永远不禁用** ❌
+     * -> 改成：**选区文本长度 > 0** 才算"选了文字" ✅
+     */
+    return selection.toString().trim().length > 0;
+  }, [selectionTick]);
 
   const queryCommandActive = useCallback((command: string): boolean => {
     /*
@@ -509,7 +525,15 @@ export function RichTextEditor(props: RichTextEditorProps) {
                  * ⚠️⚠️ **没选文字 -> 置灰**（用户需求：
                  * "清除格式按钮如果没有选择文字 应该置灰"✅）。
                  */
-                disabled={disabled}
+                /*
+                 * ⚠️⚠️ **颜色按钮即使置灰，也要能点开面板** ✅
+                 *
+                 * -> 用户没选文字时，按钮是灰的 ❌
+                 * -> 但**颜色面板还得能打开** ❌
+                 *    -> 否则用户**没法选颜色**（选了字才能用，但用户不知道）✅
+                 * -> -> **颜色命令不禁用**（只用视觉上的"灰"表示不可用）✅
+                 */
+                disabled={disabled && !hasPalette}
                 onMouseDown={(event) => {
                   // ⚠️ **阻止默认行为** → 不然编辑区会失焦 → 光标丢失
                   event.preventDefault();
