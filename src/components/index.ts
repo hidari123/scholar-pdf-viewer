@@ -26,5 +26,6 @@ export * from './SelectionLayer';
 export * from './SelectionPopover';
 export * from './StickyNoteLayer';
 export * from './TextLayer';
+export * from './ThemePicker';
 export * from './ThumbnailPanel';
 export * from './Toolbar';

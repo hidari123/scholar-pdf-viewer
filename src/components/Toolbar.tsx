@@ -10,11 +10,12 @@
 
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import type { ToolbarConfig } from '../core/theme';
+import type { PdfViewerTheme, ToolbarConfig } from '../core/theme';
 import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
+import { ThemePicker } from './ThemePicker';
 
 /**
  * **工具栏配置**。
@@ -63,6 +64,25 @@ export interface ToolbarProps {
   /** 打印 */
   onPrint?: () => void;
   /**
+   * **当前主题**（受控）。
+   *
+   * -> 配合 \`onThemeChange\` -> 工具栏显示主题选择按钮 ✅
+   */
+  theme?: PdfViewerTheme;
+  /**
+   * **切换主题**（宿主改 \`theme\` prop）。
+   *
+   * ⚠️ **不传就不渲染主题按钮** ✅
+   * -> 宿主自己已经有主题切换 UI -> 不要重复 ✅
+   */
+  onThemeChange?: (theme: PdfViewerTheme) => void;
+  /**
+   * **可选的主题列表**（宿主可自定义）。
+   *
+   * -> 不传 -> 用**内置的全部 7 个** ✅
+   */
+  themeOptions?: readonly PdfViewerTheme[];
+  /**
    * **图标覆盖**（宿主 → 包）。
    *
    * ⚠️ 宿主可以用自己的图标体系（`lucide-react` 等）覆盖内置图标 → 风格统一 ✅
@@ -93,6 +113,9 @@ export function Toolbar(props: ToolbarProps) {
     onToggleThumbnails,
     onToggleOutline,
     onPrint,
+    theme,
+    onThemeChange,
+    themeOptions,
     icons,
   } = props;
 
@@ -297,6 +320,30 @@ export function Toolbar(props: ToolbarProps) {
           >
             <Icon name={'print'} title={t('print.title')} overrides={icons} />
           </button>
+        ) : null}
+
+        {/*
+         * ⚠️⚠️ **主题选择按钮**（用户需求：
+         * "主题应该是包里面内置的 然后宿主可以进行选择配置
+         *  包在工具栏那里也可以加上一个按钮让用户进行选择"✅）。
+         *
+         * -> **独立分组**（和缩放/打印隔开）-> 视觉更清楚 ✅
+         * -> 宿主不传 \`onThemeChange\` -> **不渲染** ✅
+         *    -> 宿主自己已经有主题切换 UI -> 不重复 ✅
+         */}
+        {onThemeChange ? (
+          <>
+            <span className="scpdf-toolbar__divider" aria-hidden="true" />
+            <ThemePicker
+              theme={theme}
+              onThemeChange={onThemeChange}
+              themes={themeOptions}
+              locale={locale}
+              locales={locales}
+              messages={messages}
+              icons={icons}
+            />
+          </>
         ) : null}
 
         {toolbar.rightSlot}

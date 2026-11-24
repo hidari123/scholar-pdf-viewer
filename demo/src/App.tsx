@@ -1144,6 +1144,13 @@ export default function App() {
           file={sampleUrl}
           documentId={documentId}
           theme={theme}
+          /*
+           * ⚠️ **主题切换**（包的工具栏里会多一个 🎨 按钮）。
+           *
+           * -> 用户需求："包在工具栏那里也可以加上一个按钮让用户进行选择" ✅
+           * -> 传了 `onThemeChange` -> 工具栏显示主题按钮 ✅
+           */
+          onThemeChange={setTheme}
           dir={dir}
           appearance={{ density }}
           slots={useSlots ? demoSlots : undefined}

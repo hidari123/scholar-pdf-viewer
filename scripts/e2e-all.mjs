@@ -84,6 +84,7 @@ const suites = [
   { name: '打印时藏起便签和浮层（不泄露批注）', file: 'e2e-print-hide-overlays.mjs' },
   { name: '打印时所有页都有内容（不是白页）', file: 'e2e-print-all-pages.mjs' },
   { name: '高亮按钮直接用当前色 / 默认色', file: 'e2e-highlight-default-color.mjs' },
+  { name: '工具栏的主题选择按钮', file: 'e2e-theme-picker.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

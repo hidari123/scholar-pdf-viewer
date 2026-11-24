@@ -87,6 +87,11 @@ export interface Messages {
   'outline.title': string;
   'thumbnails.title': string;
   'print.title': string;
+  /* —— 主题 —— */
+  /** 主题选择按钮 */
+  'theme.picker': string;
+  /** 当前主题（勾选标记） */
+  'theme.current': string;
   'a11y.canvas': string;
   'a11y.page': string;
   /*
@@ -269,6 +274,8 @@ export const ZH_MESSAGES: Messages = {
   'outline.title': '目录',
   'thumbnails.title': '缩略图',
   'print.title': '打印',
+  'theme.picker': '主题',
+  'theme.current': '当前主题',
   'a11y.canvas': 'PDF 页面',
   'a11y.page': '第 {page} 页',
   'page.prev': '上一页',
@@ -379,6 +386,8 @@ export const EN_MESSAGES: Messages = {
   'outline.title': 'Outline',
   'thumbnails.title': 'Thumbnails',
   'print.title': 'Print',
+  'theme.picker': 'Theme',
+  'theme.current': 'Current theme',
   'a11y.canvas': 'PDF page',
   'a11y.page': 'Page {page}',
   'page.prev': 'Previous page',

@@ -649,6 +649,21 @@ export interface PdfViewerProps {
   annotationTextPalette?: RichTextPalette;
   /** 换色 */
   onHighlightColorChange?: (id: string, color: string) => void;
+  /**
+   * **切换主题**（宿主改 `theme` prop）。
+   *
+   * ⚠️ **不传就不显示工具栏的主题按钮** ✅
+   * -> 宿主自己已经有主题切换 UI -> 不要重复 ✅
+   * -> 传了 -> 工具栏出现 🎨 按钮 -> 点它选主题 ✅
+   * -> 用户需求："包在工具栏那里也可以加上一个按钮让用户进行选择" ✅
+   */
+  onThemeChange?: (theme: PdfViewerTheme) => void;
+  /**
+   * **可选的主题列表**（宿主可自定义）。
+   *
+   * -> 不传 -> 用**内置的全部 7 个** ✅
+   */
+  themeOptions?: readonly PdfViewerTheme[];
   /** 复制高亮的文字 */
   onHighlightCopy?: (text: string) => void;
   /** 更多（宿主自定义） */
@@ -759,6 +774,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onToast,
     onAnnotationDelete,
     onHighlightColorChange,
+    onThemeChange,
+    themeOptions,
     onHighlightCopy,
     onHighlightMore,
     onPageChange,
@@ -4652,6 +4669,16 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               : () => setSidebar((v) => (v === 'outline' ? 'none' : 'outline'))
           }
           onPrint={merged.features?.print === false ? undefined : printDocument}
+          /*
+           * ⚠️ **主题选择按钮**（用户需求：
+           * "包在工具栏那里也可以加上一个按钮让用户进行选择"✅）。
+           *
+           * -> 宿主传了 `onThemeChange` -> 显示 ✅
+           * -> 宿主关掉了 \`features.themePicker\` -> 不显示 ✅
+           */
+          theme={merged.theme}
+          onThemeChange={merged.features?.themePicker === false ? undefined : onThemeChange}
+          themeOptions={themeOptions}
         />
       )}
 

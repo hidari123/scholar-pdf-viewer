@@ -129,6 +129,117 @@
   font-size: var(--scpdf-font-size);
 }
 
+/* ---------- 主题选择器（🎨） ---------- */
+
+/*
+ * ⚠️ **工具栏分组之间的分隔线**。
+ *
+ * -> 用户要求："工具栏那里也可以加上一个按钮让用户进行选择"
+ * -> 主题按钮**独立一组**（和缩放/打印隔开）✅
+ * -> 分隔线让"这是一组新的东西"更清楚 ✅
+ */
+.scpdf-toolbar__divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--scpdf-color-border);
+  flex: none;
+}
+
+.scpdf-theme-picker {
+  position: relative;
+  display: inline-flex;
+}
+
+/* 下拉菜单 */
+.scpdf-theme-picker__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--scpdf-color-border);
+  border-radius: 6px;
+  background: var(--scpdf-color-surface);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* 菜单里的一项 */
+.scpdf-theme-picker__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: var(--scpdf-font-size);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scpdf-theme-picker__item:hover {
+  background: var(--scpdf-color-surface-alt);
+}
+
+/* 当前主题（加粗 + 主色） */
+.scpdf-theme-picker__item[data-active="true"] {
+  color: var(--scpdf-color-primary);
+  font-weight: 600;
+}
+
+.scpdf-theme-picker__label {
+  flex: 1;
+}
+
+/*
+ * ⚠️ **主题色板小方块**。
+ *
+ * -> 每个主题给一个**代表色** ✅
+ * -> 用户不用记住名字 -> **看颜色就知道** ✅
+ */
+.scpdf-theme-picker__swatch {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--scpdf-color-border);
+  border-radius: 3px;
+  flex: none;
+}
+
+.scpdf-theme-picker__swatch[data-theme="light"] {
+  background: #ffffff;
+}
+
+.scpdf-theme-picker__swatch[data-theme="dark"] {
+  background: #1f2933;
+}
+
+.scpdf-theme-picker__swatch[data-theme="auto"] {
+  background: linear-gradient(135deg, #ffffff 50%, #1f2933 50%);
+}
+
+.scpdf-theme-picker__swatch[data-theme="paper"] {
+  background: #f5f0e6;
+}
+
+.scpdf-theme-picker__swatch[data-theme="sepia"] {
+  background: #f4ecd8;
+}
+
+.scpdf-theme-picker__swatch[data-theme="contrast"] {
+  background: #000000;
+}
+
+.scpdf-theme-picker__swatch[data-theme="minimal"] {
+  background: #fafafa;
+}
+
 .scpdf-toolbar__page-input {
   width: 44px;
   padding: 3px 6px;
