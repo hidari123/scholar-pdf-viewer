@@ -15,6 +15,7 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { HighlightPalette } from '../core/highlight/palette';
+import { resolveHighlightColorName } from '../core/highlight/palette';
 import type { SelectionAction } from '../core/selection/actions';
 import { BUILTIN_ACTION_KEYS, isBuiltinIcon } from '../core/selection/actions';
 import { HIGHLIGHT_ACTION_KEYS } from '../core/selection/highlight-actions';
@@ -736,7 +737,14 @@ export function SelectionPopover({
                 <button
                   type="button"
                   className="scpdf-selection-popover__btn scpdf-selection-popover__btn--split"
-                  title={t('selection.color')}
+                  /*
+                   * ⚠️ **title 和 aria-label 要一致**（实测踩到的坑）。
+                   *
+                   * -> 之前 `title="选择颜色"` + `aria-label="展开颜色下拉"` ❌
+                   * -> 同一个按钮**两套说法** ❌ -> 用户说"title 变来变去" ✅
+                   * -> -> 现在**都用同一个文案** ✅
+                   */
+                  title={t('selection.expandColor')}
                   aria-label={t('selection.expandColor')}
                   aria-expanded={paletteOpen}
                   onClick={(event) => {
@@ -765,26 +773,42 @@ export function SelectionPopover({
 
               {showPalette && paletteOpen ? (
                 <span className="scpdf-selection-popover__palette">
-                  {Object.entries(highlightPalette).map(([key, color]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      className="scpdf-selection-popover__swatch"
-                      /*
-                       * ⚠️ **当前选中的色块要标出来** ✅
-                       * -> 用户一眼知道"现在用的是哪个颜色" ✅
-                       */
-                      data-active={key === currentHighlightColor ? 'true' : undefined}
-                      style={{ background: color }}
-                      title={color}
-                      aria-label={t('selection.highlightColor', { key })}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onPickColor(key);
-                        setPaletteOpen(false);
-                      }}
-                    />
-                  ))}
+                  {Object.entries(highlightPalette).map(([key, color]) => {
+                    /*
+                     * ⚠️⚠️ **tooltip 要本地化**（实测踩到的坑，用户反馈：
+                     * "选区的工具栏里面的中英文title还是会变来变去的
+                     *  有时候hover上去 title显示中文 有时候英文"）。
+                     *
+                     * -> 之前 \`title={color}\` -> 直接显示**原始色值**（\`#ffd54a\`）❌
+                     * -> 界面是中文也显示 \`#ffd54a\`，英文还是 \`#ffd54a\` ❌
+                     * -> -> **和界面语言完全脱节** ❌
+                     * -> -> 用户的体感就是"title 变来变去" ✅
+                     *
+                     * -> 现在按 key 查**本地化名字** ✅
+                     * -> 宿主自定义的 key 查不到 -> **退回 key 本身** ✅
+                     */
+                    const colorName = resolveHighlightColorName(key, locale);
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className="scpdf-selection-popover__swatch"
+                        /*
+                         * ⚠️ **当前选中的色块要标出来** ✅
+                         * -> 用户一眼知道"现在用的是哪个颜色" ✅
+                         */
+                        data-active={key === currentHighlightColor ? 'true' : undefined}
+                        style={{ background: color }}
+                        title={colorName}
+                        aria-label={colorName}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onPickColor(key);
+                          setPaletteOpen(false);
+                        }}
+                      />
+                    );
+                  })}
                 </span>
               ) : null}
             </span>

@@ -55,6 +55,7 @@ import {
 } from '../core/editor/rich-text';
 import type { ToolbarStateEditor } from '../core/editor/toolbar-state';
 import { computeToolbarActiveState, FORMAT_COMMANDS } from '../core/editor/toolbar-state';
+import { resolveHighlightColorName } from '../core/highlight/palette';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
@@ -313,6 +314,7 @@ export function TipTapEditor(props: TipTapEditorProps) {
         icons={icons}
         palette={palette}
         t={t}
+        locale={locale}
         onOverlayStateChange={onOverlayStateChange}
       />
       <div ref={hostRef} className="scpdf-rich-text__editor scpdf-tiptap__editor" />
@@ -348,10 +350,16 @@ function TipTapToolbar(props: {
   /** **文字颜色**色板（**深色**） */
   textPalette?: RichTextPalette;
   t: (key: keyof Messages, vars?: Record<string, string | number>) => string;
+  /**
+   * **当前语言**（色块的 tooltip 要本地化）✅
+   *
+   * ⚠️ 之前色块的 `title={key}` -> 显示英文 key ❌ -> 和界面语言不一致 ❌
+   */
+  locale: Locale;
   /** 嵌套弹窗的状态（通知外层） */
   onOverlayStateChange?: (hasOverlay: boolean) => void;
 }) {
-  const { hostRef, items, icons, palette, textPalette, t, onOverlayStateChange } = props;
+  const { hostRef, items, icons, palette, textPalette, t, locale, onOverlayStateChange } = props;
 
   /**
    * **当前展开的颜色面板**（命令名）。
@@ -1067,8 +1075,16 @@ function TipTapToolbar(props: {
               type="button"
               className="scpdf-rich-text__swatch"
               style={{ background: color }}
-              title={key}
-              aria-label={key}
+              /*
+               * ⚠️⚠️ **tooltip 要本地化**（实测踩到的坑，用户反馈：
+               * "选区的工具栏里面的中英文title还是会变来变去的
+               *  有时候hover上去 title显示中文 有时候英文"）。
+               *
+               * -> 之前 `title={key}` -> 显示英文 key ❌ -> 和界面语言不一致 ❌
+               * -> -> 现在按 key 查**本地化名字** ✅
+               */
+              title={resolveHighlightColorName(key, locale)}
+              aria-label={resolveHighlightColorName(key, locale)}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
                 /*

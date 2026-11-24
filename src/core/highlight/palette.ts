@@ -55,6 +55,49 @@ export const DEFAULT_HIGHLIGHT_PALETTE: HighlightPalette = {
 };
 
 /**
+ * **内置色板 key 的本地化名字**（key → 各语言的名字）。
+ *
+ * ⚠️ **为什么需要这个**（实测踩到的坑，用户反馈：
+ * "选区的工具栏里面的中英文title还是会变来变去的
+ *  有时候hover上去 title显示中文 有时候英文"）：
+ *
+ * -> 色块的 \`title\` 之前直接写**原始色值**（\`#ffd54a\`）❌
+ * -> 界面是中文也显示 \`#ffd54a\`，英文还是 \`#ffd54a\` ❌
+ * -> -> **和界面语言完全脱节** ❌
+ *
+ * -> 现在按 key 查本地化名字 ✅
+ * -> 宿主自定义的 key 查不到 -> **退回 key 本身** ✅（不猜）
+ *
+ * ⚠️ **只覆盖内置色板** ✅ -> 宿主的自定义 key 不在这里 ✅
+ */
+export const HIGHLIGHT_COLOR_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  yellow: { zh: '黄色', en: 'Yellow', ja: '黄色', fr: 'Jaune' },
+  green: { zh: '绿色', en: 'Green', ja: '緑色', fr: 'Vert' },
+  blue: { zh: '蓝色', en: 'Blue', ja: '青色', fr: 'Bleu' },
+  pink: { zh: '粉色', en: 'Pink', ja: 'ピンク', fr: 'Rose' },
+  purple: { zh: '紫色', en: 'Purple', ja: '紫色', fr: 'Violet' },
+  orange: { zh: '橙色', en: 'Orange', ja: 'オレンジ', fr: 'Orange' },
+  cyan: { zh: '青色', en: 'Cyan', ja: 'シアン', fr: 'Cyan' },
+  red: { zh: '红色', en: 'Red', ja: '赤色', fr: 'Rouge' },
+};
+
+/**
+ * 取某个色板 key 的**本地化名字**。
+ *
+ * @param key 色板 key
+ * @param locale 语言（\`zh\` / \`en\` / \`ja\` / \`fr\`…）
+ * @returns 本地化名字；查不到就**退回 key 本身** ✅
+ */
+export function resolveHighlightColorName(key: string, locale: string): string {
+  const names = HIGHLIGHT_COLOR_NAMES[key];
+  if (!names) {
+    // ⚠️ **查不到就退回 key**（宿主自定义的颜色）-> 至少不是色值 ❌
+    return key;
+  }
+  return names[locale] ?? names.en ?? key;
+}
+
+/**
  * 取色板里某个 key 的颜色。
  *
  * @param palette 色板（宿主传入）

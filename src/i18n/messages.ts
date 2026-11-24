@@ -168,6 +168,22 @@ export interface Messages {
   'annotation.empty': string;
   'link.internal': string;
   'selection.highlightColor': string;
+  /**
+   * **高亮色的本地化名字**（色块的 tooltip / aria-label）。
+   *
+   * ⚠️ **为什么不能直接用色值**（实测踩到的坑，用户反馈：
+   * "选区的工具栏里面的中英文title还是会变来变去的
+   *  有时候hover上去 title显示中文 有时候英文"）：
+   *
+   * -> 之前色块的 `title` 直接写**原始色值**（`#ffd54a`）❌
+   * -> 界面是中文也显示 `#ffd54a`，英文还是 `#ffd54a` ❌
+   * -> -> **和界面语言完全脱节** ❌
+   * -> -> 用户的体感就是"title 变来变去" ✅
+   *
+   * -> 现在按 key 查本地化名字 ✅（`yellow` -> 黄色 / Yellow / イエロー）✅
+   * -> 宿主自定义的 key 查不到 -> **退回 key 本身** ✅（不用猜）
+   */
+  'selection.highlightColorName': string;
   /* —— 富文本工具栏 —— */
   'richtext.bold': string;
   'richtext.italic': string;
@@ -330,7 +346,8 @@ export const ZH_MESSAGES: Messages = {
   'annotation.expand': '展开批注',
   'annotation.empty': '（空批注）',
   'link.internal': '内部链接',
-  'selection.highlightColor': '高亮色 {key}',
+  'selection.highlightColor': '高亮色 {name}',
+  'selection.highlightColorName': '高亮色 {name}',
   'richtext.bold': '加粗',
   'richtext.italic': '斜体',
   'richtext.underline': '下划线',
@@ -443,7 +460,8 @@ export const EN_MESSAGES: Messages = {
   'annotation.expand': 'Expand annotation',
   'annotation.empty': '(Empty annotation)',
   'link.internal': 'Internal link',
-  'selection.highlightColor': 'Highlight color {key}',
+  'selection.highlightColor': 'Highlight color {name}',
+  'selection.highlightColorName': 'Highlight color {name}',
   'richtext.bold': 'Bold',
   'richtext.italic': 'Italic',
   'richtext.underline': 'Underline',

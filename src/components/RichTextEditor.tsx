@@ -32,6 +32,7 @@ import {
   richTextToPlain,
 } from '../core/editor/rich-text';
 import { FORMAT_COMMANDS } from '../core/editor/toolbar-state';
+import { resolveHighlightColorName } from '../core/highlight/palette';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
@@ -577,8 +578,18 @@ export function RichTextEditor(props: RichTextEditorProps) {
                       type="button"
                       className="scpdf-rich-text__swatch"
                       style={{ background: color }}
-                      title={key}
-                      aria-label={key}
+                      /*
+                       * ⚠️⚠️ **tooltip 要本地化**（实测踩到的坑，用户反馈：
+                       * "选区的工具栏里面的中英文title还是会变来变去的
+                       *  有时候hover上去 title显示中文 有时候英文"）。
+                       *
+                       * -> 之前 `title={key}` -> 显示英文 key（`yellow`）❌
+                       * -> 中文界面上也显示 `yellow` ❌ -> **和界面语言不一致** ❌
+                       * -> -> 现在按 key 查**本地化名字** ✅
+                       * -> 宿主自定义的 key 查不到 -> **退回 key 本身** ✅
+                       */
+                      title={resolveHighlightColorName(key, locale)}
+                      aria-label={resolveHighlightColorName(key, locale)}
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => pickColor(item.command, color)}
                     />

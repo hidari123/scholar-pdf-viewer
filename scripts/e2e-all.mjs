@@ -89,6 +89,7 @@ const suites = [
   { name: '没选字时只有"清除格式"置灰', file: 'e2e-editor-disabled-state.mjs' },
   { name: '批注详情贴在便签旁边（任意页）', file: 'e2e-annotation-panel-position.mjs' },
   { name: '跨页选择高亮（两页都有）', file: 'e2e-cross-page-highlight.mjs' },
+  { name: '选区浮层的 tooltip 本地化', file: 'e2e-i18n-titles.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 
