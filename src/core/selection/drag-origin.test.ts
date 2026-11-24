@@ -180,3 +180,60 @@ describe('filterByDragOrigin', () => {
     expect(kept.some((r) => r.top === 140 && r.left === 1000)).toBe(false);
   });
 });
+
+/*
+ * ⚠️ **垂直过滤**（跨页选择的关键，用户反馈：
+ * "跨页选择高亮的时候 实测只能高亮第一页的内容
+ *  第二页的内容也高亮到了第一页" ✅）。
+ */
+describe('垂直过滤（跨页选择）', () => {
+  it('**没有拖动范围 -> 不过滤**', () => {
+    const rects = [
+      { top: 100, left: 10, width: 50, height: 20 },
+      { top: 200, left: 10, width: 50, height: 20 },
+    ];
+    expect(filterByDragOrigin(rects, null)).toHaveLength(2);
+  });
+
+  it('**丢掉垂直范围之外的矩形**', () => {
+    const rects = [
+      { top: 100, left: 10, width: 50, height: 20 }, // 范围外（在上方）
+      { top: 500, left: 10, width: 50, height: 20 }, // 范围内
+      { top: 900, left: 10, width: 50, height: 20 }, // 范围外（在下方）
+    ];
+    const kept = filterByDragOrigin(rects, {
+      startX: 10,
+      endX: 60,
+      startY: 480,
+      endY: 520,
+    });
+    expect(kept.length).toBeGreaterThan(0);
+    // 范围上方的那个**必须被丢掉** ✅
+    expect(kept.every((r) => r.top + r.height > 460)).toBe(true);
+  });
+
+  it('**留容差**（起点那一行不会被丢掉）', () => {
+    // 起点正上方一点的行（字形盒比行盒小）
+    const rects = [{ top: 480, left: 10, width: 50, height: 20 }];
+    const kept = filterByDragOrigin(rects, {
+      startX: 10,
+      endX: 60,
+      startY: 494,
+      endY: 520,
+    });
+    expect(kept.length).toBe(1);
+  });
+
+  it('**"整页"的矩形被丢掉**（跨页时浏览器会给这种）', () => {
+    const rects = [
+      { top: 0, left: 0, width: 1400, height: 1822 }, // 整页 ❌
+      { top: 500, left: 100, width: 60, height: 20 }, // 正常 ✅
+    ];
+    const kept = filterByDragOrigin(
+      rects,
+      { startX: 100, endX: 160, startY: 490, endY: 530 },
+      1822,
+    );
+    expect(kept.every((r) => r.height <= 1822 / 3)).toBe(true);
+  });
+});

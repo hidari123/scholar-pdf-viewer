@@ -88,6 +88,7 @@ const suites = [
   { name: '缩放比例可以填写', file: 'e2e-scale-input.mjs' },
   { name: '没选字时只有"清除格式"置灰', file: 'e2e-editor-disabled-state.mjs' },
   { name: '批注详情贴在便签旁边（任意页）', file: 'e2e-annotation-panel-position.mjs' },
+  { name: '跨页选择高亮（两页都有）', file: 'e2e-cross-page-highlight.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

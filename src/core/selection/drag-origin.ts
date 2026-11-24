@@ -114,6 +114,16 @@ export const OUTLIER_DISTANCE = 450;
 export const MAX_SAME_LINE_GAP = 400;
 
 /**
+ * **垂直方向的容差**（px）。
+ *
+ * ⚠️ **必须有**（实测踩到的坑）：
+ * -> 起点那一行的**字形盒**可能比鼠标按下的位置**略高** ❌
+ * -> 不留容差 -> **起点那行没高亮** ❌
+ * -> 20px 足够（一个行高）✅
+ */
+export const VERTICAL_TOLERANCE = 20;
+
+/**
  * 按**拖动范围**过滤矩形（只丢"离群"的）。
  *
  * ## ⚠️ 实测踩过的坑（这是最隐蔽的一个 bug）
@@ -162,11 +172,70 @@ export const MAX_SAME_LINE_GAP = 400;
  */
 export function filterByDragOrigin(
   rects: ClientRectLike[],
-  drag: { startX: number; endX: number } | null,
+  drag: { startX: number; endX: number; startY?: number; endY?: number } | null,
+  maxRectHeight?: number,
 ): ClientRectLike[] {
   // 没有拖动范围 → 不过滤（保守：宁可多画，也不要画不出来）
   if (!drag || rects.length <= 1) {
     return rects;
+  }
+
+  /*
+   * ⚠️⚠️ **先按【垂直方向】过滤**（跨页选择的关键，实测踩到的坑）。
+   *
+   * ### 问题（用户反馈）
+   *
+   * > "跨页选择高亮的时候 实测只能高亮第一页的内容
+   * >  第二页的内容也高亮到了第一页"
+   *
+   * ### 实测
+   *
+   * -> 从第 1 页**最后一行**往下拖到第 2 页 ✅
+   * -> 浏览器**自动滚动**（鼠标拖到容器外）✅
+   * -> 滚动后 Range 被**向前扩展到了页首** ❌
+   *    -> 选区长度 **1726** 字符（本来只有 ~84）❌
+   *    -> 矩形里有**整页**的（top=-3028, height=1822）❌
+   *    -> 选区文字从**页眉**（"上海人工智能实验室"）开始 ❌
+   * -> -> 高亮时**全落在第 1 页** ❌
+   *
+   * ### 修法
+   *
+   * -> 只保留**和拖动的垂直范围有重叠**的矩形 ✅
+   * -> 拖动起点在第 1 页底部 -> 页首的矩形**在拖动范围之外** -> 丢掉 ✅
+   *
+   * ⚠️ **要留一点容差**（`VERTICAL_TOLERANCE`）✅
+   * -> 起点那一行**可能略高于**起点（字形盒比行盒小）❌
+   * -> 不留容差 -> **起点那行的高亮没了** ❌
+   */
+  if (typeof drag.startY === 'number' && typeof drag.endY === 'number') {
+    const fromY = Math.min(drag.startY, drag.endY) - VERTICAL_TOLERANCE;
+    const toY = Math.max(drag.startY, drag.endY) + VERTICAL_TOLERANCE;
+    const inRangeRaw = rects.filter((rect) => {
+      const rectTop = rect.top;
+      const rectBottom = rect.top + rect.height;
+      return rectBottom > fromY && rectTop < toY;
+    });
+    /*
+     * ⚠️⚠️ **同时丢掉"整页"的矩形**（实测踩到的坑）。
+     *
+     * -> 浏览器的 Range 跨页时会给一个**整页**的矩形 ❌
+     *    -> 比如 `{top: -3028, height: 1822, left: 17}`（整页）❌
+     * -> 它的**垂直范围覆盖整页** -> 垂直过滤**留不住它** ❌
+     *    -> 但它的**水平范围**也覆盖整页 -> 水平过滤会**以它为准** ❌
+     *    -> -> 结果：**真正的正文被丢掉**，留下的是整页矩形 ❌
+     *    -> -> 高亮画成一整页 ❌
+     *
+     * -> 判据：**高度超过页面高度的 1/3** -> 一定是整页/旋转项 ❌
+     *    -> 和 `useTextSelection` 里已有的"旋转文字"过滤一致 ✅
+     */
+    const maxNormalHeight =
+      maxRectHeight !== undefined && maxRectHeight > 0 ? maxRectHeight / 3 : Infinity;
+    const inRange = inRangeRaw.filter((rect) => rect.height <= maxNormalHeight);
+
+    // 全过滤掉了 -> 说明拖动范围有问题 -> 保守起见**保留原来的** ✅
+    if (inRange.length > 0) {
+      rects = inRange;
+    }
   }
 
   // 拖动的水平范围（用户从左往右拖，或从右往左拖）

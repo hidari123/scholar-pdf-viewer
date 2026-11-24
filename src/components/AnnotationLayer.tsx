@@ -88,11 +88,32 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
 
     for (const highlight of highlights) {
       const position = highlight.position;
-      if (position.pageNumber !== pageNumber) {
-        continue;
-      }
 
+      /*
+       * ⚠️⚠️ **按【每个矩形自己的页码】过滤**，不能用 `position.pageNumber`（实测踩到的坑）。
+       *
+       * ### 问题（用户反馈）
+       *
+       * > "跨页选择高亮的时候 实测只能高亮第一页的内容
+       * >  第二页的内容也高亮到了第一页"
+       *
+       * -> 跨页高亮有**多个矩形**（每页一个）✅
+       * -> 但 \`position.pageNumber\` 只有**第一页** ❌
+       * -> 之前用 \`position.pageNumber !== pageNumber\` 过滤 ❌
+       *    -> 第 2 页的图层**看不到这条高亮** ❌
+       *    -> -> **第 2 页没有高亮** ❌
+       *
+       * ### 修法
+       *
+       * -> **每个矩形**按**它自己的** \`pageNumber\` 判断 ✅
+       * -> 一条跨页高亮 -> 第 1 页画它第 1 页的矩形 ✅
+       * ->                     第 2 页画它第 2 页的矩形 ✅
+       */
       for (const norm of position.rects) {
+        if (norm.pageNumber !== pageNumber) {
+          continue;
+        }
+
         // 归一化 → 视口 px：坐标 × (当前视口 / 参考尺寸)
         const ratioX = norm.width > 0 ? viewport.width / norm.width : 1;
         const ratioY = norm.height > 0 ? viewport.height / norm.height : 1;

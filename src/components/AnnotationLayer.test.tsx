@@ -243,3 +243,61 @@ describe('AnnotationLayer', () => {
     expect(container.style.getPropertyValue('--scpdf-hl-my-1')).toBe('#ff6b6b');
   });
 });
+
+/*
+ * ⚠️⚠️ **跨页高亮要在【每一页】都渲染**（用户反馈：
+ * "跨页选择高亮的时候 实测只能高亮第一页的内容
+ *  第二页的内容也高亮到了第一页" ✅）。
+ */
+describe('跨页高亮', () => {
+  /** 造一条跨页高亮（第 1 页一个矩形，第 2 页一个矩形） */
+  function crossPageHighlight() {
+    return {
+      id: 'h-cross',
+      color: 'yellow',
+      selectedText: '跨页',
+      position: {
+        // ⚠️ `position.pageNumber` 只有**第一页** ✅
+        pageNumber: 1,
+        boundingRect: { x1: 10, y1: 10, x2: 100, y2: 30, width: 600, height: 800, pageNumber: 1 },
+        rects: [
+          { x1: 10, y1: 10, x2: 100, y2: 30, width: 600, height: 800, pageNumber: 1 },
+          { x1: 10, y1: 10, x2: 100, y2: 30, width: 600, height: 800, pageNumber: 2 },
+        ],
+      },
+    };
+  }
+
+  it('**第 1 页渲染第 1 页的矩形**', () => {
+    render(
+      <AnnotationLayer
+        pageNumber={1}
+        viewport={{ width: 600, height: 800 }}
+        highlights={[crossPageHighlight() as never]}
+      />,
+    );
+    expect(document.querySelectorAll('.scpdf-annotation').length).toBe(1);
+  });
+
+  it('**第 2 页也渲染第 2 页的矩形**（不是只看 position.pageNumber）', () => {
+    render(
+      <AnnotationLayer
+        pageNumber={2}
+        viewport={{ width: 600, height: 800 }}
+        highlights={[crossPageHighlight() as never]}
+      />,
+    );
+    expect(document.querySelectorAll('.scpdf-annotation').length).toBe(1);
+  });
+
+  it('**第 3 页没有 -> 不渲染**', () => {
+    render(
+      <AnnotationLayer
+        pageNumber={3}
+        viewport={{ width: 600, height: 800 }}
+        highlights={[crossPageHighlight() as never]}
+      />,
+    );
+    expect(document.querySelectorAll('.scpdf-annotation').length).toBe(0);
+  });
+});

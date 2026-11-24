@@ -36,6 +36,21 @@ export interface RectInput {
 
 /** 提取选区所需的输入 */
 export interface ExtractSelectionInput {
+  /**
+   * **只保留这个页码范围内的矩形**（可选）。
+   *
+   * ⚠️ **跨页选择的���键**（实测踩到的坑）✅
+   *
+   * -> 浏览器在**自动滚动**后会把 Range **向前扩展到页首** ❌
+   *    -> 选区长度 1726 字符（本来只有 ~84）❌
+   *    -> 页 1 的**页眉**（"上海人工智能实验室"）也被选中了 ❌
+   * -> -> 高亮全落在**第 1 页** ❌
+   *    -> 用户反馈："第二页的内容也高亮到了第一页" ✅
+   *
+   * -> 精确的做法：只保留**起点页 ~ 终点页**的矩形 ✅
+   * -> 起点页 = 起点所在���页；终点页 = 终点所在的页 ✅
+   */
+  pageRange?: { from: number; to: number };
   /** 选中的文本 */
   text: string;
   /** 原始矩形（浏览器 Range 给的） */
@@ -170,10 +185,27 @@ export function extractSelection(input: ExtractSelectionInput): SelectionData | 
 
   // 1) 归页：每个矩形找它的页（中心点判定）
   const byPage = new Map<number, ViewRect[]>();
+  const pageRange = input.pageRange;
   for (const rect of rects) {
     const pageNumber = pageOfRect(rect, pages);
     if (pageNumber === null) {
       continue;
+    }
+
+    /*
+     * ⚠️⚠️ **丢掉【起点页之前】和【终点页之后】的矩形** ✅
+     *
+     * -> 跨页拖选时浏览器**自动滚动** ❌
+     * -> 滚动后 Range 被**向前扩展到页首** ❌
+     *    -> 页 1 开头的东西全被选中了 ❌
+     * -> -> 只保留**起点页 ~ 终点页** ✅
+     *    -> 页 1 的页眉被丢掉 ✅
+     *    -> 页 2 的内容保留 ✅
+     */
+    if (pageRange) {
+      if (pageNumber < pageRange.from || pageNumber > pageRange.to) {
+        continue;
+      }
     }
 
     const page = pages.find((p) => p.pageNumber === pageNumber);

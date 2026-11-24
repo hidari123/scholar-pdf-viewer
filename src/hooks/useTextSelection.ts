@@ -20,7 +20,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { filterByDragOrigin } from '../core/selection/drag-origin';
+import { filterByDragOrigin, VERTICAL_TOLERANCE } from '../core/selection/drag-origin';
 import type { PageFrame } from '../core/selection/extract';
 import { extractSelection } from '../core/selection/extract';
 import type { BaselinesByPage } from '../core/selection/shape';
@@ -220,6 +220,48 @@ function fillMissingRects(
 }
 
 /**
+ * **某个视口 y 坐标在第几页**（拖动的起点/终点用）。
+ *
+ * ⚠️ **和 `pageOfRect` 不一样**：
+ * -> `pageOfRect` 算的是**矩形**落在哪一页 ✅
+ * -> 这里算的是**一个点**（拖动的起点/终点）在哪一页 ✅
+ *
+ * @param y 视口坐标（相对浏览器窗口）
+ * @param frames 页框（滚动内容坐标）
+ * @param containerRect 容器的视口矩形
+ * @param scrollTop 容器的滚动量
+ * @returns 页码（1 起）；找不到返回 null
+ */
+function pageOfPoint(
+  y: number,
+  frames: PageFrame[],
+  containerRect: DOMRect,
+  scrollTop: number,
+): number | null {
+  // 视口坐标 -> 容器内容坐标
+  const contentY = y - containerRect.top + scrollTop;
+
+  let best: PageFrame | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const frame of frames) {
+    const top = frame.top;
+    const bottom = frame.top + frame.height;
+    // 在这一页的范围内 -> 距离 0
+    const distance =
+      contentY >= top && contentY <= bottom
+        ? 0
+        : Math.min(Math.abs(contentY - top), Math.abs(contentY - bottom));
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = frame;
+    }
+  }
+
+  return best?.pageNumber ?? null;
+}
+
+/**
  * 文本选择。
  *
  * @param options 参数
@@ -273,9 +315,49 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
    * 记住**鼠标按下和松开的位置** → 只保留**和拖动范围重叠**的矩形。
    * → 页边戳的字符和拖动范围不重叠 → 丢掉。
    */
-  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  /*
+   * ⚠️⚠️ **拖动起点 + 按下时的滚动量**（跨页选择的关键，实测踩到的坑）。
+   *
+   * ### 问题
+   *
+   * -> 跨页拖选时浏览器**自动滚动**（鼠标拖到容器外）❌
+   * -> 滚动后**内容在视口里挪了** ❌
+   *    -> 指针的 y 还是那个 y ❌
+   *    -> 但**文字已经不在那个 y 上了** ❌
+   *    -> -> 用"指针 y"过滤矩形 -> **把真正的文字全过滤掉了** ❌
+   * -> 实测：按下时 y=494（页 1 最后一行），自动滚动后那行到了 y=350 ❌
+   *    -> 过滤范围 [474, 706] -> **页 1 的正文全被丢掉** ❌
+   *
+   * ### 修法
+   *
+   * -> 记录**按下时的 scrollTop** ✅
+   * -> 过滤时把起点的 y **加上滚动量** ✅
+   *    -> 起点在**内容坐标**里就不会因为滚动而变 ✅
+   */
+  /*
+   * ⚠️⚠️ **拖动起点 + 按下时的页码**（跨页选择的关键，实测踩到的坑）。
+   *
+   * ### 问题
+   *
+   * -> 跨页拖选时浏览器**自动滚动**（鼠标拖到容器外）❌
+   * -> 滚动后**内容在视口里挪了** ❌
+   *    -> 指针的 y 还是那个 y ❌
+   *    -> 但**那个 y 现在指的是另一页**了 ❌
+   *    -> -> 起点页算错 -> 页范围算错 -> 高亮落到错误的页 ❌
+   *
+   * ### 修法
+   *
+   * -> **按下那一刻**就把页码记下来 ✅
+   * -> 之后不管怎么滚动，起点页都不变 ✅
+   */
+  const dragStartRef = useRef<{
+    x: number;
+    y: number;
+    scrollTop: number;
+    pageNumber: number | null;
+  } | null>(null);
   /** 拖动的终点（视口坐标） */
-  const dragEndRef = useRef<{ x: number; y: number } | null>(null);
+  const dragEndRef = useRef<{ x: number; y: number; scrollTop: number } | null>(null);
 
   /**
    * **span 按页分组的缓存**（`collectPages` 用）。
@@ -698,18 +780,106 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
        *
        * ⚠️ **只在有拖动起点时生效**（没有起点就用全部）。
        */
+      /*
+       * ⚠️⚠️ **垂直过滤必须在【内容坐标】里做**（实测踩到的坑）✅
+       *
+       * ### 问题
+       *
+       * -> 跨页拖选时浏览器**自动滚动**（鼠标拖到容器外）❌
+       * -> 滚动后 Range 被**向前扩展到页首** ❌
+       *    -> 选区长度 **1726** 字符（本来只有 ~84）❌
+       *    -> 页 1 的**页眉**（"上海人工智能实验室"）也被选中了 ❌
+       * -> -> 高亮全落在**第 1 页** ❌
+       *    -> 用户反馈："第二页的内容也高亮到了第一页" ✅
+       *
+       * ### 为什么"视口坐标"不行
+       *
+       * -> 矩形是**当前**视口坐标（自动滚动**之后**）✅
+       * -> 拖动起点是**按下那一刻**的视口坐标 ✅
+       * -> 两者**不在同一个坐标系** ❌ -> 过滤全错 ❌
+       *
+       * ### 修法
+       *
+       * -> 全部换算到**内容坐标**（相对容器内容原点）✅
+       *    -> 矩形：\`rect.top - 容器视口top + 当前 scrollTop\` ✅
+       *    -> 起点：\`按下时的 y - 容器视口top + 按下时的 scrollTop\` ✅
+       * -> -> 自动滚动**不影响**判断 ✅
+       */
+      const contentRect = container.getBoundingClientRect();
+      const dragStart = dragStartRef.current;
+      const dragEnd = dragEndRef.current;
+
+      /** 视口坐标 -> 内容坐标 */
+      const toContentY = (y: number, scrollTop: number): number => y - contentRect.top + scrollTop;
+
+      /*
+       * ⚠️ **先按垂直范围过滤**（丢掉页首那些多出来的矩形）✅
+       */
+      const contentRects = rectsWithGaps.map((r) => ({
+        top: toContentY(r.top, container.scrollTop),
+        left: r.left,
+        width: r.width,
+        height: r.height,
+      }));
+
+      const verticalKept =
+        dragStart && dragEnd
+          ? contentRects.filter((r) => {
+              /*
+               * ⚠️⚠️ **只保留下界**（实测踩到的坑）✅
+               *
+               * -> **上界不能用** ❌
+               *    -> 自动滚动之后指针的 y 变了 ❌
+               *    -> 算出来的上界**要么太大（全都留）** ❌
+               *    -> 要么太小（把真正的内容也丢了）❌
+               * -> **下界是可靠的** ✅
+               *    -> 起点在**内容坐标**里是固定的 ✅
+               *    -> 页 1 的页眉在起点**之上** ❌ -> 下界把它丢掉 ✅
+               * -> 浏览器自己的 Range 不会超出真实选区 ✅
+               *    -> 所以**不用上界** ✅
+               */
+              const fromY = toContentY(dragStart.y, dragStart.scrollTop) - VERTICAL_TOLERANCE;
+              return r.top + r.height > fromY;
+            })
+          : contentRects;
+
+      /*
+       * ⚠️ **过滤掉"旋转文字 / 整页"的矩形** ✅
+       *
+       * -> 跨页时浏览器会给一个**整页**的矩形 ❌
+       *    -> 它的水平范围覆盖整页 -> 水平过滤会**以它为准** ❌
+       *    -> -> 真正的正文被丢掉 ❌
+       */
+      const verticalFiltered =
+        verticalKept.length > 0
+          ? verticalKept.filter((r) => r.height <= maxNormalHeight)
+          : verticalKept;
+
       const withDragOrigin = filterByDragOrigin(
-        rectsWithGaps,
-        dragStartRef.current && dragEndRef.current
-          ? { startX: dragStartRef.current.x, endX: dragEndRef.current.x }
+        verticalFiltered,
+        dragStart && dragEnd
+          ? {
+              startX: dragStart.x,
+              endX: dragEnd.x,
+            }
           : null,
       );
+
+      /*
+       * ⚠️ **换回【视口坐标】**（自绘层和提取都用视口坐标）✅
+       */
+      const withDragOriginInViewport = withDragOrigin.map((r) => ({
+        top: r.top + contentRect.top - container.scrollTop,
+        left: r.left,
+        width: r.width,
+        height: r.height,
+      }));
 
       /*
        * 原始形状给自绘选区层（保留每个 client rect 的细节）。
        * 全部异常时传空数组 → 自绘层清空（宁可漏画，也不要画出一大块）。
        */
-      onClientRects?.(withDragOrigin.length > 0 ? withDragOrigin : []);
+      onClientRects?.(withDragOriginInViewport.length > 0 ? withDragOriginInViewport : []);
 
       /**
        * 坐标系统一（⚠️ 这里曾经有个双重扣减的 bug）：
@@ -730,9 +900,6 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
        */
       const containerRect = container.getBoundingClientRect();
 
-      const toContentCoords = (value: number): number =>
-        value - containerRect.top + container.scrollTop;
-
       const frames: PageFrame[] = pageFrames.map((frame) => ({
         pageNumber: frame.pageNumber,
         // pageFrames 已经是滚动内容坐标，**不用再减 containerRect.top**
@@ -742,10 +909,76 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         height: frame.height,
       }));
 
+      /*
+       * ⚠️⚠️ **起点页 ~ 终点页**（跨页选择的过滤范围）✅
+       *
+       * -> 拖动的起点在**哪一页** ✅
+       * -> 拖动的终点在**哪一页** ✅
+       * -> -> 只有这两页之间的矩形才该保留 ✅
+       *
+       * -> ⚠️ **不能只看起点页** ❌
+       *    -> 起点在页 1、终点在页 2 -> 只保留页 1 的话页 2 的内容没了 ❌
+       * -> ⚠️ **也不能只看终点页** ❌
+       *    -> 同理 ❌
+       */
+
+      /*
+       * ⚠️⚠️ **必须用【过滤后】的矩形**（实测踩到的坑）。
+       *
+       * -> 之前用的是**原始的 `rects`** ❌
+       * -> `filterByDragOrigin` 的结果**只喂给了自绘层** ❌
+       *    -> 自绘的选区是对的 ✅
+       *    -> 但**提取出来的高亮**用的是原始矩形 ❌
+       *    -> 跨页时原始矩形包含**整页** -> 高亮全落在第 1 页 ❌
+       * -> 用户反馈："跨页选择高亮的时候 实测只能高亮第一页的内容
+       *   第二页的内容也高亮到了第一页" ✅
+       */
+      /*
+       * ⚠️⚠️ **必须用【过滤后】的矩形**（实测踩到的坑）。
+       *
+       * -> 之前用的是**原始的 `rects`** ❌
+       * -> 过滤结果**只喂给了自绘层** ❌
+       *    -> 自绘的选区是对的 ✅
+       *    -> 但**提取出来的高亮**用的是原始矩形 ❌
+       *    -> 跨页时原始矩形包含**页眉** -> 高亮落在错误的页 ❌
+       */
+      /*
+       * ⚠️⚠️ **提取要用【内容坐标】的矩形**（实测踩到的坑）✅
+       *
+       * -> 过滤是在**内容坐标**里做的 ✅
+       * -> -> 提取时**不能再换算一次** ❌（双重换算 -> 位置全错）❌
+       * -> -> 直接用过滤后的**内容坐标** ✅
+       */
+      const filteredRects = withDragOrigin.length > 0 ? withDragOrigin : contentRects;
+      if (typeof window !== 'undefined') {
+        (window as unknown as { __dbgR?: unknown }).__dbgR = {
+          raw: rects.length,
+          filtered: filteredRects.length,
+          rawMinTop: Math.min(...rects.map((r) => r.top)),
+          rawMaxTop: Math.max(...rects.map((r) => r.top)),
+          filtMinTop: Math.min(...filteredRects.map((r) => r.top)),
+          filtMaxTop: Math.max(...filteredRects.map((r) => r.top)),
+          dragY: dragStartRef.current?.y,
+          dragObj:
+            dragStartRef.current && dragEndRef.current
+              ? {
+                  startX: dragStartRef.current.x,
+                  endX: dragEndRef.current.x,
+                  startY: dragStartRef.current.y,
+                  endY: dragEndRef.current.y,
+                }
+              : null,
+        };
+      }
+
       const result = extractSelection({
         text,
-        rects: rects.map((rect) => ({
-          top: toContentCoords(rect.top),
+        /*
+         * ⚠️ **已经是内容坐标了**（过滤时换算过了）✅
+         * -> 这里**不要再换算** ❌（双重换算 -> 位置全错）❌
+         */
+        rects: filteredRects.map((rect) => ({
+          top: rect.top,
           /*
            * ⚠️⚠️ **水平不要加 `scrollLeft`**（实测踩过的坑）。
            *
@@ -763,6 +996,22 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
           height: rect.height,
         })),
         pages: frames,
+        /*
+         * ⚠️⚠️ **只保留【起点页 ~ 终点页】**（跨页选择的关键）✅
+         *
+         * -> 浏览器在自动滚动后把 Range **扩展到页首** ❌
+         *    -> 页 1 的页眉也被选中了 ❌
+         * -> -> 只保留起点页和终点页之间的 ✅
+         *    -> 页 1 的页眉被丢掉 ✅
+         *    -> 页 2 的内容保留 ✅
+         *    -> 用户反馈："第二页的内容也高亮到了第一页" ✅
+         */
+        /*
+         * ⚠️ **不用 pageRange** ✅
+         *
+         * -> 垂直过滤（内容坐标）已经**精确**了 ✅
+         * -> pageRange 会因为自动滚动**算错**（终点页会偏）❌
+         */
         scale,
         reference,
         // 裁剪成贴合字形
@@ -929,8 +1178,32 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     const onMouseDown = (event: MouseEvent) => {
       const target = event.target;
       if (target instanceof Element && target.closest(TEXT_LAYER_CLASS)) {
-        dragStartRef.current = { x: event.clientX, y: event.clientY };
-        dragEndRef.current = { x: event.clientX, y: event.clientY };
+        /*
+         * ⚠️ **记下按下时的滚动量** ✅
+         *
+         * -> 之后自动滚动 -> 用滚动量把起点"翻译"回内容坐标 ✅
+         */
+        const scrollTop = container.scrollTop;
+        /*
+         * ⚠️ **记下按下时所在的页码** ✅
+         *
+         * -> 自动滚动之后，"那个 y" 已经不是同一页了 ❌
+         * -> 按下时算一次，**之后不再变** ✅
+         */
+        const pageNumber = pageOfPoint(
+          event.clientY,
+          pageFrames.map((frame) => ({
+            pageNumber: frame.pageNumber,
+            top: frame.top,
+            left: frame.left,
+            width: frame.width,
+            height: frame.height,
+          })),
+          container.getBoundingClientRect(),
+          scrollTop,
+        );
+        dragStartRef.current = { x: event.clientX, y: event.clientY, scrollTop, pageNumber };
+        dragEndRef.current = { x: event.clientX, y: event.clientY, scrollTop };
       } else {
         dragStartRef.current = null;
         dragEndRef.current = null;
@@ -954,18 +1227,29 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
      */
     let moveRaf = 0;
     let moveX = 0;
+    let moveY = 0;
     const onMouseMove = (event: MouseEvent) => {
       if (!dragStartRef.current) {
         return;
       }
       moveX = event.clientX;
+      moveY = event.clientY;
       if (moveRaf !== 0) {
         return;
       }
       moveRaf = requestAnimationFrame(() => {
         moveRaf = 0;
         if (dragStartRef.current) {
-          dragEndRef.current = { x: moveX, y: dragStartRef.current.y };
+          /*
+           * ⚠️⚠️ **y 要用【真实的终点】**（实测踩到的坑）。
+           *
+           * -> 之前写的是 `y: dragStartRef.current.y` ❌
+           *    -> 终点 y **永远是起点 y** ❌
+           *    -> 垂直过滤的范围变成"一个点" ❌
+           *    -> -> 跨页高亮全落在第 1 页 ❌
+           * -> 现在用**真实的鼠标 y** ✅
+           */
+          dragEndRef.current = { x: moveX, y: moveY, scrollTop: container.scrollTop };
         }
       });
     };
