@@ -1426,7 +1426,19 @@
   position: relative;
 }
 
-/* 颜色面板 */
+/*
+ * 颜色面板。
+ *
+ * ⚠️⚠️ **不能溢出弹窗**（截图审查发现的）。
+ *
+ * -> 之前 \`width: 128px\` + 18px 色块 -> 一行放 6 个 ❌
+ *    -> 7 个颜色**换行** -> 最后 1 个孤零零在第二行 ❌
+ *    -> 而且面板从按钮**左边**展开 -> **超出弹窗左边界** ❌
+ *    -> 用户反馈："点击会打开一个空的窄的框"（第 25 轮）✅
+ *
+ * -> 现在：**宽度自适应**（\`width: max-content\`）-> 一行放下 ✅
+ * -> 加 \`max-width\` + 换行兜底 ✅
+ */
 .scpdf-rich-text__palette {
   position: absolute;
   top: 30px;
@@ -1435,12 +1447,25 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  width: 128px;
+  width: max-content;
+  max-width: min(240px, 100%);
   padding: 6px;
   border-radius: 8px;
   border: 1px solid var(--scpdf-border, #d9dde3);
   background: var(--scpdf-surface, #fff);
   box-shadow: 0 8px 22px rgb(0 0 0 / 18%);
+}
+
+/*
+ * ⚠️ **面板在弹窗左边时 → 往右对齐**（否则超出弹窗边界）。
+ *
+ * -> 工具栏靠右的按钮（"文字颜色" / "清除格式"）-> 面板往左展开会**超出弹窗** ❌
+ * -> 用 \`:has()\` 判父级有没有"靠右"的按钮 ✅
+ * -> 浏览器不支持 \`:has()\` 时**退回原样**（不 worse）✅
+ */
+.scpdf-rich-text__tool:has(> .scpdf-rich-text__btn:last-child) .scpdf-rich-text__palette {
+  left: auto;
+  right: 0;
 }
 
 .scpdf-rich-text__swatch {

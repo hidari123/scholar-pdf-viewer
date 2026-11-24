@@ -1096,7 +1096,7 @@ export default function App() {
           → 实测缩放矩阵的"选区水平贴合墨迹"从 49/49 掉到 46/49。
         */}
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ opacity: 0.7 }}>{t('demo.theme')}</span>
+          <span style={{ opacity: 0.7, whiteSpace: 'nowrap' }}>{t('demo.theme')}</span>
           <select
             value={theme}
             onChange={(e) => setTheme(e.target.value as PdfViewerTheme)}
@@ -1108,7 +1108,9 @@ export default function App() {
               </option>
             ))}
           </select>
-          <span style={{ opacity: 0.7, marginLeft: 12 }}>{t('demo.locale')}</span>
+          <span style={{ opacity: 0.7, marginLeft: 12, whiteSpace: 'nowrap' }}>
+            {t('demo.locale')}
+          </span>
           <select
             value={locale}
             onChange={(e) => setLocale(e.target.value as 'zh' | 'en' | 'ja')}
@@ -1119,7 +1121,9 @@ export default function App() {
             {/* 宿主通过 JSON 加的语言 */}
             <option value="ja">{t('demo.localeName.ja')}</option>
           </select>
-          <span style={{ opacity: 0.7, marginLeft: 12 }}>{t('demo.density')}</span>
+          <span style={{ opacity: 0.7, marginLeft: 12, whiteSpace: 'nowrap' }}>
+            {t('demo.density')}
+          </span>
           <select
             value={density}
             onChange={(e) => setDensity(e.target.value as PdfViewerDensity)}
@@ -1135,7 +1139,7 @@ export default function App() {
            * -> 之前**完全没有 RTL 支持** -> 阿拉伯语 / 希伯来语的宿主没法用 ❌
            * -> 现在：\`dir\` prop + CSS 镜像 ✅
            */}
-          <span style={{ opacity: 0.7, marginLeft: 12 }}>RTL</span>
+          <span style={{ opacity: 0.7, marginLeft: 12, whiteSpace: 'nowrap' }}>RTL</span>
           <select
             value={dir}
             onChange={(e) => setDir(e.target.value as 'ltr' | 'rtl')}
@@ -1152,7 +1156,7 @@ export default function App() {
           取色器/预设/持久化全在宿主。
         */}
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ opacity: 0.7 }}>{t('demo.highlightColor')}</span>
+          <span style={{ opacity: 0.7, whiteSpace: 'nowrap' }}>{t('demo.highlightColor')}</span>
           <HighlightPicker
             value={highlightColor}
             customColors={customColors}
