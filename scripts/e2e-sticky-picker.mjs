@@ -183,6 +183,29 @@ try {
   check('第二项内容正确', items[1]?.text.includes('第二条'), items[1]?.text ?? '');
 
   // ---- ③ 点第一项 -> 打开"那一条"的详情 ----
+  /*
+   * ⚠️ **列表必须在视口内**（实测踩过的坑）。
+   *
+   * -> 列表默认在图标**右边** -> 便签在页面偏右时 -> 跑到**屏幕外** ❌
+   * -> 用户**点不到**任何一项 -> "点击每一项没反应" ✅
+   */
+  const pickerBox = await page.evaluate(() => {
+    const el = document.querySelector('.scpdf-sticky-note__picker');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      x: Math.round(r.x),
+      right: Math.round(r.right),
+      vw: window.innerWidth,
+      flip: el.getAttribute('data-flip'),
+    };
+  });
+  check(
+    '**列表在视口内**（不会跑到屏幕外点不到）',
+    pickerBox !== null && pickerBox.right <= pickerBox.vw && pickerBox.x >= 0,
+    JSON.stringify(pickerBox),
+  );
+
   const item = await page.evaluate(() => {
     const el = document.querySelectorAll('.scpdf-sticky-note__picker-item')[0];
     if (!el) {
@@ -207,6 +230,11 @@ try {
     ),
   }));
   check('**点某项打开了详情面板**', after.panel, JSON.stringify(after));
+  check(
+    '**列表顺序是文档顺序**（第一条在前）',
+    items[0]?.text.includes('第一条'),
+    items.map((i) => i.text).join(' | '),
+  );
   check(
     '**打开的是"那一条"的详情**',
     (after.content ?? '').includes('第一条'),

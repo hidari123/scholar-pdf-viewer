@@ -194,7 +194,10 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
 
   /** 每条批注的锚点（页内矩形） */
   const anchors = useMemo(() => {
-    const map = new Map<string, { left: number; top: number; width: number; height: number }>();
+    const map = new Map<
+      string,
+      { left: number; top: number; width: number; height: number; startLeft: number }
+    >();
 
     for (const annotation of annotations) {
       const rects = highlightRects.get(annotation.highlightId);
@@ -206,13 +209,33 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
       let top = Infinity;
       let right = -Infinity;
       let bottom = -Infinity;
+      /*
+       * ⚠️ **"起点"**（第一行的左边界）—— 用来**排序**。
+       *
+       * -> 并集的 `left` 是**所有行**的最左边 ❌
+       * -> 一条跨 3 行的高亮 -> 并集 left 是**第 3 行**的位置 ❌
+       * -> 分组排序按它 -> **列表顺序反了** ❌
+       * -> `startLeft` = **第一行**的左边界 -> **文档顺序** ✅
+       */
+      let startLeft = Infinity;
+      let startTop = Infinity;
       for (const r of rects) {
+        if (r.top < startTop || (r.top === startTop && r.left < startLeft)) {
+          startLeft = r.left;
+          startTop = r.top;
+        }
         left = Math.min(left, r.left);
         top = Math.min(top, r.top);
         right = Math.max(right, r.left + r.width);
         bottom = Math.max(bottom, r.top + r.height);
       }
-      map.set(annotation.id, { left, top, width: right - left, height: bottom - top });
+      map.set(annotation.id, {
+        left,
+        top,
+        width: right - left,
+        height: bottom - top,
+        startLeft,
+      });
     }
 
     return map;
@@ -266,6 +289,23 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
         if (!pos) {
           return null;
         }
+
+        /*
+         * ⚠️ **选择列表往哪边开**（实测踩过的坑）。
+         *
+         * ### 问题
+         *
+         * -> 列表默认 `left: 26px`（图标的**右边**）❌
+         * -> 便签在页面**偏右**时 -> 列表跑到**屏幕外面** ❌
+         *    -> 实测：列表的 x=1544，视口只有 1442 -> **点在屏幕外** ❌
+         *    -> 用户点不到任何一项 -> "点击每一项没反应" ✅
+         *
+         * ### 修法
+         *
+         * -> 右边放不下（超出页宽）-> **往左边开** ✅
+         */
+        const pickerWidth = 200;
+        const flipLeft = pos.left + 26 + pickerWidth > viewport.width;
 
         return (
           <span
@@ -454,6 +494,8 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
               <span
                 className="scpdf-sticky-note__picker"
                 data-visible={isHovered ? 'true' : 'false'}
+                /* ⚠️ **往左边开**（右边放不下时）✅ */
+                data-flip={flipLeft ? 'true' : 'false'}
                 role="menu"
               >
                 <span className="scpdf-sticky-note__picker-title">

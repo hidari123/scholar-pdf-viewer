@@ -724,6 +724,20 @@
   pointer-events: auto;
 }
 
+/*
+ * ⚠️ **往左边开**（右边放不下时）。
+ *
+ * -> 列表默认在图标**右边**（`left: 26px`）❌
+ * -> 便签在页面**偏右**时 -> 列表跑到**屏幕外面** ❌
+ *    -> 实测：列表 x=1544，视口 1442 -> **点不到** ❌
+ *    -> 用户反馈："点击每一项没反应" ✅
+ * -> 右边放不下 -> **翻到左边** ✅
+ */
+.scpdf-sticky-note__picker[data-flip="true"] {
+  left: auto;
+  right: 26px;
+}
+
 .scpdf-sticky-note__picker-title {
   padding: 2px 6px 6px;
   color: var(--scpdf-text-muted, #6b7280);

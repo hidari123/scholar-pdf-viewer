@@ -33,6 +33,16 @@
 export interface AnnotationAnchor {
   /** 页内左边界（px） */
   left: number;
+  /**
+   * **"起点"的左边界**（多行高亮的第一行）。
+   *
+   * ⚠️ **为什么和 `left` 分开**（实测踩过的坑）：
+   * -> `left` 是**所有行的高亮的并集**的左边界 ❌
+   * -> 一条跨 3 行的高亮 -> 并集的 left 是**第 3 行**的位置 ❌
+   *    -> 分组排序按 `left` -> **顺序反了** ❌
+   * -> `startLeft` 是**第一行**的左边界 -> **文档顺序** ✅
+   */
+  startLeft?: number;
   /** 页内上边界（px） */
   top: number;
   /** 宽（px） */
@@ -191,7 +201,15 @@ export function groupAnnotations(
 
   // 每组按水平位置排序（图标从左到右）
   return groups.map((group) => {
-    const sortedGroup = [...group].sort((a, b) => a.left - b.left);
+    /*
+     * ⚠️ **按"起点"排序**（文档顺序），不是按并集的 left。
+     *
+     * -> 并集的 left 是**所有行**的最左边 -> 跨行高亮会**排到最后** ❌
+     * -> 用户看到的"选择批注"列表**顺序反了** ❌
+     */
+    const sortedGroup = [...group].sort(
+      (a, b) => (a.startLeft ?? a.left) - (b.startLeft ?? b.left),
+    );
     return {
       key: sortedGroup[0]?.id ?? '',
       annotations: sortedGroup,
