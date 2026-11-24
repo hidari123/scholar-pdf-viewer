@@ -103,6 +103,17 @@ export interface PdfViewerConfig {
    */
   highlightPalette?: HighlightPalette;
 
+  /**
+   * **默认高亮色**（语义 key）。
+   *
+   * → 用户**不选颜色**时用这个 ✅
+   *    （用户需求："如果没有选择颜色 也按照默认颜色来展示高亮
+   *    不必每次都选择颜色"✅）
+   * → 不传 -> 用色板里的**第一个**颜色 ✅
+   * → 传了但色板里没有这个 key -> 也用色板第一个 ✅
+   */
+  defaultHighlightColor?: string;
+
   /* —— 语言 —— */
 
   /** 语言 */
@@ -261,6 +272,7 @@ export function mergeConfig(
     appearance?: PdfViewerAppearance;
     icons?: Partial<Record<IconName, ReactNode>>;
     highlightPalette?: HighlightPalette;
+    defaultHighlightColor?: string;
     locale?: Locale;
     locales?: LocaleTable;
     messages?: LocaleMessagesMap;
@@ -289,6 +301,19 @@ export function mergeConfig(
      */
     highlightPalette:
       resolveConfigValue(props.highlightPalette, c.highlightPalette) ?? BUILTIN_HIGHLIGHT_PALETTE,
+    /*
+     * ⚠️ **默认高亮色**（用户需求："如果没有选择颜色
+     * 也按照默认颜色来展示高亮 不必每次都选择颜色"✅）。
+     *
+     * -> 宿主可以指定（语义 key）✅
+     * -> 没指定 / 色板里没这个 key -> 用色板的**第一个** ✅
+     *    -> 保证"点高亮按钮一定有颜色" ✅
+     */
+    defaultHighlightColor:
+      resolveConfigValue(props.defaultHighlightColor, c.defaultHighlightColor) ??
+      Object.keys(
+        resolveConfigValue(props.highlightPalette, c.highlightPalette) ?? BUILTIN_HIGHLIGHT_PALETTE,
+      )[0],
     /*
      * ⚠️ **没指定语言时按浏览器语言推断**（而不是硬编码 'zh'）。
      * -> 很多宿主是英文站点 -> 默认中文 -> 用户看到"怎么是中文" ❌

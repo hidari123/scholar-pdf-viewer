@@ -96,6 +96,15 @@ export interface SelectionPopoverProps {
   highlightPalette?: HighlightPalette;
   /** 选颜色（key） */
   onPickColor?: (key: string) => void;
+  /**
+   * **当前高亮色**（语义 key）。
+   *
+   * → 主按钮会**用它高亮**（用户需求："如果没有选择颜色
+   *   也按照默认颜色来展示高亮 不必每次都选择颜色"✅）
+   * → 没有（undefined / null）→ 用**宿主配的默认色** ✅
+   * → 主按钮下面会显示**一条这个颜色的下划线** ✅（飞书样式）
+   */
+  currentHighlightColor?: string | null;
   /** 语言 */
   locale?: Locale;
   /**
@@ -216,6 +225,7 @@ export function SelectionPopover({
   onDismiss,
   highlightPalette,
   onPickColor,
+  currentHighlightColor,
   messages,
   locale = 'zh',
   locales,
@@ -674,16 +684,27 @@ export function SelectionPopover({
                 onClick={(event) => {
                   event.stopPropagation();
                   /*
-                   * ⚠️ **"选择高亮颜色"按钮本身也要能展开下拉**
-                   *    （用户反馈"第一个是高亮 但是没有什么效果"）。
+                   * ⚠️⚠️ **主按钮 = 【直接用当前色高亮】**（用户需求：
+                   * "文字选取的高亮那里 如果没有选择颜色 也按照默认颜色来展示高亮
+                   *  不必每次都选择颜色"✅）。
                    *
-                   * → 主按钮 = **打开颜色下拉**（而不是"用当前颜色高亮"）
-                   * → 旁边的箭头 = 同样打开下拉（保持一致）
+                   * ### 之前的行为（❌）
+                   *
+                   * → 主按钮**只**展开下拉 ❌
+                   * → 用户**必须**选一次颜色才能高亮 ❌
+                   *    → "第一个是高亮 但是没有什么效果" ✅
+                   *
+                   * ### 现在的行为（✅）
+                   *
+                   * → 点**主按钮** → **直接用"当前色"高亮** ✅
+                   *    → 当前色 = 上次选的 ✅
+                   *    → 没选过 = **宿主配的默认色** ✅（`color` 传 undefined → 走默认）
+                   * → 点**旁边的箭头** → 展开颜色下拉 ✅
+                   *    → 选一个色 → **立刻用那个色高亮** ✅
+                   *    → 之后主按钮就用这个色 ✅
+                   *
+                   * → 这就是 **飞书 / WPS** 的交互 ✅
                    */
-                  if (showPalette) {
-                    setPaletteOpen((v) => !v);
-                    return;
-                  }
                   onAction?.(action);
                 }}
               >
@@ -694,6 +715,21 @@ export function SelectionPopover({
                 ) : (
                   action.icon
                 )}
+                {/*
+                 * ⚠️ **当前色的小色条**（飞书 / WPS 样式）✅
+                 *
+                 * -> 让用户**一眼看到**"点这个按钮会用哪个颜色" ✅
+                 * -> 没选过颜色 -> 不显示（用的是默认色）✅
+                 */}
+                {showPalette && currentHighlightColor ? (
+                  <span
+                    className="scpdf-selection-popover__current"
+                    style={{
+                      background: highlightPalette?.[currentHighlightColor] ?? 'transparent',
+                    }}
+                    aria-hidden="true"
+                  />
+                ) : null}
               </button>
 
               {showPalette ? (
@@ -734,6 +770,11 @@ export function SelectionPopover({
                       key={key}
                       type="button"
                       className="scpdf-selection-popover__swatch"
+                      /*
+                       * ⚠️ **当前选中的色块要标出来** ✅
+                       * -> 用户一眼知道"现在用的是哪个颜色" ✅
+                       */
+                      data-active={key === currentHighlightColor ? 'true' : undefined}
                       style={{ background: color }}
                       title={color}
                       aria-label={t('selection.highlightColor', { key })}

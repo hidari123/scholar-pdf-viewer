@@ -115,3 +115,30 @@ describe('mergeConfig（统一配置）', () => {
     expect(merged.printMargin).toBeUndefined();
   });
 });
+
+/*
+ * ⚠️ **默认高亮色**（用户需求："如果没有选择颜色
+ * 也按照默认颜色来展示高亮 不必每次都选择颜色"✅）。
+ */
+describe('默认高亮色', () => {
+  it('**不传时用色板的第一个颜色**', () => {
+    const merged = mergeConfig({}, {});
+    const paletteKeys = Object.keys(merged.highlightPalette ?? {});
+    expect(merged.defaultHighlightColor).toBe(paletteKeys[0]);
+  });
+
+  it('**宿主可以指定默认色**', () => {
+    const merged = mergeConfig({}, { defaultHighlightColor: 'green' });
+    expect(merged.defaultHighlightColor).toBe('green');
+  });
+
+  it('**prop 优先于 config**', () => {
+    const merged = mergeConfig({ defaultHighlightColor: 'red' }, { defaultHighlightColor: 'blue' });
+    expect(merged.defaultHighlightColor).toBe('blue');
+  });
+
+  it('**色板换了，默认色跟着换**（没指定时）', () => {
+    const merged = mergeConfig({}, { highlightPalette: { my: '#123456' } });
+    expect(merged.defaultHighlightColor).toBe('my');
+  });
+});

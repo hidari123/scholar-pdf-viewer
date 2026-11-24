@@ -1987,6 +1987,39 @@
   transform: scale(1.15);
 }
 
+/*
+ * ⚠️ **当前选中的色块**（用户需求："如果没有选择颜色 也按照默认颜色来展示高亮"）。
+ *
+ * -> 下拉里给当前色**加一圈深色描边** ✅
+ * -> 一眼看出"现在用的是哪个颜色" ✅
+ */
+.scpdf-selection-popover__swatch[data-active="true"] {
+  border-color: var(--scpdf-color-primary, #2f6feb);
+  box-shadow: 0 0 0 2px var(--scpdf-color-primary, #2f6feb);
+}
+
+/*
+ * ⚠️ **主按钮上的"当前色"小色条**（飞书 / WPS 样式）。
+ *
+ * -> 在 🖍 图标**下面**画一条当前颜色的横线 ✅
+ * -> 用户点之前就知道"这个按钮会用哪个颜色" ✅
+ */
+.scpdf-selection-popover__current {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+/* 按钮本身要 relative（色条要相对它定位） */
+.scpdf-selection-popover__btn {
+  position: relative;
+}
+
 /* ---------- 状态区（加载 / 空 / 错误） ---------- */
 
 .scpdf-state {

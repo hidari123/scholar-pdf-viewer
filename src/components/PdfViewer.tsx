@@ -957,6 +957,13 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     id: string;
     text: string;
     rect: { left: number; top: number; right: number; bottom: number } | null;
+    /*
+     * ⚠️ **这条高亮的颜色**（语义 key）。
+     *
+     * -> 用于在颜色下拉里**标出当前色** ✅
+     * -> （用户需求："如果没有选择颜色 也按照默认颜色来展示高亮"✅）
+     */
+    color?: string | null;
   } | null>(null);
 
   /** 侧栏：'none' | 'thumbnails' | 'outline' */
@@ -3113,7 +3120,11 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        * → 要取所有行的**并集**，不能只取第一行。
        */
       const rect = measureHighlightRect(highlight);
-      setHighlightPopover(rect ? { id: highlight.id, text: highlight.selectedText, rect } : null);
+      setHighlightPopover(
+        rect
+          ? { id: highlight.id, text: highlight.selectedText, rect, color: highlight.color ?? null }
+          : null,
+      );
 
       /*
        * ⚠️ **蓝框 1.5s 后自动消失**（用户反馈"一直都有外边框"）。
@@ -3399,7 +3410,16 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
             return;
           }
 
-          onHighlight?.({ ...ctx, color: pickedColor ?? undefined });
+          /*
+           * ⚠️⚠️ **颜色：当前色 -> 默认色**（用户需求：
+           * "如果没有选择颜色 也按照默认颜色来展示高亮
+           *  不必每次都选择颜色"✅）。
+           *
+           * → \`pickedColor\` = 上次在**下拉里选**的颜色 ✅
+           * → 没有 -> **默认色**（宿主可配 \`defaultHighlightColor\`）✅
+           * → 之前是 \`undefined\` -> 宿主那边自己决定 -> **不统一** ❌
+           */
+          onHighlight?.({ ...ctx, color: pickedColor ?? merged.defaultHighlightColor });
           // 包自己清选区（"清选区"是 UI 行为，属于包）
           clearSelectionAfterHighlight();
         },
@@ -3565,6 +3585,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     toast.info,
     isFullyCoveredByExistingHighlight,
     selectionShapes,
+    merged.defaultHighlightColor,
   ]);
 
   /** 合并后的动作列表（宿主覆盖 + 追加） */
@@ -3920,6 +3941,17 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
          * -> \`position\` 找不到时用**空对象**而不是 \`null\`（类型是 \`NormPosition\`）✅
          */
         position: findHighlightPosition(highlightPopover.id) ?? EMPTY_NORM_POSITION,
+        /*
+         * ⚠️ **换色动作带上颜色**（用户需求：
+         * "如果没有选择颜色 也按照默认颜色来展示高亮 不必每次都选择颜色"✅）。
+         *
+         * -> 点高亮的 🖍（不选色）-> 用**当前色**换 ✅
+         * -> 没选过 -> 用**默认色** ✅
+         */
+        color:
+          action.key === HIGHLIGHT_ACTION_KEYS.color
+            ? (highlightPopover.color ?? merged.defaultHighlightColor)
+            : undefined,
       });
       // 换色 / 删除后关闭；复制保留（可能还要连续操作）
       if (
@@ -3929,7 +3961,12 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         handleHighlightPopoverClose();
       }
     },
-    [highlightPopover, findHighlightPosition, handleHighlightPopoverClose],
+    [
+      highlightPopover,
+      findHighlightPosition,
+      handleHighlightPopoverClose,
+      merged.defaultHighlightColor,
+    ],
   );
 
   /** 高亮浮层：选颜色 → 换色 */
@@ -4966,7 +5003,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                  */
                 const returnedId = onHighlight?.({
                   ...note,
-                  color: pickedColor ?? undefined,
+                  color: pickedColor ?? merged.defaultHighlightColor,
                 });
                 const highlightId =
                   typeof returnedId === 'string' && returnedId.length > 0
@@ -5195,6 +5232,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         onDismiss={handlePopoverDismiss}
         highlightPalette={merged.highlightPalette}
         onPickColor={handlePickHighlightColor}
+        currentHighlightColor={pickedColor}
       />
 
       {/*
@@ -5219,6 +5257,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         onClose={handleHighlightPopoverClose}
         highlightPalette={merged.highlightPalette}
         onPickColor={handleHighlightColorPick}
+        currentHighlightColor={highlightPopover?.color ?? null}
       />
 
       {/* 加密文档密码框（宿主没接管时） */}
