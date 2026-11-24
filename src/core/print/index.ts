@@ -26,6 +26,29 @@ export interface PrintMargin {
   left: number;
 }
 
+/**
+ * **打印方向**（用户确认："允许"）。
+ *
+ * - `portrait` 纵向
+ * - `landscape` 横向（**竖版 PDF 旋转 90° 打印**，像 WPS / Word）
+ * - `auto` 跟着**用户打印对话框**里的纸张方向走
+ */
+export type PrintOrientation = 'portrait' | 'landscape' | 'auto';
+
+/**
+ * **把纸张按方向摆好**（横向 = 宽高互换）。
+ *
+ * @param paper 纸张规格
+ * @param orientation 方向（`auto` 当成纵向）
+ * @returns 摆好的纸张尺寸
+ */
+export function orientPaper(paper: PaperSize, orientation: PrintOrientation = 'auto'): PaperSize {
+  if (orientation === 'landscape') {
+    return { width: paper.height, height: paper.width };
+  }
+  return paper;
+}
+
 /** 常用的纸张规格 */
 export const PAPER_SIZES: Record<string, PaperSize> = {
   A4: { width: 210, height: 297 },
@@ -136,13 +159,24 @@ export function computePrintScaleForRender(
   renderedSize: { width: number; height: number },
   paper: PaperSize = PAPER_SIZES.A4 as PaperSize,
   margin: PrintMargin = DEFAULT_PRINT_MARGIN,
+  orientation: PrintOrientation = 'auto',
 ): number {
   if (renderedSize.width <= 0 || renderedSize.height <= 0) {
     return 1;
   }
 
-  const printableWidthMm = paper.width - margin.left - margin.right;
-  const printableHeightMm = paper.height - margin.top - margin.bottom;
+  /*
+   * ⚠️ **横向时纸张要宽高互换**（实测踩到的坑，用户反馈：
+   * "而且横向打印有很多空白页"）。
+   *
+   * -> 横向 A4 的可印区是 **297 × 210mm**（不是 210 × 297）✅
+   * -> 不换 -> 按**纵向**的高度算缩放 ❌
+   *    -> 缩放太大 ❌ -> 每页占 **2 张纸** ❌
+   *    -> 实测：18 页印成 **36 张** ❌
+   */
+  const oriented = orientPaper(paper, orientation);
+  const printableWidthMm = oriented.width - margin.left - margin.right;
+  const printableHeightMm = oriented.height - margin.top - margin.bottom;
   if (printableWidthMm <= 0 || printableHeightMm <= 0) {
     return 1;
   }

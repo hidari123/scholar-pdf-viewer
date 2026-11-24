@@ -41,7 +41,7 @@ import type { HighlightPalette } from '../core/highlight/palette';
 import type { InternalLinkContext } from '../core/outline/link-context';
 import type { OutlineItemLike } from '../core/outline/outline';
 import { resolveOutlinePageNumbers } from '../core/outline/resolve';
-import type { PAPER_SIZES, PaperSize, PrintMargin } from '../core/print';
+import type { PAPER_SIZES, PaperSize, PrintMargin, PrintOrientation } from '../core/print';
 import type { IndexOffset } from '../core/search/align';
 import { alignRenderedToIndex } from '../core/search/align';
 import type { SearchHitRect } from '../core/search/highlight';
@@ -394,6 +394,17 @@ export interface PdfViewerProps {
    * 内置：`'A4'` `'A3'` `'Letter'` `'Legal'`
    */
   printPaper?: keyof typeof PAPER_SIZES | PaperSize;
+  /**
+   * **打印方向**（用户确认："允许"）。
+   *
+   * - `portrait` 纵向（默认）
+   * - `landscape` 横向（**竖版 PDF 旋转 90° 打印**，像 WPS / Word）
+   * - `auto` 跟着用户打印对话框走
+   *
+   * ⚠️ **横向时缩放必须按【横向纸张】算** ✅
+   * -> 不算的话 -> 每页占 **2 张纸** ❌（用户反馈："横向打印有很多空白页"）
+   */
+  printOrientation?: PrintOrientation;
   /**
    * **打印边距**（mm，**部分覆盖**）。
    *
@@ -769,6 +780,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     printMode = 'with-highlights',
     dir,
     printPaper = 'A4',
+    printOrientation = 'auto',
     printMargin,
     slots,
     getPage,
@@ -1711,6 +1723,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
      * -> 现在：**宿主可配**（\`printPaper\` prop 或 \`config.printPaper\`）✅
      */
     paper: merged.printPaper ?? printPaper,
+    /** 方向（横向时按横向纸张算缩放） */
+    orientation: printOrientation,
     /** 边距（部分覆盖；不传用默认 12mm） */
     margin: merged.printMargin ?? printMargin,
     /*

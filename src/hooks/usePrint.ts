@@ -29,6 +29,7 @@ import {
   PAPER_SIZES,
   type PaperSize,
   type PrintMargin,
+  type PrintOrientation,
 } from '../core/print';
 
 /**
@@ -47,6 +48,14 @@ export interface UsePrintOptions {
   pageSizePt?: { width: number; height: number };
   /** 纸张规格（名字或尺寸） */
   paper?: keyof typeof PAPER_SIZES | PaperSize;
+  /**
+   * **打印方向**（用户确认："允许"）。
+   *
+   * - `portrait` 纵向（默认）
+   * - `landscape` 横向（**竖版 PDF 旋转 90° 打印**，像 WPS / Word）
+   * - `auto` 跟着用户打印对话框走
+   */
+  orientation?: PrintOrientation;
   /** 打印边距（mm） */
   margin?: Partial<PrintMargin>;
   /** 目标元素（默认找 `.scpdf-root`） */
@@ -76,7 +85,15 @@ export interface UsePrintResult {
  * @returns 打印函数 + 准备状态
  */
 export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
-  const { pageSizePt, paper = 'A4', margin, root, pageCount, onAfterPrint } = options;
+  const {
+    pageSizePt,
+    paper = 'A4',
+    orientation = 'auto',
+    margin,
+    root,
+    pageCount,
+    onAfterPrint,
+  } = options;
 
   /** 正在准备 */
   const [preparing, setPreparing] = useState(false);
@@ -175,6 +192,7 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
         { width: renderedWidth, height: renderedHeight },
         paperSize,
         fullMargin,
+        orientation,
       );
       target.style.setProperty('--scpdf-print-scale', String(scale));
     };
@@ -266,7 +284,17 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
       observer.disconnect();
     };
     // ⚠️ `pageCount` 在依赖里 → 页数变了 → 重新写每页的高度
-  }, [pageSizePt, paper, marginTop, marginRight, marginBottom, marginLeft, root, pageCount]);
+  }, [
+    pageSizePt,
+    paper,
+    marginTop,
+    marginRight,
+    marginBottom,
+    marginLeft,
+    root,
+    pageCount,
+    orientation,
+  ]);
 
   const print = useCallback(() => {
     const target = root ?? document.querySelector<HTMLElement>('.scpdf-root');

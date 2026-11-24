@@ -93,6 +93,7 @@ const suites = [
   { name: '主题下拉的色块能区分开', file: 'e2e-theme-swatches.mjs' },
   { name: '批注详情的位置 / 宽度 / 工具栏', file: 'e2e-annotation-panel-anchor.mjs' },
   { name: '工具栏的"高亮"按钮（分裂按钮）', file: 'e2e-toolbar-highlight.mjs' },
+  { name: '打印要一页一张纸（竖向 + 横向）', file: 'e2e-print-pagination.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

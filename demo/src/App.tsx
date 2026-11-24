@@ -131,6 +131,12 @@ export default function App() {
        * 造两条锚定**同一条高亮**的批注（用来测"合并成一个图标"）。
        */
       /**
+       * **设置打印方向**（E2E 用）✅
+       */
+      setPrintOrientation(orientation: 'auto' | 'portrait' | 'landscape') {
+        setPrintOrientation(orientation);
+      },
+      /**
        * **打开工具栏的"高亮"按钮**（E2E 用）✅
        */
       enableToolbarHighlight() {
@@ -228,6 +234,16 @@ export default function App() {
    * -> E2E 里**打开**它来测 ✅
    */
   const [showToolbarHighlight, setShowToolbarHighlight] = useState(false);
+  /**
+   * **打印方向**（E2E 用）。
+   *
+   * -> 包新增 `printOrientation` prop ✅（用户确认："允许"）
+   * -> demo 平时用 **auto** ✅
+   * -> E2E 里可以切成 **landscape** 来测横向 ✅
+   */
+  const [printOrientation, setPrintOrientation] = useState<'auto' | 'portrait' | 'landscape'>(
+    'auto',
+  );
 
   /**
    * **语言（宿主可切换）**。
@@ -1242,6 +1258,7 @@ export default function App() {
            * -> 包的这个按钮**默认隐藏** ✅（用户确认："默认隐藏吧"）
            * -> demo 平时**不传** ✅ -> 保持默认的样子 ✅
            */
+          printOrientation={printOrientation}
           onToolbarHighlight={
             showToolbarHighlight
               ? (color: string) => {

@@ -5,6 +5,7 @@ import {
   computePrintScaleForRender,
   DEFAULT_PRINT_MARGIN,
   MM_TO_PX,
+  orientPaper,
   PAPER_SIZES,
 } from './index';
 
@@ -161,5 +162,51 @@ describe('PAPER_SIZES', () => {
   it('默认边距是合理的（不小于 5mm）', () => {
     expect(DEFAULT_PRINT_MARGIN.top).toBeGreaterThanOrEqual(5);
     expect(DEFAULT_PRINT_MARGIN.left).toBeGreaterThanOrEqual(5);
+  });
+});
+
+/*
+ * ⚠️ **打印方向**（用户反馈："而且横向打印有很多空白页"）。
+ *
+ * -> 横向 A4 的可印区是 **297 × 210mm**（不是 210 × 297）✅
+ * -> 不换 -> 按**纵向**的高度算缩放 ❌
+ *    -> 缩放太大 ❌ -> 每页占 **2 张纸** ❌
+ *    -> 实测：18 页印成 **36 张** ❌
+ */
+describe('orientPaper', () => {
+  it('**纵向 -> 不变**', () => {
+    const a4 = { width: 210, height: 297 };
+    expect(orientPaper(a4, 'portrait')).toEqual(a4);
+    expect(orientPaper(a4, 'auto')).toEqual(a4);
+  });
+
+  it('**横向 -> 宽高互换**', () => {
+    expect(orientPaper({ width: 210, height: 297 }, 'landscape')).toEqual({
+      width: 297,
+      height: 210,
+    });
+  });
+});
+
+describe('computePrintScaleForRender（方向）', () => {
+  const rendered = { width: 1408, height: 1822 };
+
+  it('**横向的缩放比纵向【小】**', () => {
+    const portrait = computePrintScaleForRender(rendered, PAPER_SIZES.A4);
+    const landscape = computePrintScaleForRender(rendered, PAPER_SIZES.A4, undefined, 'landscape');
+    expect(landscape).toBeLessThan(portrait);
+  });
+
+  it('**横向：页高正好放得进横向的纸**（703px = 186mm @96dpi）', () => {
+    const scale = computePrintScaleForRender(rendered, PAPER_SIZES.A4, undefined, 'landscape');
+    // 可印高 = (210 - 24) mm = 186mm = 703px
+    const printableHeightPx = (210 - 12 - 12) * (96 / 25.4);
+    expect(rendered.height * scale).toBeLessThanOrEqual(printableHeightPx + 1);
+  });
+
+  it('**纵向：页高正好放得进纵向的纸**（1032px = 273mm @96dpi）', () => {
+    const scale = computePrintScaleForRender(rendered, PAPER_SIZES.A4);
+    const printableHeightPx = (297 - 12 - 12) * (96 / 25.4);
+    expect(rendered.height * scale).toBeLessThanOrEqual(printableHeightPx + 1);
   });
 });
