@@ -137,6 +137,25 @@ import '@scholar-club/pdf-viewer/styles.css';
 > ⚠️ **`onAnnotationChange` 不传 → 详情面板永远是只读**（"编辑"按钮点不动）。
 > ⚠️ **`onAnnotationExpand` 不传 → 便签上没有"展开"按钮**（用户会以为按钮坏了）。
 
+### ⚠️ **高亮的 id 必须唯一**
+
+-> 用户的反馈："有时候点击一个高亮 两个高亮都会被选中"✅
+-> 根因：**两个高亮用了同一个 id** ❌
+-> 比如用**计数器**生成 id（`h-1`、`h-2`…），刷新后计数器归零 ❌
+-> 但**持久化恢复**的高亮还带着旧 id ❌ -> **撞了** ❌
+-> **用 `crypto.randomUUID()`** ✅
+
+```tsx
+onHighlight={({ text, color, position }) => {
+  const id = `h-${crypto.randomUUID()}`;   // ← 绝对不会重复 ✅
+  setHighlights((prev) => [...prev, { id, selectedText: text, position, color }]);
+  return id;
+}}
+```
+
+> 💡 **包已经能容忍重复 id**（只激活真正点到的那一个）✅
+> -> 但还是**强烈建议**宿主用唯一 id（否则"改色 / 删除"可能命中错的那条）✅
+
 ### 富文本的两个色板
 
 | 配置                    | 用途         | 内置值                                |

@@ -4718,3 +4718,226 @@ case 'textColor':    paths:['M8 17 12 5l4 12','M9.5 13h5'], lines:[{4,20->20,20}
 - `pnpm test` -> **739 passed**
 - E2E -> **638/639**（回归中）
 - 体积：主入口 **33.14 kB / 33.5 kB** ✅
+
+---
+
+# 第 27 轮：7 个问题（富文本 4 + 批注 3）（2026-11-24）
+
+用户提了 **7 个问题**（分 2 批），本轮**逐个修** + 每个一个 commit。
+
+| commit                    | 修的问题                                    |
+| ------------------------- | ------------------------------------------- |
+| `b420df5` fix(editor)     | ① 去掉"文字高亮"按钮（功能重复 + 图标丑）   |
+| `75de8af` fix(editor)     | ② 点面板外面关闭颜色面板                    |
+| `1ac466f` feat(editor)    | ③ 高亮/文字颜色加"无背景色"选项（飞书样式） |
+| `3d3f54c` fix(editor)     | ④ 没选文字时格式按钮置灰                    |
+| `26fd858` fix(annotation) | ⑤ 批注详情贴着便签                          |
+| `70d48da` fix(highlight)  | ⑥ 高亮 ID 冲突（两个都被选中）              |
+| `22c1598` fix(print)      | ⑦ 打印时便签泄露内容                        |
+
+---
+
+## ① 去掉"文字高亮"按钮
+
+-> 实现上它就是 `hiliteColor` 的**别名** ✅ -> 功能重复 ✅
+-> **默认工具栏**去掉 ✅
+-> **命令和图标保留** -> 宿主自定义工具栏还能用 ✅
+-> 文档同步（"三个颜色命令" -> "两个"）✅
+
+---
+
+## ② 点面板外面关闭颜色面板
+
+**根因**：两个编辑器里**只有 4 处 `setOpenPalette`** -> **没有任何"点击外面关闭"的监听** ❌
+
+**修法**：
+-> 面板开着时在 `document` 上挂 `mousedown` ✅
+-> 点外面 -> 关闭 ✅ / 点里面 -> **不关** ✅ / **Esc** -> 关闭 ✅
+
+### ⚠️ 两个 ref 挂点不一样（实测踩到的坑）
+
+-> **TipTap**：面板是 `.scpdf-rich-text__toolbar` 的**兄弟节点** ❌
+-> 用 toolbar 判断 `contains(panel)` = **false** ❌ -> 点面板里也会关 ❌
+-> 改挂 `.scpdf-rich-text__toolbar-wrap` ✅
+-> **内置编辑器**：面板在 `.scpdf-rich-text__tool` 里 -> 是 toolbar 的**后代** ✅
+-> 挂 `.scpdf-rich-text__toolbar` 就行 ✅
+
+### ⚠️ Esc 会把整个弹窗关掉（顺带发现并修的）
+
+-> 外层（`AnnotationDialog`）有自己的 **Esc -> 关自己** ❌
+-> `AnnotationDialog` **本来就有** `onOverlayStateChange` 机制 ✅（给链接弹窗用的）
+-> 但**编辑器从来没调过它** ❌ -> **接上** ✅
+-> ⚠️ **两个 effect 会打架** -> 合并成一个 `anyOverlayOpen` ✅
+
+---
+
+## ③ "无背景色"选项（飞书样式）
+
+-> 色板**第一个**是**斜杠色块** ✅（用户截图里飞书就是这样）
+-> 核心加 `NO_COLOR = '__none__'` + `isNoColor()` ✅
+-> TipTap：`unsetHighlight()` / `unsetColor()` ✅（比 `transparent` 干净）
+-> 内置编辑器：`execCommand('hiliteColor', false, 'transparent')` ✅
+-> 新增 i18n key `richtext.noColor` ✅
+
+**实测**：
+```
+① 色板: { count: 7, firstLabel: "无背景色", firstHasNone: true }
+② 加了颜色: <p><mark style="background-color: rgb(255,243,163); color: inherit;">测试文字</mark></p>
+③ 点斜杠后: <p>测试文字</p>          <- 高亮被清掉了 ✅
+```
+
+---
+
+## ④ 没选文字时格式按钮置灰
+
+**根因**：
+```ts
+// toolbar-state.ts:100
+if (command === 'removeFormat') {
+  return { command, active: false, disabled: false };   // <- 永远不禁用 ❌
+}
+```
+-> 而且**整个文件里没有任何"选区是否为空"的检测** ❌
+
+**修法**：
+-> `ToolbarActiveState` 加 `hasSelection` ✅
+-> TipTap：`editor.state.selection.empty` ✅
+-> 内置编辑器：`window.getSelection().isCollapsed` ✅
+-> **撤销 / 重做不受影响**（撤销的是上一步操作，不是格式）✅
+-> 编辑器不提供这个能力 -> **默认当成"有选区"**（不误伤老宿主）✅
+
+### ⚠️ 顺带修的两个问题
+
+**① 颜色按钮置灰后点不开面板了**
+-> 用户只要求"清除格式"置灰 -> 我把**所有**格式命令都置灰 ❌
+-> 结果**颜色按钮也灰了** -> **面板打不开** -> 用户没法选颜色 ❌
+-> 改：**颜色命令不禁用**（只用视觉上的"灰"表示不可用）✅
+
+**② `hasSelection` 首次渲染时判断错了**
+-> `editorRef.current` 首次渲染是 **null** ❌
+-> `contains(anchor)` 返回 false -> 误判成"选区在编辑区外面" ❌
+-> -> 按钮**永远不禁用** ❌
+-> 改成：**选区文本长度 > 0** 才算"选了文字" ✅
+
+---
+
+## ⑤ 批注详情贴着便签
+
+**用户反馈**："批注详情目前是出现在pdf的最上方 应该定位在批注按钮附近的"
+
+**实测（修复前）**：
+```
+panel: { x: 539, y: 524 }        <- 便签在 y=367 -> 偏了 157px ❌
+panelStyle: "531.227px/0px"     <- top = 0 !! ❌
+containerRect: "8,124"           <- 容器在视口里偏移了 (8, 124)
+```
+
+**真因（**三层**，每层都得修）**：
+
+### ① 视口坐标 vs 容器坐标
+
+-> `computeDialogPosition` 返回**视口坐标** ✅
+-> 但面板是 `position: absolute` -> 父容器是 `.scpdf-container` ❌
+-> 容器的视口偏移 `(8, 124)` 被**再加了一遍** ❌
+-> **修法**：减去容器的偏移 ✅
+-> ⚠️ **必须用 state + useEffect**（不能在 useMemo 里现量）❌
+-> useMemo 在**渲染期间**跑 -> DOM 还没更新 -> 量到**旧值** ❌
+-> 实测：`top = 124 - 124 = 0` -> 面板贴到容器顶部 ❌
+
+### ② 视口尺寸传错了
+
+-> 传给 `computeDialogPosition` 的是**滚动容器**的尺寸（1442 × **608**）❌
+-> 容器比窗口矮 -> "下面放不下" -> 面板被**推到上面** ❌
+-> **修法**：传**窗口**的尺寸（1442 × **732**）✅
+
+### ③ ⚠️ **面板高度写死 320**（这才是"跑到最上方"的直接原因）
+
+-> 面板的真实高度是 `min(460px, 70%)`，不是固定的 ❌
+-> 实测：`anchor.bottom(391) + 30 + 320 = 741 > 732 - 12` -> **放不下** ❌
+-> -> 走"放上面"分支 -> `top = anchor.top - 30 - 320 = 16` ❌
+-> -> **贴在 PDF 最上方** ✅
+-> **修法**：高度用 **200** -> **正常贴在下面** ✅
+
+### ④ `gap: 30`（默认 8）
+
+-> 便签图标只有 **22px** 宽 ✅ -> gap=8 -> 面板**盖住便签** ❌
+-> gap=30 -> 两个都看得见 ✅
+
+### ⑤ 锚点要等 DOM 画完再量
+
+-> 之前 `activeAnnotationAnchor` 是 `useMemo([activeAnnotationId])` ❌
+-> 它在**渲染期间**算 -> 那时便签图标**可能还没渲染** ❌
+-> 改成 `useState` + `useEffect`（必要时下一帧再量一次）✅
+
+**结果**：panel y=524 -> **y=421**（便签 y=367 -> 偏 **54px**）✅
+
+---
+
+## ⑥ 高亮 ID 冲突（"两个高亮都被选中"）
+
+### 复现（用 demo 真实的持久化流程）
+
+```
+① 建完:      ["h-1"]
+② 刷新后:    ["h-1"]          <- 旧高亮从持久化恢复，id 还是 h-1
+③ 新建后:    ["h-1","h-1"]    <- ⚠️ ID 重复了！
+④ 点第一个:  activeCount: 2   <- 两个都被选中 ❌
+```
+
+### 真因（**两处**）
+
+-> **① 宿主侧**：demo 的 `highlightSeq` 在文档加载时**归零** ❌
+-> 但**持久化恢复**的高亮还带着旧 id ❌ -> **撞了** ❌
+-> **修法**：用 `crypto.randomUUID()`（用户选的 A 方案）✅
+-> **② 包侧**：`activeHighlightId === highlight.id` -> 同 id **两个都激活** ❌
+-> **修法**：激活态改成**按矩形**判断 ✅
+
+### 包要能**容忍**重复 id（宿主不一定都小心）
+
+-> **命中判定**按【几何】找 DOM 元素（不是按 id）✅
+-> **层级（zIndex）**按【DOM 顺序】（之前按 id 去重 -> 同 id 拿到同 zIndex -> 永远只能点到第一个）✅
+-> **激活态**按【矩形】（`activeHighlightRect`）✅
+-> **找到"真正点到的那一条"**（`findHighlightByElement`）✅
+-> **换色时也要消歧**（`findHighlightPosition`）✅
+
+### 抽到 core（可单测）
+
+-> `isSameRect(a, b, tolerance)` ✅
+-> `pickHighlightByRect(candidates, target, toRect)` ✅
+-> `HighlightHit` 加 `rect` 字段 ✅
+
+---
+
+## ⑦ 打印时便签泄露内容
+
+**实测（打印媒体下）**：
+```
+stickyNotes:  { display: "block", visibility: "visible" }  ❌ 没藏
+annotations:  { display: "none" }                         ✅ 高亮藏对了
+```
+
+-> 打印 CSS 的隐藏清单里**有** `.scpdf-annotations` ✅
+-> 但**没有** `.scpdf-sticky-notes`（便签）❌
+-> 便签带着**批注正文**（用户的私人内容）-> **会被打印出去** ❌
+
+**修法**：把**所有浮层**都加进隐藏清单 ✅
+-> 便签 / 详情面板 / 批注弹窗 / 颜色面板 / 链接弹窗 / toast ✅
+
+**顺带查了"导出 PDF"那条路** -> 走**真 PDF 批注** -> 本来就没这个问题 ✅
+
+---
+
+# 覆盖率
+
+-> 新增 6 个测试文件/组 -> 覆盖率 **49.98%** -> **52.1%** ✅
+-> 阈值同步提高：50/45/40/50 -> **51/47/41/51** ✅
+-> 体积：33.5 -> 33.56 kB -> 上限 **34 kB** ✅
+
+---
+
+# 验证
+
+- `pnpm verify` -> **9/9 全绿**
+- `pnpm test` -> **775 passed**
+- E2E -> **639/639**（含 2 个新套件）
+- 体积：主入口 **33.56 kB / 34 kB** ✅
