@@ -1143,6 +1143,21 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
        * 哨兵放到选区底部**往下一点** → 用户继续往下拖时，选区到此为止
        * （这正是 pdf.js 哨兵的用途：防止选区一路扩到文本层末尾）。
        */
+      /*
+       * ⚠️⚠️ **必须防一手**（审核补测发现的健壮性问题）。
+       *
+       * -> `range.getBoundingClientRect()` **在某些环境里【不存在】** ❌
+       *    （jsdom 的 `Range` 上就没有 ✅ -> 实测直接抛 `TypeError` ❌）
+       * -> -> 抛在 `selectionchange` 的处理器里 ❌
+       *    -> **整个选区处理链断掉** ❌ -> 选区"卡住" ❌
+       * -> -> 而且这类异常**没人接** ❌ -> 变成 unhandled error ❌
+       *
+       * -> 哨兵只是"辅助"功能（防止选区扩到文本层末尾）✅
+       *    -> 算不出来就**跳过** ✅（不影响主功能 ✅）
+       */
+      if (typeof range.getBoundingClientRect !== 'function') {
+        return;
+      }
       const rangeRect = range.getBoundingClientRect();
       const parentRect = parent.getBoundingClientRect();
       const offsetY = rangeRect.bottom - parentRect.top + 1;
