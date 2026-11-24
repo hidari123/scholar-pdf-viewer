@@ -44,7 +44,7 @@
 | 文档                                | 内容                                          |
 | ----------------------------------- | --------------------------------------------- |
 | **[使用指南](./docs/GUIDE.md)**     | 怎么接进来、完整接线示例、常见问题            |
-| **[API 参考](./docs/API.md)**       | 全部 67 个 props、11 个 handle 方法、类型定义 |
+| **[API 参考](./docs/API.md)**       | 全部 71 个 props、11 个 handle 方法、类型定义 |
 | **[扩展开发](./docs/EXTENDING.md)** | 加按钮、加语言、换主题、换编辑器              |
 
 ## 设计原则（硬约束）
@@ -105,6 +105,48 @@ import '@scholar-club/pdf-viewer/styles.css';
 
 > 💡 **包不碰你的后端**。换后端不用改包。
 
+## 批注（便签）接线
+
+批注有三个入口，**宿主必须传对应的回调**，否则对应按钮**不会渲染**：
+
+| 入口       | 触发                | 必须传的 prop                               |
+| ---------- | ------------------- | ------------------------------------------- |
+| 写新批注   | 选区浮层 → "加批注" | `onAnnotationCreate`                        |
+| 看详情     | 便签 hover → "展开" | `onAnnotationExpand` + `onAnnotationChange` |
+| 改已有批注 | 便签 hover → "编辑" | `onAnnotationEdit`                          |
+
+```tsx
+<PdfViewer
+  stickyNotes={notes}
+  onAnnotationCreate={(id, html, plain, highlightId, text) => {
+    setNotes((prev) => [...prev, { id, content: html, highlightId, text }]);
+  }}
+  /* "展开" -> 打开便签详情（只读）-> 点"编辑"进编辑器 */
+  onAnnotationExpand={(note) => console.log('展开', note.id)}
+  /* 编辑器里的内容变化（实时） */
+  onAnnotationChange={(id, html) => {
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content: html } : n)));
+  }}
+  onAnnotationSave={(id, html) => {
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content: html } : n)));
+  }}
+  onAnnotationDelete={(id) => setNotes((prev) => prev.filter((n) => n.id !== id))}
+/>;
+```
+
+> ⚠️ **`onAnnotationChange` 不传 → 详情面板永远是只读**（"编辑"按钮点不动）。
+> ⚠️ **`onAnnotationExpand` 不传 → 便签上没有"展开"按钮**（用户会以为按钮坏了）。
+
+### 富文本的两个色板
+
+| 配置                    | 用途         | 内置值                                |
+| ----------------------- | ------------ | ------------------------------------- |
+| `annotationPalette`     | **高亮底色** | 浅色（`#fff3a3` 黄 / `#c8e6c9` 绿 …） |
+| `annotationTextPalette` | **文字颜色** | 深色（`#c62828` 红 / `#1565c0` 蓝 …） |
+
+-> 工具栏里有**三个**颜色命令：**高亮底色** / **文字高亮**（只加背景，字色不变）/ **文字颜色** ✅
+-> 宿主不传也有内置的 ✅ 传了**覆盖**内置 ✅
+
 ## 宿主接线（完整示例）
 
 ```tsx
@@ -155,6 +197,8 @@ export function Reader({ url, paperId }: { url: string; paperId: string }) {
 | 高亮 / 批注绘制         | ✅   | 正片叠底（`multiply`），和 WPS 一致                            |
 | 选区浮层                | ✅   | 自研定位（不用 UI 库）                                         |
 | 高亮浮层                | ✅   | 点高亮块出现的 4 个按钮                                        |
+| 富文本工具栏            | ✅   | 三个颜色命令：**高亮底色 / 文字高亮 / 文字颜色**（色板分开）   |
+| 便签（批注）            | ✅   | hover 展开详情 → 点"编辑"就地编辑；同一行多条自动合并          |
 | 缩放                    | ✅   | 适应宽度 / 适应整页 / Ctrl+滚轮 / 就近取整到 10%               |
 | 跳页                    | ✅   | 精确（靠 `getPageSizes`）                                      |
 | 缩略图 / 目录 / 搜索    | ✅   | 宿主注入渲染函数                                               |
@@ -365,6 +409,50 @@ import '@scholar-club/pdf-viewer/styles.css';
 | **Actions**   | Emit events (`onXxx`)     | **Execute** them (translate / ask / save) |
 
 > 💡 **The package never touches your backend.** Swapping backends requires no package changes.
+
+## Annotation (sticky note) wiring
+
+Annotations have three entry points. **The host must pass the matching callback**,
+otherwise the matching button is **not rendered**:
+
+| Entry point           | Trigger                       | Required props                              |
+| --------------------- | ----------------------------- | ------------------------------------------- |
+| Write a new note      | Selection popover → "Comment" | `onAnnotationCreate`                        |
+| View details          | Sticky note hover → "Expand"  | `onAnnotationExpand` + `onAnnotationChange` |
+| Edit an existing note | Sticky note hover → "Edit"    | `onAnnotationEdit`                          |
+
+```tsx
+<PdfViewer
+  stickyNotes={notes}
+  onAnnotationCreate={(id, html, plain, highlightId, text) => {
+    setNotes((prev) => [...prev, { id, content: html, highlightId, text }]);
+  }}
+  /* "Expand" -> opens the read-only detail panel -> "Edit" turns it into an editor */
+  onAnnotationExpand={(note) => console.log('expand', note.id)}
+  /* Live content changes while editing */
+  onAnnotationChange={(id, html) => {
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content: html } : n)));
+  }}
+  onAnnotationSave={(id, html) => {
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content: html } : n)));
+  }}
+  onAnnotationDelete={(id) => setNotes((prev) => prev.filter((n) => n.id !== id))}
+/>;
+```
+
+> ⚠️ **Without `onAnnotationChange` the detail panel stays read-only** (the "Edit" button does nothing).
+> ⚠️ **Without `onAnnotationExpand` the sticky note has no "Expand" button** (it looks broken).
+
+### The two rich-text palettes
+
+| Config                  | Purpose            | Built-in values                                |
+| ----------------------- | ------------------ | ---------------------------------------------- |
+| `annotationPalette`     | **Highlight fill** | Light (`#fff3a3` yellow / `#c8e6c9` green / …) |
+| `annotationTextPalette` | **Text color**     | Dark (`#c62828` red / `#1565c0` blue / …)      |
+
+-> The toolbar has **three** color commands: **highlight fill** / **text highlight**
+(background only, text color unchanged) / **text color** ✅
+-> Both palettes ship with the package ✅ and are **overridable** by the host ✅
 
 ## Full wiring example
 

@@ -53,6 +53,7 @@ const ALL_ICONS: IconName[] = [
   'italic',
   'underline',
   'textColor',
+  'textHighlight',
   'list',
   'listOrdered',
   'menu',
@@ -75,6 +76,16 @@ describe('内置图标集', () => {
 
       expect(hasSomething, `图标 "${name}" 什么形状都没有`).toBe(true);
     }
+  });
+
+  /*
+   * ⚠️ **颜色相关的图标必须各不相同**（用户反馈：
+   * "清空format这个功能的按钮和修改文字颜色的按钮一样 需要区分开"）。
+   */
+  it('**颜色相关的图标互不相同**（用户分不清哪个是哪个）', () => {
+    const colorIcons: IconName[] = ['highlightColor', 'textHighlight', 'textColor', 'clearFormat'];
+    const shapes = colorIcons.map((name) => JSON.stringify(getIconShape(name)));
+    expect(new Set(shapes).size, '颜色图标有重复的').toBe(colorIcons.length);
   });
 
   it('**坐标都在 24×24 的画布内**（防止图标被裁掉）', () => {

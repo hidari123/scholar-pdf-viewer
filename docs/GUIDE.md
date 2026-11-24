@@ -232,13 +232,31 @@ onHighlight={save}
 
 ## 6. 批注
 
-### 三个回调的分工
+### 三个入口，三个回调（**别漏传**）
 
-| 回调                                                     | 场景                       |
-| -------------------------------------------------------- | -------------------------- |
-| `onAnnotationCreate(id, html, plain, highlightId, text)` | 选区浮层点"加批注"         |
-| `onAnnotationChange(id, html, plain)`                    | 编辑器内容变了（**实时**） |
-| `onAnnotationSave(id, html, plain)`                      | 点"保存"                   |
+| 入口       | 触发                | 必须传的回调                                                             | 不传会怎样                |
+| ---------- | ------------------- | ------------------------------------------------------------------------ | ------------------------- |
+| 写新批注   | 选区浮层 → "加批注" | `onAnnotationCreate(id, html, plain, highlightId, text)`                 | 没有新批注                |
+| 看详情     | 便签 → "展开"       | `onAnnotationExpand(annotation)` + `onAnnotationChange(id, html, plain)` | 没有"展开"按钮 / 详情只读 |
+| 改已有批注 | 便签 → "编辑"       | `onAnnotationEdit(annotation, element?)`                                 | 没有"编辑"按钮            |
+
+> ⚠️ **`onAnnotationExpand` 不传 → 便签上不渲染"展开"按钮** —— 用户会以为"按钮坏了"。
+> ⚠️ **`onAnnotationChange` 不传 → 详情面板**永远是只读**（"编辑"按钮点不动）。
+
+### 便签详情的流程
+
+```
+hover 便签 → 点"展开"
+   ↓
+【详情面板】只读（富文本渲染，贴着便签显示）
+   ├─ 点"编辑" → **就地变成编辑器**（按钮变"完成"）→ `onAnnotationChange` 实时回调
+   ├─ 点"删除" → `onAnnotationDelete(id)`
+   └─ 点"✕"    → 关闭
+```
+
+-> 同一行有多条批注 -> 自动**合并成一个图标**（带角标）✅
+-> hover 那个图标 -> 弹出**选择列表** -> 点某项 -> **打开那一条的详情** ✅
+-> 列表在右边放不下 -> **自动翻到左边** ✅
 
 ### ⚠️ HTML 已经消毒过
 
@@ -397,6 +415,43 @@ const toolbar = [{ command: 'bold' as const, label: '{my.bold}', icon: 'bold' as
 > -> demo 里演示了正确的做法（见 `demo/src/demo-i18n.ts`）✅
 
 > 💡 `label` 写 `{xxx.yyy}` 形式 → 包会拿 `xxx.yyy` 去查文案表。
+
+---
+
+## 9.5 富文本的两个色板
+
+### 为什么分成两个
+
+| 色板                    | 用途         | 内置值                                    |
+| ----------------------- | ------------ | ----------------------------------------- |
+| `annotationPalette`     | **高亮底色** | **浅色**（`#fff3a3` 黄 / `#c8e6c9` 绿 …） |
+| `annotationTextPalette` | **文字颜色** | **深色**（`#c62828` 红 / `#1565c0` 蓝 …） |
+
+-> 之前只有**一个**色板（浅色）❌
+-> 拿来当**文字颜色** -> **浅得看不见** ❌
+-> 所以**文字颜色必须用深色板** ✅
+
+### 工具栏里的三个颜色命令
+
+| 命令            | 效果                     | 用哪个色板              |
+| --------------- | ------------------------ | ----------------------- |
+| `hiliteColor`   | 高亮底色（**浅色背景**） | `annotationPalette`     |
+| `textHighlight` | 文字高亮（**字色不变**） | `annotationPalette`     |
+| `foreColor`     | 文字颜色（**字色**）     | `annotationTextPalette` |
+
+-> `textHighlight` **只加背景色，字色完全不变** ✅（WPS 的"突出显示"）
+
+### 换掉色板
+
+```tsx
+<PdfViewer
+  annotationPalette={{ yellow: '#ffe082', green: '#a5d6a7' }}
+  annotationTextPalette={{ red: '#b71c1c', blue: '#0d47a1' }}
+/>;
+```
+
+-> 不传也有内置的 ✅
+-> 传了**覆盖**内置 ✅
 
 ---
 

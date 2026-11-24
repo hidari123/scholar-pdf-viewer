@@ -230,7 +230,7 @@ import { Icon } from '@scholar-club/pdf-viewer/icons';
 <Icon name="download" size={16} />;
 ```
 
-**全部 53 个图标名**见 [API §9](./API.md#9-图标)。
+**全部 54 个图标名**见 [API §9](./API.md#9-图标)。
 
 > 💡 换图标不影响包体积 —— 宿主引的库不进包的 bundle。
 
@@ -328,6 +328,35 @@ const MyEditor: ComponentType<{
 
 <PdfViewer annotationEditor={MyEditor} />;
 ```
+
+### ⚠️ 自定义编辑器要支持这三个颜色命令
+
+包会把 `toolbar` 传给编辑器，**编辑器负责执行命令**。三个颜色命令的语义**必须一致**：
+
+| 命令            | 必须做到                         | 用哪个色板              |
+| --------------- | -------------------------------- | ----------------------- |
+| `hiliteColor`   | 设**背景色**（`value` 是颜色值） | `annotationPalette`     |
+| `textHighlight` | 设**背景色**，**字色不变** ⭐    | `annotationPalette`     |
+| `foreColor`     | 设**字色**（`value` 是颜色值）   | `annotationTextPalette` |
+
+-> `value` **可能为空** -> 表示"清除这个格式" ✅
+-> 颜色值是 **CSS 颜色字符串**（`#rrggbb` / `rgb(...)`）✅
+
+**参考实现**：包内置的 `RichTextEditor`（`execRichTextCommand`）和
+`TipTapEditor`（`run`）都遵守这个约定 ✅
+
+### ⚠️ 图标要能区分开
+
+三个颜色命令的图标**必须长得不一样**（用户反馈："图标还是跟文字颜色相同 需要区分开"）：
+
+| 命令            | 内置图标         | 画法               |
+| --------------- | ---------------- | ------------------ |
+| `hiliteColor`   | `highlightColor` | 笔 + **底部**色条  |
+| `textHighlight` | `textHighlight`  | "A" + **背景方块** |
+| `foreColor`     | `textColor`      | "A" + **下方色条** |
+| `removeFormat`  | `clearFormat`    | "A" + **斜杠**划掉 |
+
+-> 宿主覆盖图标时**也要保持这个区分** ✅
 
 ---
 

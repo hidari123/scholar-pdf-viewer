@@ -109,6 +109,7 @@ import '@scholar-club/pdf-viewer/themes.css'; // 可选
 | `printMode`   | `'with-highlights' \| 'original'`                  | `'with-highlights'` | 打印模式                                                         |
 | `printPaper`  | `'A4' \| 'A3' \| 'Letter' \| 'Legal' \| PaperSize` | `'A4'`              | 打印纸张（mm）                                                   |
 | `printMargin` | `Partial<PrintMargin>`                             | 四边 12mm           | 打印边距（mm，部分覆盖）                                         |
+| `dir`         | `'ltr'                                             | 'rtl'`              | 自动                                                             | 文字方向（RTL：界面镜像 + 箭头翻转） |
 | `slots`       | `PdfViewerSlots`                                   | —                   | 插槽（完全替换内置 UI）                                          |
 | `icons`       | `Partial<Record<IconName, ReactNode>>`             | —                   | 逐个图标覆盖                                                     |
 | `children`    | `ReactNode`                                        | —                   | 渲染在工具栏下方                                                 |
@@ -152,18 +153,45 @@ import '@scholar-club/pdf-viewer/themes.css'; // 可选
 
 ### 2.9 批注
 
-| Prop                 | 类型                                           | 说明                                          |
-| -------------------- | ---------------------------------------------- | --------------------------------------------- |
-| `onAnnotationClick`  | `(annotation) => void`                         | 点击批注                                      |
-| `onAnnotationEdit`   | `(annotation, element?) => void`               | 点"编辑"。**不传 → 不渲染编辑按钮**           |
-| `onAnnotationExpand` | `(annotation) => void`                         | 点"展开"。不传 → 不渲染展开按钮               |
-| `onAnnotationChange` | `(id, html, plain) => void`                    | 内容变化。**不传 → 包只读展示**               |
-| `onAnnotationSave`   | `(id, html, plain) => void`                    | 保存。**HTML 已经过 `sanitizeRichText` 清洗** |
-| `onAnnotationCreate` | `(id, html, plain, highlightId, text) => void` | 新建                                          |
-| `onAnnotationDelete` | `(id) => void`                                 | 删除                                          |
-| `annotationToolbar`  | `RichTextToolbarItem[]`                        | 批注编辑器的工具栏                            |
-| `annotationPalette`  | `RichTextPalette`                              | 批注编辑器的高亮色板                          |
-| `annotationEditor`   | `ComponentType`                                | 换掉批注编辑器（比如用 `TipTapEditor`）       |
+| Prop                    | 类型                                           | 说明                                          |
+| ----------------------- | ---------------------------------------------- | --------------------------------------------- |
+| `onAnnotationClick`     | `(annotation) => void`                         | 点击批注                                      |
+| `onAnnotationEdit`      | `(annotation, element?) => void`               | 点"编辑"。**不传 → 不渲染编辑按钮**           |
+| `onAnnotationExpand`    | `(annotation) => void`                         | 点"展开"。不传 → 不渲染展开按钮               |
+| `onAnnotationChange`    | `(id, html, plain) => void`                    | 内容变化。**不传 → 包只读展示**               |
+| `onAnnotationSave`      | `(id, html, plain) => void`                    | 保存。**HTML 已经过 `sanitizeRichText` 清洗** |
+| `onAnnotationCreate`    | `(id, html, plain, highlightId, text) => void` | 新建                                          |
+| `onAnnotationDelete`    | `(id) => void`                                 | 删除                                          |
+| `annotationToolbar`     | `RichTextToolbarItem[]`                        | 批注编辑器的工具栏                            |
+| `annotationPalette`     | `RichTextPalette`                              | 批注编辑器的**高亮底色**色板（**浅色**）      |
+| `annotationTextPalette` | `RichTextPalette`                              | 批注编辑器的**文字颜色**色板（**深色**）      |
+| `annotationEditor`      | `ComponentType`                                | 换掉批注编辑器（比如用 `TipTapEditor`）       |
+
+#### 批注的三个入口（**宿主必须知道的差异**）
+
+| 入口                          | 触发                    | 需要传的 prop                               | 效果                                       |
+| ----------------------------- | ----------------------- | ------------------------------------------- | ------------------------------------------ |
+| **写新批注**（选中 → 加批注） | 选区浮层的"加批注"按钮  | `onAnnotationCreate`                        | 弹出**编辑弹窗** → 保存后回调              |
+| **看详情**（便签 → 展开）     | 便签 hover → "展开"按钮 | `onAnnotationExpand` + `onAnnotationChange` | 打开**详情面板**（只读）→ 点"编辑"进编辑器 |
+| **改已有批注**（便签 → 编辑） | 便签 hover → "编辑"按钮 | `onAnnotationEdit`                          | 弹出**锚点编辑弹窗**（贴着便签）           |
+
+> ⚠️ **`onAnnotationExpand` 不传 → 便签上不渲染"展开"按钮**（用户会以为"按钮坏了"）。
+> ⚠️ **`onAnnotationChange` 不传 → 详情面板**永远是只读**（"编辑"按钮点不动）。
+
+#### 详情面板的"只读 → 编辑"流程
+
+```
+hover 便签 → 点"展开"
+   ↓
+【详情面板】只读（富文本渲染）
+   ├─ 点"编辑" → **就地变成编辑器**（按钮变"完成"）→ `onAnnotationChange` 实时回调
+   ├─ 点"删除" → `onAnnotationDelete`
+   └─ 点"✕"    → 关闭
+```
+
+- 详情面板**贴在便签旁边**（不是页面最右）✅
+- 合并组（同一行多条批注）的**选择列表**里点某项 → **打开那一条的详情** ✅
+- 列表**自动翻边**（右边放不下就往左开）✅
 
 ### 2.10 链接 / 密码 / Toast
 
@@ -267,21 +295,22 @@ undefined                      ←  用内置默认值
 
 ### `PdfViewerConfig` 的字段
 
-| 字段                | 类型                                    | 说明       |
-| ------------------- | --------------------------------------- | ---------- |
-| `theme`             | `PdfViewerTheme`                        | 主题       |
-| `appearance`        | `PdfViewerAppearance`                   | 外观       |
-| `highlightPalette`  | `HighlightPalette`                      | 高亮色板   |
-| `locale`            | `Locale`                                | 语言       |
-| `locales`           | `LocaleTable`                           | 语言表     |
-| `messages`          | `Partial<Messages>`                     | 文案覆盖   |
-| `selectionActions`  | `SelectionAction[]`                     | 选区动作   |
-| `annotationToolbar` | `RichTextToolbarItem[]`                 | 批注工具栏 |
-| `annotationPalette` | `RichTextPalette`                       | 批注色板   |
-| `toolbar`           | `ToolbarConfig`                         | 工具栏     |
-| `features`          | `Partial<Features>`                     | 功能开关   |
-| `printPaper`        | `keyof typeof PAPER_SIZES \| PaperSize` | 打印纸张   |
-| `printMargin`       | `Partial<PrintMargin>`                  | 打印边距   |
+| 字段                    | 类型                                    | 说明                         |
+| ----------------------- | --------------------------------------- | ---------------------------- |
+| `theme`                 | `PdfViewerTheme`                        | 主题                         |
+| `appearance`            | `PdfViewerAppearance`                   | 外观                         |
+| `highlightPalette`      | `HighlightPalette`                      | 高亮色板                     |
+| `locale`                | `Locale`                                | 语言                         |
+| `locales`               | `LocaleTable`                           | 语言表                       |
+| `messages`              | `Partial<Messages>`                     | 文案覆盖                     |
+| `selectionActions`      | `SelectionAction[]`                     | 选区动作                     |
+| `annotationToolbar`     | `RichTextToolbarItem[]`                 | 批注工具栏                   |
+| `annotationPalette`     | `RichTextPalette`                       | 批注**高亮底色**色板（浅色） |
+| `annotationTextPalette` | `RichTextPalette`                       | 批注**文字颜色**色板（深色） |
+| `toolbar`               | `ToolbarConfig`                         | 工具栏                       |
+| `features`              | `Partial<Features>`                     | 功能开关                     |
+| `printPaper`            | `keyof typeof PAPER_SIZES \| PaperSize` | 打印纸张                     |
+| `printMargin`           | `Partial<PrintMargin>`                  | 打印边距                     |
 
 > ⚠️ `config` **不覆盖** `file` / `highlights` / `stickyNotes` / `slots` / `printMode` / 所有 `onXxx` —— 那些只能单独传。
 
@@ -439,10 +468,31 @@ interface RichTextToolbarItem {
 
 ```
 bold  italic  underline  strikeThrough
-hiliteColor  foreColor  createLink
+hiliteColor  textHighlight  foreColor  createLink
 insertUnorderedList  insertOrderedList  formatBlock
 removeFormat  undo  redo
 ```
+
+### 三个颜色命令的区别（**别搞混**）
+
+| 命令            | 作用         | 用哪个色板                      | 图标           |
+| --------------- | ------------ | ------------------------------- | -------------- |
+| `hiliteColor`   | **高亮底色** | `annotationPalette`（浅色）     | 笔 + 底部色条  |
+| `textHighlight` | **文字高亮** | `annotationPalette`（浅色）     | "A" + 背景方块 |
+| `foreColor`     | **文字颜色** | `annotationTextPalette`（深色） | "A" + 下方色条 |
+
+> ⚠️ **`textHighlight` 只加背景色，**字色不变**（WPS 的"突出显示"）。
+> ⚠️ **`foreColor` 必须用深色板** —— 浅色当字色会**看不见**。
+
+### `removeFormat`（清除格式）会清什么
+
+| 编辑器       | 清除的内容                         |
+| ------------ | ---------------------------------- |
+| TipTap       | 全部标记 + **字色** + **高亮底色** |
+| 包内置编辑器 | 全部格式 + **字色** + **高亮底色** |
+
+> ⚠️ **`removeFormat` 不弹颜色面板** —— 它是**直接执行**的。
+> （`hiliteColor` / `textHighlight` / `foreColor` 才弹面板。）
 
 **i18n 占位符**：`label` 写 `'{richtext.bold}'` → 由包解析成当前语言的文案。
 **自定义按钮**也能翻译 —— 宿主加一个新的 key 到 `messages` 即可：
@@ -456,19 +506,28 @@ const toolbar: RichTextToolbarItem[] = [{ command: 'bold', label: '{my.bold}', i
 
 ## 9. 图标
 
-**全部 `IconName`（53 个）**：
+**全部 `IconName`（54 个）**：
 
 ```
 chevronLeft  chevronRight  chevronUp  chevronDown
 arrowLeft  arrowRight  zoomIn  zoomOut  fitWidth  fitPage  rotate
 search  thumbnails  outline  print  upload  download
 file  fileText  exportJson  exportPdf
-highlight  highlightColor  comment  copy  trash  more
+highlight  highlightColor  textHighlight  comment  copy  trash  more
 note  stickyNote  translate  ask  explain
 plus  minus  close  check  alert  info  edit  link
 bold  italic  underline  strike  quote  clearFormat  undo  redo
 textColor  list  listOrdered  menu  settings
 ```
+
+> 💡 **三个颜色图标刻意画得不一样**（用户反馈："图标还是跟文字颜色相同 需要区分开"）：
+>
+> | 图标             | 画法               |
+> | ---------------- | ------------------ |
+> | `highlightColor` | 笔 + **底部**色条  |
+> | `textHighlight`  | "A" + **背景方块** |
+> | `textColor`      | "A" + **下方色条** |
+> | `clearFormat`    | "A" + **斜杠**划掉 |
 
 **逐个覆盖**：
 
