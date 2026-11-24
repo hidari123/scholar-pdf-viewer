@@ -31,6 +31,7 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
+import { sanitizeRichTextHtml } from '../core/editor/render-rich-text';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
 import { richTextToPlain, sanitizeRichText } from '../core/editor/rich-text';
 import { computeDialogPosition } from '../core/selection/dialog-position';
@@ -522,9 +523,15 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
  *
  * ⚠️ **这里用 `dangerouslySetInnerHTML`**（内容是富文本 HTML）。
  *
- * → 安全责任在**调用方**：宿主传进来的内容应当已经过
- *   `sanitizeRichText` 处理（包也导出了这个函数）
- * → 或者宿主用 `readOnly` 时自己保证数据可信
+ * ### ⚠️⚠️ **必须自己消毒**（审核发现的安全问题）
+ *
+ * -> 之前是**直接渲染宿主的 html** ❌
+ *    -> 安全责任全推给宿主 ❌
+ *    -> 但**包自己已经导出了 `sanitizeRichTextHtml`** ✅
+ *    -> 而且**同一个包的 `RichTextPreview` 就消毒了** ✅ -> **不一致** ❌
+ * -> -> 现在：**渲染前一律消毒** ✅
+ *    -> **纵深防御** ✅ -> 宿主传了脏数据也不会出事 ✅
+ *    -> 和 `RichTextPreview` **行为一致** ✅
  *
  * biome 的 `noDangerouslySetInnerHtml` 在这里是**误报**
  * → 富文本内容**必须**用 innerHTML 渲染（否则标签会显示成文本）
@@ -532,9 +539,14 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
  * @param props 参数
  */
 function ReadOnlyContent({ html }: { html: string }) {
+  /*
+   * ⚠️ **渲染前消毒**（纵深防御）✅
+   * -> `sanitizeRichTextHtml` 是**纯正则**的 ✅ -> SSR / Node 也能用 ✅
+   */
+  const safe = useMemo(() => sanitizeRichTextHtml(html ?? ''), [html]);
   return (
-    // biome-ignore lint/security/noDangerouslySetInnerHtml: 富文本内容必须用 innerHTML 渲染
-    <div className="scpdf-annotation-panel__content" dangerouslySetInnerHTML={{ __html: html }} />
+    // biome-ignore lint/security/noDangerouslySetInnerHtml: 富文本内容必须用 innerHTML 渲染（渲染前已消毒）
+    <div className="scpdf-annotation-panel__content" dangerouslySetInnerHTML={{ __html: safe }} />
   );
 }
 
