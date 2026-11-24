@@ -82,6 +82,7 @@ const suites = [
   { name: '便签好 hover（热区 + 不移开就消失）', file: 'e2e-sticky-hover.mjs' },
   { name: '重复的高亮 id（只激活点到的那一个）', file: 'e2e-highlight-duplicate-id.mjs' },
   { name: '打印时藏起便签和浮层（不泄露批注）', file: 'e2e-print-hide-overlays.mjs' },
+  { name: '打印时所有页都有内容（不是白页）', file: 'e2e-print-all-pages.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

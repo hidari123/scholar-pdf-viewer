@@ -847,6 +847,76 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
 
   /*
+   * ⚠️⚠️ **打印中**（beforeprint -> afterprint）。
+   *
+   * ### 为什么需要（用户反馈："打印的时候只能展示前几张
+   *   后面是只有标题没有内容 是因为你还没缓存是吗"）
+   *
+   * -> 实测：18 页里**只有 4 页**渲染了 canvas ❌
+   *    -> 打印时**没渲染的页 = 白页** ❌
+   *    -> 用户看到"只有标题没有内容" ✅
+   * -> 根因：`renderCanvas={isVisible}` -> 只渲染**可见**的页 ❌
+   *
+   * ### 修法
+   *
+   * -> 打印前（`beforeprint`）-> **临时**渲染全部页 ✅
+   * -> 打印完（`afterprint`）-> **恢复**虚拟化 ✅
+   * -> 平时**不受影响**（性能不变）✅
+   */
+  const [printing, setPrinting] = useState(false);
+
+  /**
+   * ⚠️⚠️ **打印时临时渲染全部页**。
+   *
+   * ### 为什么需要（用户反馈）
+   *
+   * > "打印的时候只能展示前几张 后面是只有标题没有内容
+   * >  是因为你还没缓存是吗"
+   *
+   * ### 实测（修复前）
+   *
+   * ```
+   * 总页数:            18
+   * 渲染了 canvas 的页: 4     ← ❌ 只有 4 页！
+   * 打印出的 PDF 页数:  18    ← 页数对，但 14 页是空白的
+   * ```
+   *
+   * -> 根因：`<Page renderCanvas={isVisible} />` -> 只渲染**可见**的页 ❌
+   * -> 打印时**没渲染的页 = 白页** ❌ -> 用户看到"只有标题没有内容" ✅
+   * -> **不是缓存问题**（缓存是浏览器的事，和这个无关）✅
+   *
+   * ### 修法
+   *
+   * -> 打印前（`beforeprint`）-> **临时**渲染全部页 ✅
+   * -> 打印完（`afterprint`）-> **恢复**虚拟化 ✅
+   * -> 平时**完全不受影响**（性能不变）✅
+   *
+   * ### ⚠️ 为什么用 `beforeprint` 而不是"一直全渲染"
+   *
+   * -> 18 页全渲染 = 18 个 canvas 同时画 -> **卡顿** ❌
+   * -> 虚拟化是**性能的核心** ✅ -> 只能在打印这个**短窗口**里放开 ✅
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const onBeforePrint = () => {
+      setPrinting(true);
+    };
+    const onAfterPrint = () => {
+      setPrinting(false);
+    };
+
+    window.addEventListener('beforeprint', onBeforePrint);
+    window.addEventListener('afterprint', onAfterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', onBeforePrint);
+      window.removeEventListener('afterprint', onAfterPrint);
+    };
+  }, []);
+
+  /*
    * ⚠️⚠️ **当前激活的那个矩形**（视口 px）。
    *
    * ### 为什么需要（实测踩到的坑）
@@ -1323,7 +1393,19 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * 只取可见页 → 100 页文档首屏只加载 3~7 页，不是 100 页。
    */
   useEffect(() => {
-    if (!getPage || visiblePages.length === 0 || !data) {
+    /*
+     * ⚠️⚠️ **打印时要把【所有页】的 proxy 都取出来**（实测踩到的坑）。
+     *
+     * -> 页面元素虽然都在 DOM 里 ✅
+     * -> 但 `pageProxies` 只有**可见页**的 ❌
+     * -> -> 打印时 `renderCanvas` 打开了 ✅
+     *    -> 但**没 proxy 的页渲染不出来** ❌ -> 还是白页 ❌
+     * -> -> 打印时改成取**全部页** ✅
+     */
+    const targetPages =
+      printing && numPages > 0 ? Array.from({ length: numPages }, (_, i) => i + 1) : visiblePages;
+
+    if (!getPage || targetPages.length === 0 || !data) {
       return;
     }
 
@@ -1332,7 +1414,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     const load = async () => {
       const next = new Map(pageProxies);
 
-      for (const pageNumber of visiblePages) {
+      for (const pageNumber of targetPages) {
         if (next.has(pageNumber)) {
           continue;
         }
@@ -1356,7 +1438,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     return () => {
       cancelled = true;
     };
-  }, [getPage, visiblePages, pageProxies, data]);
+  }, [getPage, visiblePages, pageProxies, data, printing, numPages]);
 
   /**
    * 取链接注解（可见页才取）。
@@ -5013,14 +5095,14 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                     top: pageTops[index] ?? 0,
                   }}
                 >
-                  {isVisible || textLayerPages.has(pageNumber) ? (
+                  {printing || isVisible || textLayerPages.has(pageNumber) ? (
                     <Page
                       pageNumber={pageNumber}
                       page={pageProxies.get(pageNumber) ?? null}
                       scale={scale}
                       size={size}
                       pageSizePt={pageSizesPt[index]}
-                      renderCanvas={isVisible}
+                      renderCanvas={printing || isVisible}
                       annotations={annotations.get(pageNumber) ?? null}
                       searchRects={searchRectsByPage.get(pageNumber)}
                       activeSearchRectIndex={activeSearchIndexOnPage(pageNumber)}
