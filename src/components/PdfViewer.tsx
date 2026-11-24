@@ -4106,22 +4106,61 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * -> 现在：**量便签图标的位置** -> 面板**贴在它旁边** ✅
    */
-  const activeAnnotationAnchor = useMemo(() => {
+  /*
+   * ⚠️⚠️ **便签的位置要在 DOM 画出来之后才能量**（实测踩到的坑）。
+   *
+   * ### 问题
+   *
+   * -> 之前是 `useMemo([activeAnnotationId])` ❌
+   * -> 它在**渲染期间**算 -> 那时便签图标**可能还没渲染出来** ❌
+   *    -> `querySelector` 返回 null -> `anchorRect = null` ❌
+   *    -> 详情面板**退回"中间偏右"** -> "出现在 PDF 的最上方" ❌
+   *
+   * ### 现在的做法
+   *
+   * -> 用 `state` + `useEffect` -> **DOM 画完之后**再量 ✅
+   * -> 量不到就**再试一次**（下一帧）✅
+   */
+  const [activeAnnotationAnchor, setActiveAnnotationAnchor] = useState<{
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  } | null>(null);
+
+  useEffect(() => {
     if (!activeAnnotationId) {
-      return null;
+      setActiveAnnotationAnchor(null);
+      return;
     }
-    const container = containerRef.current;
-    if (!container) {
-      return null;
-    }
-    const el = container.querySelector<HTMLElement>(
-      `.scpdf-sticky-note__icon[data-note-id="${CSS.escape(activeAnnotationId)}"]`,
-    );
-    if (!el) {
-      return null;
-    }
-    const r = el.getBoundingClientRect();
-    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+
+    const measure = () => {
+      const container = containerRef.current;
+      if (!container) {
+        return;
+      }
+      const el = container.querySelector<HTMLElement>(
+        `.scpdf-sticky-note__icon[data-note-id="${CSS.escape(activeAnnotationId)}"]`,
+      );
+      if (!el) {
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      setActiveAnnotationAnchor({
+        left: r.left,
+        top: r.top,
+        right: r.right,
+        bottom: r.bottom,
+      });
+    };
+
+    // ⚠️ **先量一次**（便签已经在了）
+    measure();
+    // ⚠️ **再量一次**（下一帧）—— 便签可能是**这一帧**才画出来的 ✅
+    const raf = requestAnimationFrame(measure);
+    return () => {
+      cancelAnimationFrame(raf);
+    };
   }, [activeAnnotationId]);
 
   /** 批注的删除（宿主实现） */
@@ -4756,6 +4795,13 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                 annotation={activeAnnotation}
                 container={{ width: containerSize.width, height: containerSize.height }}
                 anchorRect={activeAnnotationAnchor}
+                /*
+                 * ⚠️ **滚动容器的 ref**（视口坐标 -> 容器坐标）。
+                 *
+                 * -> 面板是 `position: absolute` -> 相对 `.scpdf-container` ✅
+                 * -> 不传 -> 面板**整体偏移** -> "出现在 PDF 的最上方" ❌
+                 */
+                containerRef={containerRef}
                 onChange={onAnnotationChange}
                 onSubmit={onAnnotationSave}
                 onDelete={onAnnotationDelete ? handleAnnotationDelete : undefined}

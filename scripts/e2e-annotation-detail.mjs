@@ -179,6 +179,25 @@ try {
     const n = document.querySelector('.scpdf-sticky-note__icon')?.getBoundingClientRect();
     return {
       panel: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width) },
+      panelStyle: `${p.style.left}/${p.style.top}`,
+      containerRect: (() => {
+        const c = document.querySelector('.scpdf-container')?.getBoundingClientRect();
+        return c ? `${Math.round(c.x)},${Math.round(c.y)}` : null;
+      })(),
+      noteIconExists: !!document.querySelector('.scpdf-sticky-note__icon[data-note-id]'),
+      icons: [...document.querySelectorAll('.scpdf-sticky-note__icon')].map((e) => {
+        const r = e.getBoundingClientRect();
+        return { id: e.getAttribute('data-note-id'), x: Math.round(r.x), y: Math.round(r.y) };
+      }),
+      matchedBySelector: (() => {
+        const c = document.querySelector('.scpdf-container');
+        const el = c?.querySelector(
+          `.scpdf-sticky-note__icon[data-note-id="${CSS.escape('note-h-1')}"]`,
+        );
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { x: Math.round(r.x), y: Math.round(r.y), bottom: Math.round(r.bottom) };
+      })(),
       note: n ? { x: Math.round(n.x), y: Math.round(n.y), w: Math.round(n.width) } : null,
       hasEditor: !!p.querySelector('.ProseMirror'),
       btns: [...p.querySelectorAll('.scpdf-annotation-panel__btn')].map((b) =>
@@ -209,7 +228,24 @@ try {
     opened?.panel && opened?.note
       ? Math.abs(opened.panel.x - (opened.note.x + opened.note.w))
       : Number.POSITIVE_INFINITY;
-  check('**详情面板贴在便签旁边**（不是离得很远）', gap < 120, `距离 ${Math.round(gap)}px`);
+  check('**详情面板贴在便签旁边**（不是离得很远）', gap < 60, `距离 ${Math.round(gap)}px`);
+
+  /*
+   * ⚠️ **垂直方向也要在便签附近**（用户反馈：
+   * "批注详情目前是出现在pdf的最上方 应该定位在批注按钮附近的"❌）。
+   *
+   * -> 之前**偏了 124px**（视口坐标当成了容器坐标）❌
+   * -> 面板整体下移 -> "出现在 PDF 的最上方"❌
+   */
+  const verticalGap =
+    opened?.panel && opened?.note
+      ? Math.abs(opened.panel.y - opened.note.y)
+      : Number.POSITIVE_INFINITY;
+  check(
+    '**详情面板在便签的垂直位置附近**（不是跑到 PDF 最上方）',
+    verticalGap < 80,
+    `垂直距离 ${Math.round(verticalGap)}px（便签 y=${opened?.note?.y} 面板 y=${opened?.panel?.y}）`,
+  );
 
   // ---- ⑤ 点"编辑" -> 就地变成编辑器 ----
   await page.evaluate(() => {

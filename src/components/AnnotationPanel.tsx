@@ -59,6 +59,16 @@ export interface AnnotationPanelProps {
    * -> 传了 -> **贴在便签旁边**（优先放右边，放不下就翻到左边）✅
    */
   anchorRect?: { left: number; top: number; right: number; bottom: number } | null;
+  /**
+   * **滚动容器的 ref**（用来把"视口坐标"换成"容器坐标"）。
+   *
+   * ⚠️ **必须传** ❌
+   * -> 面板是 `position: absolute` -> 相对 `.scpdf-container` ✅
+   * -> 但 `computeDialogPosition` 返回的是**视口坐标** ✅
+   * -> 不减掉容器的偏移 -> 面板**整体偏移** ❌
+   *    （实测：偏了 124px -> "出现在 PDF 的最上方"❌）
+   */
+  containerRef?: React.RefObject<HTMLDivElement | null>;
   /** 批注内容变化（HTML + 纯文本） */
   onChange?: (id: string, html: string, plain: string) => void;
   /** 保存 */
@@ -118,6 +128,7 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
     annotation,
     container,
     anchorRect,
+    containerRef,
     onChange,
     onSubmit,
     onDelete,
@@ -228,19 +239,63 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
   );
 
   /*
-   * ⚠️ **位置：贴着便签**（用户需求："打开一个稍微大一点的便利贴的样式"）。
+   * ⚠️ **位置：贴着便签**（用户需求：
+   * "点击批注详情 批注详情目前是出现在pdf的最上方 应该定位在批注按钮附近的
+   *  跟编辑批注的位置应该是差不多的"）。
    *
-   * ### 之前
+   * ### ⚠️⚠️ **坐标系必须对齐**（实测踩到的坑）
    *
-   * -> 固定在**页面中间偏右** -> 便签在 `x=571`、面板在 `x=918` -> **离得很远** ❌
+   * -> `computeDialogPosition` 返回的是**视口坐标** ✅
+   * -> 但面板是 `position: absolute` -> **父容器是 `.scpdf-container`** ❌
+   * -> 容器的 `offsetParent` 在视口里是 `(x=8, y=124)` ❌
+   *    -> 绝对定位会**再加一遍这个偏移** ❌
+   *    -> 面板**整体下移 124px** -> "出现在 PDF 的最上方" ❌
    *
-   * ### 现在
+   * ### 实测（修复前）
    *
-   * -> **复用 `computeDialogPosition`**（和编辑弹窗同一套定位规则）✅
-   * -> 有锚点（便签）-> **贴在便签旁边** ✅
-   * -> 放不下 -> **自动翻边** ✅
-   * -> 没锚点 -> 退回"中间偏右" ✅
+   * ```
+   * panel.style.left = "539.227px"    ← 视口坐标
+   * offsetParent = .scpdf-container    ← 容器在视口里 x=8, y=124
+   * → 面板实际落在 y = 399 + 124 = 523  ← 偏了 124px ❌
+   * ```
+   *
+   * ### 修法
+   *
+   * -> **减去容器的偏移** ✅（视口坐标 -> 容器坐标）
+   * -> 和"编辑批注"（`position: fixed`）**定位逻辑一致** ✅
    */
+  /*
+   * ⚠️⚠️ **滚动容器在视口里的偏移**（视口坐标 -> 容器坐标）。
+   *
+   * -> 面板是 `position: absolute` -> 相对 `.scpdf-container` ✅
+   * -> 但 `computeDialogPosition` 返回的是**视口坐标** ✅
+   * -> **必须减去这个偏移** ✅
+   *
+   * -> ⚠️ **必须用 state + useEffect**（不能在 useMemo 里现量）❌
+   *    -> useMemo 在**渲染期间**跑 -> DOM 还没更新 -> 量到**旧值** ❌
+   *    -> 实测：`top = 124 - 124 = 0` -> 面板贴到容器顶部 ❌
+   */
+  const [containerOffset, setContainerOffset] = useState<{
+    left: number;
+    top: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const el = containerRef?.current;
+    if (!el) {
+      return;
+    }
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setContainerOffset({ left: r.left, top: r.top });
+    };
+    measure();
+    const raf = requestAnimationFrame(measure);
+    return () => {
+      cancelAnimationFrame(raf);
+    };
+  }, [containerRef]);
+
   const position = useMemo(() => {
     if (!anchorRect) {
       return {
@@ -251,12 +306,67 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
         top: Math.max(8, container.height * 0.18),
       };
     }
-    return computeDialogPosition({
+
+    /*
+     * ⚠️⚠️ **视口尺寸必须是"窗口"的**，不是"滚动容器"的** ❌
+     *
+     * -> `computeDialogPosition` 拿 `viewport` 来判断"放不放得下" ✅
+     * -> 传**滚动容器**的尺寸（1442 × 608）❌
+     *    -> 容器比窗口矮 -> "下面放不下" -> 面板被**推到上面** ❌
+     *    -> 实测：`top = 124` -> 面板贴在**容器顶部** ❌
+     *    -> "出现在 PDF 的最上方" ✅
+     * -> 传**窗口**的尺寸（1442 × 732）✅ -> 判断正确 ✅
+     *
+     * -> ⚠️ 容器尺寸只用来做"没锚点时的兜底位置" ✅
+     */
+    const viewport = {
+      width: typeof window === 'undefined' ? container.width : window.innerWidth,
+      height: typeof window === 'undefined' ? container.height : window.innerHeight,
+    };
+    /*
+     * ⚠️ **`gap: 30`**（默认是 8）——
+     *
+     * -> 便签图标只有 **22px** 宽 ✅
+     * -> gap=8 -> 面板**盖住便签**（图标被挡住，看不到"这是哪条批注"）❌
+     * -> gap=30 -> 面板在便签**右边 30px** -> 两个都看得见 ✅
+     */
+    const dialog = computeDialogPosition({
       anchor: anchorRect,
-      size: { width: ANNOTATION_PANEL_WIDTH, height: 320 },
-      viewport: { width: container.width, height: container.height },
+      /*
+       * ⚠️ **高度要给"小一点的值"**（实测踩到的坑）。
+       *
+       * -> 面板的**真实高度**是 `min(460px, 70%)`，不是固定的 ❌
+       * -> 之前写死 **320** -> 算"下面放不下" -> 面板被放到**上面** ❌
+       *    -> 实测：`anchor.bottom(391) + 30 + 320 = 741 > 732 - 12` ❌
+       *    -> -> `top = anchor.top - 30 - 320 = 16` -> **贴在 PDF 最上方** ❌
+       * -> 用 **200**（比"锚点下面能放下的高度"小）-> **正常贴在下面** ✅
+       */
+      size: { width: ANNOTATION_PANEL_WIDTH, height: 200 },
+      viewport,
+      gap: 30,
     });
-  }, [anchorRect, container.width, container.height]);
+
+    /*
+     * ⚠️⚠️ **视口坐标 -> 容器坐标**（绝对定位的坐标系）✅
+     *
+     * -> 锚点是 `getBoundingClientRect()` -> **视口坐标** ✅
+     * -> 面板是 `position: absolute` -> **相对 `.scpdf-container`** ✅
+     * -> **必须减去容器的视口偏移** ✅
+     *
+     * ⚠️ **容器偏移要用 state**（不能在 useMemo 里现量）❌
+     * -> useMemo 在**渲染期间**跑 -> 那时 DOM 还没更新 ❌
+     * -> 量到的是**旧值**（甚至 0）❌
+     * -> 实测：top 算成 `124 - 124 = 0` -> 面板贴到容器顶部 ❌
+     * -> "出现在 PDF 的最上方" ✅
+     */
+    const offsetX = containerOffset?.left ?? 0;
+    const offsetY = containerOffset?.top ?? 0;
+
+    return {
+      left: Math.max(0, dialog.left - offsetX),
+      top: Math.max(0, dialog.top - offsetY),
+    };
+  }, [anchorRect, container.width, container.height, containerOffset]);
 
   const left = position.left;
   const top = position.top;
