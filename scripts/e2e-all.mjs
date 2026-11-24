@@ -87,6 +87,7 @@ const suites = [
   { name: '工具栏的主题选择按钮', file: 'e2e-theme-picker.mjs' },
   { name: '缩放比例可以填写', file: 'e2e-scale-input.mjs' },
   { name: '没选字时只有"清除格式"置灰', file: 'e2e-editor-disabled-state.mjs' },
+  { name: '批注详情贴在便签旁边（任意页）', file: 'e2e-annotation-panel-position.mjs' },
   { name: '缩略图', file: 'e2e-thumbnail.mjs' },
 ];
 

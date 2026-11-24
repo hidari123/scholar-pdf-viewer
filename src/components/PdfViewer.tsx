@@ -4494,12 +4494,72 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       });
     };
 
-    // ⚠️ **先量一次**（便签已经在了）
+    /*
+     * ⚠️ **先量一次**（便签已经在了）
+     */
     measure();
-    // ⚠️ **再量一次**（下一帧）—— 便签可能是**这一帧**才画出来的 ✅
-    const raf = requestAnimationFrame(measure);
+
+    /*
+     * ⚠️⚠️ **量不到就【多试几次】**（实测踩到的坑）。
+     *
+     * -> 便签是**这一帧**才画出来的 ❌
+     * -> 只试一次（下一帧）**可能还是量不到** ❌
+     *    -> 量不到 -> `anchorRect = null` ❌
+     *    -> 面板**用旧锚点**（上一次的！）❌
+     *    -> 用户反馈："不管在哪个页面点击批注按钮
+     *      批注详情都会出现在pdf首页的位置" ✅
+     *    -> 实测：第 1 页有一条 -> 第 4 页打开详情 -> 用的是**第 1 页的锚点** ❌
+     *      -> 面板被 clamp 到视口顶部（top=12）❌
+     *
+     * -> -> **重试到量到为止**（最多 ~10 帧）✅
+     */
+    let raf = 0;
+    let tries = 0;
+    const retry = () => {
+      tries += 1;
+      const el2 = containerRef.current?.querySelector<HTMLElement>(
+        `.scpdf-sticky-note__icon[data-note-id="${CSS.escape(activeAnnotationId)}"]`,
+      );
+      if (el2) {
+        const r2 = el2.getBoundingClientRect();
+        setActiveAnnotationAnchor({
+          left: r2.left,
+          top: r2.top,
+          right: r2.right,
+          bottom: r2.bottom,
+        });
+        return;
+      }
+      if (tries < 10) {
+        raf = requestAnimationFrame(retry);
+      }
+    };
+    raf = requestAnimationFrame(retry);
+
+    /*
+     * ⚠️⚠️ **容器滚动时要重新量**（实测踩到的坑）。
+     *
+     * -> 便签是 `position: absolute` -> 在**容器的内容坐标系**里 ✅
+     * -> 容器滚动 -> 便签在**视口里**的位置变了 ❌
+     *    -> 但**视口矩形**变了 -> 锚点得跟着变 ✅
+     * -> 实测：先在第 1 页建一条 -> 再滚到第 4 页建第二条 ✅
+     *    -> 打开详情时，锚点还是**滚动前**量的（旧的）❌
+     *    -> `computeDialogPosition` 以为"下面放不下" -> clamp 到视口顶部 ❌
+     *    -> 实测：`panelY = 12`（应该是 194）❌
+     *    -> 用户反馈："不管在哪个页面点击批注按钮
+     *      批注详情都会出现在pdf首页的位置" ✅
+     *
+     * -> -> **滚动时重新量锚点** ✅
+     */
+    const container = containerRef.current;
+    const onScroll = () => {
+      measure();
+    };
+    container?.addEventListener('scroll', onScroll, { passive: true });
+
     return () => {
       cancelAnimationFrame(raf);
+      container?.removeEventListener('scroll', onScroll);
     };
   }, [activeAnnotationId]);
 

@@ -278,6 +278,17 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
   const [containerOffset, setContainerOffset] = useState<{
     left: number;
     top: number;
+    /*
+     * ⚠️⚠️ **容器的滚动量**（用户反馈：
+     * "不管在哪个页面哪个地方点击批注按钮 批注详情都会出现在pdf首页的位置"✅）。
+     *
+     * -> 面板是 `position: absolute` -> 相对 **.scpdf-container 的内容原点** ✅
+     * -> 而锚点是 `getBoundingClientRect()` -> **视口坐标** ✅
+     * -> 换算：`内容坐标 = 视口坐标 - 容器视口原点 + scrollTop` ✅
+     * -> ⚠️ **只减视口偏移、不加 scrollTop** ❌ -> 差了整个滚动量 ❌
+     *    -> 实测（第 4 页，scrollTop=7000）：面板 y = **-6806** ❌
+     */
+    scrollTop: number;
   } | null>(null);
 
   useEffect(() => {
@@ -287,12 +298,23 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
     }
     const measure = () => {
       const r = el.getBoundingClientRect();
-      setContainerOffset({ left: r.left, top: r.top });
+      setContainerOffset({ left: r.left, top: r.top, scrollTop: el.scrollTop });
     };
     measure();
     const raf = requestAnimationFrame(measure);
+
+    /*
+     * ⚠️ **滚动时要重新量**。
+     *
+     * -> 容器滚动 -> 内容在动 -> 锚点（视口坐标）变了 ❌
+     *    -> 但面板是**内容坐标** -> **不用动** ✅
+     *    -> 但**scrollTop 变了** -> 换算要跟着变 ✅
+     * -> 不监听滚动 -> 用户滚一下 -> 面板**飘了** ❌
+     */
+    el.addEventListener('scroll', measure, { passive: true });
     return () => {
       cancelAnimationFrame(raf);
+      el.removeEventListener('scroll', measure);
     };
   }, [containerRef]);
 
@@ -361,10 +383,20 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
      */
     const offsetX = containerOffset?.left ?? 0;
     const offsetY = containerOffset?.top ?? 0;
+    /*
+     * ⚠️⚠️ **必须加上 `scrollTop`**（实测踩到的坑）。
+     *
+     * -> 视口坐标 -> 内容坐标：`y - 容器视口top + scrollTop` ✅
+     * -> 之前**只减了视口偏移** ❌
+     *    -> 容器滚到第 4 页（scrollTop=7000）-> 差 7000px ❌
+     *    -> 实测：便签在 y=140，面板在 y=**-6806** ❌
+     *    -> "批注详情都会出现在pdf首页的位置" ✅
+     */
+    const scrollTop = containerOffset?.scrollTop ?? 0;
 
     return {
       left: Math.max(0, dialog.left - offsetX),
-      top: Math.max(0, dialog.top - offsetY),
+      top: Math.max(0, dialog.top - offsetY + scrollTop),
     };
   }, [anchorRect, container.width, container.height, containerOffset]);
 
