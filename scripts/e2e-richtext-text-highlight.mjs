@@ -1,19 +1,21 @@
 /**
- * E2E：文字颜色用**深色** + 新增"文字高亮"按钮 + 三个按钮的图标各不相同。
+ * E2E：文字颜色用**深色** + 三个按钮的图标各不相同 + **"文字高亮"已移除**。
  *
  * ## 用户反馈
  *
  * > "1. 富文本的那个文字颜色 如果是放在文字上 就太浅了 文字可以适当加深颜色；
  *    但是这个颜色可以放在文字的高亮上 增加一个添加文字高亮的按钮"
  * > "2. 富文本的清除格式按钮没生效 并且图标还是跟文字颜色相同 需要重新设计过图标"
+ * > "把富文本编辑框里的文字高亮这个按钮去掉吧 功能和高亮重复了而且图标很丑"  ← **第 27 轮**
  *
  * ## 修法
  *
  * - **文字颜色** -> 用**独立的深色板**（`annotationTextPalette`）✅
- * - **"文字高亮"** -> 新命令 `textHighlight` -> **只加背景色，字色不变** ✅
- * - **三个图标** -> `highlightColor`（笔）/ `textHighlight`（A+背景块）/
- *   `textColor`（A+横条）/ `clearFormat`（A+斜杠）-> **各不相同** ✅
+ * - **三个图标** -> `highlightColor`（笔）/ `textColor`（A+横条）/ `clearFormat`（A+斜杠）
+ *   -> **各不相同** ✅
  * - **清除格式** -> TipTap 加 `unsetColor` + `unsetHighlight` -> **真清干净** ✅
+ * - **"文字高亮"** -> **从默认工具栏移除**（功能重复 + 图标丑）❌
+ *   -> 但**命令和图标保留** -> 宿主可自己加回来 ✅
  *
  * 用法：`node scripts/e2e-richtext-text-highlight.mjs`
  */
@@ -125,7 +127,8 @@ try {
     ),
   );
   check('有"高亮"按钮', labels.includes('高亮'), labels.join(','));
-  check('**有"文字高亮"按钮**', labels.includes('文字高亮'), '');
+  // ⚠️ **"文字高亮"已从默认工具栏移除**（用户反馈："功能重复 + 图标很丑"）✅
+  check('**没有"文字高亮"按钮**（功能和高亮重复）', !labels.includes('文字高亮'), labels.join(','));
   check('有"文字颜色"按钮', labels.includes('文字颜色'), '');
   check('有"清除格式"按钮', labels.includes('清除格式'), '');
 
@@ -134,7 +137,7 @@ try {
     const out = {};
     for (const b of document.querySelectorAll('.scpdf-annotation-dialog .scpdf-rich-text__btn')) {
       const label = b.getAttribute('aria-label');
-      if (label && ['高亮', '文字高亮', '文字颜色', '清除格式'].includes(label)) {
+      if (label && ['高亮', '文字颜色', '清除格式'].includes(label)) {
         out[label] = b.querySelector('svg')?.innerHTML ?? '';
       }
     }
@@ -142,8 +145,8 @@ try {
   });
   const iconValues = Object.values(icons);
   check(
-    '**4 个图标互不相同**',
-    new Set(iconValues).size === iconValues.length && iconValues.length === 4,
+    '**3 个图标互不相同**',
+    new Set(iconValues).size === iconValues.length && iconValues.length === 3,
     Object.entries(icons)
       .map(([k, v]) => `${k}=${v.length}字符`)
       .join(' '),
@@ -230,10 +233,12 @@ try {
   const html = () =>
     page.evaluate(() => document.querySelector('.scpdf-annotation-dialog .ProseMirror')?.innerHTML);
 
-  // ---- ⑤ "文字高亮"：面板 + 只加背景色 ----
+  // ---- ⑤ "高亮"：面板 + 加背景色 ----
+  // ⚠️ **"文字高亮"按钮已移除**（用户反馈："功能重复 + 图标很丑"）
+  //    -> 这里测**"高亮"**按钮（背景色）✅
   await selectAll();
   await page.waitForTimeout(300);
-  await clickBtn('文字高亮');
+  await clickBtn('高亮');
   const pal = await page.evaluate(() => {
     const p = document.querySelector('.scpdf-annotation-dialog .scpdf-rich-text__palette');
     if (!p) {
@@ -247,19 +252,19 @@ try {
       colors: [...p.querySelectorAll('.scpdf-rich-text__swatch')].map((s) => s.style.background),
     };
   });
-  check('"文字高亮"弹出了颜色面板', pal !== null, JSON.stringify(pal));
+  check('"高亮"弹出了颜色面板', pal !== null, JSON.stringify(pal));
   check('面板不是空的窄框', (pal?.w ?? 0) >= 100, `${pal?.w}x${pal?.h}`);
   check('面板有 >= 4 个色块', (pal?.count ?? 0) >= 4, String(pal?.count));
 
   await clickSwatch(2);
   const afterHighlight = await html();
   check(
-    '**"文字高亮"加了背景色**',
+    '**"高亮"加了背景色**',
     (afterHighlight ?? '').includes('background-color'),
     afterHighlight ?? '',
   );
   check(
-    '**"文字高亮"没有改字色**（用户要求：只加背景色 字色不变）',
+    '**"高亮"没有改字色**（高亮只加背景）',
     // `color: inherit` 是**正确**的 —— 显式声明"字色继承父级" -> 视觉上就是没改 ✅
     // -> 只检查有没有**具体的字色值**（排除 `background-color`）✅
     !/(^|[;"\s])color:\s*(rgb|#[0-9a-f]{3,8})/i.test(afterHighlight ?? ''),

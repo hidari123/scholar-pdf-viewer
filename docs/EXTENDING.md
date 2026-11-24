@@ -356,6 +356,8 @@ const MyEditor: ComponentType<{
 | `foreColor`     | `textColor`      | "A" + **下方色条** |
 | `removeFormat`  | `clearFormat`    | "A" + **斜杠**划掉 |
 
+-> ⚠️ **默认工具栏只有前三个里的"高亮"和"文字颜色"**（"文字高亮"被去掉了）❌
+
 -> 宿主覆盖图标时**也要保持这个区分** ✅
 
 ---

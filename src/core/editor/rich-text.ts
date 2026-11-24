@@ -52,6 +52,9 @@ export type RichTextCommand =
    * -> `hiliteColor` = 荧光笔效果（背景色 + 可能带浅色）
    * -> `textHighlight` = 纯背景色，**字色完全不变** ✅（用户需求：
    *    "这个颜色可以放在文字的高亮上"）
+   *
+   * ⚠️⚠️ **不在默认工具栏里**（用户反馈："功能和高亮重复了而且图标很丑"）❌
+   * -> 宿主可以自己在 `annotationToolbar` 里加回来 ✅
    */
   | 'textHighlight'
   /** 文字颜色 */
@@ -94,8 +97,10 @@ export interface RichTextPalette {
  * | U 下划线 | `underline` | ✅ |
  * | S 删除线 | `strikeThrough` | ✅ |
  * | 高亮底色 | `hiliteColor` | ✅（有 palette 时） |
- * | 文字高亮 | `textHighlight` | ✅（有 textPalette 时） |
  * | A 文字颜色 | `foreColor` | ✅ |
+ *
+ * ⚠️ **`textHighlight`（文字高亮）不在默认工具栏里**（用户反馈："功能重复 + 图标很丑"）❌
+ * -> 但**命令和图标保留** -> 宿主可自己加回来 ✅
  * | 链接 | `createLink` | ✅ |
  * | 无序列表 | `insertUnorderedList` | ✅ |
  * | 有序列表 | `insertOrderedList` | ✅ |
@@ -135,20 +140,23 @@ export function defaultRichTextToolbar(
   }
 
   /*
-   * ⚠️ **"文字高亮"按钮**（用户需求：
-   * "这个颜色可以放在文字的高亮上 增加一个添加文字高亮的按钮"）。
+   * ⚠️⚠️ **"文字高亮"按钮已从默认工具栏移除**（用户反馈：
+   * "把富文本编辑框里的文字高亮这个按钮去掉吧 功能和高亮重复了而且图标很丑"）。
    *
-   * -> 和 `hiliteColor` 的区别：**字色不变**，只加背景色 ✅
-   * -> 用**高亮底色板**（浅色）-> 适合当背景 ✅
+   * ### 为什么去掉
+   *
+   * -> 实现上它就是 \`hiliteColor\` 的**别名** ✅
+   *    -> \`execCommand(command === 'textHighlight' ? 'hiliteColor' : command, ...)\` ✅
+   * -> 功能**完全重复** ❌
+   * -> 图标（"A" + 背景块）**不好看** ❌
+   *
+   * ### 但是**命令和图标保留**
+   *
+   * -> 宿主可以自己在 \`annotationToolbar\` 里加回来 ✅
+   * -> 命令（\`textHighlight\`）保留 -> 宿主的自定义工具栏能用 ✅
+   * -> 图标（\`textHighlight\`）保留 -> 宿主想用能用 ✅
+   * -> **不破坏**已有宿主的自定义工具栏 ✅
    */
-  if (palette) {
-    items.push({
-      command: 'textHighlight',
-      label: '{richtext.textHighlight}',
-      icon: 'textHighlight',
-      palette,
-    });
-  }
 
   items.push(
     // ⚠️ **文字颜色用【深色】色板**（浅色当字色看不见）✅

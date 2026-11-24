@@ -142,17 +142,39 @@ describe('defaultRichTextToolbar', () => {
     expect(commands).toContain('hiliteColor');
   });
 
-  it('**按钮顺序固定**（加粗 -> 斜体 -> 下划线 -> 删除线 -> 高亮 -> 文字高亮 -> 文字颜色）', () => {
+  it('**按钮顺序固定**（加粗 -> 斜体 -> 下划线 -> 删除线 -> 高亮 -> 文字颜色）', () => {
     const commands = defaultRichTextToolbar({ yellow: '#ff0' }).map((i) => i.command);
-    expect(commands.slice(0, 7)).toEqual([
+    expect(commands.slice(0, 6)).toEqual([
       'bold',
       'italic',
       'underline',
       'strikeThrough',
       'hiliteColor',
-      'textHighlight',
       'foreColor',
     ]);
+  });
+
+  /*
+   * ⚠️ **"文字高亮"不在默认工具栏里**（用户反馈：
+   * "把富文本编辑框里的文字高亮这个按钮去掉吧 功能和高亮重复了而且图标很丑"）。
+   *
+   * -> 但**命令保留** -> 宿主可以自己加回来 ✅
+   */
+  it('**默认工具栏没有"文字高亮"**（功能和高亮重复）', () => {
+    const commands = defaultRichTextToolbar({ yellow: '#ff0' }).map((i) => i.command);
+    expect(commands).not.toContain('textHighlight');
+  });
+
+  it('**"文字高亮"命令仍然保留**（宿主可以自己加回来）', () => {
+    const custom = [
+      ...defaultRichTextToolbar({ yellow: '#ff0' }),
+      {
+        command: 'textHighlight' as const,
+        label: '{richtext.textHighlight}',
+        icon: 'textHighlight' as const,
+      },
+    ];
+    expect(custom.map((i) => i.command)).toContain('textHighlight');
   });
 
   /*
@@ -166,8 +188,16 @@ describe('defaultRichTextToolbar', () => {
   });
 
   it('**"文字高亮"用高亮板**（浅色 -> 适合当背景）', () => {
-    const items = defaultRichTextToolbar({ yellow: '#fff3a3' }, { red: '#c62828' });
-    const highlight = items.find((i) => i.command === 'textHighlight');
+    // ⚠️ 默认工具栏里**没有**它（用户要求去掉）-> 宿主自己加 -> 用高亮板 ✅
+    const custom = [
+      ...defaultRichTextToolbar({ yellow: '#fff3a3' }, { red: '#c62828' }),
+      {
+        command: 'textHighlight' as const,
+        label: '{richtext.textHighlight}',
+        palette: { yellow: '#fff3a3' },
+      },
+    ];
+    const highlight = custom.find((i) => i.command === 'textHighlight');
     expect(highlight?.palette).toEqual({ yellow: '#fff3a3' });
   });
 
