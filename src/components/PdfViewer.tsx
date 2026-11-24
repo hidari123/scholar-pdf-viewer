@@ -650,6 +650,26 @@ export interface PdfViewerProps {
   /** 换色 */
   onHighlightColorChange?: (id: string, color: string) => void;
   /**
+   * **最小缩放**（宿主可配）。
+   *
+   * → 不传 → **20%** ✅
+   * → 用户需求："这个上限下限宿主也可以配置" ✅
+   */
+  minScale?: number;
+  /**
+   * **最大缩放**（宿主可配）。
+   *
+   * → 不传 → **250%** ✅
+   */
+  maxScale?: number;
+  /**
+   * **允许用户直接填写缩放比例**。
+   *
+   * → `true`（默认）→ 工具栏比例**可以点一下改成输入框** ✅
+   * → 用户需求："是可以用户进行填写比例的" ✅
+   */
+  allowScaleInput?: boolean;
+  /**
    * **切换主题**（宿主改 `theme` prop）。
    *
    * ⚠️ **不传就不显示工具栏的主题按钮** ✅
@@ -813,6 +833,13 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         features: props.features,
         printPaper: props.printPaper,
         printMargin: props.printMargin,
+        /*
+         * ⚠️ **缩放上下限 / 能不能填写**（用户需求：
+         * "这个上限下限宿主也可以配置，包括是否用户可以填写" ✅）。
+         */
+        minScale: props.minScale,
+        maxScale: props.maxScale,
+        allowScaleInput: props.allowScaleInput,
       }),
     [
       props.config,
@@ -831,6 +858,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       props.features,
       props.printPaper,
       props.printMargin,
+      props.minScale,
+      props.maxScale,
+      props.allowScaleInput,
     ],
   );
 
@@ -1639,6 +1669,13 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onScaleChange: handleZoomChange,
     fitMode,
     onFitModeChange: setFitMode,
+    /*
+     * ⚠️ **缩放上下限**（宿主可配）。
+     *
+     * -> 用户需求："这个上限下限宿主也可以配置" ✅
+     */
+    minScale: merged.minScale,
+    maxScale: merged.maxScale,
   });
 
   /**
@@ -4669,6 +4706,16 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               : () => setSidebar((v) => (v === 'outline' ? 'none' : 'outline'))
           }
           onPrint={merged.features?.print === false ? undefined : printDocument}
+          /*
+           * ⚠️ **缩放比例可填写 + 上下限可配**（用户需求）。
+           *
+           * -> "是可以用户进行填写比例的" ✅
+           * -> "这个上限下限宿主也可以配置" ✅
+           * -> "包括是否用户可以填写 这个宿主也要可以进行配置" ✅
+           */
+          scaleBounds={zoom.bounds}
+          allowScaleInput={merged.allowScaleInput}
+          onScaleChange={handleZoomChange}
           /*
            * ⚠️ **主题选择按钮**（用户需求：
            * "包在工具栏那里也可以加上一个按钮让用户进行选择"✅）。

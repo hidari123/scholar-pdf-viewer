@@ -20,6 +20,7 @@ export * from './PageCanvas';
 export * from './PasswordDialog';
 export * from './PdfViewer';
 export * from './RichTextPreview';
+export * from './ScaleInput';
 export * from './SearchPanel';
 export * from './SelectionActionIcons';
 export * from './SelectionLayer';

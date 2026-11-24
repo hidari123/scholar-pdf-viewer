@@ -151,6 +151,63 @@
   display: inline-flex;
 }
 
+/* ---------- 缩放比例（可填写） ---------- */
+
+/*
+ * ⚠️ **可填写的缩放比例**（用户需求：
+ * "放大缩小这个 是可以用户进行填写比例的"✅）。
+ *
+ * -> 平时是一个**按钮**（显示 "100%"）✅
+ * -> 点一下变成**输入框** ✅
+ */
+.scpdf-toolbar__scale--editable {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: var(--scpdf-font-size);
+  cursor: text;
+  transition:
+    background var(--scpdf-motion-fast) ease,
+    border-color var(--scpdf-motion-fast) ease;
+}
+
+.scpdf-toolbar__scale--editable:hover {
+  background: var(--scpdf-color-surface-alt);
+  border-color: var(--scpdf-color-border);
+}
+
+/* 编辑中 */
+.scpdf-toolbar__scale--editing {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 52px;
+  height: 28px;
+  padding: 0 4px;
+  border: 1px solid var(--scpdf-color-primary);
+  border-radius: 4px;
+  background: var(--scpdf-color-surface);
+  font-size: var(--scpdf-font-size);
+}
+
+.scpdf-toolbar__scale-input {
+  width: 38px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  text-align: right;
+  outline: none;
+}
+
 /* 下拉菜单 */
 .scpdf-theme-picker__menu {
   position: absolute;

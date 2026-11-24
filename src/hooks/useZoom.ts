@@ -13,7 +13,16 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { anchoredScrollTop } from '../core/store/instance';
 
-/** 缩放范围 */
+/**
+ * **缩放范围（默认值）**。
+ *
+ * ⚠️ 用户反馈："放大缩小这个 是可以用户进行填写比例的
+ *   包默认最大是250%，最小是20%，这个上限下限宿主也可以配置"✅
+ *
+ * -> 这两个是**默认值** ✅
+ * -> 宿主可以通过 `minScale` / `maxScale` **覆盖** ✅
+ * -> 工具栏的 +/- 按钮也用**动态的上下限** ✅
+ */
 export const MIN_SCALE = 0.2;
 export const MAX_SCALE = 2.5;
 
@@ -83,6 +92,18 @@ export interface UseZoomOptions {
   containerRef: React.RefObject<HTMLElement | null>;
   /** 当前缩放 */
   scale: number;
+  /**
+   * **最小缩放**（宿主可配）。
+   *
+   * -> 不传 -> `MIN_SCALE`（20%）✅
+   */
+  minScale?: number;
+  /**
+   * **最大缩放**（宿主可配）。
+   *
+   * -> 不传 -> `MAX_SCALE`（250%）✅
+   */
+  maxScale?: number;
   /** 缩放变化（写回 store / 触发渲染） */
   onScaleChange: (scale: number) => void;
   /** 缩放模式 */
@@ -134,11 +155,36 @@ export interface UseZoomResult {
    * → 宿主据此决定"容器变窄时要不要自动重适配"。
    */
   fitMode: 'width' | 'page' | null;
+  /**
+   * **当前的缩放上下限**（宿主可配后的实际值）。
+   *
+   * -> 工具栏用它来**判断 +/- 按钮要不要置灰** ✅
+   * -> 之前是**硬编码** 0.2 / 2.5 ❌
+   */
+  bounds: { min: number; max: number };
 }
 
-/** 夹到缩放范围 */
-function clampScale(scale: number): number {
-  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+/**
+ * **夹到缩放范围**。
+ *
+ * ⚠️ **上下限可以由宿主配置**（用户需求）✅
+ * -> 之前是**硬编码** `MIN_SCALE` / `MAX_SCALE` ❌
+ * -> 现在传进来 ✅
+ *
+ * @param scale 原始比例
+ * @param min 最小值
+ * @param max 最大值
+ * @returns 夹好���比例
+ */
+export function clampScale(
+  scale: number,
+  min: number = MIN_SCALE,
+  max: number = MAX_SCALE,
+): number {
+  // ⚠️ **宿主配反了**（min > max）-> 用默认值，别让用户完全不能缩放 ❌
+  const lo = min < max ? min : MIN_SCALE;
+  const hi = min < max ? max : MAX_SCALE;
+  return Math.min(hi, Math.max(lo, scale));
 }
 
 /**
@@ -162,7 +208,22 @@ export function quantizeScale(scale: number): number {
  * @param options 参数
  */
 export function useZoom(options: UseZoomOptions): UseZoomResult {
-  const { containerRef, scale, onScaleChange, onFitModeChange } = options;
+  const {
+    containerRef,
+    scale,
+    onScaleChange,
+    onFitModeChange,
+    minScale = MIN_SCALE,
+    maxScale = MAX_SCALE,
+  } = options;
+
+  /*
+   * ⚠️ **动态的缩放上下限**（宿主可配）。
+   *
+   * -> 用户需求："这个上限下限宿主也可以配置"✅
+   * -> 夹的时候要用**动态的**上下限 ✅
+   */
+  const scaleBounds = useMemo(() => ({ min: minScale, max: maxScale }), [minScale, maxScale]);
 
   /** 上一次的缩放（算锚点用） */
   const prevScaleRef = useRef(scale);
@@ -212,7 +273,7 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
   const applyScale = useCallback(
     (next: number) => {
       // 量化到 10% 的倍数（显示值与渲染几何一致）
-      const clamped = clampScale(quantizeScale(next));
+      const clamped = clampScale(quantizeScale(next), scaleBounds.min, scaleBounds.max);
       const container = containerRef.current;
 
       if (!container) {
@@ -244,7 +305,7 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
         onScaleChange(clamped);
       }
     },
-    [containerRef, onScaleChange],
+    [containerRef, onScaleChange, scaleBounds],
   );
 
   /**
@@ -399,7 +460,15 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
    * （实测：打开缩略图 → 容器 1384→1139 → 缩放没变 → 页溢出）
    */
   return useMemo(
-    () => ({ zoomIn, zoomOut, fitWidth, fitPage, setScale, fitMode: fitModeRef.current }),
-    [zoomIn, zoomOut, fitWidth, fitPage, setScale],
+    () => ({
+      zoomIn,
+      zoomOut,
+      fitWidth,
+      fitPage,
+      setScale,
+      fitMode: fitModeRef.current,
+      bounds: scaleBounds,
+    }),
+    [zoomIn, zoomOut, fitWidth, fitPage, setScale, scaleBounds],
   );
 }

@@ -75,6 +75,8 @@ export interface Messages {
   'page.of': string;
   'zoom.in': string;
   'zoom.out': string;
+  /** 缩放比例（可填写） */
+  'zoom.scale': string;
   'zoom.fitWidth': string;
   'zoom.fitPage': string;
   'zoom.reset': string;
@@ -262,6 +264,7 @@ export const ZH_MESSAGES: Messages = {
   'page.of': '第 {page} / {total} 页',
   'zoom.in': '放大',
   'zoom.out': '缩小',
+  'zoom.scale': '缩放比例',
   'zoom.fitWidth': '适应宽度',
   'zoom.fitPage': '适合页面',
   'zoom.reset': '重置缩放',
@@ -374,6 +377,7 @@ export const EN_MESSAGES: Messages = {
   'page.of': 'Page {page} of {total}',
   'zoom.in': 'Zoom in',
   'zoom.out': 'Zoom out',
+  'zoom.scale': 'Zoom',
   'zoom.fitWidth': 'Fit width',
   'zoom.fitPage': 'Fit page',
   'zoom.reset': 'Reset zoom',

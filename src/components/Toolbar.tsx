@@ -15,6 +15,7 @@ import type { Locale, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
+import { ScaleInput } from './ScaleInput';
 import { ThemePicker } from './ThemePicker';
 
 /**
@@ -53,6 +54,20 @@ export interface ToolbarProps {
   /** 缩放 */
   onZoomIn: () => void;
   onZoomOut: () => void;
+  /** 直接设置缩放（用户填写比例） */
+  onScaleChange?: (scale: number) => void;
+  /**
+   * **缩放上下限**（宿主可配）。
+   *
+   * -> 不传 -> 20% ~ 250% ✅
+   */
+  scaleBounds?: { min: number; max: number };
+  /**
+   * **允许用户填写缩放比例**。
+   *
+   * -> `false` -> 只读（只有 +/- 按钮）✅
+   */
+  allowScaleInput?: boolean;
   onFitWidth: () => void;
   onFitPage: () => void;
   /** 打开搜索 */
@@ -107,6 +122,9 @@ export function Toolbar(props: ToolbarProps) {
     onPageChange,
     onZoomIn,
     onZoomOut,
+    onScaleChange,
+    scaleBounds,
+    allowScaleInput,
     onFitWidth,
     onFitPage,
     onToggleSearch,
@@ -266,22 +284,27 @@ export function Toolbar(props: ToolbarProps) {
               type="button"
               className="scpdf-toolbar__btn"
               onClick={onZoomOut}
-              disabled={scale <= 0.2}
+              disabled={scale <= (scaleBounds?.min ?? 0.2) + 0.001}
               aria-label={t('zoom.out')}
               title={t('zoom.out')}
             >
               <Icon name={'zoomOut'} title={t('zoom.out')} overrides={icons} />
             </button>
 
-            <span className="scpdf-toolbar__scale" aria-live="polite">
-              {Math.round(scale * 100)}%
-            </span>
+            <ScaleInput
+              scale={scale}
+              onScaleChange={onScaleChange ?? (() => undefined)}
+              min={scaleBounds?.min}
+              max={scaleBounds?.max}
+              allowInput={allowScaleInput}
+              label={t('zoom.scale')}
+            />
 
             <button
               type="button"
               className="scpdf-toolbar__btn"
               onClick={onZoomIn}
-              disabled={scale >= 2.5}
+              disabled={scale >= (scaleBounds?.max ?? 2.5) - 0.001}
               aria-label={t('zoom.in')}
               title={t('zoom.in')}
             >

@@ -114,6 +114,33 @@ export interface PdfViewerConfig {
    */
   defaultHighlightColor?: string;
 
+  /* —— 缩放 —— */
+
+  /**
+   * **最小缩放**（宿主可配）。
+   *
+   * -> 不传 -> **20%**（`MIN_SCALE`）✅
+   * -> 用户需求："包默认最大是250%，最小是20%，
+   *   这个上限下限宿主也可以配置" ✅
+   */
+  minScale?: number;
+
+  /**
+   * **最大缩放**（宿主可配）。
+   *
+   * -> 不传 -> **250%**（`MAX_SCALE`）✅
+   */
+  maxScale?: number;
+
+  /**
+   * **允许用户直接填写缩放比例**。
+   *
+   * -> `true`（默认）-> 工具栏的比例**可以点一下改成输入框** ✅
+   * -> `false` -> 只读（只有 +/- 按钮）✅
+   * -> 用户需求："放大缩小这个 是可以用户进行填写比例的" ✅
+   */
+  allowScaleInput?: boolean;
+
   /* —— 语言 —— */
 
   /** 语言 */
@@ -273,6 +300,9 @@ export function mergeConfig(
     icons?: Partial<Record<IconName, ReactNode>>;
     highlightPalette?: HighlightPalette;
     defaultHighlightColor?: string;
+    minScale?: number;
+    maxScale?: number;
+    allowScaleInput?: boolean;
     locale?: Locale;
     locales?: LocaleTable;
     messages?: LocaleMessagesMap;
@@ -319,6 +349,20 @@ export function mergeConfig(
      * -> 很多宿主是英文站点 -> 默认中文 -> 用户看到"怎么是中文" ❌
      * -> 推断成浏览器语言 -> **开箱即用** ✅
      */
+    /*
+     * ⚠️ **缩放上下限**（宿主可配）。
+     *
+     * -> 用户需求："这个上限下限宿主也可以配置" ✅
+     * -> 不传 -> 用默认（20% ~ 250%）✅
+     */
+    minScale: resolveConfigValue(props.minScale, c.minScale),
+    maxScale: resolveConfigValue(props.maxScale, c.maxScale),
+    /*
+     * ⚠️ **能不能填写比例**（宿主可配）。
+     *
+     * -> 默认**允许**（用户需求："是可以用户进行填写比例的"）✅
+     */
+    allowScaleInput: resolveConfigValue(props.allowScaleInput, c.allowScaleInput) ?? true,
     locale: resolveConfigValue(props.locale, c.locale) ?? detectDefaultLocale(),
     // 宿主的语言表 + 内置的语言表（宿主覆盖内置）
     locales: mergeLocales(resolveConfigValue(props.locales, c.locales)),

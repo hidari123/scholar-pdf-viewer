@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import {
+  clampScale,
   FIT_WIDTH_PADDING,
   MAX_SCALE,
   MIN_SCALE,
@@ -103,5 +104,27 @@ describe('fitWidth 的留白', () => {
   it('两边都要留空隙（用户反馈："两边也要留一点空隙的"）', () => {
     // 至少 20px -> 看起来像 WPS 那样有留白
     expect(FIT_WIDTH_PADDING).toBeGreaterThanOrEqual(20);
+  });
+});
+
+/*
+ * ⚠️ **缩放上下限可以由宿主配置**（用户需求：
+ * "这个上限下限宿主也可以配置" ✅）。
+ */
+describe('夹到缩放范围（上下限可配）', () => {
+  it('**默认夹到 20% ~ 250%**', () => {
+    expect(clampScale(0.05)).toBe(0.2);
+    expect(clampScale(5)).toBe(2.5);
+    expect(clampScale(1.5)).toBe(1.5);
+  });
+
+  it('**宿主可以指定上下限**', () => {
+    expect(clampScale(5, 0.1, 4)).toBe(4);
+    expect(clampScale(0.05, 0.1, 4)).toBe(0.1);
+  });
+
+  it('**宿主把上下限配反了 -> 用默认值**（不能让用户完全不能缩放）', () => {
+    expect(clampScale(5, 4, 0.1)).toBe(2.5);
+    expect(clampScale(0.05, 4, 0.1)).toBe(0.2);
   });
 });
