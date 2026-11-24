@@ -91,12 +91,31 @@ export function computeVisiblePages(options: ComputeVisiblePagesOptions): number
     }
   }
 
+  /*
+   * ⚠️ **总页数**（用来夹住缓冲区）✅
+   *
+   * -> `pages` 是**当前 DOM 里有的页** ✅
+   * -> 但它可能**少于文档总页数** ✅（虚拟滚动：远处的页还没挂载 ❌）
+   * -> -> 拿 `pages.length` 当上限会**算错** ❌
+   */
+  const maxPageNumber = Math.max(...pages.map((page) => page.pageNumber), 0);
+
   // 缓冲区扩展
   const withBuffer = new Set<number>();
   for (const pageNumber of viewportPages) {
     for (let offset = -bufferPages; offset <= bufferPages; offset += 1) {
       const target = pageNumber + offset;
-      if (target >= 1) {
+      /*
+       * ⚠️⚠️ **上下限都要夹**（审核发现的真 bug）✅
+       *
+       * -> 之前**只夹了下限**（`target >= 1`）❌
+       * -> -> 滚到最后几页时，缓冲区会算出**越界的页码** ❌
+       *    （实测：10 页的文档算出第 **11** 页 ❌）
+       * -> -> 下游会去 `getPage(11)` ❌
+       *    -> 严格的实现会**抛 "Invalid page request"** ❌
+       *    -> 宽容的实现会**静默失败** ❌（页渲染不出来 ❌）
+       */
+      if (target >= 1 && target <= maxPageNumber) {
         withBuffer.add(target);
       }
     }
