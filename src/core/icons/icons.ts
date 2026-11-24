@@ -63,6 +63,14 @@ export type IconName =
   | 'fileText'
   | 'exportJson'
   | 'exportPdf'
+  /*
+   * ⚠️ **两个新图标**（用户反馈）。
+   *
+   * -> `importJson`：导入高亮 JSON（用户说"目前像是上传pdf"❌）
+   * -> `exportAnnotated`：导出**带高亮**的 PDF（和"下载 PDF"区分）✅
+   */
+  | 'importJson'
+  | 'exportAnnotated'
   // —— 选区操作 ——
   | 'highlight'
   | 'highlightColor'
@@ -303,6 +311,43 @@ export function getIconShape(name: IconName): IconShape | null {
         paths: [
           'M9 4c-2 0-3 1-3 3v2c0 1.5-.7 2.5-2 3 1.3.5 2 1.5 2 3v2c0 2 1 3 3 3',
           'M15 4c2 0 3 1 3 3v2c0 1.5.7 2.5 2 3-1.3.5-2 1.5-2 3v2c0 2-1 3-3 3',
+        ],
+      };
+    case 'importJson':
+      /*
+       * ⚠️ **导入 JSON**（用户反馈："导入高亮这个icon可否再设计
+       * 目前像是上传pdf"❌）。
+       *
+       * -> `upload` 是"云 + 向上箭头" -> **看起来像上传 PDF** ❌
+       * -> 新图标：**向下箭头进文件**（和"导出"方向相反）✅
+       *    -> 一眼看出"从文件里读进来" ✅
+       */
+      return {
+        paths: [
+          // 文件轮廓（右上角折角）
+          'M13 3v5h5',
+          'M19 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6l5 5v3',
+          // 向下箭头（进文件）
+          'M12 10v7',
+          'M9.5 14.5 12 17l2.5-2.5',
+        ],
+      };
+    case 'exportAnnotated':
+      /*
+       * ⚠️ **导出带高亮的 PDF**（用户反馈："导出带高亮的pdf这个icon
+       * 可以作为下载pdf，导出带高亮的pdf的icon再设计一下"❌）。
+       *
+       * -> 旧的 `exportPdf` 是"文件 + 向下箭头" -> 和"下载 PDF"**重复** ❌
+       * -> 新图标：**文件 + 高亮块**（一眼看出"带高亮的 PDF"）✅
+       */
+      return {
+        paths: [
+          // 文件轮廓（右上角折角）
+          'M13 3v5h5',
+          'M19 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6l5 5v3',
+          // 高亮块（文件中间的一条粗底线 + 上面的短横）
+          'M8.5 13h7',
+          'M8.5 16.5h4.5',
         ],
       };
     case 'exportPdf':

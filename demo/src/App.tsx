@@ -973,7 +973,8 @@ export default function App() {
           title={t('demo.exportPdf')}
           aria-label={t('demo.exportPdf')}
         >
-          <Icon name="exportPdf" />
+          {/* ⚠️ **新图标**：之前用 `exportPdf` -> 和"下载 PDF"重复 ❌ */}
+          <Icon name="exportAnnotated" />
         </button>
 
         <button
@@ -983,7 +984,8 @@ export default function App() {
           title={t('demo.importJson')}
           aria-label={t('demo.importJson')}
         >
-          <Icon name="upload" />
+          {/* ⚠️ **新图标**：之前用 `upload` -> 看起来像"上传 PDF" ❌ */}
+          <Icon name="importJson" />
         </button>
 
         <button

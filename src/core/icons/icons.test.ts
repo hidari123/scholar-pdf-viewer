@@ -217,3 +217,31 @@ describe('内置图标集', () => {
     expect(getIconShape('not-exist' as IconName)).toBeNull();
   });
 });
+
+/*
+ * ⚠️ **新图标不能和旧图标重复**（用户反馈：
+ * "导入高亮这个icon可否再设计 目前像是上传pdf"❌
+ * "导出带高亮的pdf这个icon可以作为下载pdf，导出带高亮的pdf的icon再设计一下"❌）。
+ */
+describe('新图标', () => {
+  it('**importJson 和 upload 不一样**（不然还是像上传 PDF）', () => {
+    const imported = getIconShape('importJson');
+    const uploaded = getIconShape('upload');
+    expect(imported).toBeTruthy();
+    expect(uploaded).toBeTruthy();
+    expect(JSON.stringify(imported)).not.toBe(JSON.stringify(uploaded));
+  });
+
+  it('**exportAnnotated 和 exportPdf 不一样**（不然和"下载 PDF"重复）', () => {
+    const annotated = getIconShape('exportAnnotated');
+    const plain = getIconShape('exportPdf');
+    const download = getIconShape('download');
+    expect(annotated).toBeTruthy();
+    expect(JSON.stringify(annotated)).not.toBe(JSON.stringify(plain));
+    expect(JSON.stringify(annotated)).not.toBe(JSON.stringify(download));
+  });
+
+  it('**palette（主题）也有形状**', () => {
+    expect(getIconShape('palette')).toBeTruthy();
+  });
+});
