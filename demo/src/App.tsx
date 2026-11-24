@@ -131,6 +131,12 @@ export default function App() {
        * 造两条锚定**同一条高亮**的批注（用来测"合并成一个图标"）。
        */
       /**
+       * **导出时写不写批注文字**（E2E 用）✅
+       */
+      setIncludeAnnotationText(on: boolean) {
+        setIncludeAnnotationText(on);
+      },
+      /**
        * **设置打印方向**（E2E 用）✅
        */
       setPrintOrientation(orientation: 'auto' | 'portrait' | 'landscape') {
@@ -241,6 +247,13 @@ export default function App() {
    * -> demo 平时用 **auto** ✅
    * -> E2E 里可以切成 **landscape** 来测横向 ✅
    */
+  /**
+   * **导出时要不要写批注文字**（E2E 用）。
+   *
+   * -> 默认 **false**（不写）✅ -> Chrome 里 hover 不会出黄色便签 ✅
+   * -> E2E 测编码时会打开 ✅
+   */
+  const [includeAnnotationText, setIncludeAnnotationText] = useState(false);
   const [printOrientation, setPrintOrientation] = useState<'auto' | 'portrait' | 'landscape'>(
     'auto',
   );
@@ -968,6 +981,13 @@ export default function App() {
           pdfBytes: buffer,
           highlights,
           pageSizesPt: viewerRef.current?.getPageSizesPt() ?? [],
+          /*
+           * ⚠️ **批注文字默认【不写】**（第 27 轮）✅
+           * -> 不写 -> Chrome 里 hover 高亮**不会出黄色便签** ✅
+           * -> 用户反馈："导出后 hover 高亮还是会出现黄色便签" ✅
+           * -> E2E 要测**编码** -> 那里显式打开 ✅
+           */
+          includeAnnotationText: includeAnnotationText,
         }),
       )
       .then((bytes) => {
@@ -981,7 +1001,7 @@ export default function App() {
       .catch((error: unknown) => {
         setHint(`导出失败：${error instanceof Error ? error.message : String(error)}`);
       });
-  }, [sampleUrl, documentId, highlights, t]);
+  }, [sampleUrl, documentId, highlights, t, includeAnnotationText]);
 
   /** 工具栏插槽（宿主塞自己的按钮 —— 证明包不需要业务入口） */
   const toolbarSlot = useMemo(

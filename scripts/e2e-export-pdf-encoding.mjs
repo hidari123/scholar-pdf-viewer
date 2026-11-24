@@ -73,6 +73,17 @@ try {
   );
   await page.waitForTimeout(1200);
 
+  /*
+   * ⚠️ **这个 E2E 专门测 `/Contents` 的编码** ✅
+   * -> 第 27 轮改成**默认不写** `/Contents` ✅（Chrome hover 不出黄色便签）✅
+   * -> -> 这里**显式打开** ✅
+   */
+  await page.evaluate(() => {
+    // @ts-expect-error 测试用的全局句柄
+    window.__scpdfDemo?.setIncludeAnnotationText?.(true);
+  });
+  await page.waitForTimeout(600);
+
   // ---- 加一条高亮 ----
   const t = await page.evaluate(() => {
     const spans = [...document.querySelectorAll('.scpdf-text-layer__item')].filter((x) => {

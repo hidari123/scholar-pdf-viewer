@@ -137,6 +137,35 @@ import '@scholar-club/pdf-viewer/styles.css';
 > ⚠️ **`onAnnotationChange` 不传 → 详情面板永远是只读**（"编辑"按钮点不动）。
 > ⚠️ **`onAnnotationExpand` 不传 → 便签上没有"展开"按钮**（用户会以为按钮坏了）。
 
+### 打印：一页一张纸（竖向 + 横向）
+
+-> 打印时页会**按纸张缩放** ✅
+- **竖向 A4**：18 页 -> **18 张纸** ✅
+- **横向 A4**：18 页 -> **18 张纸** ✅
+-> 宿主可以指定纸张和方向 ✅
+
+```tsx
+<PdfViewer
+  printPaper="A4" // ← 纸张
+  printOrientation="landscape" // ← 'portrait' | 'landscape' | 'auto'
+/>;
+```
+
+### 工具栏的"高亮"按钮（**默认隐藏**）
+
+-> 传 `onToolbarHighlight` -> 工具栏出现 **🖍 + ▾** 的分裂按钮 ✅
+-> 点**主按钮** -> 用"当前色"高亮；点 **▾** -> 选颜色 ✅
+-> 和选区浮层的分裂按钮**完全一致**（飞书 / WPS）✅
+-> **不传 -> 不显示** ✅（宿主自己已经有"加高亮"按钮就不重复）
+
+```tsx
+<PdfViewer
+  onToolbarHighlight={(color) => {
+    // color 是**语义 key**（'yellow' / 'green' / …）
+  }}
+/>;
+```
+
 ### 主题：内置 7 个，工具栏就能切
 
 -> 包**内置** 7 个主题（`light` / `dark` / `auto` / `paper` / `sepia` / `contrast` / `minimal`）✅

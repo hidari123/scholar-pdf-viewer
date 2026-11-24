@@ -403,14 +403,24 @@ try {
     findBtn(noSelection, '清除格式')?.disabled === true,
     JSON.stringify(findBtn(noSelection, '清除格式')),
   );
+  /*
+   * ⚠️ **只有"清除格式"置灰**，其余**永远可用** ✅
+   *
+   * -> 用户原话（第 27 轮）：
+   * > "没选字时格式按钮置灰这个你修错了 应该是没选字的时候清除格式按钮置灰
+   * >  其他的还是可以用的；再说一次逻辑"
+   * > "其余按钮都是可以点击的"
+   * -> -> `FORMAT_COMMANDS` **只留 `removeFormat`** ✅
+   * -> -> "文字颜色" / "加粗" **不禁用** ✅
+   */
   check(
-    '**没选字时"文字颜色"置灰**',
-    findBtn(noSelection, '文字颜色')?.disabled === true,
+    '**没选字时"文字颜色"【不禁用】**',
+    findBtn(noSelection, '文字颜色')?.disabled === false,
     JSON.stringify(findBtn(noSelection, '文字颜色')),
   );
   check(
-    '**没选字时"加粗"置灰**',
-    findBtn(noSelection, '加粗')?.disabled === true,
+    '**没选字时"加粗"【不禁用】**',
+    findBtn(noSelection, '加粗')?.disabled === false,
     JSON.stringify(findBtn(noSelection, '加粗')),
   );
   check(

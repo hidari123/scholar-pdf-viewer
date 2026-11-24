@@ -99,20 +99,21 @@ import '@scholar-club/pdf-viewer/themes.css'; // 可选
 
 ### 2.5 外观 / 结构
 
-| Prop          | 类型                                               | 默认                | 说明                                                             |
-| ------------- | -------------------------------------------------- | ------------------- | ---------------------------------------------------------------- |
-| `theme`       | `PdfViewerTheme`                                   | `'light'`           | 主题：`light` `dark` `auto` `paper` `sepia` `contrast` `minimal` |
-| `appearance`  | `PdfViewerAppearance`                              | —                   | 外观（密度 / 外壳 / 页阴影…）                                    |
-| `config`      | `PdfViewerConfig`                                  | —                   | 统一配置对象（见 §4）                                            |
-| `toolbar`     | `ToolbarConfig`                                    | —                   | 工具栏开关 + 左右插槽                                            |
-| `features`    | `Partial<Features>`                                | 全开                | 功能开关（**opt-out**：只有显式 `false` 才关）                   |
-| `printMode`   | `'with-highlights' \| 'original'`                  | `'with-highlights'` | 打印模式                                                         |
-| `printPaper`  | `'A4' \| 'A3' \| 'Letter' \| 'Legal' \| PaperSize` | `'A4'`              | 打印纸张（mm）                                                   |
-| `printMargin` | `Partial<PrintMargin>`                             | 四边 12mm           | 打印边距（mm，部分覆盖）                                         |
-| `dir`         | `'ltr'                                             | 'rtl'`              | 自动                                                             | 文字方向（RTL：界面镜像 + 箭头翻转） |
-| `slots`       | `PdfViewerSlots`                                   | —                   | 插槽（完全替换内置 UI）                                          |
-| `icons`       | `Partial<Record<IconName, ReactNode>>`             | —                   | 逐个图标覆盖                                                     |
-| `children`    | `ReactNode`                                        | —                   | 渲染在工具栏下方                                                 |
+| Prop               | 类型                                               | 默认                | 说明                                                             |
+| ------------------ | -------------------------------------------------- | ------------------- | ---------------------------------------------------------------- |
+| `theme`            | `PdfViewerTheme`                                   | `'light'`           | 主题：`light` `dark` `auto` `paper` `sepia` `contrast` `minimal` |
+| `appearance`       | `PdfViewerAppearance`                              | —                   | 外观（密度 / 外壳 / 页阴影…）                                    |
+| `config`           | `PdfViewerConfig`                                  | —                   | 统一配置对象（见 §4）                                            |
+| `toolbar`          | `ToolbarConfig`                                    | —                   | 工具栏开关 + 左右插槽                                            |
+| `features`         | `Partial<Features>`                                | 全开                | 功能开关（**opt-out**：只有显式 `false` 才关）                   |
+| `printMode`        | `'with-highlights' \| 'original'`                  | `'with-highlights'` | 打印模式                                                         |
+| `printPaper`       | `'A4' \| 'A3' \| 'Letter' \| 'Legal' \| PaperSize` | `'A4'`              | 打印纸张（mm）                                                   |
+| `printMargin`      | `Partial<PrintMargin>`                             | 四边 12mm           | 打印边距（mm，部分覆盖）                                         |
+| `printOrientation` | `'portrait' \| 'landscape' \| 'auto'`              | `'auto'`            | 打印方向（`landscape` = 横向纸张）                               |
+| `dir`              | `'ltr'                                             | 'rtl'`              | 自动                                                             | 文字方向（RTL：界面镜像 + 箭头翻转） |
+| `slots`            | `PdfViewerSlots`                                   | —                   | 插槽（完全替换内置 UI）                                          |
+| `icons`            | `Partial<Record<IconName, ReactNode>>`             | —                   | 逐个图标覆盖                                                     |
+| `children`         | `ReactNode`                                        | —                   | 渲染在工具栏下方                                                 |
 
 ### 2.6 多语言
 
@@ -194,6 +195,33 @@ hover 便签 → 点"展开"
   -> 否则**批注正文会被打印出去**（隐私泄露）❌✅
 - 合并组（同一行多条批注）的**选择列表**里点某项 → **打开那一条的详情** ✅
 - 列表**自动翻边**（右边放不下就往左开）✅
+
+### 2.9b 工具栏的"高亮"按钮（第 28 轮新增）
+
+| Prop                    | 类型                      | 默认       | 说明                                |
+| ----------------------- | ------------------------- | ---------- | ----------------------------------- |
+| `onToolbarHighlight`    | `(color: string) => void` | —          | **传了**才显示工具栏的"高亮"按钮 ✅ |
+| `highlightPalette`      | `HighlightPalette`        | 内置       | 高亮色板（语义 key -> CSS 颜色）    |
+| `defaultHighlightColor` | `string`                  | 色板第一个 | **默认色**的 key（没选过颜色时用）  |
+
+> ⚠️ **默认【隐藏】** ✅
+> -> 宿主自己已经有"加高亮"按钮 -> 不重复 ✅
+> -> 用户确认："默认隐藏吧" ✅
+
+> ⚠️ 传了之后工具栏出现 **🖍 + ▾** 的**分裂按钮** ✅
+> -> 点**主按钮** -> 直接用"当前色"高亮 ✅
+> -> 点 **▾** -> 展开颜色下拉 ✅
+> -> 和**选区浮层**的分裂按钮**完全一致**（飞书 / WPS）✅
+
+```tsx
+<PdfViewer
+  onToolbarHighlight={(color) => {
+    // color 是**语义 key**（'yellow' / 'green' / …）
+    // -> 宿主用 key 存"用户选的颜色" ✅
+  }}
+  defaultHighlightColor="green"
+/>;
+```
 
 ### 2.10 链接 / 密码 / Toast
 
