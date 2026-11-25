@@ -217,22 +217,40 @@ describe('layoutTextItems（逐 item 排版 —— 精准定位的核心）', ()
     expect(items[0]?.text).toBe('Text');
   });
 
-  it('按 (top, left) 排序（同一行内按 x 递增）', () => {
+  it('**默认【保持 PDF 原始顺序】**（抄 pdf.js ✅ 双栏选区 ✅）', () => {
     const content: TextContentLike = {
       items: [item('C', 112, 700), item('A', 72, 700), item('B', 90, 700)],
     };
 
     const items = layoutTextItems(content, viewport());
 
+    /*
+     * ⚠️ **不排序** ✅
+     *
+     * -> 浏览器的选区是**文档顺序**的连续区间 ✅
+     * -> -> **DOM 顺序 = 选区顺序** ✅
+     * -> -> 按 y 排序 ✅ -> **左右栏会交替** ✅ -> 跨栏拖选错 ❌
+     * -> -> pdf.js 就是保持 PDF 原始顺序的 ✅
+     */
+    expect(items.map((i) => i.text)).toEqual(['C', 'A', 'B']);
+  });
+
+  it('**显式开启 sortByPosition 才按 (top, left) 排序** ✅', () => {
+    const content: TextContentLike = {
+      items: [item('C', 112, 700), item('A', 72, 700), item('B', 90, 700)],
+    };
+
+    const items = layoutTextItems(content, viewport(), { sortByPosition: true });
+
     expect(items.map((i) => i.text)).toEqual(['A', 'B', 'C']);
   });
 
-  it('不同行的顺序按 y（PDF y 越大越靠上）', () => {
+  it('**不同行的顺序按 y（PDF y 越大越靠上）** ✅', () => {
     const content: TextContentLike = {
       items: [item('lower', 72, 600), item('upper', 72, 700)],
     };
 
-    const items = layoutTextItems(content, viewport());
+    const items = layoutTextItems(content, viewport(), { sortByPosition: true });
 
     expect(items[0]?.text).toBe('upper');
   });
