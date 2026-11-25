@@ -70,6 +70,7 @@ import { EMPTY_NORM_POSITION } from '../core/types';
 import { useCurrentPage } from '../hooks/useCurrentPage';
 import { usePdfDocument } from '../hooks/usePdfDocument';
 import { usePrint } from '../hooks/usePrint';
+import { usePrintOriginal } from '../hooks/usePrintOriginal';
 import { useSelectionPreservation } from '../hooks/useSelectionPreservation';
 import { useTextSelection } from '../hooks/useTextSelection';
 import { useVisiblePages } from '../hooks/useVisiblePages';
@@ -360,6 +361,22 @@ export interface PdfViewerProps {
    *    （见 `@media print` 里的隐藏规则）。
    */
   printMode?: 'with-highlights' | 'original';
+  /**
+   * **文档的 URL** ✅（"打印原 PDF" 用 ✅）
+   *
+   * ⚠️ **只在 `printMode="original"`** 时需要 ✅
+   *
+   * -> **为什么需要** ✅
+   *    -> 我们是**用 DOM + canvas 打印**的 ✅
+   *    -> -> **Chrome 的打印【不等】canvas** ✅（实测 ✅）
+   *    -> -> 打印快照时只有前几页画完 ✅ -> **后面全是空白页** ✅ ❌
+   *    -> -> **Chrome 原生 PDF 阅读器** ✅ 不打印 DOM ✅ -> **直接打印 PDF 文件** ✅ ✅
+   *    -> -> **我们也这样** ✅ -> **每一页都完整** ✅ ✅
+   *
+   * -> 宿主有 URL ✅ -> 传上来 ✅ -> 我们用**隐藏 iframe** ✅ 加载它 ✅ ✅
+   * -> 不传 ✅ -> **退回 DOM 打印** ✅ ✅
+   */
+  documentUrl?: string;
   /**
    * **文字方向**（`'ltr' | 'rtl'`）。
    *
@@ -802,6 +819,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     initialPage = 1,
     initialScale = 'width',
     printMode = 'with-highlights',
+    documentUrl,
     dir,
     printPaper = 'A4',
     printOrientation = 'auto',
@@ -1007,11 +1025,41 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       setPrinting(false);
     };
 
+    /*
+     * ⚠️⚠️⚠️ **打印意图检测**（用户反馈："后面的页全是空白" ✅）
+     *
+     * ## 根因 ✅
+     *
+     * -> `beforeprint` ✅ 触发时 ✅ -> `setPrinting(true)` ✅ -> 开始渲染**所有页** ✅
+     * -> -> **但 canvas 渲染是异步的** ✅
+     * -> -> **Chrome 的打印【不等】** ✅（实测：`page.pdf()` ✅ 和 **CDP** ✅ 都一样 ✅ ❌）
+     * -> -> 打印快照的时刻 ✅ -> **只有前 2~4 页画完** ✅ -> 后面**全是空白页** ✅ ❌
+     *
+     * ## 解法：**提前【一点】开始渲染** ✅
+     *
+     * -> 用户按 **Ctrl+P** ✅ 之前 ✅ -> 我们**先猜** ✅ ✅
+     * -> -> 捕获 `keydown` ✅（Ctrl+P ✅ / Cmd+P ✅）✅
+     * -> -> **提前**打开 `printing` ✅ -> 开始渲染所有页 ✅ ✅
+     * -> -> Chrome 的打印对话框**要弹出来** ✅ -> **这中间有几百毫秒** ✅
+     * -> -> 够渲染几页 ✅ ✅
+     *
+     * ⚠️ **只是"提前"** ✅ -> 不保证全部 ✅
+     * -> -> **最可靠** ✅：**用工具栏的"打印"按钮** ✅ -> 走 `print()` ✅ -> **等全部画完** ✅ ✅
+     */
+    const onKeyDown = (event: KeyboardEvent) => {
+      // ⚠️ **Ctrl+P（Win/Linux ✅）或 Cmd+P（Mac ✅）** ✅
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
+        setPrinting(true);
+      }
+    };
+
     window.addEventListener('beforeprint', onBeforePrint);
     window.addEventListener('afterprint', onAfterPrint);
+    window.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener('beforeprint', onBeforePrint);
       window.removeEventListener('afterprint', onAfterPrint);
+      window.removeEventListener('keydown', onKeyDown);
     };
   }, []);
 
@@ -1880,6 +1928,21 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * → 现在统一走 `usePrint` → 它负责：算缩放 → 应用 → 等重排 → 打印 → **恢复**。
    */
+  /*
+   * ⚠️⚠️ **打印原 PDF** ✅（像 Chrome 一样 ✅）
+   *
+   * -> 我们是**用 DOM + canvas 打印**的 ✅
+   * -> -> **Chrome 的打印【不等】canvas** ✅（实测 ✅）
+   * -> -> 打印快照时只有前几页画完 ✅ -> **后面全是空白页** ✅ ❌
+   * -> -> **Chrome 原生 PDF 阅读器** ✅ 不打印 DOM ✅ -> **直接打印 PDF 文件** ✅ ✅
+   * -> -> **我们也这样** ✅ -> **每一页都完整** ✅ ✅
+   *
+   * ⚠️ **只用于 `printMode="original"`** ✅（高亮不在 PDF 里 ✅ -> 只能走 DOM ✅）
+   */
+  const { print: printOriginalPdf } = usePrintOriginal({
+    url: printMode === 'original' ? (documentUrl ?? null) : null,
+  });
+
   const { print: printDocument } = usePrint({
     pageSizePt: pageSizesPt[0],
     /*
@@ -4987,7 +5050,20 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               ? undefined
               : () => setSidebar((v) => (v === 'outline' ? 'none' : 'outline'))
           }
-          onPrint={merged.features?.print === false ? undefined : printDocument}
+          onPrint={
+            merged.features?.print === false
+              ? undefined
+              : /*
+                 * ⚠️ **"打印原 PDF" 模式** ✅
+                 *
+                 * -> 传了 `documentUrl` ✅ -> **用隐藏 iframe** ✅ 打印 PDF 文件 ✅ ✅
+                 * -> -> **和 Chrome 原生一样** ✅ -> **每页都完整** ✅ ✅
+                 * -> 没传 ✅ -> 退回 DOM 打印 ✅ ✅
+                 */
+                printMode === 'original' && documentUrl
+                ? printOriginalPdf
+                : printDocument
+          }
           /*
            * ⚠️ **导出 / 下载**（用户需求 ✅）
            *

@@ -329,6 +329,14 @@ export default function App() {
 
   /** 密度（appearance 的结构开关） */
   const [density, setDensity] = useState<PdfViewerDensity>('cozy');
+  /*
+   * ⚠️ **打印模式** ✅
+   *
+   * -> `original` ✅ -> **用隐藏 iframe 打印 PDF 文件** ✅
+   * -> -> **和 Chrome 原生一样** ✅ -> 每页都完整 ✅ ✅
+   * -> `with-highlights` ✅ -> 打印 DOM ✅（带高亮 ✅）✅
+   */
+  const [printMode, setPrintMode] = useState<'with-highlights' | 'original'>('with-highlights');
 
   /**
    * **插槽演示**（方案 D）。
@@ -1232,6 +1240,25 @@ export default function App() {
             <option value="comfortable">{t('demo.density.comfortable')}</option>
           </select>
           {/*
+            ⚠️ **打印模式** ✅
+            ->
+            -> `original` ✅ -> **用隐藏 iframe 打印 PDF 文件** ✅
+            -> -> **和 Chrome 原生 PDF 阅读器一样** ✅ -> **每页都完整** ✅ ✅
+            -> -> 不会"后面全是空白页" ✅ ✅
+            -> `with-highlights` ✅ -> 打印 DOM ✅（带高亮 ✅）✅
+          */}
+          <span style={{ opacity: 0.7, marginLeft: 12, whiteSpace: 'nowrap' }}>
+            {t('demo.printMode')}
+          </span>
+          <select
+            value={printMode}
+            onChange={(e) => setPrintMode(e.target.value as 'with-highlights' | 'original')}
+            aria-label={t('demo.printMode')}
+          >
+            <option value="original">{t('demo.printMode.original')}</option>
+            <option value="with-highlights">{t('demo.printMode.withHighlights')}</option>
+          </select>
+          {/*
            * ⚠️ **RTL 开关**（审计新增的能力）。
            *
            * -> 之前**完全没有 RTL 支持** -> 阿拉伯语 / 希伯来语的宿主没法用 ❌
@@ -1310,6 +1337,15 @@ export default function App() {
            * -> 包提供**工具栏按钮** ✅ -> 宿主给**实现** ✅ ✅
            * -> demo 复用 header 里那三个按钮的逻辑 ✅ ✅
            */
+          /*
+           * ⚠️ **"打印原 PDF"** ✅
+           *
+           * -> 传 URL ✅ -> 包用**隐藏 iframe** ✅ 打印 PDF 文件 ✅ ✅
+           * -> -> **和 Chrome 原生 PDF 阅读器一样** ✅ -> **每页都完整** ✅ ✅
+           * -> -> 不用 DOM + canvas ✅ -> 不会"后面全是空白页" ✅ ✅
+           */
+          documentUrl={sampleUrl}
+          printMode={printMode}
           onDownloadPdf={handleDownloadPdf}
           onExportAnnotatedPdf={handleExportAnnotatedPdf}
           onExportHighlights={handleExportHighlights}
