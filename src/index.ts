@@ -38,7 +38,7 @@ export {
   stickyNotePosition,
 } from './core/annotation/sticky-note';
 /* ---------- 统一配置（"万物可配置"） ---------- */
-export type { PdfViewerConfig } from './core/config';
+export type { Features, PdfViewerConfig } from './core/config';
 export { mergeConfig, resolveConfigValue } from './core/config';
 export {
   /**
@@ -144,6 +144,13 @@ export type {
   TextPageLike,
 } from './core/search/search';
 export { PdfSearch } from './core/search/search';
+/* ---------- 选区动作（宿主可配置 ✅） ---------- */
+export type {
+  SelectionAction,
+  SelectionActionContext,
+  SelectionActionIcon,
+} from './core/selection/actions';
+export { BUILTIN_ACTION_KEYS, mergeSelectionActions } from './core/selection/actions';
 export type {
   PdfViewerAppearance,
   PdfViewerChrome,

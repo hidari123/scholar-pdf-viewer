@@ -171,3 +171,32 @@ describe('features.themePicker', () => {
     expect(merged.features?.themePicker).toBe(true);
   });
 });
+
+/*
+ * ⚠️ **选区动作的可见性开关**（用户反馈 ✅）
+ *
+ * > "选区工具栏的提问/翻译/加批注/高亮/复制 都需要宿主可以配置是否展示"
+ *
+ * -> 开关在 `features` 里 ✅ -> 合并进 config ✅ ✅
+ */
+describe('features（选区动作开关 ✅）', () => {
+  it('**默认全都不传** ✅（保持原行为 ✅）', () => {
+    const merged = mergeConfig({}, {});
+    expect(merged.features?.selectionHighlight).toBeUndefined();
+    expect(merged.features?.selectionCopy).toBeUndefined();
+    expect(merged.features?.selectionTranslate).toBeUndefined();
+    expect(merged.features?.selectionAsk).toBeUndefined();
+    expect(merged.features?.selectionExplain).toBeUndefined();
+    expect(merged.features?.selectionNote).toBeUndefined();
+  });
+
+  it('**可以逐个关掉** ✅', () => {
+    const merged = mergeConfig(
+      { features: { selectionAsk: false, selectionTranslate: false } },
+      {},
+    );
+    expect(merged.features?.selectionAsk).toBe(false);
+    expect(merged.features?.selectionTranslate).toBe(false);
+    expect(merged.features?.selectionCopy).toBeUndefined();
+  });
+});

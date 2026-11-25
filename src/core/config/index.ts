@@ -265,6 +265,38 @@ export interface Features {
    * -> `false` -> 按钮**不显示**（但 `onThemeChange` 回调依然有效）✅
    */
   themePicker?: boolean;
+  /*
+   * ⚠️⚠️ **选区浮层的动作开关**（用户反馈 ✅）
+   *
+   * > "选区工具栏的提问/翻译/加批注/高亮/复制 都需要宿主可以配置是否展示"
+   *
+   * ## 为什么需要 ✅
+   *
+   * -> 之前**只有"传了回调才显示"** ✅
+   *    -> `onTranslate` ✅ -> 翻译按钮出现 ✅
+   *    -> -> 但宿主**传了回调又不想显示** ✅ -> **做不到** ✅ ❌
+   *    -> -> 有些场景 ✅ 回调要留着 ✅（业务逻辑 ✅）但**按钮先藏着** ✅ ✅
+   *
+   * -> 这组开关 ✅ 让宿主**显式控制每个动作的可见性** ✅ ✅
+   *
+   * ## 语义 ✅
+   *
+   * -> `undefined`（不传）✅ -> **保持原行为** ✅（回调在就显示 ✅）✅
+   * -> `true` ✅ -> **强制显示** ✅
+   * -> `false` ✅ -> **强制隐藏** ✅（哪怕回调在 ✅）✅
+   */
+  /** 选区浮层：高亮 */
+  selectionHighlight?: boolean;
+  /** 选区浮层：复制 */
+  selectionCopy?: boolean;
+  /** 选区浮层：翻译 */
+  selectionTranslate?: boolean;
+  /** 选区浮层：提问 */
+  selectionAsk?: boolean;
+  /** 选区浮层：解释 */
+  selectionExplain?: boolean;
+  /** 选区浮层：笔记 */
+  selectionNote?: boolean;
 }
 
 /**

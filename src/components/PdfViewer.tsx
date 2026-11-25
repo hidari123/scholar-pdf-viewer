@@ -3680,8 +3680,19 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       },
     ];
 
-    // 宿主实现了才显示
-    if (onTranslate) {
+    /*
+     * ⚠️⚠️ **动作的可见性由宿主显式控制**（用户反馈 ✅）
+     *
+     * > "选区工具栏的提问/翻译/加批注/高亮/复制 都需要宿主可以配置是否展示"
+     *
+     * ## 规则 ✅
+     *
+     * -> `features.selectionXxx === false` ✅ -> **强制隐藏** ✅
+     *    -> 哪怕宿主**传了回调** ✅ -> 也不显示 ✅ ✅
+     *    -> -> 场景：回调要留着 ✅（业务 ✅）但**按钮先藏着** ✅ ✅
+     * -> `undefined` ✅ -> **保持原行为** ✅（回调在就显示 ✅）✅
+     */
+    if (onTranslate && merged.features?.selectionTranslate !== false) {
       actions.push({
         key: BUILTIN_ACTION_KEYS.translate,
         icon: 'translate',
@@ -3692,7 +3703,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       });
     }
 
-    if (onAsk) {
+    if (onAsk && merged.features?.selectionAsk !== false) {
       actions.push({
         key: BUILTIN_ACTION_KEYS.ask,
         icon: 'ask',
@@ -3703,7 +3714,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       });
     }
 
-    if (onExplain) {
+    if (onExplain && merged.features?.selectionExplain !== false) {
       actions.push({
         key: BUILTIN_ACTION_KEYS.explain,
         icon: 'explain',
@@ -3808,13 +3819,39 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     isFullyCoveredByExistingHighlight,
     selectionShapes,
     merged.defaultHighlightColor,
+    merged.features?.selectionTranslate,
+    merged.features?.selectionExplain,
+    merged.features?.selectionAsk,
   ]);
 
-  /** 合并后的动作列表（宿主覆盖 + 追加） */
-  const popoverActions = useMemo(
-    () => mergeSelectionActions(builtinActions, merged.selectionActions),
-    [builtinActions, merged.selectionActions],
-  );
+  /*
+   * ⚠️⚠️ **动作的可见性开关**（用户反馈 ✅）
+   *
+   * > "选区工具栏的提问/翻译/加批注/高亮/复制 都需要宿主可以配置是否展示"
+   *
+   * ## 为什么在这里过滤 ✅
+   *
+   * -> **一处**管全部 ✅ -> 不用在每个动作的构造处都写判断 ✅ ✅
+   * -> -> 合并完再过滤 ✅ -> **宿主自定义的动作也受控** ✅ ✅
+   *
+   * ## 规则 ✅
+   *
+   * -> `features.selectionXxx === false` ✅ -> **强制隐藏** ✅
+   *    -> 哪怕宿主传了回调 ✅ -> 也不显示 ✅ ✅
+   * -> `undefined` ✅ -> **保持原行为** ✅ ✅
+   */
+  const popoverActions = useMemo(() => {
+    const mergedActions = mergeSelectionActions(builtinActions, merged.selectionActions);
+    const toggles: Record<string, boolean | undefined> = {
+      [BUILTIN_ACTION_KEYS.highlight]: merged.features?.selectionHighlight,
+      [BUILTIN_ACTION_KEYS.copy]: merged.features?.selectionCopy,
+      [BUILTIN_ACTION_KEYS.translate]: merged.features?.selectionTranslate,
+      [BUILTIN_ACTION_KEYS.ask]: merged.features?.selectionAsk,
+      [BUILTIN_ACTION_KEYS.explain]: merged.features?.selectionExplain,
+      [BUILTIN_ACTION_KEYS.note]: merged.features?.selectionNote,
+    };
+    return mergedActions.filter((action) => toggles[action.key] !== false);
+  }, [builtinActions, merged.selectionActions, merged.features]);
 
   /**
    * 内置动作的"高亮"要带颜色 → 用一个 state 记录当前选的颜色。
