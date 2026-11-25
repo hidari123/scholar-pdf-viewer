@@ -245,6 +245,16 @@ export default function App() {
     [highlightsByDoc, documentId, saver],
   );
 
+  /**
+   * **清除当前文档的全部高亮** ✅
+   *
+   * ⚠️ **用户反馈**："换文章后旧高亮残留" ✅
+   * -> 光靠换 documentId ✅ 不够 ✅ -> 用户要能**手动清** ✅ ✅
+   */
+  const clearCurrentHighlights = useCallback(() => {
+    setHighlights([]);
+  }, [setHighlights]);
+
   /** 当前选中的高亮颜色 key（宿主的 UI 状态） */
   const [highlightColor, setHighlightColor] = useState('yellow');
   /**
@@ -418,7 +428,8 @@ export default function App() {
   /**
    * 样张 PDF。
    *
-   * 优先用本地真实文档（`/samples/local.pdf`，体积大不入库），
+   * 优先用本地真实文档（`/samples/paper.pdf` ✅
+   * —— **双栏论文** ✅ 用来暴露双栏选区的问题 ✅），
    * 没有时用内置的手写样张（3 页，可测选中）。
    */
   const [sampleUrl, setSampleUrl] = useState<string | null>(null);
@@ -427,14 +438,20 @@ export default function App() {
   /** 加载本地真实文档（若存在） */
   const loadLocal = useCallback(async () => {
     try {
-      const response = await fetch('/samples/local.pdf', { method: 'HEAD' });
+      const response = await fetch('/samples/paper.pdf', { method: 'HEAD' });
       if (!response.ok) {
         return false;
       }
-      setSampleUrl('/samples/local.pdf');
+      setSampleUrl('/samples/paper.pdf');
       setSampleLabel(t('demo.loadLocal'));
-      // ⚠️ **换文档 → 换 documentId** → 高亮按文档隔离（切回原来的文档还在）
-      setDocumentId('local');
+      /*
+       * ⚠️⚠️ **换文档 → 换 documentId** ✅（用户反馈："换文章后旧高亮残留" ✅）
+       *
+       * -> 之前用的是 `'local'` ✅ -> **和更早的文档撞了** ✅
+       * -> -> 旧文档的高亮**直接漏到新文档上** ✅ ❌
+       * -> -> 给每份文档**独立的 id** ✅ ✅
+       */
+      setDocumentId('local-paper');
       return true;
     } catch {
       return false;
@@ -1150,6 +1167,14 @@ export default function App() {
         <button type="button" className="scpdf-btn" onClick={reloadLocal}>
           {t('demo.loadLocal')}
         </button>
+        {/*
+          清除高亮 ✅
+          -> 用户反馈："换文章后旧高亮残留" ✅
+          -> 换 documentId ✅ 只是**隔离** ✅ -> 用户还需要**手动清** ✅ ✅
+        */}
+        <button type="button" className="scpdf-btn" onClick={clearCurrentHighlights}>
+          {t('demo.clearHighlights')} ({highlights.length})
+        </button>
         {sampleUrl ? (
           <span>
             {t('demo.current')} {sampleLabel || '文档'} · {t('demo.page')} {currentPage} ·{' '}
@@ -1421,6 +1446,7 @@ export default function App() {
              * ⚠️ **不要**在这里再调 `onHighlightCreate` / `createHighlight` 的
              *    包的入口 → 会**保存两次**（实测：点一次生成 3 条）。
              */
+            (window as any).__lastPosition = JSON.parse(JSON.stringify(position));
             const id = createHighlight(color ?? highlightColor, text, position);
             setHint(`已高亮（${color ?? highlightColor}）`);
             // 返回 id → "加批注"流程用它（批注挂在高亮上）
