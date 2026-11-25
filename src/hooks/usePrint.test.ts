@@ -89,6 +89,38 @@ describe('usePrint（审核补测）', () => {
     expect(page.style.getPropertyValue('--scpdf-print-page-height')).toBe('1821.6px');
   });
 
+  /*
+   * ⚠️⚠️ **打印只出前几页**（用户反馈 ✅）
+   *
+   * > "打印纵向只出前几页"
+   *
+   * ## 根因 ✅
+   *
+   * -> Chrome 的打印分页按**布局盒高度**算 ✅
+   * -> -> 如果页的 layout box **没被缩** ✅
+   * -> -> 一张 A4（1032px）塞不下 1821px 的页 ✅
+   * -> -> 每页占 **2 张纸** ✅ -> **后面的页被挤出打印范围** ✅ ❌
+   *
+   * ## 断言 ✅
+   *
+   * -> **缩放后的页高** <= **A4 可打印高度** ✅
+   * -> -> 这样才**一页一张纸** ✅ ✅
+   */
+  it('**缩放后的页高要放得进一张 A4**（否则会跨纸 ✅）', async () => {
+    const root = makeRoot();
+    renderHook(() => usePrint({ root, paper: 'A4', orientation: 'portrait' }));
+    await waitFrames();
+
+    const scale = Number.parseFloat(root.style.getPropertyValue('--scpdf-print-scale'));
+    const pageHeight = 1821.6;
+
+    // ⚠️ **A4 纵向减去边距**（12mm × 4 ✅）-> 703 × 1032 px ✅
+    const printableHeight = (297 - 12 - 12) * (96 / 25.4);
+
+    expect(scale).toBeGreaterThan(0);
+    expect(pageHeight * scale).toBeLessThanOrEqual(printableHeight);
+  });
+
   it('**横向时缩放更小**（横向纸更矮）', async () => {
     const root = makeRoot();
     const { rerender } = renderHook(

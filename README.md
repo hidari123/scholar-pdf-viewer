@@ -157,6 +157,39 @@ import '@scholar-club/pdf-viewer/styles.css';
 />;
 ```
 
+#### ⚠️ 打印只出前几页？（先看这 3 条 ✅）
+
+-> 包**本身**是好的 ✅ -> 回归测试 `e2e-print-pagination.mjs` ✅
+断言 **纸数 == PDF 页数** ✅（14 页 -> 14 张纸 ✅ 纵向/横向都对 ✅）
+-> 如果你遇到"只有前几页" ✅ -> **大概率是宿主自己的 CSS** ✅ ✅
+
+**排查顺序** ✅：
+
+1. **宿主的全局 CSS 盖掉了包的打印样式** ✅
+   -> 最常见 ✅ -> 宿主写了 `@media print { .my-layout { height: 100vh } }` ✅
+   -> -> **把宿主自己的 CSS 在打印时也处理掉** ✅
+
+   ```css
+   @media print {
+     .my-layout {
+       height: auto !important;
+       overflow: visible !important;
+     }
+   }
+   ```
+
+2. **宿主把 `.scpdf-root` 固定了高度** ✅
+   -> 包在打印时已经设了 `height: auto` ✅
+   -> -> 但宿主写在**内联 style** ✅ 的话 ✅ **内联优先级更高** ✅ ❌
+   -> -> 宿主把高度改成**内联** ✅ -> 打印时改成 **`!important`** ✅ ✅
+
+3. **打印预览是缓存的** ✅
+   -> Chrome 的打印预览会**缓存上一次的结果** ✅
+   -> -> 关掉预览 ✅ **重新打开** ✅ -> 或者 **Ctrl+Shift+R** 硬刷新 ✅ ✅
+
+> 💡 **验证包本身没问题** ✅：跑 `node scripts/e2e-print-pagination.mjs` ✅
+> -> 断言"纸数 == PDF 页数" ✅ -> **通过就说明是宿主的问题** ✅ ✅
+
 ### 工具栏的"高亮"按钮（**默认隐藏**）
 
 -> 传 `onToolbarHighlight` -> 工具栏出现 **🖍 + ▾** 的分裂按钮 ✅
@@ -422,7 +455,7 @@ node scripts/e2e-all.mjs   # E2E
 
 ## License
 
-UNLICENSED — 内部使用。
+MIT © 2026 hidari — 见 [LICENSE](./LICENSE)。
 
 ---
 
@@ -728,4 +761,4 @@ node scripts/e2e-all.mjs   # E2E
 
 ## License
 
-UNLICENSED — internal use.
+MIT © 2026 hidari — see [LICENSE](./LICENSE).
