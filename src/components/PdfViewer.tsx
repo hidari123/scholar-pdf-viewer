@@ -3524,31 +3524,10 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       /*
        * ⚠️ **记录"点到的是哪个矩形"** -> 激活态**只给那一个** ✅
        */
-      /*
-       * ⚠️⚠️⚠️ **必须记【页内坐标】**（用户反馈的真 bug ✅）
-       *
-       * ## 问题（使用方报告 ✅）
-       *
-       * -> 激活态判定用的是**两个不同的坐标空间** ✅
-       *    -> 渲染侧 `AnnotationLayer`：**页内坐标** ✅（norm × viewport ✅）
-       *    -> 点击侧（这里 ✅）：**视口坐标** ✅（getBoundingClientRect ✅）
-       * -> `isSameRect` 容差 **1px** ✅ -> 差一个页偏移 ✅ -> **永远不匹配** ✅
-       * -> -> **激活态永远不亮** ✅
-       *
-       * ## 修法 ✅
-       *
-       * -> 高亮块在 **Page 里面** ✅（`AnnotationLayer` 是 Page 的子节点 ✅）
-       * -> -> 它的 offsetParent 就是**页元素** ✅
-       * -> -> 用 `offsetLeft` / `offsetTop` 减掉 ✅ -> 得到**页内坐标** ✅
-       * -> -> 和渲染侧**同一个空间** ✅ -> 能匹配上了 ✅
-       */
-      // ⚠️ **要用 .scpdf-page** ✅ -> 文本层的 item 也有 data-page-number ✅
-      const pageEl = highlightEl.closest<HTMLElement>('.scpdf-page');
       const elRect = highlightEl.getBoundingClientRect();
-      const pageRect = pageEl?.getBoundingClientRect();
       setActiveHighlightRect({
-        left: pageRect ? elRect.left - pageRect.left : elRect.left,
-        top: pageRect ? elRect.top - pageRect.top : elRect.top,
+        left: elRect.left,
+        top: elRect.top,
         width: elRect.width,
         height: elRect.height,
       });
@@ -5462,7 +5441,6 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                       activeSearchRectIndex={activeSearchIndexOnPage(pageNumber)}
                       highlights={highlights}
                       activeHighlightId={activeHighlightId}
-                      activeHighlightRect={activeHighlightRect}
                       palette={merged.highlightPalette}
                       stickyNotes={stickyNotes}
                       onAnnotationClick={(annotation) => {
