@@ -84,6 +84,87 @@ export interface UsePrintResult {
  * @param options 参数
  * @returns 打印函数 + 准备状态
  */
+/**
+ * **等所有页的 canvas 都画完** ✅（用户反馈："打印的页面显示也不全 后面都是空白页" ✅）
+ *
+ * ## 为什么需要 ✅
+ *
+ * -> 页是**虚拟化渲染**的 ✅ -> 平时只渲染**看得见的** ✅ ✅
+ * -> -> 打印时 `beforeprint` ✅ -> 开始渲染**所有页** ✅
+ * -> -> **但 canvas 渲染是异步的** ✅（pdf.js 的 `render().promise` ✅）✅
+ * -> -> 原来只等 **2 帧** ✅ -> **14 页画不完** ✅ ❌
+ * -> -> 打印开始时 ✅ -> **只有前 2~3 页有内容** ✅ -> 后面**全是空白页** ✅ ❌
+ *
+ * ## 怎么判断"画完了" ✅
+ *
+ * -> 用 `getImageData` ✅ 读 canvas 的一小块 ✅
+ * -> -> 全透明 ✅ -> 还没画 ✅
+ * -> -> 有内容 ✅ -> 画好了 ✅ ✅
+ *
+ * ⚠️ **canvas 会被 `getImageData` 弄脏** ✅（浏览器会警告 ✅）
+ * -> 所以读**一次**就**恢复** ✅（`clearRect` + 重画 ❌ 做不到 ✅）
+ * -> -> 用 `willReadFrequently` 避免警告 ✅ ✅
+ *
+ * @param pages 页元素列表 ✅
+ * @param timeout 超时（ms ✅）—— 兜底 ✅ 不能无限等 ✅
+ * @returns 全部画完（或超时）✅
+ */
+async function waitForCanvases(pages: readonly HTMLElement[], timeout: number): Promise<void> {
+  if (pages.length === 0) {
+    return;
+  }
+
+  const deadline = Date.now() + timeout;
+
+  /* ⚠️ **等所有页都"有内容"** ✅ */
+  while (Date.now() < deadline) {
+    const pending = pages.filter((page) => !isCanvasPainted(page));
+    if (pending.length === 0) {
+      return;
+    }
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+  }
+}
+
+/**
+ * **canvas 是不是已经画上有内容** ✅
+ *
+ * @param page 页元素 ✅
+ * @returns 有内容 -> true ✅
+ */
+function isCanvasPainted(page: HTMLElement): boolean {
+  const canvas = page.querySelector('canvas');
+  if (!canvas) {
+    // ⚠️ **没有 canvas** -> 认为是空白页 ✅ -> 一直等 ✅ -> 超时兜底 ✅
+    return true;
+  }
+  const width = canvas.width;
+  const height = canvas.height;
+  if (width <= 0 || height <= 0) {
+    return false;
+  }
+  try {
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) {
+      return true;
+    }
+    // ⚠️ **只读一小块** ✅（读全图太慢 ✅）
+    const data = context.getImageData(0, 0, Math.min(width, 4), Math.min(height, 4)).data;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] !== 0) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    // ⚠️ **跨域污染的 canvas** -> 读不了 ✅ -> 认为画好了 ✅（不阻塞 ✅）
+    return true;
+  }
+}
+
+/** 等 canvas 的超时（ms ✅） */
+const CANVAS_WAIT_TIMEOUT = 15000;
+
 export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
   const {
     pageSizePt,
@@ -371,48 +452,68 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
     setPreparing(true);
 
     /*
-     * ⚠️ **必须等重排完成再打印**。
+     * ⚠️⚠️⚠️ **必须等【所有页的 canvas】都画完**（用户反馈 ✅）
      *
-     * `window.print()` 是**同步阻塞**的 → 浏览器会打印**当前**的布局
-     * → 如果缩放刚设上去还没重排 → 印出来的是旧的尺寸。
+     * > "打印的页面显示也不全 只能展示出来已经缓存的一些 后面都是空白页"
      *
-     * → 用 `requestAnimationFrame` 等两帧（第一帧应用样式，第二帧布局完成）。
+     * ## 根因 ✅
+     *
+     * -> 页是**虚拟化渲染**的 ✅ -> 平时只渲染**看得见的** ✅ ✅
+     * -> -> `beforeprint` ✅ 触发 ✅ -> `setPrinting(true)` ✅ -> 开始渲染**所有页** ✅
+     * -> -> **但 canvas 渲染是异步的** ✅（pdf.js 的 `render().promise` ✅）✅
+     * -> -> 原来只等 **2 帧** ✅ → **14 页根本画不完** ✅ ❌
+     * -> -> 打印开始时 ✅ -> **只有前 2~3 页画完** ✅ -> 后面是**空白页** ✅ ❌
+     *
+     * ## 修法 ✅
+     *
+     * -> 等到**每个 canvas 都有内容** ✅ 或者**超时兜底** ✅ ✅
+     * -> -> `waitForCanvases` ✅ ✅
      */
-    requestAnimationFrame(() => {
+    void waitForCanvases([...pages], CANVAS_WAIT_TIMEOUT).then(() => {
+      /*
+       * ⚠️ **必须等重排完成再打印**。
+       *
+       * `window.print()` 是**同步阻塞**的 → 浏览器会打印**当前**的布局
+       * → 如果缩放刚设上去还没重排 → 印出来的是旧的尺寸。
+       *
+       * → 用 `requestAnimationFrame` 等两帧（第一帧应用样式，第二帧布局完成）。
+       */
       requestAnimationFrame(() => {
-        setPreparing(false);
-        globalThis.print?.();
+        requestAnimationFrame(() => {
+          setPreparing(false);
+          globalThis.print?.();
 
-        /*
-         * ⚠️⚠️ **不要恢复打印变量**（实测踩过的坑，用户反馈"打印预览效果还是不对"）。
-         *
-         * ```
-         * 旧行为: 打印完 → removeProperty('--scpdf-print-scale')
-         *        → 变量没了 → **再按 Ctrl+P 就是坏的**
-         * ```
-         *
-         * → 现在变量由 **effect 一直维护**（见上面）
-         * → 打印变量只在 `@media print` 里用 → **屏幕显示不受影响**
-         * → 所以**不需要恢复**。
-         *
-         * ⚠️ 只保留 `onAfterPrint` 的回调（宿主可能要刷新统计等）。
-         */
-        let restored = false;
-        const restore = () => {
-          if (restored) {
-            return;
+          /*
+           * ⚠️⚠️ **不要恢复打印变量**（实测踩过的坑，用户反馈"打印预览效果还是不对"）。
+           *
+           * ```
+           * 旧行为: 打印完 → removeProperty('--scpdf-print-scale')
+           *        → 变量没了 → **再按 Ctrl+P 就是坏的**
+           * ```
+           *
+           * → 现在变量由 **effect 一直维护**（见上面）
+           * → 打印变量只在 `@media print` 里用 → **屏幕显示不受影响**
+           * → 所以**不需要恢复**。
+           *
+           * ⚠️ 只保留 `onAfterPrint` 的回调（宿主可能要刷新统计等）。
+           */
+          let restored = false;
+          const restore = () => {
+            if (restored) {
+              return;
+            }
+            restored = true;
+            onAfterPrintRef.current?.();
+          };
+
+          if (typeof globalThis.addEventListener === 'function') {
+            globalThis.addEventListener('afterprint', restore, { once: true });
+            // 兜底：有些浏览器不发 afterprint
+            setTimeout(restore, 1000);
+          } else {
+            restore();
           }
-          restored = true;
-          onAfterPrintRef.current?.();
-        };
-
-        if (typeof globalThis.addEventListener === 'function') {
-          globalThis.addEventListener('afterprint', restore, { once: true });
-          // 兜底：有些浏览器不发 afterprint
-          setTimeout(restore, 1000);
-        } else {
-          restore();
-        }
+        });
       });
     });
   }, [pageSizePt, paper, marginTop, marginRight, marginBottom, marginLeft, root]);

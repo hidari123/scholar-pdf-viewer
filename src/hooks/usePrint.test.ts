@@ -121,6 +121,85 @@ describe('usePrint（审核补测）', () => {
     expect(pageHeight * scale).toBeLessThanOrEqual(printableHeight);
   });
 
+  /*
+   * ⚠️⚠️ **打印的页面显示不全**（用户反馈 ✅）
+   *
+   * > "打印的页面显示也不全 只能展示出来已经缓存的一些 后面都是空白页"
+   *
+   * ## 根因 ✅
+   *
+   * -> 页是**虚拟化渲染**的 ✅ -> 平时只渲染**看得见的** ✅ ✅
+   * -> -> 打印时开始渲染**所有页** ✅
+   * -> -> **但 canvas 渲染是异步的** ✅
+   * -> -> 原来只等 **2 帧** ✅ -> 14 页**画不完** ✅ ❌
+   * -> -> 打印开始时只有**前 2~3 页**有内容 ✅ -> 后面是**空白页** ✅ ❌
+   *
+   * ## 修法 ✅
+   *
+   * -> 等到**每个 canvas 都画上有内容** ✅ 或者**超时兜底** ✅ ✅
+   */
+  it('**会等所有页的 canvas 画完**（不然后面是空白页 ✅）', async () => {
+    const root = makeRoot();
+    /*
+     * ⚠️ **给 canvas 打桩** ✅
+     *
+     * -> jsdom **没有真实的 2D 上下文** ✅ -> `getContext('2d')` ✅ 返回 null ✅
+     * -> -> 我们**造一个假的** ✅ -> 能测"等待"这个逻辑 ✅ ✅
+     */
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    let painted = false;
+    HTMLCanvasElement.prototype.getContext = function fakeGetContext(
+      this: HTMLCanvasElement,
+      kind: string,
+    ) {
+      if (kind !== '2d') {
+        return null;
+      }
+      return {
+        getImageData: () => ({
+          data: painted
+            ? new Uint8ClampedArray([0, 0, 0, 255])
+            : new Uint8ClampedArray([0, 0, 0, 0]),
+        }),
+      } as unknown as CanvasRenderingContext2D;
+    } as typeof HTMLCanvasElement.prototype.getContext;
+
+    const page = root.querySelector('.scpdf-page') as HTMLElement;
+    const canvas = document.createElement('canvas');
+    canvas.width = 100;
+    canvas.height = 100;
+    page.appendChild(canvas);
+
+    let printed = false;
+    const originalPrint = globalThis.print;
+    globalThis.print = () => {
+      printed = true;
+    };
+
+    try {
+      const { result } = renderHook(() => usePrint({ root }));
+      await waitFrames();
+      result.current.print();
+
+      // ⚠️ **还没画完 -> 不应该打印** ✅
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 30));
+      });
+      expect(printed).toBe(false);
+
+      // ⚠️ **画完了 -> 才打印** ✅
+      painted = true;
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 30));
+      });
+      await waitFrames();
+      expect(printed).toBe(true);
+    } finally {
+      globalThis.print = originalPrint;
+      HTMLCanvasElement.prototype.getContext = originalGetContext;
+    }
+  });
+
   it('**横向时缩放更小**（横向纸更矮）', async () => {
     const root = makeRoot();
     const { rerender } = renderHook(
