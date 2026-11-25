@@ -89,6 +89,12 @@ export interface Messages {
   'outline.title': string;
   'thumbnails.title': string;
   'print.title': string;
+  /** 下载原 PDF ✅ */
+  'export.downloadPdf': string;
+  /** 导出带高亮的 PDF ✅ */
+  'export.annotatedPdf': string;
+  /** 导出高亮 JSON ✅ */
+  'export.highlightsJson': string;
   /* —— 主题 —— */
   /** 主题选择按钮 */
   'theme.picker': string;
@@ -293,6 +299,9 @@ export const ZH_MESSAGES: Messages = {
   'outline.title': '目录',
   'thumbnails.title': '缩略图',
   'print.title': '打印',
+  'export.downloadPdf': '下载 PDF',
+  'export.annotatedPdf': '导出带高亮的 PDF',
+  'export.highlightsJson': '导出高亮',
   'theme.picker': '主题',
   'theme.current': '当前主题',
   'a11y.canvas': 'PDF 页面',
@@ -407,6 +416,9 @@ export const EN_MESSAGES: Messages = {
   'outline.title': 'Outline',
   'thumbnails.title': 'Thumbnails',
   'print.title': 'Print',
+  'export.downloadPdf': 'Download PDF',
+  'export.annotatedPdf': 'Export annotated PDF',
+  'export.highlightsJson': 'Export highlights',
   'theme.picker': 'Theme',
   'theme.current': 'Current theme',
   'a11y.canvas': 'PDF page',

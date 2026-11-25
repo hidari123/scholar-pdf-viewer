@@ -417,6 +417,29 @@ export interface PdfViewerProps {
    */
   printMargin?: Partial<PrintMargin>;
   /**
+   * **下载原 PDF** ✅（用户需求："包需要内置 PDF 下载" ✅）
+   *
+   * ⚠️ **包不自己下载** ✅
+   * -> 包**拿不到原始字节** ✅（宿主是通过 URL / ArrayBuffer 加载的 ✅）
+   * -> 宿主给回调 ✅ -> 包在工具栏渲染按钮 ✅ ✅
+   * -> 不传 -> **按钮不渲染** ✅ ✅
+   */
+  onDownloadPdf?: () => void;
+  /**
+   * **导出带高亮的 PDF** ✅（用户需求 ✅）
+   *
+   * ⚠️ **包不自己导出** ✅
+   * -> 需要 `pdf-lib` ✅ -> **宿主决定版本和打包方式** ✅ ✅
+   * -> 宿主可以先用 `exportHighlightedPdf` ✅（包已导出 ✅）✅
+   */
+  onExportAnnotatedPdf?: () => void;
+  /**
+   * **导出高亮 JSON** ✅（用户需求 ✅）
+   *
+   * -> 宿主可以先用 `exportHighlights` ✅（包已导出 ✅）✅
+   */
+  onExportHighlights?: () => void;
+  /**
    * **插槽**（方案 D：完全自定义）。
    *
    * 每个槽给了就**替换**内置的那块；不给就用内置的。
@@ -783,6 +806,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     printPaper = 'A4',
     printOrientation = 'auto',
     printMargin,
+    onDownloadPdf,
+    onExportAnnotatedPdf,
+    onExportHighlights,
     slots,
     getPage,
     getPageSizes,
@@ -4962,6 +4988,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               : () => setSidebar((v) => (v === 'outline' ? 'none' : 'outline'))
           }
           onPrint={merged.features?.print === false ? undefined : printDocument}
+          /*
+           * ⚠️ **导出 / 下载**（用户需求 ✅）
+           *
+           * -> 包提供**按钮** ✅ -> 宿主给**实现** ✅ ✅
+           * -> 不传 ✅ -> **按钮不渲染** ✅ ✅
+           */
+          onDownloadPdf={onDownloadPdf}
+          onExportAnnotatedPdf={onExportAnnotatedPdf}
+          onExportHighlights={onExportHighlights}
           /*
            * ⚠️ **缩放比例可填写 + 上下限可配**（用户需求）。
            *

@@ -25,6 +25,37 @@ describe('Toolbar', () => {
     return props;
   }
 
+  /*
+   * ⚠️ **导出 / 下载按钮**（用户需求 ✅）
+   *
+   * > "包需要内置导出带高亮的 PDF、导出高亮、PDF 下载"
+   *
+   * -> 宿主给回调 ✅ -> 按钮出现 ✅ ✅
+   * -> 不给 ✅ -> 按钮**不出现** ✅ ✅
+   */
+  it('**不传回调 -> 不渲染导出按钮** ✅', () => {
+    setup();
+    expect(screen.queryByLabelText('下载 PDF')).toBeNull();
+    expect(screen.queryByLabelText('导出带高亮的 PDF')).toBeNull();
+    expect(screen.queryByLabelText('导出高亮')).toBeNull();
+  });
+
+  it('**传回调 -> 渲染三个按钮并可点** ✅', async () => {
+    const onDownloadPdf = vi.fn();
+    const onExportAnnotatedPdf = vi.fn();
+    const onExportHighlights = vi.fn();
+    setup({ onDownloadPdf, onExportAnnotatedPdf, onExportHighlights });
+
+    await userEvent.click(screen.getByLabelText('下载 PDF'));
+    expect(onDownloadPdf).toHaveBeenCalled();
+
+    await userEvent.click(screen.getByLabelText('导出带高亮的 PDF'));
+    expect(onExportAnnotatedPdf).toHaveBeenCalled();
+
+    await userEvent.click(screen.getByLabelText('导出高亮'));
+    expect(onExportHighlights).toHaveBeenCalled();
+  });
+
   it('显示当前页与总页数', () => {
     setup();
 

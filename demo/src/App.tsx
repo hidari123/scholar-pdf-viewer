@@ -1304,6 +1304,15 @@ export default function App() {
            * -> 传了 `onThemeChange` -> 工具栏显示主题按钮 ✅
            */
           onThemeChange={setTheme}
+          /*
+           * ⚠️ **导出 / 下载**（用户需求 ✅）
+           *
+           * -> 包提供**工具栏按钮** ✅ -> 宿主给**实现** ✅ ✅
+           * -> demo 复用 header 里那三个按钮的逻辑 ✅ ✅
+           */
+          onDownloadPdf={handleDownloadPdf}
+          onExportAnnotatedPdf={handleExportAnnotatedPdf}
+          onExportHighlights={handleExportHighlights}
           dir={dir}
           appearance={{ density }}
           /*

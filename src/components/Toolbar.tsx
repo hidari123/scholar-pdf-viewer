@@ -81,6 +81,24 @@ export interface ToolbarProps {
   /** 打印 */
   onPrint?: () => void;
   /**
+   * **下载原 PDF** ✅（用户需求："包需要内置 PDF 下载" ✅）
+   *
+   * -> 不传 -> 不渲染 ✅ ✅
+   */
+  onDownloadPdf?: () => void;
+  /**
+   * **导出带高亮的 PDF** ✅（用户需求："包需要内置导出带高亮的 PDF" ✅）
+   *
+   * -> 不传 -> 不渲染 ✅ ✅
+   */
+  onExportAnnotatedPdf?: () => void;
+  /**
+   * **导出高亮 JSON** ✅（用户需求："包需要内置导出高亮" ✅）
+   *
+   * -> 不传 -> 不渲染 ✅ ✅
+   */
+  onExportHighlights?: () => void;
+  /**
    * **当前主题**（受控）。
    *
    * -> 配合 \`onThemeChange\` -> 工具栏显示主题选择按钮 ✅
@@ -148,6 +166,9 @@ export function Toolbar(props: ToolbarProps) {
     onToggleThumbnails,
     onToggleOutline,
     onPrint,
+    onDownloadPdf,
+    onExportAnnotatedPdf,
+    onExportHighlights,
     theme,
     onThemeChange,
     themeOptions,
@@ -362,6 +383,58 @@ export function Toolbar(props: ToolbarProps) {
             title={t('print.title')}
           >
             <Icon name={'print'} title={t('print.title')} overrides={icons} />
+          </button>
+        ) : null}
+
+        {/*
+         * ⚠️⚠️ **导出 / 下载**（用户需求 ✅）
+         *
+         * > "包需要内置导出带高亮的 PDF、导出高亮、PDF 下载、主题色"
+         *
+         * ## 为什么是"宿主传回调"而不是"包自己实现" ✅
+         *
+         * -> **下载原 PDF** ✅ -> 包**拿不到原始字节** ✅
+         *    -> 宿主是通过 URL / ArrayBuffer 加载的 ✅ -> 包不知道 ✅ ✅
+         * -> **导出带高亮的 PDF** ✅ -> 需要 `pdf-lib` ✅
+         *    -> **宿主决定用哪个版本 / 怎么打包** ✅ -> 包不该硬塞 ✅ ✅
+         * -> **导出高亮 JSON** ✅ -> 高亮数据在**宿主手里** ✅ ✅
+         *
+         * -> 所以：**包提供按钮和入口** ✅ -> **宿主给实现** ✅ ✅
+         * -> 不传回调 ✅ -> **按钮不渲染** ✅ ✅
+         */}
+        {onDownloadPdf ? (
+          <button
+            type="button"
+            className="scpdf-toolbar__btn"
+            onClick={onDownloadPdf}
+            aria-label={t('export.downloadPdf')}
+            title={t('export.downloadPdf')}
+          >
+            <Icon name={'download'} title={t('export.downloadPdf')} overrides={icons} />
+          </button>
+        ) : null}
+
+        {onExportAnnotatedPdf ? (
+          <button
+            type="button"
+            className="scpdf-toolbar__btn"
+            onClick={onExportAnnotatedPdf}
+            aria-label={t('export.annotatedPdf')}
+            title={t('export.annotatedPdf')}
+          >
+            <Icon name={'exportAnnotated'} title={t('export.annotatedPdf')} overrides={icons} />
+          </button>
+        ) : null}
+
+        {onExportHighlights ? (
+          <button
+            type="button"
+            className="scpdf-toolbar__btn"
+            onClick={onExportHighlights}
+            aria-label={t('export.highlightsJson')}
+            title={t('export.highlightsJson')}
+          >
+            <Icon name={'exportJson'} title={t('export.highlightsJson')} overrides={icons} />
           </button>
         ) : null}
 
