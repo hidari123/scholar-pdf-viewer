@@ -67,6 +67,13 @@ export interface PageProps {
   highlights: HighlightRecord[];
   /** 激活的高亮 id */
   activeHighlightId?: string | null;
+  /**
+   * **点到的高亮矩形**（**页内坐标** ✅）
+   *
+   * -> 用来区分**同一个 id 的多个矩形** ✅（宿主可能传重复 id ✅）
+   * -> ⚠️ **必须是页内坐标** ✅（和 `AnnotationLayer` 渲染的一致 ✅）
+   */
+  activeHighlightRect?: { left: number; top: number; width: number; height: number } | null;
   /** 高亮色板（语义 key → CSS 颜色） */
   palette?: HighlightPalette;
   /** 选区形状（自绘选区层用；页内坐标） */
@@ -145,6 +152,7 @@ export function PageInner(props: PageProps) {
     activeSearchRectIndex,
     highlights,
     activeHighlightId,
+    activeHighlightRect,
     palette,
     selectionShape,
     onHighlightClick,
@@ -331,6 +339,7 @@ export function PageInner(props: PageProps) {
         highlights={highlights}
         viewport={viewportSize}
         activeHighlightId={activeHighlightId}
+        activeHighlightRect={activeHighlightRect}
         onHighlightClick={onHighlightClick}
         searchRects={searchRects}
         activeSearchRectIndex={activeSearchRectIndex}
