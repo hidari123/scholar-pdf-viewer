@@ -1,0 +1,99 @@
+name: Release
+
+# ⚠️ **什么时候跑**：
+# -> 往 `main` 推一个 **changeset** ✅
+#    （`pnpm changeset` -> 写一个 `.changeset/xxx.md` ✅ -> 提交 ✅）
+# -> 本工作流会：**合并所有 changeset** ✅ -> **升版本** ✅ -> **建 tag** ✅ -> **发到 npm** ✅
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".changeset/**"
+  # 手动触发（重发 / 补发用 ✅）
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ① 把 changeset 合并成版本 + CHANGELOG
+  version:
+    name: 合并 changeset（升版本 + 生成 CHANGELOG）
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.release.outputs.published }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # ⚠️ **要拉全部 tag** ✅（changeset 要靠 git tag 判断"上个版本"✅）
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # ⚠️ **发之前先跑一遍全部门禁** ✅
+      # -> 不然会把坏包发出去 ❌ -> 而且**发出去的版本撤不回来** ❌
+      - run: pnpm verify
+      - run: pnpm build
+
+      # 合并 changeset（改 package.json + 生成 CHANGELOG.md ✅）
+      - run: pnpm changeset version
+      - run: pnpm install --lockfile-only
+
+      # ⚠️ **把升版本的改动提交回 main** ✅
+      # -> 不提交的话 -> 下次 CI 还是旧版本 ❌
+      - name: 提交版本号 + CHANGELOG
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json CHANGELOG.md pnpm-lock.yaml
+          git diff --staged --quiet || git commit -m "chore: 版本发布"
+          git push origin HEAD:main
+
+      # 建 tag（changeset 会自己打 ✅）
+      - name: 建 tag 并推
+        run: git push --follow-tags origin main
+
+  # ② 发到 npm
+  publish:
+    name: 发布到 npm
+    needs: version
+    runs-on: ubuntu-latest
+    # ⚠️ **只有真的升了版本才发** ✅（纯文档改动不该发 ✅）
+    if: needs.version.outputs.published == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          # ⚠️ **必须写 registry** ✅ -> 不然会用默认的 npmjs ✅（其实也是它 ✅ 但显式更稳 ✅）
+          registry-url: "https://registry.npmjs.org"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      # ⚠️ **发之前最后再验一次包** ✅
+      - run: pnpm release:check
+
+      - name: 发布
+        run: pnpm release
+        env:
+          # ⚠️ **token 来自仓库的 secret** ✅ -> 不在代码里 ✅
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # ⚠️ **changeset publish 默认发到配置的 registry** ✅ -> package.json 里已锁 npmjs ✅
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+
+      # ③ 发布后验证：npm 上真的有这个版本了 ✅
+      - name: 验证发布结果
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "发布版本: $VERSION"
+          npm view "@scholar-club/pdf-viewer@$VERSION" version

@@ -1,2 +1,12 @@
 packages:
+  # ⚠️⚠️ **根目录自己也是 workspace 成员**（发布准备时发现的问题 ✅）。
+  #
+  # -> 之前只有 `demo` ✅
+  # -> -> **changesets 找不到根包** ❌
+  #    -> `pnpm changeset status` 直接报错 ✅
+  #      （"which is not in the workspace" ✅）
+  #    -> -> **根本没法升版本 / 发版** ❌
+  #
+  # -> 加上 `.` ✅ -> 根包进 workspace ✅ -> changesets 认得它了 ✅
+  - .
   - demo
