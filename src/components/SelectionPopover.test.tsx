@@ -2,6 +2,7 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { Messages } from '../i18n/messages';
 import { SelectionPopover } from './SelectionPopover';
 
 /**
@@ -17,7 +18,13 @@ const CONTAINER = { left: 0, top: 0, right: 1000, bottom: 800 };
  */
 function renderPopover(
   open: boolean,
-  actions: { key: string; label?: string; onSelect?: () => void }[] = [],
+  actions: {
+    key: string;
+    label?: string;
+    messageKey?: keyof Messages;
+    onSelect?: () => void;
+  }[] = [],
+  locale: 'zh' | 'en' = 'zh',
 ) {
   return render(
     <SelectionPopover
@@ -26,12 +33,42 @@ function renderPopover(
       containerRect={CONTAINER}
       anchorRect={{ left: 100, top: 100, right: 200, bottom: 120 }}
       actions={actions}
-      locale="zh"
+      locale={locale}
     />,
   );
 }
 
 describe('SelectionPopover（审核补测）', () => {
+  /*
+   * ⚠️ **`messageKey` 跟着语言走**（用户反馈："选区浮层 title 中英混杂" ✅）
+   *
+   * -> 宿主自定义动作 ✅ 传 `label: '翻译'` ✅ -> **永远是中文** ✅ ❌
+   * -> -> 传 `messageKey` ✅ -> **按当前语言解析** ✅ ✅
+   */
+  it('**messageKey 跟着语言走** ✅', () => {
+    const { unmount } = renderPopover(
+      true,
+      [{ key: 'ask2', label: '翻译', messageKey: 'selection.actionTranslate', onSelect: () => {} }],
+      'zh',
+    );
+    expect(screen.getByRole('button', { name: '翻译' })).toBeTruthy();
+    unmount();
+
+    renderPopover(
+      true,
+      [{ key: 'ask2', label: '翻译', messageKey: 'selection.actionTranslate', onSelect: () => {} }],
+      'en',
+    );
+    expect(screen.getByRole('button', { name: 'Translate' })).toBeTruthy();
+  });
+
+  /*
+   * ⚠️ **没传 messageKey -> 退回 label** ✅
+   */
+  it('**没传 messageKey 就用 label** ✅', () => {
+    renderPopover(true, [{ key: 'x', label: '我的动作', onSelect: () => {} }]);
+    expect(screen.getByRole('button', { name: '我的动作' })).toBeTruthy();
+  });
   it('**关闭时不渲染**', () => {
     const { container } = renderPopover(false);
     expect(container.querySelector('.scpdf-selection-popover')).toBeNull();

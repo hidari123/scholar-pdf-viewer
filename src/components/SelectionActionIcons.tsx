@@ -40,6 +40,15 @@ export interface SelectionActionIconProps {
   size?: number;
   /** 宿主的图标覆盖表 */
   overrides?: Partial<Record<IconName, ReactNode>>;
+  /**
+   * **提示文案** ✅（用户反馈："选区浮层 title 中英混杂" ✅）
+   *
+   * -> 之前是 `title={name}` ✅ -> 显示**英文图标名** ✅（`highlight` ✅）
+   * -> -> 中文界面里混着英文 ✅ ❌
+   * -> -> 现在**由调用方传本地化文案** ✅ ✅
+   * -> 不传 ✅ -> 不渲染 `<title>` ✅ ✅
+   */
+  title?: string;
 }
 
 /**
@@ -47,10 +56,21 @@ export interface SelectionActionIconProps {
  *
  * @param props 参数
  */
-export function SelectionActionIconView({ name, size = 16, overrides }: SelectionActionIconProps) {
+export function SelectionActionIconView({
+  name,
+  size = 16,
+  overrides,
+  title,
+}: SelectionActionIconProps) {
   const mapped = ICON_MAP[name];
   if (!mapped) {
     return null;
   }
-  return <Icon name={mapped} size={size} title={name} overrides={overrides} />;
+  /*
+   * ⚠️ **title 由调用方给** ✅
+   *
+   * -> 之前是 `title={name}` ✅ -> 显示**英文图标名** ✅ ❌
+   * -> -> 中文界面里混着英文 ✅ ❌
+   */
+  return <Icon name={mapped} size={size} title={title} overrides={overrides} />;
 }

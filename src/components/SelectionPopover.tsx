@@ -244,6 +244,32 @@ export function SelectionPopover({
     [locale, messages, locales],
   );
 
+  /**
+   * **动作的提示文案** ✅（用户反馈："选区浮层 title 中英混杂" ✅）
+   *
+   * ## 规则 ✅
+   *
+   * -> 宿主传了 `messageKey` ✅ -> **按当前语言解析** ✅ ✅
+   *    -> 例：`{ key: 'ask2', messageKey: 'selection.actionAsk' }` ✅
+   * -> 没传 `messageKey` ✅ -> 退回 `label` ✅ ✅
+   * -> 都没有 ✅ -> 退回 `key` ✅ ✅
+   *
+   * ## 为什么需要 ✅
+   *
+   * -> 宿主自定义动作 ✅ 传 `label: '翻译'` ✅
+   * -> -> 切到英文 ✅ -> **还是中文** ✅ ❌
+   * -> -> `label` 是**写死的字符串** ✅ -> 不会跟着语言变 ✅ ❌
+   */
+  const actionTitle = useCallback(
+    (action: { key: string; label?: string; messageKey?: keyof Messages }): string => {
+      if (action.messageKey) {
+        return t(action.messageKey);
+      }
+      return action.label ?? action.key;
+    },
+    [t],
+  );
+
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState<PopoverPosition | null>(null);
   /** 颜色下拉是否展开 */
@@ -680,8 +706,8 @@ export function SelectionPopover({
               <button
                 type="button"
                 className="scpdf-selection-popover__btn"
-                title={action.label}
-                aria-label={action.label ?? action.key}
+                title={actionTitle(action)}
+                aria-label={actionTitle(action)}
                 onClick={(event) => {
                   event.stopPropagation();
                   /*
@@ -711,7 +737,11 @@ export function SelectionPopover({
               >
                 {typeof action.icon === 'string' ? (
                   isBuiltinIcon(action.icon) ? (
-                    <SelectionActionIconView name={action.icon} overrides={icons} />
+                    <SelectionActionIconView
+                      name={action.icon}
+                      overrides={icons}
+                      title={actionTitle(action)}
+                    />
                   ) : null
                 ) : (
                   action.icon

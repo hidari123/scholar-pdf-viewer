@@ -10,6 +10,7 @@
  * 宿主没传 `onTranslate` → "翻译"按钮**不显示**（符合"没配就不展示"的要求）。
  */
 
+import type { Messages } from '../../i18n/messages';
 import type { IconName } from '../icons/icons';
 import type { NormPosition } from '../types';
 
@@ -115,6 +116,22 @@ export interface SelectionAction {
   icon?: SelectionActionIcon | React.ReactNode;
   /** 提示文案（也用作 aria-label） */
   label?: string;
+  /**
+   * **文案表的 key** ✅（用户反馈："选区浮层 title 中英混杂" ✅）
+   *
+   * ## 为什么 ✅
+   *
+   * -> 宿主自定义动作 ✅ 传 `label: '翻译'` ✅
+   * -> -> 切到英文 ✅ -> **还是中文** ✅ ❌
+   * -> -> 因为 `label` 是**写死的字符串** ✅ -> 不会跟着语言变 ✅ ❌
+   *
+   * -> 修法：宿主传 `messageKey` ✅ -> **包按当前语言解析** ✅ ✅
+   * -> -> 例：`{ key: 'ask2', messageKey: 'selection.actionAsk' }` ✅
+   * -> -> 没传 `messageKey` ✅ -> 退回 `label` ✅ ✅
+   *
+   * ⚠️ **必须是包文案表里已有的 key** ✅（见 `src/i18n/messages.ts` ✅）
+   */
+  messageKey?: keyof Messages;
   /** 点击回调 */
   onSelect?: (ctx: SelectionActionContext) => void;
   /**
