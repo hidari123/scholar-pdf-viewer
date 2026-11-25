@@ -428,16 +428,23 @@
  * -> -> 只有 16px 的色块 ✅ -> 看不出是哪个主题 ✅ ❌
  * -> -> 名字在下面 ✅ -> 一眼就知道 ✅ ✅
  */
+/*
+ * ⚠️⚠️ **色块和名字【一行】**（用户反馈："排版不对 每一栏放在一行展示" ✅）
+ *
+ * -> 之前是**竖排** ✅（色块在上 ✅ 名字在下 ✅）
+ * -> -> 用户要的是**一行一个主题** ✅ ❌
+ * -> -> 改成**横排** ✅：色块在左 ✅ 名字在右 ✅ ✅
+ */
 .scpdf-theme-picker__swatch-wrap {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 3px;
+  gap: 6px;
   flex: none;
 }
 
 .scpdf-theme-picker__swatch-name {
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.2;
   color: var(--scpdf-color-text);
   white-space: nowrap;
