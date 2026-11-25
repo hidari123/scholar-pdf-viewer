@@ -336,7 +336,7 @@ export default function App() {
    * -> -> **和 Chrome 原生一样** ✅ -> 每页都完整 ✅ ✅
    * -> `with-highlights` ✅ -> 打印 DOM ✅（带高亮 ✅）✅
    */
-  const [printMode, setPrintMode] = useState<'with-highlights' | 'original'>('with-highlights');
+  const [printMode, setPrintMode] = useState<'with-highlights' | 'original'>('original');
 
   /**
    * **插槽演示**（方案 D）。
