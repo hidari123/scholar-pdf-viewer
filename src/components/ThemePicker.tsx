@@ -107,6 +107,39 @@ export function ThemePicker(props: ThemePickerProps) {
     };
   }, [open]);
 
+  /*
+   * ⚠️ **菜单的坐标** ✅
+   *
+   * -> 菜单用 `position: fixed` ✅（祖先的 `overflow: auto` ✅ 会裁掉 absolute 的 ✅）
+   * -> -> 坐标要**自己算** ✅
+   * -> -> 贴着按钮的**下方** ✅、**右对齐** ✅ ✅
+   */
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const button = rootRef.current?.querySelector('button[aria-haspopup="menu"]');
+    if (!button) {
+      return;
+    }
+    const rect = button.getBoundingClientRect();
+    const menuHeight = 7 * 48 + 8;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    /*
+     * ⚠️ **下面放不下就翻到上面** ✅
+     *
+     * -> 主题有 7 个 ✅ -> 菜单很高 ✅
+     * -> -> 视口底部放不下 ✅ -> **翻上去** ✅ ✅
+     */
+    const top =
+      spaceBelow < menuHeight && rect.top > menuHeight
+        ? rect.top - menuHeight - 4
+        : rect.bottom + 4;
+    setMenuPos({ top, left: Math.max(8, rect.right - 150) });
+  }, [open]);
+
   const options = themes ?? (Object.keys(THEME_LABELS_I18N.zh ?? {}) as PdfViewerTheme[]);
 
   /*
@@ -137,7 +170,11 @@ export function ThemePicker(props: ThemePickerProps) {
       </button>
 
       {open ? (
-        <div className="scpdf-theme-picker__menu" role="menu">
+        <div
+          className="scpdf-theme-picker__menu"
+          role="menu"
+          style={menuPos ? { top: menuPos.top, left: menuPos.left } : { visibility: 'hidden' }}
+        >
           {options.map((key) => (
             <button
               key={key}
@@ -151,8 +188,17 @@ export function ThemePicker(props: ThemePickerProps) {
                 setOpen(false);
               }}
             >
-              <ThemeSwatch theme={key} />
-              <span className="scpdf-theme-picker__label">{labelFor(key)}</span>
+              {/*
+               * ⚠️ **色块 + 主题名** ✅
+               *
+               * -> 主题名**放在色块下面** ✅（用户反馈："色块分不清" ✅）
+               * -> -> 只有 16px 的色块 ✅ -> **看不出是哪个主题** ✅ ❌
+               * -> -> 名字在下面 ✅ -> 一眼就知道 ✅ ✅
+               */}
+              <span className="scpdf-theme-picker__swatch-wrap">
+                <ThemeSwatch theme={key} />
+                <span className="scpdf-theme-picker__swatch-name">{labelFor(key)}</span>
+              </span>
               {key === theme ? (
                 <Icon name="check" title={t('theme.current')} overrides={icons} />
               ) : null}

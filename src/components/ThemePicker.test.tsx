@@ -32,6 +32,25 @@ describe('ThemePicker 的色块', () => {
     }
   });
 
+  /*
+   * ⚠️ **每个主题都要有名字**（用户反馈："色块分不清" ✅）
+   *
+   * -> 只有 16px 的色块 ✅ -> 看不出是哪个主题 ✅ ❌
+   * -> -> 名字在色块**下面** ✅ ✅
+   */
+  it('每个主题的色块下面都有名字', () => {
+    render(<ThemePicker onThemeChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '主题' }));
+
+    const names = [...document.querySelectorAll('.scpdf-theme-picker__swatch-name')].map(
+      (n) => n.textContent?.trim() ?? '',
+    );
+    expect(names.length).toBe(7);
+    for (const name of names) {
+      expect(name.length).toBeGreaterThan(0);
+    }
+  });
+
   it('**每个色块都有主色调条 + 背景**', () => {
     render(<ThemePicker onThemeChange={vi.fn()} />);
     screen.getByRole('button', { name: '主题' }).click();

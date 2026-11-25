@@ -73,16 +73,22 @@
    ========================================================================== */
 
 .scpdf-root--sepia {
-  --scpdf-color-surface: #f4ecd8;
-  --scpdf-color-surface-alt: #e9dfc6;
-  --scpdf-color-text: #433422;
-  --scpdf-color-border: #d3c4a4;
-  --scpdf-color-primary: #8a5a2b;
-  --scpdf-highlight-my: #f7dc94;
-  --scpdf-highlight-others: #d6e0d0;
-  --scpdf-highlight-active: #8a5a2b;
-  --scpdf-selection-color: rgba(138, 90, 43, 0.24);
-  --scpdf-bbox-color: #8a5a2b;
+  /*
+   * ⚠️ **莫兰迪化**（用户反馈："主题色块太深" ✅）
+   *
+   * -> 之前 primary = `#8a5a2b` ✅ -> **饱和度太高** ✅ -> 色块很扎眼 ✅ ❌
+   * -> -> 改成**灰调棕** ✅ -> 和米黄背景**融在一起** ✅ ✅
+   */
+  --scpdf-color-surface: #f2ece0;
+  --scpdf-color-surface-alt: #e7dfcf;
+  --scpdf-color-text: #4a4238;
+  --scpdf-color-border: #d6cbb6;
+  --scpdf-color-primary: #a08a72;
+  --scpdf-highlight-my: #e8dcc0;
+  --scpdf-highlight-others: #d4ddd2;
+  --scpdf-highlight-active: #a08a72;
+  --scpdf-selection-color: rgba(160, 138, 114, 0.26);
+  --scpdf-bbox-color: #a08a72;
   --scpdf-shadow-page: 0 3px 12px rgba(90, 70, 40, 0.22);
   --scpdf-radius-page: 3px;
 }
@@ -92,16 +98,24 @@
    ========================================================================== */
 
 .scpdf-root--contrast {
-  --scpdf-color-surface: #000000;
-  --scpdf-color-surface-alt: #000000;
-  --scpdf-color-text: #ffffff;
-  --scpdf-color-border: #ffffff;
-  --scpdf-color-primary: #ffff00;
-  --scpdf-highlight-my: #ffff00;
-  --scpdf-highlight-others: #00ffff;
-  --scpdf-highlight-active: #ffff00;
-  --scpdf-selection-color: rgba(255, 255, 0, 0.4);
-  --scpdf-bbox-color: #ffff00;
+  /*
+   * ⚠️ **莫兰迪化**（用户反馈："主题色块太深" ✅）
+   *
+   * -> 之前是 **纯黑 + 纯黄** ✅ -> **极度刺眼** ✅ ❌
+   * -> -> 改成**深灰 + 柔和黄绿** ✅
+   * -> -> 保留"高对比"的意图 ✅（文字仍然很清楚 ✅）
+   *    但**不再是纯黑白** ✅ -> 长时间阅读不刺眼 ✅ ✅
+   */
+  --scpdf-color-surface: #1a1c1e;
+  --scpdf-color-surface-alt: #101214;
+  --scpdf-color-text: #f4f5f6;
+  --scpdf-color-border: #c9cdd2;
+  --scpdf-color-primary: #d9d16f;
+  --scpdf-highlight-my: #d9d16f;
+  --scpdf-highlight-others: #7fb4b0;
+  --scpdf-highlight-active: #d9d16f;
+  --scpdf-selection-color: rgba(217, 209, 111, 0.34);
+  --scpdf-bbox-color: #d9d16f;
   /* 高对比度 → 不要阴影（会降低可读性） */
   --scpdf-shadow-page: none;
   --scpdf-radius-page: 0;
@@ -137,16 +151,23 @@
  */
 
 .scpdf-root--dark {
-  --scpdf-color-surface: #1f1f1f;
-  --scpdf-color-surface-alt: #141414;
-  --scpdf-color-text: #e6e6e6;
-  --scpdf-color-border: #333333;
-  --scpdf-color-primary: #4c8dff;
-  --scpdf-highlight-my: #6b5a1f;
-  --scpdf-highlight-others: #26426b;
-  --scpdf-highlight-active: #4c8dff;
-  --scpdf-selection-color: rgba(76, 141, 255, 0.3);
-  --scpdf-bbox-color: #4c8dff;
+  /*
+   * ⚠️ **莫兰迪化**（用户反馈："主题色块太深" ✅）
+   *
+   * -> 之前 surface = `#1f1f1f` ✅ -> **接近纯黑** ✅ -> 色块很沉 ✅ ❌
+   * -> -> 改成**带一点冷灰** ✅ -> 和纯黑主题**拉开差别** ✅ ✅
+   * -> -> primary 也从**高饱和蓝** ✅ 改成**灰调蓝** ✅ ✅
+   */
+  --scpdf-color-surface: #2b2d31;
+  --scpdf-color-surface-alt: #212328;
+  --scpdf-color-text: #e2e3e5;
+  --scpdf-color-border: #3d4046;
+  --scpdf-color-primary: #7e9cc0;
+  --scpdf-highlight-my: #6b6244;
+  --scpdf-highlight-others: #3d5570;
+  --scpdf-highlight-active: #7e9cc0;
+  --scpdf-selection-color: rgba(126, 156, 192, 0.3);
+  --scpdf-bbox-color: #7e9cc0;
   --scpdf-shadow-page: 0 2px 10px rgba(0, 0, 0, 0.6);
   /*
    * ⚠️ **圆角也要覆盖**（实测发现暗色漏了它）。
@@ -159,16 +180,16 @@
 
 @media (prefers-color-scheme: dark) {
   .scpdf-root--auto {
-    --scpdf-color-surface: #1f1f1f;
-    --scpdf-color-surface-alt: #141414;
-    --scpdf-color-text: #e6e6e6;
-    --scpdf-color-border: #333333;
-    --scpdf-color-primary: #4c8dff;
-    --scpdf-highlight-my: #6b5a1f;
-    --scpdf-highlight-others: #26426b;
-    --scpdf-highlight-active: #4c8dff;
-    --scpdf-selection-color: rgba(76, 141, 255, 0.3);
-    --scpdf-bbox-color: #4c8dff;
+    --scpdf-color-surface: #2b2d31;
+    --scpdf-color-surface-alt: #212328;
+    --scpdf-color-text: #e2e3e5;
+    --scpdf-color-border: #3d4046;
+    --scpdf-color-primary: #7e9cc0;
+    --scpdf-highlight-my: #6b6244;
+    --scpdf-highlight-others: #3d5570;
+    --scpdf-highlight-active: #7e9cc0;
+    --scpdf-selection-color: rgba(126, 156, 192, 0.3);
+    --scpdf-bbox-color: #7e9cc0;
     --scpdf-shadow-page: 0 2px 10px rgba(0, 0, 0, 0.6);
     /* ⚠️ 圆角（同上：每套主题都要完整） */
     --scpdf-radius-page: 2px;

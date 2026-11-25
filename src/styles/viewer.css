@@ -98,11 +98,28 @@
   /* 高度走变量（内容决定实际高度，这里只给个下限） */
   min-height: var(--scpdf-toolbar-height, 40px);
   /*
-   * ⚠️ **工具栏本身不能溢出**（否则整页出现横向滚动条）❌
-   * -> 三组各自滚动 ✅
+   * ⚠️⚠️ **工具栏不能裁掉下拉菜单**（用户反馈："主题按钮点击没反应" ✅）
+   *
+   * -> 之前是 `overflow: hidden` ✅
+   * -> -> **主题菜单 / 高亮色板** ✅ 是**绝对定位**的 ✅
+   * -> -> 在工具栏**下面** ✅ -> **被裁掉了** ✅ ❌
+   * -> -> 用户看到的就是"点了没反应" ✅ ✅
+   *
+   * -> 修法：工具栏 **`overflow: visible`** ✅
+   * -> -> 横向滚动条的问题 ✅ -> **由三组自己滚** ✅（见下 ✅）
    */
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
+  /*
+   * ⚠️⚠️ **工具栏要在【页面层】上面**（用户反馈："主题按钮点击没反应" ✅）
+   *
+   * -> 下拉菜单 ✅ 是**绝对定位** ✅ -> 会伸到工具栏**外面** ✅
+   * -> -> 工具栏和页面层是**兄弟** ✅
+   * -> -> 页面层在 DOM 里**更靠后** ✅ -> **盖住了菜单** ✅ ❌
+   * -> -> 修法：工具栏 `position: relative` + `z-index` ✅ ✅
+   */
+  position: relative;
+  z-index: 10;
 }
 
 .scpdf-toolbar__left,
@@ -118,7 +135,16 @@
    */
   min-width: 0;
   overflow-x: auto;
-  overflow-y: hidden;
+  /*
+   * ⚠️ **`overflow-y: visible`** ✅（用户反馈："主题按钮点击没反应" ✅）
+   *
+   * -> 主题菜单 / 高亮色板 ✅ 在这组里 ✅
+   * -> -> `overflow-y: hidden` ✅ -> **菜单被裁掉** ✅ ❌
+   * -> -> 但 `overflow-x: auto` + `overflow-y: visible` ✅
+   *    -> **浏览器不允许** ✅（一个轴非 visible ✅ -> 另一个也变 auto ✅）
+   * -> -> 所以：**靠 `overflow: visible` + 内部的滚动容器** ✅ ✅
+   */
+  overflow-y: visible;
   scrollbar-width: thin;
   /* ⚠️ **不显示滚动条也能滚**（触控板 / 键盘）✅ */
   scroll-behavior: smooth;
@@ -254,10 +280,20 @@
 
 /* 下拉菜单 */
 .scpdf-theme-picker__menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 30;
+  /*
+   * ⚠️⚠️ **必须用 `position: fixed`**（用户反馈："主题按钮点击没反应" ✅）
+   *
+   * -> 之前是 `position: absolute` ✅
+   * -> -> 祖先 **`.scpdf-container`** ✅ 有 `overflow: auto` ✅
+   * -> -> **把菜单裁掉了** ✅ ❌
+   * -> -> 用户看到的就是"点了没反应" ✅ ✅
+   *
+   * -> 改用 `fixed` ✅ -> **不受任何祖先的 overflow 影响** ✅ ✅
+   *    （和 `.scpdf-selection-popover` ✅ 同一套做法 ✅）
+   * -> 坐标由 **JS 算** ✅（`top` / `left` ✅ 写在内联 style 里 ✅）
+   */
+  position: fixed;
+  z-index: 1100;
   display: flex;
   flex-direction: column;
   min-width: 140px;
@@ -348,11 +384,64 @@
   flex: none;
 }
 
-/* 下半：主题的背景色 */
+/*
+ * 下半：主题的背景色
+ *
+ * ⚠️ **必须有 fallback**（用户反馈："主题色块太深" ✅）
+ *
+ * -> `auto` 主题 ✅ **不定义任何变量** ✅
+ *    -> 只在 `prefers-color-scheme: dark` 下才有值 ✅
+ * -> -> 亮色系统下 ✅ -> 变量**不存在** ✅ -> **透明** ✅ ❌
+ *    -> -> 实测：`auto` 的色块是 `rgba(0,0,0,0)` ✅ ❌ **完全看不见** ✅
+ *
+ * -> 修法：给 **`auto` 单独定义一套"预览用"的变量** ✅ ✅
+ */
 .scpdf-theme-picker__swatch-bg {
   display: block;
   flex: 1;
-  background: var(--scpdf-color-surface, transparent);
+  background: var(--scpdf-color-surface, #f5f5f4);
+}
+
+/*
+ * ⚠️ **`auto` 主题的预览色**（用户反馈："主题色块太深" ✅）
+ *
+ * -> `auto` = 跟随系统 ✅ -> **不能只靠媒体查询** ✅
+ *    -> 媒体查询外 ✅ -> **没有变量** ✅ -> 色块透明 ✅ ❌
+ * -> -> 给它一套**中性的预览色** ✅（一半亮一半暗 ✅ 表示"跟随" ✅）✅
+ */
+/*
+ * ⚠️ **`auto` 主题的预览**（用户反馈："主题色块太深" ✅）
+ *
+ * -> `auto` = 跟随系统 ✅ -> 亮色系统下**没有任何变量** ✅ -> 色块透明 ✅ ❌
+ * -> -> 下面那段**对角渐变** ✅ 就是干这个的 ✅（一半亮一半暗 ✅）
+ * -> -> 这里**只补变量** ✅（让渐变之外的场景也有底色 ✅）
+ */
+.scpdf-root--auto.scpdf-theme-picker__swatch {
+  --scpdf-color-primary: #9aa0a6;
+  --scpdf-color-surface: #d6d3cd;
+}
+
+/*
+ * ⚠️ **色块 + 主题名**（用户反馈："色块太深 / 分不清" ✅）
+ *
+ * -> 主题名放在**色块下面** ✅
+ * -> -> 只有 16px 的色块 ✅ -> 看不出是哪个主题 ✅ ❌
+ * -> -> 名字在下面 ✅ -> 一眼就知道 ✅ ✅
+ */
+.scpdf-theme-picker__swatch-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+
+.scpdf-theme-picker__swatch-name {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--scpdf-color-text);
+  white-space: nowrap;
+  opacity: 0.75;
 }
 
 /*
@@ -387,11 +476,11 @@
  *    -> 一眼就知道"这个是两色自适应" ✅
  */
 .scpdf-theme-picker__swatch.scpdf-root--auto .scpdf-theme-picker__swatch-bg {
-  background: linear-gradient(135deg, #ffffff 50%, #1f1f1f 50%);
+  background: linear-gradient(135deg, #fafaf9 50%, #2b2d31 50%);
 }
 
 .scpdf-theme-picker__swatch.scpdf-root--auto .scpdf-theme-picker__swatch-bar {
-  background: linear-gradient(135deg, #2f6fed 50%, #4c8dff 50%);
+  background: linear-gradient(135deg, #5b83c4 50%, #7e9cc0 50%);
 }
 
 /*
