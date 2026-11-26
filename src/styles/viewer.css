@@ -970,10 +970,27 @@
  * → 但 `visibility: hidden` 时**不接收鼠标事件** → 不会挡住下面的文字
  */
 .scpdf-sticky-note__content {
-  position: absolute;
-  left: 26px;
+  /*
+   * ⚠️⚠️ **必须用 `position: fixed`**（用户反馈：
+   * "hover到批注按钮后 展示出来的批注 如果在pdf边角
+   *  则会被pdf把后面部分都截掉 看不到全部的内容"）。
+   *
+   * → 之前是 `position: absolute` + `left: 26px` ❌
+   * → 内容框在**页内** ❌ → 便签在页边角时**超出页面** ❌
+   *    → 实测：页右边超出 128px、页右下角超出 128px 宽 + 71px 高 ❌
+   * → `.scpdf-page` 有 `overflow: hidden`（裁 canvas 圆角）❌
+   *    → 内容框被**裁掉** ❌
+   *
+   * → 现在：`position: fixed` + **JS 算视口坐标** ✅
+   *    → 不受任何祖先的 overflow 影响 ✅
+   *    → 和主题菜单、选区浮层同一套做法 ✅
+   *
+   * → 坐标由 `computeStickyNoteContentPosition()` 算 ✅（含左右/上下翻转 ✅）
+   */
+  position: fixed;
+  left: 0;
   top: 0;
-  z-index: 5;
+  z-index: 1000;
   min-width: 120px;
   max-width: 260px;
   max-height: 220px;

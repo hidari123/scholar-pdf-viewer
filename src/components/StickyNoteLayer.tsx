@@ -27,6 +27,7 @@ import type { AnnotationGroup } from '../core/annotation/annotation-groups';
 import { groupAnnotations } from '../core/annotation/annotation-groups';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import { STICKY_NOTE_SIZE, stickyNotePosition } from '../core/annotation/sticky-note';
+import { computeStickyNoteContentPosition } from '../core/annotation/sticky-note-content-position';
 import type { HighlightRecord, ViewRect } from '../core/types';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
@@ -113,6 +114,20 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
   const [hoveredGroupKey, setHoveredGroupKey] = useState<string | null>(null);
 
   /*
+   * ⚠️ **内容框的视口坐标**（`position: fixed` 用）。
+   *
+   * → 内容框原来是页内绝对定位 → 写死 `left: 26px`
+   *   → 便签在页边角时**超出页面** → 被 `overflow: hidden` 裁掉
+   * → 现在改成 fixed → 坐标由 JS 算（和主题菜单、选区浮层同一套）
+   *
+   * → 图标位置用 `getBoundingClientRect()` 量（视口坐标）
+   * → 容器滚动了 → 图标跟着动 → 但坐标是**量出来的** → 不会过期
+   */
+  const [contentPos, setContentPos] = useState<{ left: number; top: number } | null>(null);
+  /** 用来量位置的图标元素（按组 key 存） */
+  const iconRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  /*
    * ⚠️⚠️ **关闭的延迟定时器**（用户反馈：
    * "鼠标一移开批注按钮 批注内容区域就消失了 鼠标一移开就消失了"）。
    *
@@ -131,6 +146,40 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
    * -> 鼠标真的走了 -> 200ms 后**关掉**  （不会粘着不走）
    */
   const closeTimerRef = useRef(0);
+
+  /*
+   * ⚠️ **算内容框的位置**（视口坐标）。
+   *
+   * → 图标位置用 `getBoundingClientRect()` 量
+   * → 内容框是 `position: fixed` → 坐标直接就是视口坐标
+   *
+   * ⚠️ **内容框的尺寸**：
+   * → CSS 里是 `max-width: 260px` / `max-height: 220px`
+   * → 实际宽度取决于内容 → 量**渲染后**的盒子
+   * → 量不到（还没渲染）→ 用 CSS 的上限兜底
+   */
+  const updateContentPos = useCallback((icon: HTMLElement, content: HTMLElement | null) => {
+    const iconRect = icon.getBoundingClientRect();
+    const contentRect = content?.getBoundingClientRect();
+    const width = contentRect?.width || 260;
+    const height = contentRect?.height || 220;
+
+    setContentPos(
+      computeStickyNoteContentPosition({
+        icon: {
+          left: iconRect.left,
+          top: iconRect.top,
+          width: iconRect.width,
+          height: iconRect.height,
+        },
+        size: { width, height },
+        viewport: {
+          width: typeof window === 'undefined' ? 0 : window.innerWidth,
+          height: typeof window === 'undefined' ? 0 : window.innerHeight,
+        },
+      }),
+    );
+  }, []);
 
   /** 取消"即将关闭" */
   const cancelClose = useCallback(() => {
@@ -351,6 +400,17 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                * -> 面板找"包含这个 id 的图标"  -> 任何一条都能定位
                */
               data-note-ids={group.annotations.map((a) => a.id).join(',')}
+              ref={(element) => {
+                /*
+                 * ⚠️ **存下图标元素** → hover 时量它的视口位置
+                 * → 用来算内容框的 fixed 坐标
+                 */
+                if (element) {
+                  iconRefs.current.set(group.key, element);
+                } else {
+                  iconRefs.current.delete(group.key);
+                }
+              }}
               style={{ width: STICKY_NOTE_SIZE, height: STICKY_NOTE_SIZE }}
               title={
                 isGroup
@@ -369,6 +429,16 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                 setHoveredId(first.id);
                 if (!isGroup) {
                   onAnnotationHover?.(firstRecord);
+                }
+                /*
+                 * ⚠️ **算内容框的位置**（视口坐标）。
+                 *
+                 * → 内容框现在是 `position: fixed` ✅ -> 不再被页面裁掉 ✅
+                 * -> 坐标每次 hover 都重算 ✅ -> 容器滚动了也不会错 ✅
+                 */
+                const icon = iconRefs.current.get(group.key);
+                if (icon) {
+                  updateContentPos(icon, null);
                 }
               }}
               onMouseLeave={(event) => {
@@ -435,6 +505,15 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                 className="scpdf-sticky-note__content"
                 data-visible={hoveredId === first.id ? 'true' : 'false'}
                 role="note"
+                /*
+                 * ⚠️ **位置由 JS 算**（视口坐标）。
+                 *
+                 * → 内容框是 `position: fixed` → 不受任何祖先的 overflow 影响
+                 * → 便签在页边角时**不会被页面裁掉**
+                 *
+                 * → 实测（修复前）：页右边超出 128px、页右下角超出 128px 宽 + 71px 高
+                 */
+                style={contentPos ? { left: contentPos.left, top: contentPos.top } : undefined}
                 /*
                  * ⚠️ **鼠标进入内容框 → 保持 hover 状态**（用户反馈：
                  * "移动鼠标到批注的文字上面 框就消失了"）。
