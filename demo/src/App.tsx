@@ -1491,7 +1491,9 @@ export default function App() {
              * ⚠️ **不要**在这里再调 `onHighlightCreate` / `createHighlight` 的
              *    包的入口 → 会**保存两次**（实测：点一次生成 3 条）。
              */
-            (window as any).__lastPosition = JSON.parse(JSON.stringify(position));
+            (window as unknown as { __lastPosition?: unknown }).__lastPosition = JSON.parse(
+              JSON.stringify(position),
+            );
             const id = createHighlight(color ?? highlightColor, text, position);
             setHint(`已高亮（${color ?? highlightColor}）`);
             // 返回 id → "加批注"流程用它（批注挂在高亮上）
