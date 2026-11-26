@@ -22,8 +22,8 @@
  * | **选了文字** | 空（等你填） | **自动带上选中的文字** |
  * | **没选文字** | 空（等你填） | **默认等于第 1 行的网址**，可改 |
  *
- * → 第 2 行**跟着第 1 行实时联动** ✅
- * → 但**用户手动改过第 2 行**后 -> **不再跟随** ✅（不覆盖用户的编辑）
+ * → 第 2 行**跟着第 1 行实时联动**
+ * → 但**用户手动改过第 2 行**后 -> **不再跟随**  （不覆盖用户的编辑）
  */
 
 import type { ReactNode } from 'react';
@@ -91,8 +91,8 @@ export function LinkPopover(props: LinkPopoverProps) {
    *   -> 结果：按 Esc -> **整个批注弹窗被关掉**，链接弹窗还留在逻辑里 ❌
    *   （实测：Esc 之后 `.scpdf-annotation-dialog` 整个消失了）
    *
-   * -> 修法：链接弹窗也用**捕获阶段**监听 -> **它先跑** -> `stopPropagation` ✅
-   *   -> 批注弹窗的监听器就收不到这个 Esc 了 ✅
+   * -> 修法：链接弹窗也用**捕获阶段**监听 -> **它先跑** -> `stopPropagation`
+   *   -> 批注弹窗的监听器就收不到这个 Esc 了
    */
   useEffect(() => {
     if (!open) {
@@ -115,8 +115,8 @@ export function LinkPopover(props: LinkPopoverProps) {
   /**
    * **第 1 行 -> 第 2 行联动**（用户没手动改过第 2 行时）。
    *
-   * → 用户填了链接 -> 第 2 行自动变成同一个网址 ✅
-   * → 用户手动改过第 2 行 -> **不再跟随** ✅
+   * → 用户填了链接 -> 第 2 行自动变成同一个网址
+   * → 用户手动改过第 2 行 -> **不再跟随**
    */
   useEffect(() => {
     if (textTouched) {
@@ -180,7 +180,7 @@ export function LinkPopover(props: LinkPopoverProps) {
       aria-label={labels.href}
       /*
        * ⚠️ **点弹窗内部不要关**（外面才关）。
-       * → 靠 `onMouseDown` + `stopPropagation` ✅
+       * → 靠 `onMouseDown` + `stopPropagation`
        */
       onMouseDown={(event) => {
         event.stopPropagation();

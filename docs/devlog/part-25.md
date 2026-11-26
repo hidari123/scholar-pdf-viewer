@@ -7,7 +7,7 @@
 **做了什么**
 - `README.md` **整体重写**：v1 的 `StorageAdapter` / `PopoverAction` / `BboxData` 全部移除，
   改为 v2 的真实 API（受控 props + 事件回调 + 宿主接线示例 + 能力清单 + 坐标三空间 + 12 错误码）
-- `PLAN.md` §13 里程碑表更新为实际完成状态（阶段 0/1/2/4/5 ✅，阶段 3 按需进行）
+- `PLAN.md` §13 里程碑表更新为实际完成状态（阶段 0/1/2/4/5，阶段 3 按需进行）
 - `tests/readme-example.test.tsx`：**README 示例的可编译性测试**
   - README 是用户看到的第一份契约，示例编译不过 = 用户第一步就卡住 → 用测试锁住
 

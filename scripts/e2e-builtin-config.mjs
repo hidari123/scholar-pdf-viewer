@@ -104,7 +104,7 @@ try {
   /*
    * ⚠️ **不能再按中文 aria-label 找**（审计修复后 aria-label 也是本地化的）。
    * -> 在 en 模式下它是 "Language" ❌
-   * -> 改成：**按选项里有 'en' 来找**（语言无关）✅
+   * -> 改成：**按选项里有 'en' 来找**（语言无关）
    */
   const localeSelect = page.locator('select:has(option[value="en"])');
   if ((await localeSelect.count()) > 0) {

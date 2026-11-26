@@ -10,12 +10,12 @@
  *
  * ## 修法
  *
- * - **文字颜色** -> 用**独立的深色板**（`annotationTextPalette`）✅
+ * - **文字颜色** -> 用**独立的深色板**（`annotationTextPalette`）
  * - **三个图标** -> `highlightColor`（笔）/ `textColor`（A+横条）/ `clearFormat`（A+斜杠）
- *   -> **各不相同** ✅
- * - **清除格式** -> TipTap 加 `unsetColor` + `unsetHighlight` -> **真清干净** ✅
+ *   -> **各不相同**
+ * - **清除格式** -> TipTap 加 `unsetColor` + `unsetHighlight` -> **真清干净**
  * - **"文字高亮"** -> **从默认工具栏移除**（功能重复 + 图标丑）❌
- *   -> 但**命令和图标保留** -> 宿主可自己加回来 ✅
+ *   -> 但**命令和图标保留** -> 宿主可自己加回来
  *
  * 用法：`node scripts/e2e-richtext-text-highlight.mjs`
  */
@@ -127,7 +127,7 @@ try {
     ),
   );
   check('有"高亮"按钮', labels.includes('高亮'), labels.join(','));
-  // ⚠️ **"文字高亮"已从默认工具栏移除**（用户反馈："功能重复 + 图标很丑"）✅
+  // ⚠️ **"文字高亮"已从默认工具栏移除**（用户反馈："功能重复 + 图标很丑"）
   check('**没有"文字高亮"按钮**（功能和高亮重复）', !labels.includes('文字高亮'), labels.join(','));
   check('有"文字颜色"按钮', labels.includes('文字颜色'), '');
   check('有"清除格式"按钮', labels.includes('清除格式'), '');
@@ -266,11 +266,11 @@ try {
 
   // 点**外面** -> 该关
   // ⚠️ **要点"编辑区里的空白"**（不是页面角落）❌
-  // -> 页面角落是"取消"按钮 -> 会把**整个弹窗**关掉 -> 后面全测不了 ✅
-  // ⚠️ **在 `body` 上派发 mousedown**（而不是真的点某个坐标）✅
+  // -> 页面角落是"取消"按钮 -> 会把**整个弹窗**关掉 -> 后面全测不了
+  // ⚠️ **在 `body` 上派发 mousedown**（而不是真的点某个坐标）
   // -> 点页面角落 = "取消" -> 整个弹窗被关掉 -> 后面全测不了 ❌
   // -> 点编辑区空白 = 也会命中"取消"（有重叠）❌
-  // -> **派发事件** = 精确模拟"点了面板外面" -> 不会误伤任何按钮 ✅
+  // -> **派发事件** = 精确模拟"点了面板外面" -> 不会误伤任何按钮
   await page.evaluate(() => {
     document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
   });
@@ -321,13 +321,13 @@ try {
     ),
   );
 
-  // ⚠️ **重新选中文字**（④.5 里点过外面 -> 浏览器的选区被清掉了）✅
+  // ⚠️ **重新选中文字**（④.5 里点过外面 -> 浏览器的选区被清掉了）
   await selectAll();
   await page.waitForTimeout(300);
 
   // ---- ⑤ "高亮"：面板 + 加背景色 ----
   // ⚠️ **"文字高亮"按钮已移除**（用户反馈："功能重复 + 图标很丑"）
-  //    -> 这里测**"高亮"**按钮（背景色）✅
+  //    -> 这里测**"高亮"**按钮（背景色）
   await selectAll();
   await page.waitForTimeout(300);
   const ok = await clickBtn('高亮');
@@ -370,8 +370,8 @@ try {
   );
   check(
     '**"高亮"没有改字色**（高亮只加背景）',
-    // `color: inherit` 是**正确**的 —— 显式声明"字色继承父级" -> 视觉上就是没改 ✅
-    // -> 只检查有没有**具体的字色值**（排除 `background-color`）✅
+    // `color: inherit` 是**正确**的 —— 显式声明"字色继承父级" -> 视觉上就是没改
+    // -> 只检查有没有**具体的字色值**（排除 `background-color`）
     !/(^|[;"\s])color:\s*(rgb|#[0-9a-f]{3,8})/i.test(afterHighlight ?? ''),
     afterHighlight ?? '',
   );
@@ -381,7 +381,7 @@ try {
   await page.evaluate(() => {
     const ed = document.querySelector('.scpdf-annotation-dialog .ProseMirror');
     ed?.focus();
-    // 光标移到**最后**（不选任何字）✅
+    // 光标移到**最后**（不选任何字）
     const sel = window.getSelection();
     const range = document.createRange();
     range.selectNodeContents(ed);
@@ -404,14 +404,14 @@ try {
     JSON.stringify(findBtn(noSelection, '清除格式')),
   );
   /*
-   * ⚠️ **只有"清除格式"置灰**，其余**永远可用** ✅
+   * ⚠️ **只有"清除格式"置灰**，其余**永远可用**
    *
    * -> 用户原话（第 27 轮）：
    * > "没选字时格式按钮置灰这个你修错了 应该是没选字的时候清除格式按钮置灰
    * >  其他的还是可以用的；再说一次逻辑"
    * > "其余按钮都是可以点击的"
-   * -> -> `FORMAT_COMMANDS` **只留 `removeFormat`** ✅
-   * -> -> "文字颜色" / "加粗" **不禁用** ✅
+   * -> -> `FORMAT_COMMANDS` **只留 `removeFormat`**
+   * -> -> "文字颜色" / "加粗" **不禁用**
    */
   check(
     '**没选字时"文字颜色"【不禁用】**',

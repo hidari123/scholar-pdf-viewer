@@ -164,7 +164,7 @@ describe('defaultRichTextToolbar', () => {
    * ⚠️ **"文字高亮"不在默认工具栏里**（用户反馈：
    * "把富文本编辑框里的文字高亮这个按钮去掉吧 功能和高亮重复了而且图标很丑"）。
    *
-   * -> 但**命令保留** -> 宿主可以自己加回来 ✅
+   * -> 但**命令保留** -> 宿主可以自己加回来
    */
   it('**默认工具栏没有"文字高亮"**（功能和高亮重复）', () => {
     const commands = defaultRichTextToolbar({ yellow: '#ff0' }).map((i) => i.command);
@@ -176,8 +176,8 @@ describe('defaultRichTextToolbar', () => {
    * "高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"）。
    */
   it('**"无背景色"的执行：`isNoColor` 为 true 时不应用颜色**', () => {
-    // ⚠️ 这是一条**纯逻辑**的断言（不碰 DOM）✅
-    // -> `execRichTextCommand` 内部会走 `isNoColor` 分支 ✅
+    // ⚠️ 这是一条**纯逻辑**的断言（不碰 DOM）
+    // -> `execRichTextCommand` 内部会走 `isNoColor` 分支
     expect(isNoColor(NO_COLOR)).toBe(true);
     expect(isNoColor('transparent')).toBe(true);
   });
@@ -213,7 +213,7 @@ describe('defaultRichTextToolbar', () => {
   });
 
   it('**"文字高亮"用高亮板**（浅色 -> 适合当背景）', () => {
-    // ⚠️ 默认工具栏里**没有**它（用户要求去掉）-> 宿主自己加 -> 用高亮板 ✅
+    // ⚠️ 默认工具栏里**没有**它（用户要求去掉）-> 宿主自己加 -> 用高亮板
     const custom = [
       ...defaultRichTextToolbar({ yellow: '#fff3a3' }, { red: '#c62828' }),
       {

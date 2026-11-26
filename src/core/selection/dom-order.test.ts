@@ -220,9 +220,9 @@ describe('assignRectsToItems（字符级矩形分配）', () => {
   });
 
   it('矩形跨两项的边界 -> 归属【第一个包含中心】的项', () => {
-    // 两项紧挨着 ✅（0..20 和 20..40 ✅）
+    // 两项紧挨着  （0..20 和 20..40）
     const items = [rect(0, 0, 100, 20), rect(0, 20, 100, 20)];
-    // 矩形 top=12 h=20 -> 中心 y=22 -> 只在第二项里 ✅
+    // 矩形 top=12 h=20 -> 中心 y=22 -> 只在第二项里
     const rangeRects = [rect(10, 12, 25, 20)];
 
     const map = assignRectsToItems(items, rangeRects);
@@ -233,7 +233,7 @@ describe('assignRectsToItems（字符级矩形分配）', () => {
 
   it('矩形刚好在两项之间（都不含） -> 丢弃', () => {
     const items = [rect(0, 0, 100, 20), rect(0, 30, 100, 20)];
-    // 中心 y=25 -> 两项都不含 ✅（0..20 和 30..50 ✅）
+    // 中心 y=25 -> 两项都不含  （0..20 和 30..50）
     const rangeRects = [rect(10, 15, 25, 20)];
 
     const map = assignRectsToItems(items, rangeRects);

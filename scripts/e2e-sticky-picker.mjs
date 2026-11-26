@@ -8,7 +8,7 @@
  *
  * ## 根因
  *
- * -> **HTML 没渲染**：\`{record.content.slice(0, 60)}\` -> React **转义** ✅
+ * -> **HTML 没渲染**：\`{record.content.slice(0, 60)}\` -> React **转义**
  *    -> 用户看到字面量 `<p>第一条</p>` ❌
  *    -> 实测：\`itemHTML: "&lt;p&gt;第一条&lt;/p&gt;"\` ❌
  * -> **点了没反应**：只调 \`onAnnotationClick\`（宿主的通知回调）❌
@@ -16,9 +16,9 @@
  *
  * ## 修法
  *
- * - 用 \`<RichTextPreview>\` 渲染（**自带消毒**）✅
- * - 点某项 -> 调 \`onAnnotationExpand\` -> **打开那一条的详情** ✅
- * - 点某项 -> **关闭选择列表**（别挡住详情）✅
+ * - 用 \`<RichTextPreview>\` 渲染（**自带消毒**）
+ * - 点某项 -> 调 \`onAnnotationExpand\` -> **打开那一条的详情**
+ * - 点某项 -> **关闭选择列表**（别挡住详情）
  *
  * 用法：`node scripts/e2e-sticky-picker.mjs`
  */
@@ -187,7 +187,7 @@ try {
    * ⚠️ **列表必须在视口内**（实测踩过的坑）。
    *
    * -> 列表默认在图标**右边** -> 便签在页面偏右时 -> 跑到**屏幕外** ❌
-   * -> 用户**点不到**任何一项 -> "点击每一项没反应" ✅
+   * -> 用户**点不到**任何一项 -> "点击每一项没反应"
    */
   const pickerBox = await page.evaluate(() => {
     const el = document.querySelector('.scpdf-sticky-note__picker');

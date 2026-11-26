@@ -293,7 +293,7 @@ try {
    *
    * → 现在高亮块是 `pointer-events: none`
    * → 点击走**容器级事件委托**（按坐标命中）
-   * → **不挡文字选择** ✅
+   * → **不挡文字选择**
    */
   const pointerEvents = await page.evaluate(() => {
     const h = document.querySelector('.scpdf-annotation--mine');

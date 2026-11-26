@@ -9,19 +9,19 @@
  * ### 现状（❌）
  *
  * -> 包的工具栏**根本没有"高亮"按钮** ❌
- * -> 只有 **demo 的 header** 里有个"添加高亮"按钮 ✅（`demo/src/App.tsx`）
+ * -> 只有 **demo 的 header** 里有个"添加高亮"按钮  （`demo/src/App.tsx`）
  * -> 宿主想用包的工具栏做高亮 -> **得自己写一个** ❌
  *
- * ### 现在的行为（✅）
+ * ### 现在的行为（）
  *
- * -> 传 `onToolbarHighlight` -> 工具栏出现 **🖍 + ▾** 的分裂按钮 ✅
- * -> 点**主按钮** -> **直接用"当前色"高亮** ✅
- *    -> 当前色 = 上次选的；没选过 = **默认色** ✅
- * -> 点**箭头** -> 展开颜色下拉 ✅
- *    -> 选一个色 -> **立刻用那个色高亮** ✅
- * -> **不传 `onToolbarHighlight` -> 不渲染** ✅
- *    -> 宿主自己已经有"加高亮"按钮 -> 不重复 ✅
- *    -> 用户确认："默认隐藏吧" ✅
+ * -> 传 `onToolbarHighlight` -> 工具栏出现 **🖍 + ▾** 的分裂按钮
+ * -> 点**主按钮** -> **直接用"当前色"高亮**
+ *    -> 当前色 = 上次选的；没选过 = **默认色**
+ * -> 点**箭头** -> 展开颜色下拉
+ *    -> 选一个色 -> **立刻用那个色高亮**
+ * -> **不传 `onToolbarHighlight` -> 不渲染**
+ *    -> 宿主自己已经有"加高亮"按钮 -> 不重复
+ *    -> 用户确认："默认隐藏吧"
  *
  * ### 交互和选区浮层**完全一致**（飞书 / WPS）
  */
@@ -78,19 +78,19 @@ export function ToolbarHighlightButton(props: ToolbarHighlightButtonProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   /**
-   * ⚠️ **当前色**（上次选的；没选过 = 默认色）✅
+   * ⚠️ **当前色**（上次选的；没选过 = 默认色）
    */
   const [currentColor, setCurrentColor] = useState<string | null>(defaultColor ?? null);
 
   /*
-   * ⚠️ **默认色变了就跟着变**（宿主改配置）✅
+   * ⚠️ **默认色变了就跟着变**（宿主改配置）
    */
   useEffect(() => {
     setCurrentColor(defaultColor ?? null);
   }, [defaultColor]);
 
   /*
-   * ⚠️ **点外面关闭**（和高亮色板的行为保持一致）✅
+   * ⚠️ **点外面关闭**（和高亮色板的行为保持一致）
    */
   useEffect(() => {
     if (!open) {
@@ -119,7 +119,7 @@ export function ToolbarHighlightButton(props: ToolbarHighlightButtonProps) {
   const paletteEntries = Object.entries(palette ?? {});
 
   /*
-   * ⚠️ **没有色板 -> 只画主按钮**（没有下拉）✅
+   * ⚠️ **没有色板 -> 只画主按钮**（没有下拉）
    */
   if (paletteEntries.length === 0) {
     return (
@@ -146,8 +146,8 @@ export function ToolbarHighlightButton(props: ToolbarHighlightButtonProps) {
       >
         <Icon name="highlight" title={t('selection.actionHighlight')} overrides={icons} />
         {/*
-         * ⚠️ **当前色的小色条**（飞书 / WPS 样式）✅
-         * -> 一眼看到"点这个会用哪个颜色" ✅
+         * ⚠️ **当前色的小色条**（飞书 / WPS 样式）
+         * -> 一眼看到"点这个会用哪个颜色"
          */}
         <span
           className="scpdf-toolbar__current-color"
@@ -204,7 +204,7 @@ export function ToolbarHighlightButton(props: ToolbarHighlightButtonProps) {
                   setCurrentColor(key);
                   setOpen(false);
                   /*
-                   * ⚠️ **选了颜色就立刻高亮**（和选区浮层一致）✅
+                   * ⚠️ **选了颜色就立刻高亮**（和选区浮层一致）
                    */
                   onHighlight?.(key);
                 }}

@@ -58,7 +58,7 @@ export function downloadFile(
      * -> 之前 \`anchor.click()\` 抛错 -> **直接跳到 catch 之外** ❌
      *   -> \`revokeObjectURL\` **永远不会被调** ❌
      *   -> Blob **永久占着内存**（大文件 = 几十 MB）❌
-     * -> 现在：**try/finally** -> 一定会 revoke ✅
+     * -> 现在：**try/finally** -> 一定会 revoke
      */
     URL.revokeObjectURL(url);
     throw error;

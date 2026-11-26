@@ -19,26 +19,26 @@
  *
  * ### 为什么之前会这样
  *
- * -> 包**不 import pdf.js** ✅（core 层零依赖 ✅）
+ * -> 包**不 import pdf.js**  （core 层零依赖）
  * -> 宿主必须自己：
- *    1. \`import * as pdfjs from 'pdfjs-dist'\` ✅
+ *    1. \`import * as pdfjs from 'pdfjs-dist'\`
  *    2. 设 \`GlobalWorkerOptions.workerSrc\` ✅（否则 worker 加载失败 ❌）
- *    3. 传 \`getDocInfo\` / \`getPage\` / \`getPageSizes\` ✅
+ *    3. 传 \`getDocInfo\` / \`getPage\` / \`getPageSizes\`
  * -> 宿主漏了任何一步 -> **白屏 + 无报错** ❌
  *
  * ### 修法
  *
- * -> **包内置一份默认接线** ✅
- *    -> 宿主**不传** -> 用默认的 ✅ -> **开箱即用** ✅
- *    -> 宿主**传了** -> 用宿主的 ✅（完全覆盖 ✅）
- * -> 默认接线会**自动设好 worker** ✅
+ * -> **包内置一份默认接线**
+ *    -> 宿主**不传** -> 用默认的  -> **开箱即用**
+ *    -> 宿主**传了** -> 用宿主的  （完全覆盖）
+ * -> 默认接线会**自动设好 worker**
  *
- * ⚠️ **仍然是"可替换"的** ✅
- * -> 宿主想自己控制 pdf.js 的版本 / worker / 沙箱 -> 传自己的 ✅
+ * ⚠️ **仍然是"可替换"的**
+ * -> 宿主想自己控制 pdf.js 的版本 / worker / 沙箱 -> 传自己的
  *
- * ⚠️ **动态 import** ✅
- * -> \`pdfjs-dist\` 体积不小 ✅ -> 不该拖慢**没用 PDF** 的页面 ✅
- * -> -> **用到时才加载** ✅
+ * ⚠️ **动态 import**
+ * -> \`pdfjs-dist\` 体积不小  -> 不该拖慢**没用 PDF** 的页面
+ * -> -> **用到时才加载**
  */
 
 /** 宿主的"取页"回调（和 \`PdfViewer\` 的 prop 同型） */
@@ -66,7 +66,7 @@ export interface PdfJsBridge {
    * 打开文档。
    *
    * @param data PDF 字节
-   * @param password 密码（**加密文档**要用 ✅）
+   * @param password 密码（**加密文档**要用）
    */
   open: (data: Uint8Array, password?: string) => Promise<DefaultDocInfo & { doc: unknown }>;
   /** 取第 n 页（1 起） */
@@ -86,10 +86,10 @@ let bridgePromise: Promise<PdfJsBridge> | null = null;
  * **动态 import pdf.js 并接好**。
  *
  * ⚠️ **worker 的处理**（实测踩到的坑）：
- * -> pdf.js v6 的 worker 是**独立文件**（\`pdf.worker.min.mjs\`）✅
+ * -> pdf.js v6 的 worker 是**独立文件**（\`pdf.worker.min.mjs\`）
  * -> 不设 \`workerSrc\` -> **worker 加载失败** ❌ -> 文档永远不加载 ❌
- * -> 这里用 \`new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)\` ✅
- *    -> **打包器能静态分析到** ✅ -> 产物里会带上这个 worker ✅
+ * -> 这里用 \`new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)\`
+ *    -> **打包器能静态分析到**  -> 产物里会带上这个 worker
  *
  * @returns 接好的桥接
  */
@@ -101,8 +101,8 @@ export async function createDefaultPdfJsBridge(): Promise<PdfJsBridge> {
       /*
        * ⚠️ **设置 worker**（不设 -> 文档永远加载不出来 ❌）。
        *
-       * -> \`new URL(..., import.meta.url)\` 是**打包器能识别的写法** ✅
-       * -> Vite / webpack / rollup 都会把 worker 打进产物 ✅
+       * -> \`new URL(..., import.meta.url)\` 是**打包器能识别的写法**
+       * -> Vite / webpack / rollup 都会把 worker 打进产物
        */
       try {
         const workerUrl = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url);
@@ -110,7 +110,7 @@ export async function createDefaultPdfJsBridge(): Promise<PdfJsBridge> {
       } catch {
         /*
          * ⚠️ **兜底**：某些环境（老的打包器 / 某些 CDN）不支持这个写法 ❌
-         * -> 试试**字符串路径**（pdf.js 会按它自己的规则解析）✅
+         * -> 试试**字符串路径**（pdf.js 会按它自己的规则解析）
          */
         pdfjs.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.mjs';
       }
@@ -130,11 +130,11 @@ export async function createDefaultPdfJsBridge(): Promise<PdfJsBridge> {
            * -> -> 随机报"message length does not match" ❌
            */
           /*
-           * ⚠️ **加密文档要传密码**（审核发现的功能缺口）✅
+           * ⚠️ **加密文档要传密码**（审核发现的功能缺口）
            *
            * -> 不传 -> pdf.js 抛 `PasswordException` ❌
            * -> -> 加密 PDF 在**默认接线**下打不开 ❌
-           * -> -> 这里把密码传进去 ✅
+           * -> -> 这里把密码传进去
            */
           const doc = await pdfjs.getDocument({
             data: data.slice(),
@@ -145,7 +145,7 @@ export async function createDefaultPdfJsBridge(): Promise<PdfJsBridge> {
           const numPages = doc.numPages;
 
           /*
-           * ⚠️ **顺手把每页的尺寸量出来** ✅
+           * ⚠️ **顺手把每页的尺寸量出来**
            * -> 宿主经常忘了传 \`getPageSizes\` ❌
            * -> -> 跳页 / 打印的缩放会**偏** ❌
            */

@@ -74,8 +74,8 @@ describe('computeVisiblePages 的边界（审核补测）', () => {
   it('**缓冲区会多带几页**', () => {
     const pages = makePages(20);
     /*
-     * ⚠️ **默认缓冲区就是 3** ✅
-     * -> 所以"不带缓冲"的那次**必须显式传 0** ✅
+     * ⚠️ **默认缓冲区就是 3**
+     * -> 所以"不带缓冲"的那次**必须显式传 0**
      * -> 否则两次算出来一样多 ❌
      */
     const withoutBuffer = computeVisiblePages({

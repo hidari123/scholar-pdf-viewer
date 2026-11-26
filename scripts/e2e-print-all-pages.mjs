@@ -16,12 +16,12 @@
  *
  * -> `<Page renderCanvas={isVisible} />` -> 只渲染**可见**的页 ❌
  * -> 打印时**没渲染的页 = 白页** ❌
- * -> **不是缓存问题**（缓存是浏览器的事）✅
+ * -> **不是缓存问题**（缓存是浏览器的事）
  *
  * ## 修法
  *
- * -> 监听 `beforeprint` -> **临时**渲染全部页 ✅
- * -> 监听 `afterprint` -> **恢复**虚拟化 ✅
+ * -> 监听 `beforeprint` -> **临时**渲染全部页
+ * -> 监听 `afterprint` -> **恢复**虚拟化
  *
  * 用法：`node scripts/e2e-print-all-pages.mjs`
  */
@@ -85,7 +85,7 @@ try {
       ).length,
     }));
 
-  // ---- ① 平时是虚拟化的（只渲染可见页）✅
+  // ---- ① 平时是虚拟化的（只渲染可见页）
   const before = await countCanvases();
   check(
     '**平时是虚拟化的**（只渲染可见页，不是全部）',
@@ -93,7 +93,7 @@ try {
     `${before.withCanvas}/${before.pages}`,
   );
 
-  // ---- ② 打印前 -> 全部渲染 ✅
+  // ---- ② 打印前 -> 全部渲染
   await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
   await page.waitForTimeout(8000);
   const during = await countCanvases();
@@ -103,19 +103,19 @@ try {
     `${during.withCanvas}/${during.pages}`,
   );
 
-  // ---- ③ 生成的 PDF 每页都有内容（不是空白页）✅
+  // ---- ③ 生成的 PDF 每页都有内容（不是空白页）
   const pdf = await page.pdf({ format: 'A4', printBackground: true });
   const pdfText = Buffer.from(pdf).toString('latin1');
   const pdfPages = (pdfText.match(/\/Type\s*\/Page[^s]/g) || []).length;
   check('**PDF 页数 = 文档页数**', pdfPages === during.pages, `${pdfPages} 页`);
-  // 之前只有 4 页有内容 -> PDF 1.5MB；现在全部有 -> 明显更大 ✅
+  // 之前只有 4 页有内容 -> PDF 1.5MB；现在全部有 -> 明显更大
   check(
     '**PDF 体积合理**（所有页都有内容，不是白页）',
     pdf.length > 3_000_000,
     `${(pdf.length / 1024 / 1024).toFixed(2)} MB`,
   );
 
-  // ---- ④ 打印完 -> 恢复虚拟化 ✅
+  // ---- ④ 打印完 -> 恢复虚拟化
   await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
   await page.waitForTimeout(1500);
   const after = await countCanvases();

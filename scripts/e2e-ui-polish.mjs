@@ -133,14 +133,14 @@ try {
   await page.waitForTimeout(500);
   /*
    * ⚠️ **颜色按钮现在是"弹面板"**（审计修复：之前直接应用第一个颜色 -> 用户没法选）。
-   * -> 所以测试要：**点按钮 -> 选一个色块** ✅
+   * -> 所以测试要：**点按钮 -> 选一个色块**
    */
   await page.locator('.scpdf-annotation-dialog button[aria-label="高亮"]').first().click();
   await page.waitForTimeout(600);
   /*
-   * ⚠️ **色板第一个是"无背景色"（斜杠）**（第 27 轮加的）✅
+   * ⚠️ **色板第一个是"无背景色"（斜杠）**（第 27 轮加的）
    * -> 点**第一个** = **清除高亮** ❌
-   * -> 要点**第二个**（第一个真实颜色）✅
+   * -> 要点**第二个**（第一个真实颜色）
    */
   await page
     .locator('.scpdf-annotation-dialog .scpdf-rich-text__palette .scpdf-rich-text__swatch')

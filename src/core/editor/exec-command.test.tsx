@@ -12,14 +12,14 @@
  *
  * ## 修法
  *
- * -> 先 `execCommand('styleWithCSS', false, 'true')` ✅
- *   -> 生成 **`<span style="color: rgb(255,0,0)">`** ✅
- *   -> `<span>` **在白名单里** ✅ -> 清洗后**颜色还在** ✅
+ * -> 先 `execCommand('styleWithCSS', false, 'true')`
+ *   -> 生成 **`<span style="color: rgb(255,0,0)">`**
+ *   -> `<span>` **在白名单里**  -> 清洗后**颜色还在**
  *
  * ## ⚠️ **jsdom 没有 `execCommand`**
  *
  * -> jsdom **不实现** `document.execCommand` ❌
- * -> 这里**手写一个桩**，**忠实模拟 Chrome 的行为** ✅
+ * -> 这里**手写一个桩**，**忠实模拟 Chrome 的行为**
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -72,7 +72,7 @@ function execCommandStub(command: string, _showUi?: boolean, value?: string): bo
       /*
        * ⚠️ **拆平整个编辑区的样式标签**。
        * -> 选区可能是**碎片**（extractContents 之后 DOM 是散的）❌
-       * -> 所以直接处理**编辑区根节点** ✅
+       * -> 所以直接处理**编辑区根节点**
        */
       const root = (range.startContainer.parentElement ?? document.body) as HTMLElement;
       root.querySelectorAll('span[style], font').forEach((el) => {
@@ -117,7 +117,7 @@ describe('execRichTextCommand（颜色）', () => {
     selectLast();
     execRichTextCommand('foreColor', '#ff0000');
 
-    // ⚠️ 关键断言：**调用了 styleWithCSS** ✅
+    // ⚠️ 关键断言：**调用了 styleWithCSS**
     const calls = (document.execCommand as unknown as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls.some((c) => c[0] === 'styleWithCSS')).toBe(true);
   });
@@ -151,7 +151,7 @@ describe('execRichTextCommand（颜色）', () => {
     const raw = document.getElementById('ed')?.innerHTML ?? '';
     const cleaned = sanitizeRichText(raw);
 
-    // ⚠️ **颜色没被剥掉** ✅
+    // ⚠️ **颜色没被剥掉**
     expect(cleaned).toContain('color');
     expect(cleaned).not.toContain('<font');
     expect(cleaned).toContain('World');

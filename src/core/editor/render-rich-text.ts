@@ -12,14 +12,14 @@
  *
  * ### 现在
  *
- * → 用 `dangerouslySetInnerHTML` 渲染 → **显示的是排版好的富文本** ✅
- * → 但必须**先消毒**（不能直接插宿主给的内容）✅
+ * → 用 `dangerouslySetInnerHTML` 渲染 → **显示的是排版好的富文本**
+ * → 但必须**先消毒**（不能直接插宿主给的内容）
  *
  * ## 安全
  *
- * → 复用 `sanitizeRichText` 的白名单 ✅
- * → 只保留排版相关的标签，丢掉 `<script>` / `<iframe>` / `on*` 事件 ✅
- * → 链接只允许 `http` / `https` / `mailto` ✅
+ * → 复用 `sanitizeRichText` 的白名单
+ * → 只保留排版相关的标签，丢掉 `<script>` / `<iframe>` / `on*` 事件
+ * → 链接只允许 `http` / `https` / `mailto`
  */
 
 /**
@@ -126,7 +126,7 @@ const ALLOWED_TAGS = new Set([
 /**
  * **纯文本**（去掉所有标签）。
  *
- * → 用于 `aria-label` / `title` / 摘要 ✅
+ * → 用于 `aria-label` / `title` / 摘要
  * → 用户看到的是文字，不是标签 ❌→✅
  *
  * @param html 原始 HTML

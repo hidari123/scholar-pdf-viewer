@@ -101,9 +101,9 @@ export interface SelectionPopoverProps {
    * **当前高亮色**（语义 key）。
    *
    * → 主按钮会**用它高亮**（用户需求："如果没有选择颜色
-   *   也按照默认颜色来展示高亮 不必每次都选择颜色"✅）
-   * → 没有（undefined / null）→ 用**宿主配的默认色** ✅
-   * → 主按钮下面会显示**一条这个颜色的下划线** ✅（飞书样式）
+   *   也按照默认颜色来展示高亮 不必每次都选择颜色"）
+   * → 没有（undefined / null）→ 用**宿主配的默认色**
+   * → 主按钮下面会显示**一条这个颜色的下划线**  （飞书样式）
    */
   currentHighlightColor?: string | null;
   /** 语言 */
@@ -117,13 +117,13 @@ export interface SelectionPopoverProps {
    *
    * ⚠️ 用户反馈："语言切换了 但是切换之后实际上 title 啊什么东西都没切换语言呢"
    * → 之前浮层的 title / aria-label 是**硬编码中文** → 切语言不变 ❌
-   * → 现在全部走文案表 → 跟着语言走 ✅
+   * → 现在全部走文案表 → 跟着语言走
    */
   messages?: LocaleMessagesMap;
   /**
    * **图标覆盖**（宿主 → 包）。
    *
-   * ⚠️ 宿主可以用自己的图标体系（`lucide-react` 等）覆盖内置图标 → 风格统一 ✅
+   * ⚠️ 宿主可以用自己的图标体系（`lucide-react` 等）覆盖内置图标 → 风格统一
    */
   icons?: Partial<Record<IconName, ReactNode>>;
 }
@@ -143,8 +143,8 @@ export interface SelectionPopoverProps {
  *   -> 实测（视口 1500×1000，跨第 1→2 页）：
  * ```
  * unionBBox:  top=-1571, bottom=2247     ← 巨大的并集 ❌
- * clientRects: 113 个（每行一个）        ← 真正的数据 ✅
- * 最后一行:    top=943, bottom=972       ← 用户最后选到的位置 ✅
+ * clientRects: 113 个（每行一个）        ← 真正的数据
+ * 最后一行:    top=943, bottom=972       ← 用户最后选到的位置
  * ```
  * -> 然后 \`computePopoverPosition\` 算：
  * ```
@@ -157,14 +157,14 @@ export interface SelectionPopoverProps {
  *
  * ### 现在的做法
  *
- * -> **取 \`getClientRects()\` 的【最后一个】** ✅
- *   -> 那是**用户最后选到的那一行** ✅
- *   -> 浮层贴在**手指刚松开的地方** ✅
- *   -> **和单页完全一致** ✅
+ * -> **取 \`getClientRects()\` 的【最后一个】**
+ *   -> 那是**用户最后选到的那一行**
+ *   -> 浮层贴在**手指刚松开的地方**
+ *   -> **和单页完全一致**
  *
  * ⚠️ **为什么是"最后一个"而不是"第一个"**：
- * -> 用户是从上往下拖的 -> 最后一行 = 拖拽终点 ✅
- * -> 浮层应该出现在**终点旁边**（用户的手还在那儿）✅
+ * -> 用户是从上往下拖的 -> 最后一行 = 拖拽终点
+ * -> 浮层应该出现在**终点旁边**（用户的手还在那儿）
  *
  * @returns 选区矩形；没有选区时返回 null
  */
@@ -236,7 +236,7 @@ export function SelectionPopover({
    * 文案解析（支持宿主的语言表）。
    *
    * ⚠️ 用户反馈："语言切换了 但是切换之后实际上 title 啊什么东西都没切换语言呢"
-   * → 之前浮层的 title 是**硬编码中文** → 现在全走文案表 ✅
+   * → 之前浮层的 title 是**硬编码中文** → 现在全走文案表
    */
   const t = useCallback(
     (key: keyof Messages, vars?: Record<string, string | number>) =>
@@ -245,18 +245,18 @@ export function SelectionPopover({
   );
 
   /**
-   * **动作的提示文案** ✅（用户反馈："选区浮层 title 中英混杂" ✅）
+   * **动作的提示文案**  （用户反馈："选区浮层 title 中英混杂"）
    *
-   * ## 规则 ✅
+   * ## 规则
    *
-   * -> 宿主传了 `messageKey` ✅ -> **按当前语言解析** ✅ ✅
-   *    -> 例：`{ key: 'ask2', messageKey: 'selection.actionAsk' }` ✅
-   * -> 没传 `messageKey` ✅ -> 退回 `label` ✅ ✅
-   * -> 都没有 ✅ -> 退回 `key` ✅ ✅
+   * -> 宿主传了 `messageKey`  -> **按当前语言解析**
+   *    -> 例：`{ key: 'ask2', messageKey: 'selection.actionAsk' }`
+   * -> 没传 `messageKey`  -> 退回 `label`
+   * -> 都没有  -> 退回 `key`
    *
-   * ## 为什么需要 ✅
+   * ## 为什么需要
    *
-   * -> 宿主自定义动作 ✅ 传 `label: '翻译'` ✅
+   * -> 宿主自定义动作  传 `label: '翻译'`
    * -> -> 切到英文 ✅ -> **还是中文** ✅ ❌
    * -> -> `label` 是**写死的字符串** ✅ -> 不会跟着语言变 ✅ ❌
    */
@@ -637,9 +637,9 @@ export function SelectionPopover({
          * -> 用户反馈："往下滚动页面工具栏也会消失" ❌
          * -> 跨页选完往下滚 -> 选区滚出视野 -> 浮层跟着消失 ❌
          *
-         * -> 现在：选区滚出视野 -> 浮层**吸到容器边缘**（不消失）✅
-         *   -> 加 \`--sticky\` class -> CSS 给它**不透明 + 阴影**（和普通态区分）✅
-         *   -> 用户知道"选区在别处，但工具条还在" ✅
+         * -> 现在：选区滚出视野 -> 浮层**吸到容器边缘**（不消失）
+         *   -> 加 \`--sticky\` class -> CSS 给它**不透明 + 阴影**（和普通态区分）
+         *   -> 用户知道"选区在别处，但工具条还在"
          */
         position?.placement === 'sticky-top' || position?.placement === 'sticky-bottom'
           ? 'scpdf-selection-popover--sticky'
@@ -713,24 +713,24 @@ export function SelectionPopover({
                   /*
                    * ⚠️⚠️ **主按钮 = 【直接用当前色高亮】**（用户需求：
                    * "文字选取的高亮那里 如果没有选择颜色 也按照默认颜色来展示高亮
-                   *  不必每次都选择颜色"✅）。
+                   *  不必每次都选择颜色"）。
                    *
                    * ### 之前的行为（❌）
                    *
                    * → 主按钮**只**展开下拉 ❌
                    * → 用户**必须**选一次颜色才能高亮 ❌
-                   *    → "第一个是高亮 但是没有什么效果" ✅
+                   *    → "第一个是高亮 但是没有什么效果"
                    *
-                   * ### 现在的行为（✅）
+                   * ### 现在的行为（）
                    *
-                   * → 点**主按钮** → **直接用"当前色"高亮** ✅
-                   *    → 当前色 = 上次选的 ✅
-                   *    → 没选过 = **宿主配的默认色** ✅（`color` 传 undefined → 走默认）
-                   * → 点**旁边的箭头** → 展开颜色下拉 ✅
-                   *    → 选一个色 → **立刻用那个色高亮** ✅
-                   *    → 之后主按钮就用这个色 ✅
+                   * → 点**主按钮** → **直接用"当前色"高亮**
+                   *    → 当前色 = 上次选的
+                   *    → 没选过 = **宿主配的默认色**  （`color` 传 undefined → 走默认）
+                   * → 点**旁边的箭头** → 展开颜色下拉
+                   *    → 选一个色 → **立刻用那个色高亮**
+                   *    → 之后主按钮就用这个色
                    *
-                   * → 这就是 **飞书 / WPS** 的交互 ✅
+                   * → 这就是 **飞书 / WPS** 的交互
                    */
                   onAction?.(action);
                 }}
@@ -747,10 +747,10 @@ export function SelectionPopover({
                   action.icon
                 )}
                 {/*
-                 * ⚠️ **当前色的小色条**（飞书 / WPS 样式）✅
+                 * ⚠️ **当前色的小色条**（飞书 / WPS 样式）
                  *
-                 * -> 让用户**一眼看到**"点这个按钮会用哪个颜色" ✅
-                 * -> 没选过颜色 -> 不显示（用的是默认色）✅
+                 * -> 让用户**一眼看到**"点这个按钮会用哪个颜色"
+                 * -> 没选过颜色 -> 不显示（用的是默认色）
                  */}
                 {showPalette && currentHighlightColor ? (
                   <span
@@ -772,7 +772,7 @@ export function SelectionPopover({
                    *
                    * -> 之前 `title="选择颜色"` + `aria-label="展开颜色下拉"` ❌
                    * -> 同一个按钮**两套说法** ❌ -> 用户说"title 变来变去" ✅
-                   * -> -> 现在**都用同一个文案** ✅
+                   * -> -> 现在**都用同一个文案**
                    */
                   title={t('selection.expandColor')}
                   aria-label={t('selection.expandColor')}
@@ -812,10 +812,10 @@ export function SelectionPopover({
                      * -> 之前 \`title={color}\` -> 直接显示**原始色值**（\`#ffd54a\`）❌
                      * -> 界面是中文也显示 \`#ffd54a\`，英文还是 \`#ffd54a\` ❌
                      * -> -> **和界面语言完全脱节** ❌
-                     * -> -> 用户的体感就是"title 变来变去" ✅
+                     * -> -> 用户的体感就是"title 变来变去"
                      *
-                     * -> 现在按 key 查**本地化名字** ✅
-                     * -> 宿主自定义的 key 查不到 -> **退回 key 本身** ✅
+                     * -> 现在按 key 查**本地化名字**
+                     * -> 宿主自定义的 key 查不到 -> **退回 key 本身**
                      */
                     const colorName = resolveHighlightColorName(key, locale);
                     return (
@@ -824,8 +824,8 @@ export function SelectionPopover({
                         type="button"
                         className="scpdf-selection-popover__swatch"
                         /*
-                         * ⚠️ **当前选中的色块要标出来** ✅
-                         * -> 用户一眼知道"现在用的是哪个颜色" ✅
+                         * ⚠️ **当前选中的色块要标出来**
+                         * -> 用户一眼知道"现在用的是哪个颜色"
                          */
                         data-active={key === currentHighlightColor ? 'true' : undefined}
                         style={{ background: color }}

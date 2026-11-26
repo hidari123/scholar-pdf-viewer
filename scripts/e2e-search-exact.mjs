@@ -206,7 +206,7 @@ try {
           /*
            * ⚠️ **字符顺序可能和关键词不同**。
            * → 例：logo 的 "A2E" 里 "2" 是上标 → DOM 顺序是 "2" "A" "E"
-           * → 所以判据是"**包含同样的字符**"，不是"顺序一致" ✅
+           * → 所以判据是"**包含同样的字符**"，不是"顺序一致"
            */
           const strip = (s) => s.toLowerCase().replace(/\s+/g, '');
           const coveredChars = strip(covered);

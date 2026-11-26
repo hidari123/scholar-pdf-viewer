@@ -58,9 +58,9 @@ export interface PdfViewerError {
    *   -> 宿主写 \`error.retryable\` -> **永远 undefined**（falsy）❌
    *   -> 宿主以为"不可重试" -> **不给用户重试按钮** ❌
    *
-   * → 现在：**字段真的存在** ✅
-   * -> 值和 \`isRetryable(error)\` **保持一致** ✅
-   * -> 宿主可以直接 \`if (error.retryable) showRetryButton()\` ✅
+   * → 现在：**字段真的存在**
+   * -> 值和 \`isRetryable(error)\` **保持一致**
+   * -> 宿主可以直接 \`if (error.retryable) showRetryButton()\`
    */
   retryable: boolean;
 }
@@ -69,7 +69,7 @@ export interface PdfViewerError {
  * **可重试的错误码**。
  *
  * ⚠️ **只包含"重试有可能成功"的**：
- * -> 网络 / 超时 / HTTP 5xx -> **重试有意义** ✅
+ * -> 网络 / 超时 / HTTP 5xx -> **重试有意义**
  * -> 文件不是 PDF / 密码错 -> **重试没用**（用户得换文件 / 换密码）❌
  */
 const RETRYABLE_CODES: readonly PdfViewerErrorCode[] = [
@@ -102,7 +102,7 @@ export function pdfViewerError(
 /**
  * 是否某个错误码属于"可重试"类（宿主据此决定是否提示重试按钮）。
  *
- * ⚠️ **和 `error.retryable` 字段保持一致**（用同一份名单）✅
+ * ⚠️ **和 `error.retryable` 字段保持一致**（用同一份名单）
  */
 export function isRetryable(error: PdfViewerError): boolean {
   return error.retryable ?? RETRYABLE_CODES.includes(error.code);

@@ -38,7 +38,7 @@
  * → 再用**文本内容**去渲染的项里找对应的（按顺序 + 按内容）
  * → 找不到就**跳过**（宁可漏画，也不要画到错的字上）
  *
- * ⚠️ **这是"内容对齐"，不是"下标对齐"** → 两边的边界不一样也能对上 ✅
+ * ⚠️ **这是"内容对齐"，不是"下标对齐"** → 两边的边界不一样也能对上
  */
 
 /** 一页的文本项（pdf.js TextItem 的最小形状） */
@@ -60,7 +60,7 @@ export interface SearchTextItemLike {
  * - `str` 非空（空项没有内容，也定位不到）
  *
  * ⚠️ **动态判据**（定位失败 / 旋转文字）只有渲染时才知道 →
- *   - 传了 `viewport` → 这里也能判断 → **索引和渲染完全一致** ✅
+ *   - 传了 `viewport` → 这里也能判断 → **索引和渲染完全一致**
  *   - 没传 → 索引收全部 → 渲染侧靠**字符位置**兜底
  *
  * ⚠️ **不排序** → 保持 PDF 的原始顺序（索引和偏移都基于它）。
@@ -111,8 +111,8 @@ export function selectSearchItems<T extends SearchTextItemLike>(
      * ### 判据（必须和渲染侧一致）
      *
      * → 渲染侧（`positionTextItem`）：`fontHeight = hypot(tx[2], tx[3])`
-     *   → `fontHeight` 不是有限数或 ≤ 0 → **返回 null（不渲染）** ✅
-     * → 索引侧也要用**同样的判据** ✅
+     *   → `fontHeight` 不是有限数或 ≤ 0 → **返回 null（不渲染）**
+     * → 索引侧也要用**同样的判据**
      */
     if (options.viewport && !canPositionItem(item, options.viewport)) {
       continue;
@@ -305,7 +305,7 @@ export function convertIndexOffsetToRendered(
    * → 索引里 "A2E" 是一个项
    * → 渲染侧 "A"、"2"、"E" 是**三个**项
    * → `alignRenderedToIndex` 会把**三个都**映射到索引项 0
-   * → 所以这里是 **Map<索引项, 渲染项[]>**（不是单个）✅
+   * → 所以这里是 **Map<索引项, 渲染项[]>**（不是单个）
    */
   /** 索引项下标 → 渲染项下标列表 */
   const indexToRendered = new Map<number, number[]>();
@@ -458,11 +458,11 @@ export function alignRenderedToIndex(
    * ```
    *
    * → 渲染项 "A"：
-   *   - 规则 ②（索引项**包含**渲染项）："A2E" 包含 "A" → 匹配 ✅
+   *   - 规则 ②（索引项**包含**渲染项）："A2E" 包含 "A" → 匹配
    *   - 规则 ③（渲染项**包含**索引项）："A" 不包含任何索引项 → 不匹配
    *
    * → 渲染项 "2"：
-   *   - 规则 ②：**还是** "A2E" → 匹配 ✅（但它已经被"占用"了！）
+   *   - 规则 ②：**还是** "A2E" → 匹配  （但它已经被"占用"了！）
    *
    * → 一遍扫描 → "A" 占用了索引项 0 → "2" 找不到 → **高亮只框住 "A"** ❌
    *
@@ -470,7 +470,7 @@ export function alignRenderedToIndex(
    *
    * - **第 1 遍**：只做**完全相同**的匹配 → 精确、无歧义
    * - **第 2 遍**：剩下的用"包含"关系兜底 → **不占用**索引项
-   *   → 多个渲染项可以属于同一个索引项 ✅
+   *   → 多个渲染项可以属于同一个索引项
    */
   for (let r = 0; r < renderedTexts.length; r += 1) {
     const text = renderedTexts[r];
@@ -546,7 +546,7 @@ export function alignRenderedToIndex(
  * 2. 命中的字符偏移落在哪一段 → 就是哪个渲染项
  * 3. 项内的偏移 = 命中起点 - 该项的起点
  *
- * ⚠️ **不依赖索引的项边界** → 两边切分不同也不影响 ✅
+ * ⚠️ **不依赖索引的项边界** → 两边切分不同也不影响
  *
  * @param renderedTexts 渲染的项文本（顺序 = 渲染顺序）
  * @param start 起始字符偏移（**基于索引文本**）

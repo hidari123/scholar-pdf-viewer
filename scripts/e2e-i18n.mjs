@@ -71,7 +71,7 @@ try {
   /*
    * ⚠️ **不能再按中文 aria-label 找**（审计修复后它也是本地化的了）。
    * -> 在 en 模式下 aria-label 是 "Language" ❌
-   * -> 改成：**按选项里有 'en' 来找**（语言无关）✅
+   * -> 改成：**按选项里有 'en' 来找**（语言无关）
    */
   const hasLangSelect = await page.evaluate(() =>
     [...document.querySelectorAll('select')].some((s) =>
@@ -83,7 +83,7 @@ try {
   /** 切换语言 */
   async function switchLocale(value) {
     await page.evaluate((v) => {
-      // ⚠️ 按【选项里有 en】找（语言无关）✅
+      // ⚠️ 按【选项里有 en】找（语言无关）
       const select = [...document.querySelectorAll('select')].find((s) =>
         [...s.options].some((o) => o.value === 'en'),
       );

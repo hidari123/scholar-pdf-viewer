@@ -8,23 +8,23 @@
  *
  * ### 现状（❌）
  *
- * -> `core/theme` 里**已经有** 7 个内置主题（`THEMES`）✅
- * -> `theme` prop **也能配** ✅
+ * -> `core/theme` 里**已经有** 7 个内置主题（`THEMES`）
+ * -> `theme` prop **也能配**
  * -> 但**包的工具栏没有入口** ❌ -> 只有 demo 的 header 里有个 `<select>` ❌
  *    -> 宿主要自己**另外做一个**切换 UI ❌
  *
- * ### 现在的行为（✅）
+ * ### 现在的行为（）
  *
- * -> 工具栏右上角有一个**独立分组**的 🎨 按钮 ✅
- * -> 点它 -> 弹出**主题列表**（7 个）✅
- * -> 点一个 -> 调 `onThemeChange(theme)` ✅
- * -> 宿主**不用**自己写切换 UI ✅
+ * -> 工具栏右上角有一个**独立分组**的 🎨 按钮
+ * -> 点它 -> 弹出**主题列表**（7 个）
+ * -> 点一个 -> 调 `onThemeChange(theme)`
+ * -> 宿主**不用**自己写切换 UI
  *
  * ### 主题是**受控**的（controlled）
  *
- * -> 包**不自己存**主题状态 ✅
- * -> 调 `onThemeChange` -> **宿主**改 `theme` prop ✅
- * -> 宿主也可以**完全不用**这个按钮（`features.themePicker === false`）✅
+ * -> 包**不自己存**主题状态
+ * -> 调 `onThemeChange` -> **宿主**改 `theme` prop
+ * -> 宿主也可以**完全不用**这个按钮（`features.themePicker === false`）
  */
 
 import type { ReactNode } from 'react';
@@ -45,7 +45,7 @@ export interface ThemePickerProps {
   /**
    * **可选的主题列表**（宿主可自定义）。
    *
-   * -> 不传 -> 用**内置的全部 7 个** ✅
+   * -> 不传 -> 用**内置的全部 7 个**
    */
   themes?: readonly PdfViewerTheme[];
   /** 语言 */
@@ -81,7 +81,7 @@ export function ThemePicker(props: ThemePickerProps) {
   /**
    * ⚠️ **点外面关闭**。
    *
-   * -> 和高亮色板的行为**保持一致** ✅
+   * -> 和高亮色板的行为**保持一致**
    */
   useEffect(() => {
     if (!open) {
@@ -108,11 +108,11 @@ export function ThemePicker(props: ThemePickerProps) {
   }, [open]);
 
   /*
-   * ⚠️ **菜单的坐标** ✅
+   * ⚠️ **菜单的坐标**
    *
-   * -> 菜单用 `position: fixed` ✅（祖先的 `overflow: auto` ✅ 会裁掉 absolute 的 ✅）
-   * -> -> 坐标要**自己算** ✅
-   * -> -> 贴着按钮的**下方** ✅、**右对齐** ✅ ✅
+   * -> 菜单用 `position: fixed`  （祖先的 `overflow: auto`  会裁掉 absolute 的）
+   * -> -> 坐标要**自己算**
+   * -> -> 贴着按钮的**下方**、**右对齐**
    */
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
 
@@ -128,10 +128,10 @@ export function ThemePicker(props: ThemePickerProps) {
     const menuHeight = 7 * 48 + 8;
     const spaceBelow = window.innerHeight - rect.bottom;
     /*
-     * ⚠️ **下面放不下就翻到上面** ✅
+     * ⚠️ **下面放不下就翻到上面**
      *
-     * -> 主题有 7 个 ✅ -> 菜单很高 ✅
-     * -> -> 视口底部放不下 ✅ -> **翻上去** ✅ ✅
+     * -> 主题有 7 个  -> 菜单很高
+     * -> -> 视口底部放不下  -> **翻上去**
      */
     const top =
       spaceBelow < menuHeight && rect.top > menuHeight
@@ -147,8 +147,8 @@ export function ThemePicker(props: ThemePickerProps) {
    *
    * -> 之前 demo 的下拉框用 `THEME_LABELS`（**永远是中文**）❌
    * -> 用户反馈："切换语言还是没变啊 下拉框选择语言之后
-   *   发现页面上语言还是没换啊" ✅
-   * -> 现在用 `THEME_LABELS_I18N` -> **跟着语言走** ✅
+   *   发现页面上语言还是没换啊"
+   * -> 现在用 `THEME_LABELS_I18N` -> **跟着语言走**
    */
   const labelFor = (key: PdfViewerTheme): string => {
     const table = THEME_LABELS_I18N[locale] ?? THEME_LABELS_I18N.zh;
@@ -189,11 +189,11 @@ export function ThemePicker(props: ThemePickerProps) {
               }}
             >
               {/*
-               * ⚠️ **色块 + 主题名** ✅
+               * ⚠️ **色块 + 主题名**
                *
-               * -> 主题名**放在色块下面** ✅（用户反馈："色块分不清" ✅）
+               * -> 主题名**放在色块下面**  （用户反馈："色块分不清"）
                * -> -> 只有 16px 的色块 ✅ -> **看不出是哪个主题** ✅ ❌
-               * -> -> 名字在下面 ✅ -> 一眼就知道 ✅ ✅
+               * -> -> 名字在下面  -> 一眼就知道
                */}
               <span className="scpdf-theme-picker__swatch-wrap">
                 <ThemeSwatch theme={key} />
@@ -231,17 +231,17 @@ export function ThemePicker(props: ThemePickerProps) {
  *
  * ### 根因
  *
- * -> 这些主题的差别**本来就不在背景色上**（背景差 1~2%）✅
- * -> 差别在 **主色调** + **圆角** + **阴影** ✅
+ * -> 这些主题的差别**本来就不在背景色上**（背景差 1~2%）
+ * -> 差别在 **主色调** + **圆角** + **阴影**
  * -> 只画一个纯背景 -> **看起来全都一样** ❌
  *
  * ### 修法
  *
- * -> 画成**迷你预览卡**（上半 = 主色调，下半 = 背景色）✅
- * -> **颜色从 CSS 变量取** ✅
- *    -> \`--scpdf-color-primary\` / \`--scpdf-color-surface\` ✅
+ * -> 画成**迷你预览卡**（上半 = 主色调，下半 = 背景色）
+ * -> **颜色从 CSS 变量取**
+ *    -> \`--scpdf-color-primary\` / \`--scpdf-color-surface\`
  *    -> **不在 TS 里再抄一份色值** ✅（避免两处不一致 ❌）
- * -> 每个主题在自己的 class 下 -> 变量天然是对应的 ✅
+ * -> 每个主题在自己的 class 下 -> 变量天然是对应的
  *
  * @param props 参数
  */
@@ -250,21 +250,21 @@ function ThemeSwatch({ theme }: { theme: PdfViewerTheme }) {
     /*
      * ⚠️⚠️ **色块要带上主题自己的 class**（实测踩到的坑）。
      *
-     * -> 主题的颜色是**CSS 变量**定义的 ✅
-     *    -> \`.scpdf-root--paper\` 里定义 \`--scpdf-color-primary: #b45309\` ✅
+     * -> 主题的颜色是**CSS 变量**定义的
+     *    -> \`.scpdf-root--paper\` 里定义 \`--scpdf-color-primary: #b45309\`
      * -> 色块在**下拉菜单里**（不在 \`.scpdf-root--paper\` 下面）❌
      *    -> **拿不到那个主题的变量** ❌ -> 只能用写死的颜色 ❌
      *    -> -> 写死的颜色**和主题对不上** ❌（而且两处维护 ❌）
      *
-     * -> 修法：色块**自己也挂上主题的 class** ✅
-     *    -> \`.scpdf-root--paper\` 里的变量定义**照样生效** ✅
+     * -> 修法：色块**自己也挂上主题的 class**
+     *    -> \`.scpdf-root--paper\` 里的变量定义**照样生效**
      *    -> 变量是**按 class 选择器**定义的，不是按祖先 ❌ -> 只要元素自己带这个 class 就行 ✅
      */
     <span className={`scpdf-root--${theme} scpdf-theme-picker__swatch`} aria-hidden="true">
       {/*
-       * ⚠️ **颜色靠 CSS 变量**（不在 TS 里写死色值）✅
-       * -> 每个主题在自己的 class 下 -> 变量天然对应 ✅
-       * -> 宿主改主题的色 -> 这里**自动跟着变** ✅
+       * ⚠️ **颜色靠 CSS 变量**（不在 TS 里写死色值）
+       * -> 每个主题在自己的 class 下 -> 变量天然对应
+       * -> 宿主改主题的色 -> 这里**自动跟着变**
        */}
       <span className="scpdf-theme-picker__swatch-bar" />
       <span className="scpdf-theme-picker__swatch-bg" />

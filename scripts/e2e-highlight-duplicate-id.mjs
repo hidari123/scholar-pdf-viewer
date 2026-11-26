@@ -12,7 +12,7 @@
  * ### ① 宿主侧的 id 撞了（demo 的锅）
  *
  * -> `demo/src/App.tsx` 的 `highlightSeq` 在**文档加载完成时归零** ❌
- * -> 但**持久化恢复**的高亮还带着原来的 id（`h-1`、`h-2`…）✅
+ * -> 但**持久化恢复**的高亮还带着原来的 id（`h-1`、`h-2`…）
  * -> 刷新页面 -> 建一个新高亮 -> 计数器又是 1 -> **又是 `h-1`** ❌
  * -> **两个高亮同 id** ❌
  *
@@ -20,13 +20,13 @@
  *
  * -> `AnnotationLayer`: `activeHighlightId === highlight.id` ❌
  * -> 同 id -> **两个都加 `.scpdf-annotation--active`** ❌
- * -> 用户看到"两个高亮都被选中" ✅
+ * -> 用户看到"两个高亮都被选中"
  *
  * ## 修法
  *
- * 1. **宿主**：用 `crypto.randomUUID()` -> **绝对不会重复** ✅
- * 2. **包**：激活态改成**按矩形**判断 -> **只激活真正点到的那一个** ✅
- *    -> 命中判定也改成**按几何**找 DOM 元素（不是按 id）✅
+ * 1. **宿主**：用 `crypto.randomUUID()` -> **绝对不会重复**
+ * 2. **包**：激活态改成**按矩形**判断 -> **只激活真正点到的那一个**
+ *    -> 命中判定也改成**按几何**找 DOM 元素（不是按 id）
  *
  * 用法：`node scripts/e2e-highlight-duplicate-id.mjs`
  */
@@ -164,7 +164,7 @@ try {
     };
   });
   await page.mouse.click(target.x, target.y);
-  // ⚠️ **不要等太久**（激活态 1.5s 后会自动清除）✅
+  // ⚠️ **不要等太久**（激活态 1.5s 后会自动清除）
   await page.waitForTimeout(500);
 
   const active = await page.evaluate(() => {

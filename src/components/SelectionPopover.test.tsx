@@ -40,12 +40,12 @@ function renderPopover(
 
 describe('SelectionPopover（审核补测）', () => {
   /*
-   * ⚠️ **`messageKey` 跟着语言走**（用户反馈："选区浮层 title 中英混杂" ✅）
+   * ⚠️ **`messageKey` 跟着语言走**（用户反馈："选区浮层 title 中英混杂"）
    *
    * -> 宿主自定义动作 ✅ 传 `label: '翻译'` ✅ -> **永远是中文** ✅ ❌
-   * -> -> 传 `messageKey` ✅ -> **按当前语言解析** ✅ ✅
+   * -> -> 传 `messageKey`  -> **按当前语言解析**
    */
-  it('**messageKey 跟着语言走** ✅', () => {
+  it('**messageKey 跟着语言走**  ', () => {
     const { unmount } = renderPopover(
       true,
       [{ key: 'ask2', label: '翻译', messageKey: 'selection.actionTranslate', onSelect: () => {} }],
@@ -63,9 +63,9 @@ describe('SelectionPopover（审核补测）', () => {
   });
 
   /*
-   * ⚠️ **没传 messageKey -> 退回 label** ✅
+   * ⚠️ **没传 messageKey -> 退回 label**
    */
-  it('**没传 messageKey 就用 label** ✅', () => {
+  it('**没传 messageKey 就用 label**  ', () => {
     renderPopover(true, [{ key: 'x', label: '我的动作', onSelect: () => {} }]);
     expect(screen.getByRole('button', { name: '我的动作' })).toBeTruthy();
   });
@@ -76,8 +76,8 @@ describe('SelectionPopover（审核补测）', () => {
 
   it('**打开时渲染**', () => {
     /*
-     * ⚠️ **必须至少有一个动作** ✅
-     * -> 没有动作 -> 组件返回 `null` ✅（不渲染空浮层 ✅）
+     * ⚠️ **必须至少有一个动作**
+     * -> 没有动作 -> 组件返回 `null`  （不渲染空浮层）
      */
     const { container } = renderPopover(true, [{ key: 'a', label: 'A', onSelect: () => {} }]);
     expect(container.querySelector('.scpdf-selection-popover')).not.toBeNull();
@@ -90,9 +90,9 @@ describe('SelectionPopover（审核补测）', () => {
 
   it('**有 anchorRect 时不依赖选区矩形**', () => {
     /*
-     * ⚠️ **`anchorRect` 优先** ✅
-     * -> 点高亮块时**浏览器里没有选区** ✅ -> 但浮层要出 ✅
-     * -> -> 所以 `selectionRect` 为 null 也能渲染 ✅
+     * ⚠️ **`anchorRect` 优先**
+     * -> 点高亮块时**浏览器里没有选区**  -> 但浮层要出
+     * -> -> 所以 `selectionRect` 为 null 也能渲染
      */
     const { container } = render(
       <SelectionPopover
@@ -109,15 +109,15 @@ describe('SelectionPopover（审核补测）', () => {
 
   it('**动作会渲染出来**（用 aria-label 找）', () => {
     renderPopover(true, [{ key: 'highlight', label: '高亮' }]);
-    // ⚠️ **文案在 `aria-label` / `title` 上** ✅（不是文本节点 ✅）
+    // ⚠️ **文案在 `aria-label` / `title` 上**  （不是文本节点）
     expect(screen.getByRole('button', { name: '高亮' })).toBeTruthy();
   });
 
   it('**点动作会调 onAction**', () => {
     /*
-     * ⚠️ **组件只调 `onAction`** ✅（带整个 action 对象 ✅）
-     * -> `action.onSelect` 是**包在 `PdfViewer` 里**调的 ✅
-     *    （因为要带"当前选区的文字 / 归一化位置"✅）
+     * ⚠️ **组件只调 `onAction`**  （带整个 action 对象）
+     * -> `action.onSelect` 是**包在 `PdfViewer` 里**调的
+     *    （因为要带"当前选区的文字 / 归一化位置"）
      */
     const onAction = vi.fn();
     render(

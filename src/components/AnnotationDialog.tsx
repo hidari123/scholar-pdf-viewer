@@ -58,15 +58,15 @@ export interface AnnotationDialogProps {
    * > "这个富文本编辑框没有定位到批注旁边啊 你这个编辑框定位到文档最上面谁看得到啊"
    *
    * → 之前弹窗**居中**在视口上 → 选区在屏幕底部时，弹窗在中间 → **看不到** ❌
-   * → 传了锚点 → 弹窗贴着**选区/批注**显示 ✅
+   * → 传了锚点 → 弹窗贴着**选区/批注**显示
    *
-   * → 不传 → 退回"居中"（老行为）✅
+   * → 不传 → 退回"居中"（老行为）
    */
   anchorRect?: { left: number; top: number; right: number; bottom: number } | null;
   /**
    * **锚点版本号**（锚点变了就重新定位）。
    *
-   * → 选区变了 / 页面滚了 → 锚点位置变了 → 要重算 ✅
+   * → 选区变了 / 页面滚了 → 锚点位置变了 → 要重算
    */
   anchorVersion?: number;
   /** 富文本工具栏（宿主可配；不传 → 默认的） */
@@ -84,8 +84,8 @@ export interface AnnotationDialogProps {
    * **有嵌套弹窗打开？**（比如链接弹窗）
    *
    * ⚠️ 用来决定 Esc 的行为：
-   * -> 嵌套弹窗开着 -> Esc 关**嵌套弹窗**，不关本弹窗 ✅
-   * -> 没开 -> Esc 关本弹窗 ✅
+   * -> 嵌套弹窗开着 -> Esc 关**嵌套弹窗**，不关本弹窗
+   * -> 没开 -> Esc 关本弹窗
    */
   hasNestedOverlay?: boolean;
   /** 图标覆盖 */
@@ -146,7 +146,7 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
    * **嵌套弹窗的状态**（比如链接弹窗）。
    *
    * ⚠️ Esc 的行为要靠它：
-   * -> 链接弹窗开着 -> Esc **只关链接弹窗** ✅
+   * -> 链接弹窗开着 -> Esc **只关链接弹窗**
    *   （实测踩过的坑：Esc 把整个批注弹窗也关掉了 ❌）
    */
   const [overlayOpen, setOverlayOpen] = useState(false);
@@ -167,8 +167,8 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
    * **弹窗的位置**（视口坐标 → `position: fixed`）。
    *
    * ⚠️ **用 `position: fixed`**（和 `SelectionPopover` 一个套路）：
-   * → 视口坐标**不需要**换算滚动量 → 天然不漂移 ✅
-   * → 但祖先里有 `transform` 时会失效 → 所以不能放在 `transform` 的祖先里 ✅
+   * → 视口坐标**不需要**换算滚动量 → 天然不漂移
+   * → 但祖先里有 `transform` 时会失效 → 所以不能放在 `transform` 的祖先里
    *
    * @param anchor 锚点矩形（视口坐标）
    * @param size 弹窗尺寸
@@ -185,7 +185,7 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
        * -> 之前内嵌在组件里 ❌
        *   -> jsdom **没有布局** -> `getBoundingClientRect()` 返回 0×0 ❌
        *   -> **没法写单测** ❌
-       * -> 现在：`computeDialogPosition()` ✅ -> **可单测** ✅
+       * -> 现在：`computeDialogPosition()`  -> **可单测**
        */
       return computeDialogPosition({
         anchor,
@@ -202,8 +202,8 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
   /*
    * **重新定位**（锚点变了 / 尺寸变了 / 滚动了）。
    *
-   * → 用 `requestAnimationFrame` 等弹窗渲染出来再量尺寸 ✅
-   * → 滚动时也要重算（`position: fixed` 不随滚动变，但**锚点**是视口坐标 → 会变）✅
+   * → 用 `requestAnimationFrame` 等弹窗渲染出来再量尺寸
+   * → 滚动时也要重算（`position: fixed` 不随滚动变，但**锚点**是视口坐标 → 会变）
    */
   useEffect(() => {
     if (!open || !anchorRect) {
@@ -242,8 +242,8 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
      *
      * ### 修法
      *
-     * -> 用 `ResizeObserver` **盯着尺寸** -> 变一次就重算一次位置 ✅
-     * -> 这样不管编辑器什么时候加载完，弹窗都会**自动挪到正确位置** ✅
+     * -> 用 `ResizeObserver` **盯着尺寸** -> 变一次就重算一次位置
+     * -> 这样不管编辑器什么时候加载完，弹窗都会**自动挪到正确位置**
      */
     const observer =
       typeof ResizeObserver !== 'undefined' && dialogRef.current
@@ -288,8 +288,8 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
    *   -> 结果：链接弹窗开着时按 Esc -> **整个批注弹窗被关掉** ❌
    *   （实测：Esc 之后 `.scpdf-annotation-dialog` 整个消失了）
    *
-   * -> 修法：**有嵌套弹窗打开时，Esc 不关自己** ✅
-   *   -> 让嵌套弹窗自己处理 Esc ✅
+   * -> 修法：**有嵌套弹窗打开时，Esc 不关自己**
+   *   -> 让嵌套弹窗自己处理 Esc
    */
   useEffect(() => {
     if (!open) {
@@ -327,13 +327,13 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
       className="scpdf-annotation-dialog__backdrop"
       /*
        * ⚠️ **给容器的点击委托一个"我是浮层"的标记**。
-       * -> 容器上挂了高亮的点击委托（按鼠标坐标命中）✅
-       * -> 浮层里的点击**不能**触发它（否则下面的高亮会被误激活）✅
+       * -> 容器上挂了高亮的点击委托（按鼠标坐标命中）
+       * -> 浮层里的点击**不能**触发它（否则下面的高亮会被误激活）
        */
       data-scpdf-floating="true"
       /*
        * ⚠️ **有锚点时 → 不要遮罩**（用户需求：弹窗要贴着批注，不要挡住整页）。
-       * -> 没锚点 → 保留遮罩（居中模式的老行为）✅
+       * -> 没锚点 → 保留遮罩（居中模式的老行为）
        */
       data-anchored={position ? 'true' : 'false'}
     >
@@ -354,7 +354,7 @@ export function AnnotationDialog(props: AnnotationDialogProps) {
         aria-label={dialogTitle}
         /*
          * ⚠️ **有锚点 → `position: fixed` + 视口坐标**（贴着批注显示）。
-         * -> 没有锚点 → 保持原来的居中样式 ✅
+         * -> 没有锚点 → 保持原来的居中样式
          */
         style={
           position

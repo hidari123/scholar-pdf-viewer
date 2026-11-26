@@ -25,8 +25,8 @@
 -> **页码显示 5、视口停在第 1 页** ❌
 -> 宿主最常见的用法（"打开到我上次读到的地方"）**直接失效** ❌
 
-**修**：等页尺寸算出来 -> 跳一次（ref 记住）-> 换文档重跳 ✅
-**顺带**：换文档后初始缩放也重新适配（之前 ref 永远不重置）✅
+**修**：等页尺寸算出来 -> 跳一次（ref 记住）-> 换文档重跳
+**顺带**：换文档后初始缩放也重新适配（之前 ref 永远不重置）
 
 ### ② `PdfViewerHandle` 缺方法（**文档写了但不存在**）
 
@@ -34,7 +34,7 @@
 -> README 写着"宿主自己接 `viewerRef`（`zoomIn` / `zoomOut` / `print`）" ❌
 -> **handle 里根本没有这些方法** -> 宿主照做 -> **点按钮没反应** ❌
 
-**修**：handle 补齐到 **11 个方法**（+ `zoomIn` / `zoomOut` / `fitWidth` / `fitPage` / `print`）✅
+**修**：handle 补齐到 **11 个方法**（+ `zoomIn` / `zoomOut` / `fitWidth` / `fitPage` / `print`）
 
 ### ③ 死配置
 
@@ -44,14 +44,14 @@
 | `config.toolbar.showPrint`              | `ToolbarConfig` **根本没这个字段** -> 写了没用 ❌ -> **删掉** |
 | `config.toolbar` 是**另一份匿名字面量** | 和 `ToolbarConfig` 字段不一致 ❌ -> **统一成一份**            |
 
--> `ToolbarConfig` **搬到 `core/theme`** -> `core/config` 才不用**反向依赖 components** ✅
+-> `ToolbarConfig` **搬到 `core/theme`** -> `core/config` 才不用**反向依赖 components**
 
 ### ④ `config.features` 是 `Record<string, boolean>`
 
 -> 任何 key 都能写 -> **拼错也编译通过**（`serach` / `featuers`）❌
 -> 拼错了**静默无效** -> 宿主以为关掉了搜索，其实没关 ❌
 
-**修**：`Features` 搬到 `core/config` + `features?: Partial<Features>` -> **拼错直接编译报错** ✅
+**修**：`Features` 搬到 `core/config` + `features?: Partial<Features>` -> **拼错直接编译报错**
 
 ### ⑤ XSS 漏洞：`sanitizeRichText` 的 style 过滤
 
@@ -62,24 +62,24 @@ background-color:url(javascript:alert(1))  →  能通过清洗 ❌
 -> 值组 `[^;]+` **把 `url(...)` 一起吞掉** ❌
 -> 批注 HTML 会存到宿主后端 -> **真实的攻击面** ❌
 
-**修**：新增 `isPlainColor()` -> **只认纯颜色**（含 `url(` / `expression(` / `\` / `/*` 一律丢掉整个 style）✅
+**修**：新增 `isPlainColor()` -> **只认纯颜色**（含 `url(` / `expression(` / `\` / `/*` 一律丢掉整个 style）
 
 ### ⑥ `PdfViewerError.retryable`（文档写了但字段不存在）
 
 -> 宿主写 `error.retryable` -> **永远 undefined**（falsy）❌
 -> 宿主以为"不可重试" -> **不给用户重试按钮** ❌
 
-**修**：字段真的加上 + **UI 也用上了**（只有可重试的错误才显示「重试」）✅
+**修**：字段真的加上 + **UI 也用上了**（只有可重试的错误才显示「重试」）
 
 ### ⑦ 宿主接口的类型安全
 
-| 问题                                                         | 修法                                                                                               |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| `SelectionActionContext.position: unknown`                   | -> `NormPosition`（拼错字段名**直接报错**）✅                                                      |
-| `event` 必填但实际传 `undefined as never`                    | -> **可选**；宿主 `ctx.event.preventDefault()` 不再崩 ✅                                           |
-| `core` 引用 `React.MouseEvent`                               | -> 自定义 `PointerEventLike`（**core 彻底不碰 React**）✅                                          |
-| `SelectionActionIcon` 有 `'delete'`、`IconName` 有 `'trash'` | -> 统一成 `'trash'`；`SelectionActionIcon` 改成 `Extract<IconName, ...>`（**类型上保证是子集**）✅ |
-| `RichTextToolbarItem.icon: string`                           | -> `IconName`（拼错**编译报错**，不再渲染成空白图标）✅                                            |
+| 问题                                                         | 修法                                                                                             |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `SelectionActionContext.position: unknown`                   | -> `NormPosition`（拼错字段名**直接报错**）                                                      |
+| `event` 必填但实际传 `undefined as never`                    | -> **可选**；宿主 `ctx.event.preventDefault()` 不再崩                                            |
+| `core` 引用 `React.MouseEvent`                               | -> 自定义 `PointerEventLike`（**core 彻底不碰 React**）                                          |
+| `SelectionActionIcon` 有 `'delete'`、`IconName` 有 `'trash'` | -> 统一成 `'trash'`；`SelectionActionIcon` 改成 `Extract<IconName, ...>`（**类型上保证是子集**） |
+| `RichTextToolbarItem.icon: string`                           | -> `IconName`（拼错**编译报错**，不再渲染成空白图标）                                            |
 
 ### ⑧ 打印的无限 rAF + 下载的内存泄漏
 
@@ -104,9 +104,9 @@ background-color:url(javascript:alert(1))  →  能通过清洗 ❌
 All files | 51.35% lines | 46.53% functions | 41.96% branches
 ```
 
--> 加了 `@vitest/coverage-v8` + `vitest.config.ts` 的 `coverage` 段 ✅
--> **加了下限**（卡得很紧：只留 0.5~1.5 个点）-> 覆盖率掉下去 **CI 直接红** ✅
--> `pnpm verify` 从 8 个 gate 变成 **9 个**（多了 `coverage`）✅
+-> 加了 `@vitest/coverage-v8` + `vitest.config.ts` 的 `coverage` 段
+-> **加了下限**（卡得很紧：只留 0.5~1.5 个点）-> 覆盖率掉下去 **CI 直接红**
+-> `pnpm verify` 从 8 个 gate 变成 **9 个**（多了 `coverage`）
 
 ## 回归（**连续 3 次全绿**）
 
@@ -259,20 +259,20 @@ All files | 51.35% lines | 46.53% functions | 41.96% branches
 | 测试完整度 | 94 个源文件，**21 个 core 文件零测试**、**7/10 hook 零测试**、**21/25 组件零测试**            | 补了 5 个测试文件（+65 条）+ 覆盖率门禁 |
 | 边界覆盖   | 审计找出 **20 条边界盲区**（负高度矩形 / url() 注入 / 无限 rAF / 内存泄漏 / pageCount 数错…） | 关键边界**全部有断言**                  |
 | 宿主接口   | 3 处**死配置**、1 处**类型太松**、2 处**类型不一致**、3 处**文档与实现不符**                  | **全部对齐**                            |
-| 易用性     | 最小接入很清爽 ✅（保持）                                                                     | 更好（handle 补全 + 错误码可重试）      |
-| 可读性     | JSDoc 质量**很高**（大量"为什么"）✅（保持）                                                  | 加了 README 的 handle 清单              |
+| 易用性     | 最小接入很清爽  （保持）                                                                      | 更好（handle 补全 + 错误码可重试）      |
+| 可读性     | JSDoc 质量**很高**（大量"为什么"） （保持）                                                   | 加了 README 的 handle 清单              |
 | 回归稳定性 | 偶发 flaky（已存在）                                                                          | 连续 4 次全绿                           |
 
 ### 保留的强项（审计特别点名）
 
-1. `config` + 单独 prop 的**双 API**，而且 `resolveConfigValue` **把 `false`/`0`/`''` 当成"有值"** —— 而且**有专门的测试** ✅
+1. `config` + 单独 prop 的**双 API**，而且 `resolveConfigValue` **把 `false`/`0`/`''` 当成"有值"** —— 而且**有专门的测试**
 2. i18n 的**三层回退**（`messages` -> `locales[locale]` -> 内置 -> **英文** -> key）——
-   回退到**英文**而不是中文，避免混排 ✅
-3. `Locale = BuiltinLocale | (string & {})` —— `& {}` 保住了 `zh`/`en` 的自动补全，同时允许任意语言 ✅
-4. **三个坐标空间**（PDF pt / 归一化 / 视口 px）在**一处**讲清楚 ✅
-5. `sanitizeRichText` 的**白名单**（本轮又补了 `url()` 漏洞）✅
-6. `printMode` 的**CSS 变量维护** -> `Ctrl+P` 和工具栏按钮**行为一致** ✅
+   回退到**英文**而不是中文，避免混排
+3. `Locale = BuiltinLocale | (string & {})` —— `& {}` 保住了 `zh`/`en` 的自动补全，同时允许任意语言
+4. **三个坐标空间**（PDF pt / 归一化 / 视口 px）在**一处**讲清楚
+5. `sanitizeRichText` 的**白名单**（本轮又补了 `url()` 漏洞）
+6. `printMode` 的**CSS 变量维护** -> `Ctrl+P` 和工具栏按钮**行为一致**
 7. `onHighlight`（可返回新 id）vs `onHighlightCreate` vs `onHighlightCreated` 的**微妙区别**，
-   连"**别两个都调**"都写进注释了 ✅
+   连"**别两个都调**"都写进注释了
 
 ---

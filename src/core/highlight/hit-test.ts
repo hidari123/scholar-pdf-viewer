@@ -32,7 +32,7 @@
  * ```
  *
  * → **不能进行再次高亮**（各种操作还是在原有高亮进行）
- * → 也就是说：完全重叠时，**下面的那个永远选不到** ✅
+ * → 也就是说：完全重叠时，**下面的那个永远选不到**
  */
 
 /** 一个高亮的矩形（视口 px） */
@@ -50,7 +50,7 @@ export interface HighlightRect {
   /**
    * **层级**（越大越在上面）。
    *
-   * → 渲染顺序（后面的在上面）→ 直接用数组下标 ✅
+   * → 渲染顺序（后面的在上面）→ 直接用数组下标
    */
   zIndex: number;
 }
@@ -62,18 +62,18 @@ export interface HighlightHit {
   /**
    * **命中的那个矩形**（视口 px）。
    *
-   * ⚠️ **用来精确找到 DOM 元素** ✅
+   * ⚠️ **用来精确找到 DOM 元素**
    *
    * -> 宿主可能传了**重复的 id** ❌（实测：刷新后新建高亮 -> id 撞了）
    * -> 按 id 找元素 -> `querySelectorAll` 返回**多个** -> 找到**第一个** ❌
    * -> 点的是第二个，激活的却是第一个 ❌
-   * -> 按**矩形位置**找 -> **精确到那一个** ✅
+   * -> 按**矩形位置**找 -> **精确到那一个**
    */
   rect: HighlightRect;
   /**
    * **是不是"重叠部分"**。
    *
-   * → `false` = 点的位置只属于这一个高亮 ✅
+   * → `false` = 点的位置只属于这一个高亮
    * → `true` = 点的位置**同时**属于多个高亮（重叠部分 c）⚠️
    */
   isOverlapping: boolean;
@@ -133,10 +133,10 @@ export function hitsAtPoint(x: number, y: number, rects: readonly HighlightRect[
  *
  * ## 规则（用户需求）
  *
- * 1. **只命中一个** → 选它 ✅
- * 2. **命中多个**（重叠部分 c）→ 选**最上面**的那个 ✅
+ * 1. **只命中一个** → 选它
+ * 2. **命中多个**（重叠部分 c）→ 选**最上面**的那个
  *    > "选中重叠部分c则谁在上面选中的是谁"
- * 3. **完全重叠**时 → 下面的选不到（因为总在上面那个赢）✅
+ * 3. **完全重叠**时 → 下面的选不到（因为总在上面那个赢）
  *    > "如果是全部重叠 则不能进行再次高亮，各种操作还是在原有高亮进行"
  *
  * @param x 视口 X
@@ -150,7 +150,7 @@ export function pickHighlightAtPoint(
   rects: readonly HighlightRect[],
 ): HighlightHit | null {
   const hits = hitsAtPoint(x, y, rects);
-  // ⚠️ **第一个就是最上面的**（已排序）→ 重叠时选它 ✅
+  // ⚠️ **第一个就是最上面的**（已排序）→ 重叠时选它
   return hits[0] ?? null;
 }
 
@@ -164,7 +164,7 @@ export function pickHighlightAtPoint(
  * -> 按 id 找 DOM 元素 -> `querySelectorAll` 返回**多个** -> 找到**第一个** ❌
  *    -> 点第二个 -> 操作条弹在**第一个**上 ❌
  *    -> 激活态也**两个都亮** ❌
- * -> 按**矩形**比对 -> **精确到那一个** ✅
+ * -> 按**矩形**比对 -> **精确到那一个**
  *
  * @param a 矩形 A
  * @param b 矩形 B
@@ -194,7 +194,7 @@ export function isSameRect(
  * -> `highlights.find(h => h.id === id)` -> 永远找到**第一个** ❌
  *    -> 点第二个 -> 操作条弹在**第一个**上 ❌
  *    -> 激活态也**两个都亮** ❌
- * -> 按**矩形**比对 -> **精确到那一个** ✅
+ * -> 按**矩形**比对 -> **精确到那一个**
  *
  * @param candidates 同 id 的候选高亮
  * @param target 目标矩形（视口 px）
@@ -215,7 +215,7 @@ export function pickHighlightByRect<T>(
       return candidate;
     }
   }
-  // ⚠️ **对不上** -> 退回第一个（老行为）✅
+  // ⚠️ **对不上** -> 退回第一个（老行为）
   return candidates[0];
 }
 

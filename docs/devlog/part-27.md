@@ -42,7 +42,7 @@ const frames = pageFrames.map(f => ({ ...f, top: f.top - containerRect.top, ... 
 const rects  = clientRects.map(r => ({ top: r.top - containerRect.top, ... }));
 //    ↑ containerRect.top 被减了两次 → 正好差 97px（容器的视口 top）
 
-// ✅ 改后：统一换算到"容器内容坐标"
+//  改后：统一换算到"容器内容坐标"
 const toContentCoords = (v: number) => v - containerRect.top + container.scrollTop;
 ```
 
@@ -76,7 +76,7 @@ const toContentCoords = (v: number) => v - containerRect.top + container.scrollT
 |      | 中心被涂次数                    |
 | ---- | ------------------------------- |
 | 改前 | {涂1次: 2行, **涂2次: 8行**} ❌ |
-| 改后 | **{涂1次: 10行}** ✅            |
+| 改后 | **{涂1次: 10行}**               |
 
 **为什么有效**：行盒高度 = `font-size × line-height` → 归零 → 同行不同字号不再产生独立行盒。
 **为什么不影响位置**：span 是 `position: absolute`，`top` 定位**不依赖行盒**。
@@ -87,7 +87,7 @@ const toContentCoords = (v: number) => v - containerRect.top + container.scrollT
 | -------------------------------------- | ----------------------------------- |
 | `line-height: normal` / `1`            | maxPaint = 2 ❌（问题回来了）       |
 | `line-height: 0` + `padding-top: 20px` | maxPaint = 2 ❌（padding 又撑出盒） |
-| `line-height: 0.001`                   | maxPaint = 1 ✅ 但高度只有 0.016px  |
+| `line-height: 0.001`                   | maxPaint = 1  但高度只有 0.016px    |
 
 > **pdf.js v6 自己也有这个问题** —— 它靠 `.selectionRendering` 模式绕开
 > （关掉原生 `::selection`，改用 SVG clipPath 画 `rgb(0 90 255 / 0.22)` 覆盖层）。
@@ -239,7 +239,7 @@ scripts/e2e-highlight.mjs           高亮效果 E2E（9 项）
 2. `getClientRects()` 拿原始形状 → 合并同行重叠矩形
 3. 画成 SVG `<clipPath>` → **每个像素只画一次**
 
-**已实测验证**：手工注入后选区均匀、贴合文字、无阶梯 ✅
+**已实测验证**：手工注入后选区均匀、贴合文字、无阶梯
 
 **新增** `src/core/selection/shape.ts`（`buildSelectionShapes` + `mergeOverlappingRects`）
 **新增** `src/components/SelectionLayer.tsx`（SVG clipPath 覆盖层）
@@ -296,7 +296,7 @@ The node before which the new node is to be inserted is not a child of this node
   - **实测弹层尺寸**（不猜）+ **真翻转**（先下方再上方）+ clamp 到容器
 - **动作注册表**（可注入）：宿主传 `selectionActions` 覆盖/追加
   内置：🖍高亮(带色板) · 📋复制 · 🌐翻译 · 💬提问 · 📝笔记 · 🗑删除
-  **宿主不传 `onTranslate` → 按钮不显示** ✅
+  **宿主不传 `onTranslate` → 按钮不显示**
 - **内置图标 7 个**（纯 SVG，零依赖）
 - **统一色板下拉**：6 预设色（原项目新高亮/编辑高亮用了**两套 UI**）
 - **关闭**：mousedown 外部 · Esc · 选区清空 · 滚动/缩放（隐藏）
@@ -425,8 +425,8 @@ mousedown ✅  mouseup ✅  selectionchange ❌ (0 个)
 | -------------------------- | ------------ |
 | 同步调 `removeAllRanges()` | ❌ 选不中    |
 | `setTimeout(0)` 延后调     | ❌ 选不中    |
-| 从 `page.evaluate` 调      | ✅ 正常      |
-| **完全不调**               | ✅ 正常      |
+| 从 `page.evaluate` 调      | 正常         |
+| **完全不调**               | 正常         |
 
 → 在**点击浮层按钮的同步流程里**调 `removeAllRanges()`，
 浏览器会认为"选区正在被改" → **后续拖动被浏览器吞掉**。
@@ -548,10 +548,10 @@ pdf.js v6 的 `DrawLayer` **也用 `range.getClientRects()`**（`pdf.mjs:4228`�
 |                   | 之前             | 之后                     |
 | ----------------- | ---------------- | ------------------------ |
 | 选区 rect         | `y=231.92, h=44` | **`y=237.92, h=32.996`** |
-| 与文字的 Δtop     | 6px              | **0.002px** ✅           |
-| 与墨迹的 Δtop     | 10px             | **4px** ✅               |
-| 与墨迹的 Δbottom  | 12px             | **7px** ✅               |
-| 高亮 vs 文字 Δtop | 10px             | **0.0px** ✅             |
+| 与文字的 Δtop     | 6px              | **0.002px**              |
+| 与墨迹的 Δtop     | 10px             | **4px**                  |
+| 与墨迹的 Δbottom  | 12px             | **7px**                  |
+| 高亮 vs 文字 Δtop | 10px             | **0.0px**                |
 
 **新增** `src/core/selection/item-geometry.ts` + `clipToBaseline()`。
 
@@ -727,7 +727,7 @@ span 的实际盒子          = 20.62px  ← font-size × line-height(1)
 
 **字形框 = span 的盒子**：`top = item.top`，`height = item.fontSize`。
 
-实测 `item.top` 与渲染后的 `span.getBoundingClientRect().top` **完全相等** ✅
+实测 `item.top` 与渲染后的 `span.getBoundingClientRect().top` **完全相等**
 
 另外，选行时不能只取"最近的一行"：
 
@@ -985,13 +985,13 @@ mousedown → 浮层出现:  87~107ms（之前 261ms，且必须等松手）
 
 ### 用户报的问题逐条验证
 
-| 反馈                     | 结果                                |
-| ------------------------ | ----------------------------------- |
-| 缩放时浮层没跟着缩放     | ✅ 间距 −126.4px → −129.6px（一致） |
-| 缩小后选择跑偏           | ✅ −126.4px（一致）                 |
-| 滚动时浮层               | ✅ 跟随，不消失                     |
-| 鼠标开始框选立刻出现浮层 | ✅ 87~107ms，不用等松手             |
-| 很卡                     | ✅ 满帧 60fps + 拖动中实时反馈      |
+| 反馈                     | 结果                             |
+| ------------------------ | -------------------------------- |
+| 缩放时浮层没跟着缩放     | 间距 −126.4px → −129.6px（一致） |
+| 缩小后选择跑偏           | −126.4px（一致）                 |
+| 滚动时浮层               | 跟随，不消失                     |
+| 鼠标开始框选立刻出现浮层 | 87~107ms，不用等松手             |
+| 很卡                     | 满帧 60fps + 拖动中实时反馈      |
 
 ### 关键文件
 
@@ -1051,10 +1051,10 @@ scripts/e2e-selection-perf.mjs         新增（3 项断言）
 E2E **15 套 132/132**（`e2e-popover-anchor.mjs` 加到 11 项）
 
 ```
-1-fit:        选区88字符 自绘8个 浮层间距8px ✅
-2-zoomed:     选区88字符 自绘8个 浮层间距8px ✅
-3-zoominout:  选区88字符 自绘8个 浮层间距8px ✅
-4-scrolled:   浮层在 间距8px 选区88字符 ✅
+1-fit:        选区88字符 自绘8个 浮层间距8px
+2-zoomed:     选区88字符 自绘8个 浮层间距8px
+3-zoominout:  选区88字符 自绘8个 浮层间距8px
+4-scrolled:   浮层在 间距8px 选区88字符
 ```
 
 ---
@@ -1138,9 +1138,9 @@ pdf.js 把文字画在 canvas 上 → **canvas 的像素位置就是文字的真
 
 ```
 100%: 高亮 (205.02, 103.44, 201, 14.34)
-      选区 (205.031, 103.445, 201.011, 14.346)   → Δ < 0.01px ✅
+      选区 (205.031, 103.445, 201.011, 14.346)   → Δ < 0.01px
 50%:  高亮 (102.50, 51.72, 100.52, 7.17)
-      选区 (102.500, 51.723, 100.520, 7.173)     → Δ < 0.005px ✅
+      选区 (102.500, 51.723, 100.520, 7.173)     → Δ < 0.005px
 ```
 
 ### 测试脚本本身踩的坑（记录）

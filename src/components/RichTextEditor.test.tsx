@@ -49,7 +49,7 @@ describe('RichTextEditor', () => {
 
     await userEvent.click(screen.getByLabelText('高亮'));
 
-    // ⚠️ **斜杠色块 + 2 个颜色** = 3 个 ✅
+    // ⚠️ **斜杠色块 + 2 个颜色** = 3 个
     expect(document.querySelectorAll('.scpdf-rich-text__swatch')).toHaveLength(3);
   });
 
@@ -63,7 +63,7 @@ describe('RichTextEditor', () => {
     await userEvent.click(screen.getByLabelText('高亮'));
     expect(document.querySelector('.scpdf-rich-text__palette')).toBeTruthy();
 
-    // ⚠️ **点 body**（面板外面）✅
+    // ⚠️ **点 body**（面板外面）
     await userEvent.click(document.body);
     expect(document.querySelector('.scpdf-rich-text__palette')).toBeNull();
   });

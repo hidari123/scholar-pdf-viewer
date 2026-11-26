@@ -9,10 +9,10 @@
  *
  * ## 根因（实测复现）
  *
- * -> 批注弹窗在 **React 树里是 `.scpdf-container` 的后代** ✅
- *    （DOM 上靠 `position: fixed` 浮着，但 React 的合成事件照样冒泡）✅
- * -> 容器上挂了**高亮的点击委托**（`handleHighlightContainerClick`）✅
- * -> 它按 **鼠标坐标** 命中高亮（`findHighlightAtPoint`）✅
+ * -> 批注弹窗在 **React 树里是 `.scpdf-container` 的后代**
+ *    （DOM 上靠 `position: fixed` 浮着，但 React 的合成事件照样冒泡）
+ * -> 容器上挂了**高亮的点击委托**（`handleHighlightContainerClick`）
+ * -> 它按 **鼠标坐标** 命中高亮（`findHighlightAtPoint`）
  * -> 用户在弹窗里点"加粗"按钮 -> 坐标正好落在**下面的高亮**上 ❌
  *    -> `handleHighlightClick` -> `setActiveHighlightId(highlight.id)` ❌
  *    -> 高亮加上 `.scpdf-annotation--active` -> **蓝色 2px 边框** ❌
@@ -20,10 +20,10 @@
  *
  * ## 修法（三层防御）
  *
- * 1. 容器上加 `onClickCapture`：**捕获阶段**就拦掉来自浮层内部的点击 ✅
- * 2. 浮层根节点打 `data-scpdf-floating` 标记 ✅
- * 3. 正在批注时**根本不设置**激活态 ✅
- * 4. 安全网：`activeHighlightId` 非空时**保证 1.5s 后清掉** ✅
+ * 1. 容器上加 `onClickCapture`：**捕获阶段**就拦掉来自浮层内部的点击
+ * 2. 浮层根节点打 `data-scpdf-floating` 标记
+ * 3. 正在批注时**根本不设置**激活态
+ * 4. 安全网：`activeHighlightId` 非空时**保证 1.5s 后清掉**
  *
  * 用法：`node scripts/e2e-annotation-dialog-highlight-activate.mjs`
  */

@@ -101,7 +101,7 @@ async function readTitles() {
  * ⚠️ **label 会跟着界面语言变** ❌
  * -> 中文界面里是"中文"，英文界面里就变成"Chinese" ❌
  * -> 按 label 找 -> 切回中文时找不到 ❌
- * -> -> 按 `value="zh"` 切 ✅
+ * -> -> 按 `value="zh"` 切
  */
 async function switchLocale(value) {
   const selects = await page.locator('select').all();

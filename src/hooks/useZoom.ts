@@ -17,11 +17,11 @@ import { anchoredScrollTop } from '../core/store/instance';
  * **缩放范围（默认值）**。
  *
  * ⚠️ 用户反馈："放大缩小这个 是可以用户进行填写比例的
- *   包默认最大是250%，最小是20%，这个上限下限宿主也可以配置"✅
+ *   包默认最大是250%，最小是20%，这个上限下限宿主也可以配置"
  *
- * -> 这两个是**默认值** ✅
- * -> 宿主可以通过 `minScale` / `maxScale` **覆盖** ✅
- * -> 工具栏的 +/- 按钮也用**动态的上下限** ✅
+ * -> 这两个是**默认值**
+ * -> 宿主可以通过 `minScale` / `maxScale` **覆盖**
+ * -> 工具栏的 +/- 按钮也用**动态的上下限**
  */
 export const MIN_SCALE = 0.2;
 export const MAX_SCALE = 2.5;
@@ -44,8 +44,8 @@ export const SCALE_QUANTUM = 0.1;
  * ⚠️ 用户反馈："默认的fitWidth 两边也要留一点空隙的 具体像wps展示的一样"。
  *
  * → 之前只减了 `32`（左右各 16px）-> **几乎贴着边** ❌
- * -> WPS 的样子是**页两侧有明显的留白** ✅
- * -> 现在：左右各留 **`FIT_WIDTH_PADDING`（24px）** ✅
+ * -> WPS 的样子是**页两侧有明显的留白**
+ * -> 现在：左右各留 **`FIT_WIDTH_PADDING`（24px）**
  */
 export const FIT_WIDTH_PADDING = 24;
 
@@ -65,8 +65,8 @@ export const FIT_WIDTH_PADDING = 24;
  * | 230% | **240%** | **220%** |
  * | 90%  | **100%** | **80%** |
  *
- * → **就近**取整（不是向上/向下）-> 连点两次**不会跳过 10%** ✅
- * → 已经在整十数上 -> 直接**加/减一步** ✅
+ * → **就近**取整（不是向上/向下）-> 连点两次**不会跳过 10%**
+ * → 已经在整十数上 -> 直接**加/减一步**
  *
  * @param current 当前比例（2.37 = 237%）
  * @param direction 1 = 放大，-1 = 缩小
@@ -95,13 +95,13 @@ export interface UseZoomOptions {
   /**
    * **最小缩放**（宿主可配）。
    *
-   * -> 不传 -> `MIN_SCALE`（20%）✅
+   * -> 不传 -> `MIN_SCALE`（20%）
    */
   minScale?: number;
   /**
    * **最大缩放**（宿主可配）。
    *
-   * -> 不传 -> `MAX_SCALE`（250%）✅
+   * -> 不传 -> `MAX_SCALE`（250%）
    */
   maxScale?: number;
   /** 缩放变化（写回 store / 触发渲染） */
@@ -132,7 +132,7 @@ export interface UseZoomResult {
   /**
    * 适配宽度（传入容器宽度与页面宽度 pt）。
    *
-   * ⚠️ **传了高度 -> 整页完整可见**（下面不会有滚动条）✅
+   * ⚠️ **传了高度 -> 整页完整可见**（下面不会有滚动条）
    */
   fitWidth: (
     containerWidth: number,
@@ -158,7 +158,7 @@ export interface UseZoomResult {
   /**
    * **当前的缩放上下限**（宿主可配后的实际值）。
    *
-   * -> 工具栏用它来**判断 +/- 按钮要不要置灰** ✅
+   * -> 工具栏用它来**判断 +/- 按钮要不要置灰**
    * -> 之前是**硬编码** 0.2 / 2.5 ❌
    */
   bounds: { min: number; max: number };
@@ -167,9 +167,9 @@ export interface UseZoomResult {
 /**
  * **夹到缩放范围**。
  *
- * ⚠️ **上下限可以由宿主配置**（用户需求）✅
+ * ⚠️ **上下限可以由宿主配置**（用户需求）
  * -> 之前是**硬编码** `MIN_SCALE` / `MAX_SCALE` ❌
- * -> 现在传进来 ✅
+ * -> 现在传进来
  *
  * @param scale 原始比例
  * @param min 最小值
@@ -220,8 +220,8 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
   /*
    * ⚠️ **动态的缩放上下限**（宿主可配）。
    *
-   * -> 用户需求："这个上限下限宿主也可以配置"✅
-   * -> 夹的时候要用**动态的**上下限 ✅
+   * -> 用户需求："这个上限下限宿主也可以配置"
+   * -> 夹的时候要用**动态的**上下限
    */
   const scaleBounds = useMemo(() => ({ min: minScale, max: maxScale }), [minScale, maxScale]);
 
@@ -233,7 +233,7 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
    *
    * ⚠️ wheel 监听是**一次性注册**的（不随 scale 重注册）
    * -> 所以它读到的 `scale` 会**过期** ❌
-   * -> 用 ref 存**最新值** -> 每次滚轮都能拿到当前比例 ✅
+   * -> 用 ref 存**最新值** -> 每次滚轮都能拿到当前比例
    */
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
@@ -328,9 +328,9 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
    *  比如说 fit的时候是237%，那么点击加号或者减号 放大缩小
    *  减号到230加号到240 这里用整十数"）。
    *
-   * → 逻辑抽成了纯函数 \`stepScaleByQuantum\`（**可单测**）✅
-   * → 237% 放大 -> **240%** ✅
-   * → 237% 缩小 -> **230%** ✅
+   * → 逻辑抽成了纯函数 \`stepScaleByQuantum\`（**可单测**）
+   * → 237% 放大 -> **240%**
+   * → 237% 缩小 -> **230%**
    */
   const zoomIn = useCallback(() => {
     setScale(stepScaleByQuantum(scale, 1));
@@ -352,16 +352,16 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
    * -> 之前减 `32`（左右各 16px）-> 页宽还是**比容器宽** ❌
    *   （实测：容器 1384px、页宽 1408px -> **下面出现横向滚动条** ❌
    *    -> 这就是用户说的"fitWidth 的时候下面还会出现滚动条"）
-   * -> 现在减 `FIT_WIDTH_PADDING * 2`（左右各 24px）✅
-   *   -> 页宽 = 1384 - 48 = 1336px < 容器 -> **没有横向滚动条** ✅
-   *   -> 而且**页两边有留白**（WPS 那样）✅
+   * -> 现在减 `FIT_WIDTH_PADDING * 2`（左右各 24px）
+   *   -> 页宽 = 1384 - 48 = 1336px < 容器 -> **没有横向滚动条**
+   *   -> 而且**页两边有留白**（WPS 那样）
    *
    * ⚠️ **不按高度限制**（实测踩过的坑）：
    *
    * -> 一开始想"也按高度算，取小的那个" -> 页变成 **90%** ❌
    *   -> 竖版页（612×792pt）按宽度算是 218% -> 按高度算只有 99% ❌
    *   -> **取小的** -> 页变得很小 -> **所有依赖坐标的 E2E 全挂** ❌
-   * -> 用户要的是"宽度适配 + 两边留白" -> **只按宽度** ✅
+   * -> 用户要的是"宽度适配 + 两边留白" -> **只按宽度**
    *
    * @param containerWidth 容器可用宽度（px）
    * @param pageWidth 页面宽度（pt，scale=1 时的尺寸）
@@ -421,10 +421,10 @@ export function useZoom(options: UseZoomOptions): UseZoomResult {
    *
    * ### 现在的做法
    *
-   * -> 在容器上监听 \`wheel\` -> **只有按住 Ctrl（或 Cmd）才拦** ✅
-   *   -> 不按 Ctrl -> **不拦** -> 页面正常滚动 ✅（不能抢用户的滚动）
-   * -> \`preventDefault\` -> **不让浏览器自己缩放页面**（那个是整个网页缩放）✅
-   * -> 缩放**就近取整到 10%**（和 +/- 按钮一样）✅
+   * -> 在容器上监听 \`wheel\` -> **只有按住 Ctrl（或 Cmd）才拦**
+   *   -> 不按 Ctrl -> **不拦** -> 页面正常滚动  （不能抢用户的滚动）
+   * -> \`preventDefault\` -> **不让浏览器自己缩放页面**（那个是整个网页缩放）
+   * -> 缩放**就近取整到 10%**（和 +/- 按钮一样）
    *
    * ⚠️ **监听用 \`{ passive: false }\`** -> 否则 \`preventDefault\` **不生效** ❌
    */

@@ -11,20 +11,20 @@
  *
  * | antd 的行为 | 本实现 |
  * |---|---|
- * | 顶部居中，浮在页面上方 | ✅ |
- * | `success` / `error` / `warning` / `info` / `loading` 五种类型 | ✅ |
- * | 图标 + 文案 + 可选操作按钮 | ✅ |
- * | 3 秒自动消失（可关） | ✅ |
- * | 多个 toast **堆叠**（新的在下面） | ✅ |
- * | 淡入 + 轻微上移 | ✅ |
- * | 支持 `Promise` 形态（自动 loading → success/error） | ✅ |
- * | `key` 去重（同 key 更新而不是新增） | ✅ |
+ * | 顶部居中，浮在页面上方 |  |
+ * | `success` / `error` / `warning` / `info` / `loading` 五种类型 |  |
+ * | 图标 + 文案 + 可选操作按钮 |  |
+ * | 3 秒自动消失（可关） |  |
+ * | 多个 toast **堆叠**（新的在下面） |  |
+ * | 淡入 + 轻微上移 |  |
+ * | 支持 `Promise` 形态（自动 loading → success/error） |  |
+ * | `key` 去重（同 key 更新而不是新增） |  |
  *
  * ## 包的边界
  *
  * → 包只给 **UI + 事件**
- * → 宿主要自己弹 toast → 传 `onToast` 回调 ✅
- * → 包**自己也内置**一套（默认用内置的，宿主不干预就看不到任何东西）✅
+ * → 宿主要自己弹 toast → 传 `onToast` 回调
+ * → 包**自己也内置**一套（默认用内置的，宿主不干预就看不到任何东西）
  */
 
 import type { ReactNode } from 'react';
@@ -95,7 +95,7 @@ export interface ToastController {
    * });
    * ```
    *
-   * → 自动 loading → success / error ✅
+   * → 自动 loading → success / error
    */
   loadingPromise: (
     message: string,

@@ -42,7 +42,7 @@ export interface ThumbnailPanelProps {
   /**
    * **宿主注册的语言表**（可添加任意语言）。
    *
-   * → 内置 zh / en；宿主用这个加别的语言 ✅
+   * → 内置 zh / en；宿主用这个加别的语言
    */
   locales?: LocaleTable;
 }

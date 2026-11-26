@@ -39,16 +39,16 @@ export interface ExtractSelectionInput {
   /**
    * **只保留这个页码范围内的矩形**（可选）。
    *
-   * ⚠️ **跨页选择的关键**（实测踩到的坑）✅
+   * ⚠️ **跨页选择的关键**（实测踩到的坑）
    *
    * -> 浏览器在**自动滚动**后会把 Range **向前扩展到页首** ❌
    *    -> 选区长度 1726 字符（本来只有 ~84）❌
    *    -> 页 1 的**页眉**（"上海人工智能实验室"）也被选中了 ❌
    * -> -> 高亮全落在**第 1 页** ❌
-   *    -> 用户反馈："第二页的内容也高亮到了第一页" ✅
+   *    -> 用户反馈："第二页的内容也高亮到了第一页"
    *
-   * -> 精确的做法：只保留**起点页 ~ 终点页**的矩形 ✅
-   * -> 起点页 = 起点所在的页；终点页 = 终点所在的页 ✅
+   * -> 精确的做法：只保留**起点页 ~ 终点页**的矩形
+   * -> 起点页 = 起点所在的页；终点页 = 终点所在的页
    */
   pageRange?: { from: number; to: number };
   /** 选中的文本 */
@@ -97,7 +97,7 @@ export interface ExtractSelectionInput {
  * ### 修法
  *
  * - **归页**：按**重叠面积最大**（重叠 0 → 不属于任何页 → 丢弃）
- * - **裁剪**：归页后把矩形**裁到该页的范围内** → 不会有部分跑到页外 ✅
+ * - **裁剪**：归页后把矩形**裁到该页的范围内** → 不会有部分跑到页外
  *
  * @param rect 矩形
  * @param pages 页框
@@ -132,7 +132,7 @@ export function pageOfRect(rect: RectInput, pages: PageFrame[]): number | null {
      * ⚠️ **平局时归后一页**（>= 而不是 >）。
      *
      * → 跨页的矩形正好被页边界平分时，**内容在后面**（用户往后拖）
-     * → 归后一页 → 选区的"尾巴"保住了 ✅
+     * → 归后一页 → 选区的"尾巴"保住了
      */
     if (overlap >= bestOverlap) {
       bestOverlap = overlap;
@@ -148,7 +148,7 @@ export function pageOfRect(rect: RectInput, pages: PageFrame[]): number | null {
  *
  * ⚠️ 用户反馈："跨页选择…有时候是负的 就是不在页面上"
  * → 浏览器给的跨页矩形会**贯穿两页** → 不裁的话，下半截在页外 ❌
- * → 裁到该页范围内 → 几何永远在页内 ✅
+ * → 裁到该页范围内 → 几何永远在页内
  *
  * @param rect 矩形（页内坐标还没减之前）
  * @param page 页框
@@ -193,14 +193,14 @@ export function extractSelection(input: ExtractSelectionInput): SelectionData | 
     }
 
     /*
-     * ⚠️⚠️ **丢掉【起点页之前】和【终点页之后】的矩形** ✅
+     * ⚠️⚠️ **丢掉【起点页之前】和【终点页之后】的矩形**
      *
      * -> 跨页拖选时浏览器**自动滚动** ❌
      * -> 滚动后 Range 被**向前扩展到页首** ❌
      *    -> 页 1 开头的东西全被选中了 ❌
-     * -> -> 只保留**起点页 ~ 终点页** ✅
-     *    -> 页 1 的页眉被丢掉 ✅
-     *    -> 页 2 的内容保留 ✅
+     * -> -> 只保留**起点页 ~ 终点页**
+     *    -> 页 1 的页眉被丢掉
+     *    -> 页 2 的内容保留
      */
     if (pageRange) {
       if (pageNumber < pageRange.from || pageNumber > pageRange.to) {
@@ -221,7 +221,7 @@ export function extractSelection(input: ExtractSelectionInput): SelectionData | 
      *
      * → 浏览器给的**跨页矩形会贯穿两页**（比如从第 1 页最后一行到第 2 页第一行）
      * → 归给第 1 页的话，下半截在**第 2 页的位置上** → 渲染时跑到页外 ❌
-     * → 裁到该页范围内 → 几何**永远在页内** ✅
+     * → 裁到该页范围内 → 几何**永远在页内**
      */
     const clipped = clipRectToPage(rect, page);
 

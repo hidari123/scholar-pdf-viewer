@@ -76,7 +76,7 @@ describe('usePrint（审核补测）', () => {
     expect(scale).not.toBe('');
     const value = Number.parseFloat(scale);
     expect(value).toBeGreaterThan(0);
-    // ⚠️ **A4 比 A4 页面小一点** -> 缩放应该 < 1 ✅
+    // ⚠️ **A4 比 A4 页面小一点** -> 缩放应该 < 1
     expect(value).toBeLessThan(1);
   });
 
@@ -90,23 +90,23 @@ describe('usePrint（审核补测）', () => {
   });
 
   /*
-   * ⚠️⚠️ **打印只出前几页**（用户反馈 ✅）
+   * ⚠️⚠️ **打印只出前几页**（用户反馈）
    *
    * > "打印纵向只出前几页"
    *
-   * ## 根因 ✅
+   * ## 根因
    *
-   * -> Chrome 的打印分页按**布局盒高度**算 ✅
-   * -> -> 如果页的 layout box **没被缩** ✅
-   * -> -> 一张 A4（1032px）塞不下 1821px 的页 ✅
+   * -> Chrome 的打印分页按**布局盒高度**算
+   * -> -> 如果页的 layout box **没被缩**
+   * -> -> 一张 A4（1032px）塞不下 1821px 的页
    * -> -> 每页占 **2 张纸** ✅ -> **后面的页被挤出打印范围** ✅ ❌
    *
-   * ## 断言 ✅
+   * ## 断言
    *
-   * -> **缩放后的页高** <= **A4 可打印高度** ✅
-   * -> -> 这样才**一页一张纸** ✅ ✅
+   * -> **缩放后的页高** <= **A4 可打印高度**
+   * -> -> 这样才**一页一张纸**
    */
-  it('**缩放后的页高要放得进一张 A4**（否则会跨纸 ✅）', async () => {
+  it('**缩放后的页高要放得进一张 A4**（否则会跨纸）', async () => {
     const root = makeRoot();
     renderHook(() => usePrint({ root, paper: 'A4', orientation: 'portrait' }));
     await waitFrames();
@@ -114,7 +114,7 @@ describe('usePrint（审核补测）', () => {
     const scale = Number.parseFloat(root.style.getPropertyValue('--scpdf-print-scale'));
     const pageHeight = 1821.6;
 
-    // ⚠️ **A4 纵向减去边距**（12mm × 4 ✅）-> 703 × 1032 px ✅
+    // ⚠️ **A4 纵向减去边距**（12mm × 4）-> 703 × 1032 px
     const printableHeight = (297 - 12 - 12) * (96 / 25.4);
 
     expect(scale).toBeGreaterThan(0);
@@ -122,29 +122,29 @@ describe('usePrint（审核补测）', () => {
   });
 
   /*
-   * ⚠️⚠️ **打印的页面显示不全**（用户反馈 ✅）
+   * ⚠️⚠️ **打印的页面显示不全**（用户反馈）
    *
    * > "打印的页面显示也不全 只能展示出来已经缓存的一些 后面都是空白页"
    *
-   * ## 根因 ✅
+   * ## 根因
    *
-   * -> 页是**虚拟化渲染**的 ✅ -> 平时只渲染**看得见的** ✅ ✅
-   * -> -> 打印时开始渲染**所有页** ✅
-   * -> -> **但 canvas 渲染是异步的** ✅
+   * -> 页是**虚拟化渲染**的  -> 平时只渲染**看得见的**
+   * -> -> 打印时开始渲染**所有页**
+   * -> -> **但 canvas 渲染是异步的**
    * -> -> 原来只等 **2 帧** ✅ -> 14 页**画不完** ✅ ❌
    * -> -> 打印开始时只有**前 2~3 页**有内容 ✅ -> 后面是**空白页** ✅ ❌
    *
-   * ## 修法 ✅
+   * ## 修法
    *
-   * -> 等到**每个 canvas 都画上有内容** ✅ 或者**超时兜底** ✅ ✅
+   * -> 等到**每个 canvas 都画上有内容**  或者**超时兜底**
    */
-  it('**会等所有页的 canvas 画完**（不然后面是空白页 ✅）', async () => {
+  it('**会等所有页的 canvas 画完**（不然后面是空白页）', async () => {
     const root = makeRoot();
     /*
-     * ⚠️ **给 canvas 打桩** ✅
+     * ⚠️ **给 canvas 打桩**
      *
-     * -> jsdom **没有真实的 2D 上下文** ✅ -> `getContext('2d')` ✅ 返回 null ✅
-     * -> -> 我们**造一个假的** ✅ -> 能测"等待"这个逻辑 ✅ ✅
+     * -> jsdom **没有真实的 2D 上下文**  -> `getContext('2d')`  返回 null
+     * -> -> 我们**造一个假的**  -> 能测"等待"这个逻辑
      */
     const originalGetContext = HTMLCanvasElement.prototype.getContext;
     let painted = false;
@@ -181,13 +181,13 @@ describe('usePrint（审核补测）', () => {
       await waitFrames();
       result.current.print();
 
-      // ⚠️ **还没画完 -> 不应该打印** ✅
+      // ⚠️ **还没画完 -> 不应该打印**
       await act(async () => {
         await new Promise((r) => setTimeout(r, 30));
       });
       expect(printed).toBe(false);
 
-      // ⚠️ **画完了 -> 才打印** ✅
+      // ⚠️ **画完了 -> 才打印**
       painted = true;
       await act(async () => {
         await new Promise((r) => setTimeout(r, 30));
@@ -215,12 +215,12 @@ describe('usePrint（审核补测）', () => {
     const landscape = Number.parseFloat(root.style.getPropertyValue('--scpdf-print-scale'));
 
     /*
-     * ⚠️⚠️ **横向 A4 更【矮】，不是更宽** ✅
+     * ⚠️⚠️ **横向 A4 更【矮】，不是更宽**
      *
-     * -> 竖向 A4: 210 x 297 mm -> 内容区 703 x **1032** px ✅
-     * -> 横向 A4: 297 x 210 mm -> 内容区 1032 x **703** px ✅
-     * -> 页高 1821px -> 竖向受限于 1032px（scale 0.50）✅
-     *                -> 横向受限于  703px（scale 0.39）✅
+     * -> 竖向 A4: 210 x 297 mm -> 内容区 703 x **1032** px
+     * -> 横向 A4: 297 x 210 mm -> 内容区 1032 x **703** px
+     * -> 页高 1821px -> 竖向受限于 1032px（scale 0.50）
+     *                -> 横向受限于  703px（scale 0.39）
      * -> -> **横向的缩放更小** ✅（不是更大 ❌）
      */
     expect(landscape).toBeLessThan(portrait);

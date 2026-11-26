@@ -14,14 +14,14 @@
  *
  * ### 现在
  *
- * → **高亮色板内置** → 不传也能用 ✅
- * → **语言表内置**（`ja` / `fr`）→ 宿主不用再写一整套 ✅
- * → 宿主传了 → **覆盖内置的**（优先级：prop > config > 内置默认）✅
+ * → **高亮色板内置** → 不传也能用
+ * → **语言表内置**（`ja` / `fr`）→ 宿主不用再写一整套
+ * → 宿主传了 → **覆盖内置的**（优先级：prop > config > 内置默认）
  *
  * ## 边界（不变）
  *
- * → 内置的是**视觉/文案**，不是业务 → 不违反"包只做 PDF"的边界 ✅
- * → 宿主想换主题色/换语言 → 传配置覆盖 ✅
+ * → 内置的是**视觉/文案**，不是业务 → 不违反"包只做 PDF"的边界
+ * → 宿主想换主题色/换语言 → 传配置覆盖
  */
 
 import type { Locale, LocaleMessages, LocaleTable } from '../../i18n/messages';
@@ -33,23 +33,23 @@ import { DEFAULT_HIGHLIGHT_PALETTE } from '../highlight/palette';
 /**
  * **内置的语言表**。
  *
- * ⚠️ **只包含"包自己的 UI 文案"** → 宿主自己的文案宿主自己管 ✅
+ * ⚠️ **只包含"包自己的 UI 文案"** → 宿主自己的文案宿主自己管
  *
  * ### 内置哪些语言
  *
- * - **中文（`zh`）** —— 内置 ✅
- * - **英文（`en`）** —— 内置 ✅
- * - 日文（`ja`）/ 法文（`fr`）—— 也内置了（宿主不用再写一整套）✅
- * - 宿主想加 `ko` / `de` / `es` → 传 `locales` 注册 ✅
+ * - **中文（`zh`）** —— 内置
+ * - **英文（`en`）** —— 内置
+ * - 日文（`ja`）/ 法文（`fr`）—— 也内置了（宿主不用再写一整套）
+ * - 宿主想加 `ko` / `de` / `es` → 传 `locales` 注册
  *
  * ### 为什么把 `zh` / `en` 也放进这张表
  *
  * → 之前 `zh` / `en` 在 `MESSAGES` 里，`ja` / `fr` 在这里 → **两套地方** ❌
  * → 宿主想覆盖中文里的**某一句**时，得知道去改哪里 ❌
- * → 现在**统一成一张表** → 宿主传 `locales={{ zh: {...} }}` 就能覆盖 ✅
+ * → 现在**统一成一张表** → 宿主传 `locales={{ zh: {...} }}` 就能覆盖
  *
- * ⚠️ `zh` / `en` 的**权威来源**仍然是 `MESSAGES`（`resolveMessage` 的最后兜底）✅
- * → 这里只是**再抄一份** → 让"内置语言"和"扩展语言"的处理方式**完全一致** ✅
+ * ⚠️ `zh` / `en` 的**权威来源**仍然是 `MESSAGES`（`resolveMessage` 的最后兜底）
+ * → 这里只是**再抄一份** → 让"内置语言"和"扩展语言"的处理方式**完全一致**
  */
 export const BUILTIN_LOCALES: LocaleTable = {
   /** 中文（内置） */
@@ -281,7 +281,7 @@ export const BUILTIN_LOCALES: LocaleTable = {
 /**
  * **内置的高亮色板**。
  *
- * → 和 `DEFAULT_HIGHLIGHT_PALETTE` 一样（独立导出方便宿主引用）✅
+ * → 和 `DEFAULT_HIGHLIGHT_PALETTE` 一样（独立导出方便宿主引用）
  */
 export const BUILTIN_HIGHLIGHT_PALETTE: HighlightPalette = DEFAULT_HIGHLIGHT_PALETTE;
 
@@ -292,8 +292,8 @@ export const BUILTIN_HIGHLIGHT_PALETTE: HighlightPalette = DEFAULT_HIGHLIGHT_PAL
  *   （实测：工具栏里只有 13 个按钮，**没有"高亮底色"** ❌
  *    -> 用户反馈"高亮效果也没出来" —— 其实是**按钮都没出来** ❌）
  *
- * -> 现在：**内置一份** -> 不传也有高亮按钮 ✅
- * -> 宿主传了 -> **覆盖内置的** ✅
+ * -> 现在：**内置一份** -> 不传也有高亮按钮
+ * -> 宿主传了 -> **覆盖内置的**
  */
 export const BUILTIN_ANNOTATION_PALETTE: RichTextPalette = {
   yellow: '#fff3a3',
@@ -309,11 +309,11 @@ export const BUILTIN_ANNOTATION_PALETTE: RichTextPalette = {
  *
  * ## ⚠️⚠️ **必须是【深色】**（用户反馈："如果是放在文字上 就太浅了 文字可以适当加深颜色"）
  *
- * -> `BUILTIN_ANNOTATION_PALETTE` 是**高亮底色**（\`#fff3a3\` 这种浅色）✅
+ * -> `BUILTIN_ANNOTATION_PALETTE` 是**高亮底色**（\`#fff3a3\` 这种浅色）
  * -> 拿来当**文字颜色** -> **浅得看不见** ❌
- * -> 所以**单独一份深色板** ✅
+ * -> 所以**单独一份深色板**
  *
- * -> 深色板同时也能当**文字高亮**的底色（对比度更好）✅
+ * -> 深色板同时也能当**文字高亮**的底色（对比度更好）
  *
  * | 语义 key | 颜色 | 用途 |
  * |---|---|---|
@@ -339,8 +339,8 @@ export const BUILTIN_ANNOTATION_TEXT_PALETTE: RichTextPalette = {
  * **推断默认语言**。
  *
  * → 之前是硬编码 `zh` → 很多宿主其实是英文站点 ❌
- * → 现在用**浏览器语言**推断 → 落在支持的语言上 ✅
- * → 宿主可以显式传 `locale` 覆盖 ✅
+ * → 现在用**浏览器语言**推断 → 落在支持的语言上
+ * → 宿主可以显式传 `locale` 覆盖
  *
  * @param fallback 推断不出来时的兜底
  * @returns 语言代码
@@ -370,7 +370,7 @@ export function detectDefaultLocale(fallback: Locale = 'zh'): Locale {
 /**
  * **合并语言表**（宿主的 + 内置的）。
  *
- * → 宿主的**优先级更高**（能覆盖内置的某一句）✅
+ * → 宿主的**优先级更高**（能覆盖内置的某一句）
  *
  * @param hostLocales 宿主注册的语言表
  * @returns 合并后的语言表

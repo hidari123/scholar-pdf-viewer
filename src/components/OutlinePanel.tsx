@@ -36,7 +36,7 @@ export interface OutlinePanelProps {
   /**
    * **宿主注册的语言表**（可添加任意语言）。
    *
-   * → 内置 zh / en；宿主用这个加别的语言 ✅
+   * → 内置 zh / en；宿主用这个加别的语言
    */
   locales?: LocaleTable;
 }
@@ -92,7 +92,7 @@ export function OutlinePanel(props: OutlinePanelProps) {
    * → 宿主的 `pageRefToNumber` 依赖**异步**解析（pdf.js 的 `getPageIndex`）
    * → 目录**第一次渲染**时映射还是空的 → `pageNumber === null`
    * → 之前：**按钮 disabled** → 用户点了**没反应**（像是坏了）❌
-   * → 现在：**按钮可点** → 记下意图 → 映射好了**自动跳** ✅
+   * → 现在：**按钮可点** → 记下意图 → 映射好了**自动跳**
    */
   const [pendingTargetId, setPendingTargetId] = useState<string | null>(null);
 
@@ -128,7 +128,7 @@ export function OutlinePanel(props: OutlinePanelProps) {
    * -> 宿主既没给 `pageRefToNumber`，也没给 `resolvePageRef` ❌
    *   -> 目录项的 `pageNumber` **全是 null** ❌
    *   -> 用户点了**没反应**，看起来像坏了 ❌
-   * -> 现在：**显示一条提示** ✅（告诉用户要提供映射）
+   * -> 现在：**显示一条提示**  （告诉用户要提供映射）
    */
   const allUnresolved = flatItems.length > 0 && flatItems.every((item) => item.pageNumber === null);
 
@@ -183,7 +183,7 @@ export function OutlinePanel(props: OutlinePanelProps) {
                   /*
                    * ⚠️ **页码还没解析出来 → 记下意图**（不是无反应）。
                    *
-                   * → 映射就绪后自动跳（见上面的 effect）✅
+                   * → 映射就绪后自动跳（见上面的 effect）
                    */
                   setPendingTargetId(item.id);
                 }}

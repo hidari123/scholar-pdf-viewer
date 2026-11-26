@@ -63,7 +63,7 @@ describe('isBuiltinIcon', () => {
      * -> 之前 `SelectionActionIcon` 里有 `'delete'` -> 但 `IconName` 里叫 `'trash'` ❌
      *    -> 宿主写 `icons={{ delete: <X/> }}` **类型报错** ❌
      *    -> 运行时靠一层映射兜底 ❌
-     * -> 现在：**只有 `'trash'`** -> 两边永远一致 ✅
+     * -> 现在：**只有 `'trash'`** -> 两边永远一致
      */
     for (const name of ['highlight', 'copy', 'translate', 'note', 'ask', 'explain', 'trash']) {
       expect(isBuiltinIcon(name)).toBe(true);

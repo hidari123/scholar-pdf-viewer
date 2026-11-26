@@ -9,9 +9,9 @@ import { ToolbarHighlightButton } from './ToolbarHighlightButton';
  * "包工具栏的高亮也需要加个下拉箭头 可以选择颜色
  *  如果没有选就是默认的高亮色"）。
  *
- * -> 主按钮 = 用**当前色**高亮 ✅
- * -> ▾ 箭头 = 展开颜色下拉 ✅
- * -> 没选过颜色 = **默认色** ✅
+ * -> 主按钮 = 用**当前色**高亮
+ * -> ▾ 箭头 = 展开颜色下拉
+ * -> 没选过颜色 = **默认色**
  */
 const PALETTE = {
   yellow: '#ffd54a',
@@ -56,12 +56,12 @@ describe('ToolbarHighlightButton', () => {
     const swatches = document.querySelectorAll<HTMLElement>('.scpdf-toolbar__color-swatch');
     fireEvent.click(swatches[1] as HTMLElement);
 
-    // ⚠️ **选了就要立刻高亮** ✅
+    // ⚠️ **选了就要立刻高亮**
     expect(onHighlight).toHaveBeenCalledWith('green');
-    // ⚠️ **下拉要关掉** ✅
+    // ⚠️ **下拉要关掉**
     expect(document.querySelectorAll('.scpdf-toolbar__color-swatch').length).toBe(0);
 
-    // ⚠️ **之后主按钮用这个色** ✅
+    // ⚠️ **之后主按钮用这个色**
     onHighlight.mockClear();
     fireEvent.click(screen.getByRole('button', { name: '高亮' }));
     expect(onHighlight).toHaveBeenCalledWith('green');

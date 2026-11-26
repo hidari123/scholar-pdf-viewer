@@ -159,18 +159,18 @@ export function PaperReader({ paperId, fileUrl }: Props) {
 
 ### pdf.js 的接线（**内置的**）
 
-> 💡 **宿主什么都不用做** ✅
-> -> 包会**自动加载** `pdfjs-dist` 并设好 worker ✅
-> -> 上面这段代码**直接就能跑** ✅（实测：18 页正常渲染 ✅）
+> 💡 **宿主什么都不用做**
+> -> 包会**自动加载** `pdfjs-dist` 并设好 worker
+> -> 上面这段代码**直接就能跑**  （实测：18 页正常渲染）
 
 #### 想自己控制 pdf.js？
 
--> 传 `getDocInfo` / `getPage` / `getPageSizes` ✅
--> **完全覆盖**内置的 ✅
+-> 传 `getDocInfo` / `getPage` / `getPageSizes`
+-> **完全覆盖**内置的
 -> 什么时候需要：
-- 想用**别的 pdf.js 版本** ✅
-- 想自己配 **worker**（比如 CDN / 跨域）✅
-- 想用 **CMaps / 标准字体**（中文 PDF 常见）✅
+- 想用**别的 pdf.js 版本**
+- 想自己配 **worker**（比如 CDN / 跨域）
+- 想用 **CMaps / 标准字体**（中文 PDF 常见）
 
 ```tsx
 import * as pdfjs from 'pdfjs-dist';
@@ -205,7 +205,7 @@ type DocumentSource = string | Blob | ArrayBuffer | Uint8Array;
 <PdfViewer file={urlA} documentId="doc" />
 <PdfViewer file={urlB} documentId="doc" />
 
-// ✅ documentId 跟着变
+//  documentId 跟着变
 <PdfViewer file={urlB} documentId={`doc_${paperId}`} />
 ```
 
@@ -259,7 +259,7 @@ interface NormPosition {
 // ❌ 两个都传 -> 保存两次
 onHighlight={save} onHighlightCreate={save}
 
-// ✅ 二选一
+//  二选一
 onHighlight={save}
 ```
 
@@ -289,35 +289,35 @@ hover 便签 → 点"展开"
    └─ 点"✕"    → 关闭
 ```
 
--> 同一行有多条批注 -> 自动**合并成一个图标**（带角标）✅
--> hover 那个图标 -> 弹出**选择列表** -> 点某项 -> **打开那一条的详情** ✅
--> 列表在右边放不下 -> **自动翻到左边** ✅
+-> 同一行有多条批注 -> 自动**合并成一个图标**（带角标）
+-> hover 那个图标 -> 弹出**选择列表** -> 点某项 -> **打开那一条的详情**
+-> 列表在右边放不下 -> **自动翻到左边**
 
 ### 工具栏的三个新能力（第 27 轮）
 
 #### 主题（🎨）
 
--> 包**内置 7 个主题**，宿主传 `onThemeChange` 就能在工具栏里切 ✅
--> 不传 -> **不显示按钮** ✅
--> 详见 `docs/API.md` ✅
+-> 包**内置 7 个主题**，宿主传 `onThemeChange` 就能在工具栏里切
+-> 不传 -> **不显示按钮**
+-> 详见 `docs/API.md`
 
 #### 缩放比例可以**填写**
 
--> 工具栏的比例**点一下就能填**（回车生效，Esc 放弃）✅
--> 上下限（`minScale` / `maxScale`）和**能不能填**（`allowScaleInput`）宿主可配 ✅
+-> 工具栏的比例**点一下就能填**（回车生效，Esc 放弃）
+-> 上下限（`minScale` / `maxScale`）和**能不能填**（`allowScaleInput`）宿主可配
 
 #### 高亮不用每次都选颜色
 
--> 点 **🖍** = **直接用当前色**高亮 ✅
--> 点 **▾** = 展开颜色下拉 ✅
--> 当前色 = 上次选的 / **`defaultHighlightColor`**（宿主可配）✅
+-> 点 **🖍** = **直接用当前色**高亮
+-> 点 **▾** = 展开颜色下拉
+-> 当前色 = 上次选的 / **`defaultHighlightColor`**（宿主可配）
 
 ### 打印：一页一张纸（竖向 + 横向）
 
--> 打印时页会**按纸张缩放** ✅
--> **竖向 A4**：18 页 -> **18 张纸** ✅
--> **横向 A4**：18 页 -> **18 张纸** ✅
--> 宿主可以指定方向 ✅
+-> 打印时页会**按纸张缩放**
+-> **竖向 A4**：18 页 -> **18 张纸**
+-> **横向 A4**：18 页 -> **18 张纸**
+-> 宿主可以指定方向
 
 ```tsx
 <PdfViewer
@@ -326,15 +326,15 @@ hover 便签 → 点"展开"
 />;
 ```
 
-> ⚠️ **`auto`** = 跟着用户打印对话框里的方向走 ✅
+> ⚠️ **`auto`** = 跟着用户打印对话框里的方向走
 
 ### ⚠️ **打印时不会泄露批注内容**
 
 -> 用户反馈："导出带高亮的pdf的时候 如果悬浮在pdf上
--> 会有黄色框的便签展示出高亮pdf的内容 不要这个"✅
--> **打印时**（浏览器的"打印"）-> 便签 / 详情面板 / 弹窗**全部藏起来** ✅
+-> 会有黄色框的便签展示出高亮pdf的内容 不要这个"
+-> **打印时**（浏览器的"打印"）-> 便签 / 详情面板 / 弹窗**全部藏起来**
 -> 否则**批注正文会被打印出去**（隐私泄露）❌✅
--> ⚠️ **"导出 PDF"是另一条路** -> 走**真 PDF 批注** -> 本来就没有这个问题 ✅
+-> ⚠️ **"导出 PDF"是另一条路** -> 走**真 PDF 批注** -> 本来就没有这个问题
 
 ### ⚠️ HTML 已经消毒过
 
@@ -433,16 +433,16 @@ import { TipTapEditor } from '@scholar-space/pdf-viewer/editor';
 
 > ⚠️ **`locale` 优先于页面的 `dir`**：
 > 宿主页面是 `dir="rtl"`（阿拉伯语站点）但组件 `locale="en"` ->
-> 组件**保持 LTR**（英文按钮不该反）✅
+> 组件**保持 LTR**（英文按钮不该反）
 
 ### 镜像了什么
 
-| 部位             | 处理                                                 |
-| ---------------- | ---------------------------------------------------- |
-| 文字方向         | 根节点 `dir="rtl"` -> **浏览器自己处理** ✅          |
-| 工具栏 / 侧栏    | CSS 镜像 ✅                                          |
-| **翻页箭头**     | **单独翻转**（`scaleX(-1)`）-> RTL 里"下一页"朝左 ✅ |
-| **PDF 页面本身** | **不镜像**（PDF 的内容方向是它自己的事）✅           |
+| 部位             | 处理                                              |
+| ---------------- | ------------------------------------------------- |
+| 文字方向         | 根节点 `dir="rtl"` -> **浏览器自己处理**          |
+| 工具栏 / 侧栏    | CSS 镜像                                          |
+| **翻页箭头**     | **单独翻转**（`scaleX(-1)`）-> RTL 里"下一页"朝左 |
+| **PDF 页面本身** | **不镜像**（PDF 的内容方向是它自己的事）          |
 
 ---
 
@@ -475,7 +475,7 @@ const es = {
 >
 > -> 之前是 `messages={{ 'load.loading': '…' }}`（**不绑语言**）❌
 >   -> 那些句子在**任何语言**下都生效 -> 切语言还是中文 -> **中英文混杂** ❌
-> -> 现在：`messages={{ zh: { … } }}` ✅ -> **换语言只影响对应语言的那份** ✅
+> -> 现在：`messages={{ zh: { … } }}`  -> **换语言只影响对应语言的那份**
 
 ```tsx
 <PdfViewer locale="zh" messages={{ zh: { 'load.loading': '正在打开…' } }} />;
@@ -490,7 +490,7 @@ const toolbar = [{ command: 'bold' as const, label: '{my.bold}', icon: 'bold' as
 ```
 
 > ⚠️ **宿主自己的 UI 也要自己接 `locale`**（包的 i18n 只管包里的文字）。
-> -> demo 里演示了正确的做法（见 `demo/src/demo-i18n.ts`）✅
+> -> demo 里演示了正确的做法（见 `demo/src/demo-i18n.ts`）
 
 > 💡 `label` 写 `{xxx.yyy}` 形式 → 包会拿 `xxx.yyy` 去查文案表。
 
@@ -507,7 +507,7 @@ const toolbar = [{ command: 'bold' as const, label: '{my.bold}', icon: 'bold' as
 
 -> 之前只有**一个**色板（浅色）❌
 -> 拿来当**文字颜色** -> **浅得看不见** ❌
--> 所以**文字颜色必须用深色板** ✅
+-> 所以**文字颜色必须用深色板**
 
 ### 工具栏里的三个颜色命令
 
@@ -517,7 +517,7 @@ const toolbar = [{ command: 'bold' as const, label: '{my.bold}', icon: 'bold' as
 | `textHighlight` | 文字高亮（**字色不变**） | `annotationPalette`     |
 | `foreColor`     | 文字颜色（**字色**）     | `annotationTextPalette` |
 
--> `textHighlight` **只加背景色，字色完全不变** ✅（WPS 的"突出显示"）
+-> `textHighlight` **只加背景色，字色完全不变** （WPS 的"突出显示"）
 
 ### 换掉色板
 
@@ -528,8 +528,8 @@ const toolbar = [{ command: 'bold' as const, label: '{my.bold}', icon: 'bold' as
 />;
 ```
 
--> 不传也有内置的 ✅
--> 传了**覆盖**内置 ✅
+-> 不传也有内置的
+-> 传了**覆盖**内置
 
 ---
 
@@ -566,7 +566,7 @@ const toolbar = [{ command: 'bold' as const, label: '{my.bold}', icon: 'bold' as
 
 > 💡 `appearance.showOutline` / `showThumbnails` / `showSearch` 是**上层开关**，
 > **优先级高于** `toolbar.showOutline` 等 —— 宿主用 `appearance` 统一控制，
-> 用 `toolbar` 做细调 ✅
+> 用 `toolbar` 做细调
 
 ### CSS 变量
 
@@ -594,7 +594,7 @@ const toolbar = [{ command: 'bold' as const, label: '{my.bold}', icon: 'bold' as
 <PdfViewer features={{ print: true }} />; // 默认就是 true
 ```
 
-> ✅ 打印按钮和缩放按钮**互相独立** —— `toolbar={{ showZoom: false }}` **不会**隐藏打印按钮。
+>  打印按钮和缩放按钮**互相独立** —— `toolbar={{ showZoom: false }}` **不会**隐藏打印按钮。
 
 ### 打印纸张
 
@@ -609,7 +609,7 @@ const toolbar = [{ command: 'bold' as const, label: '{my.bold}', icon: 'bold' as
 <PdfViewer printMargin={{ top: 20, bottom: 20 }} />
 ```
 
-> ✅ 也可以写进 `config`：`config={{ printPaper: 'Letter' }}`（prop 优先）。
+>  也可以写进 `config`：`config={{ printPaper: 'Letter' }}`（prop 优先）。
 
 ---
 
@@ -755,9 +755,9 @@ await cache.init();  // ⚠️ 要先 init（失败会自动降级为内存）
 
 ### 性能建议
 
-- ✅ 传 `getPageSizes`（跳页才准）
-- ✅ 用 `documentId` 复用缓存
-- ✅ 高亮用归一化坐标（渲染快）
+-  传 `getPageSizes`（跳页才准）
+-  用 `documentId` 复用缓存
+-  高亮用归一化坐标（渲染快）
 - ❌ 别在 `onHighlight` 里做同步的重活（会卡渲染）
 
 ---

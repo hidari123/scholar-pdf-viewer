@@ -15,8 +15,8 @@
  *
  * ## 修法
  *
- * -> 批注期间（`isPendingNoteRef.current`）-> **不清选区** ✅
- * -> 蓝色框保留 + 批注弹窗不关 ✅
+ * -> 批注期间（`isPendingNoteRef.current`）-> **不清选区**
+ * -> 蓝色框保留 + 批注弹窗不关
  *
  * 用法：`node scripts/e2e-annotation-highlight-under.mjs`
  */

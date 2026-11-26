@@ -8,7 +8,7 @@ import { findStickyNoteIcon, STICKY_NOTE_ICON_CLASS } from './anchor';
  * "如果同一位置两个批注 那么第一个批注点击之后展示位置正常
  *  第二个批注详情点击之后还是会出现在pdf的首页位置"）。
  *
- * -> 同一位置的多个批注**合并成一个图标** ✅
+ * -> 同一位置的多个批注**合并成一个图标**
  * -> 那个图标上只有 `data-note-id={first.id}`（第一条）❌
  * -> 选**第二条** -> 精确匹配**找不到** ❌
  * -> -> 锚点**保持旧值** ❌ -> 面板停在**首页** ❌
@@ -51,7 +51,7 @@ describe('findStickyNoteIcon', () => {
     const icon = makeGroupIcon(['note-a', 'note-b']);
     container.appendChild(icon);
 
-    // 第一条 ✅
+    // 第一条
     expect(findStickyNoteIcon(container, 'note-a')).toBe(icon);
     // ⚠️ **第二条**（之前找不到 ❌ -> 面板停在旧位置 -> 出现在首页 ❌）
     expect(findStickyNoteIcon(container, 'note-b')).toBe(icon);

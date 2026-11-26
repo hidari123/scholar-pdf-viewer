@@ -92,9 +92,9 @@ export function computeVisiblePages(options: ComputeVisiblePagesOptions): number
   }
 
   /*
-   * ⚠️ **总页数**（用来夹住缓冲区）✅
+   * ⚠️ **总页数**（用来夹住缓冲区）
    *
-   * -> `pages` 是**当前 DOM 里有的页** ✅
+   * -> `pages` 是**当前 DOM 里有的页**
    * -> 但它可能**少于文档总页数** ✅（虚拟滚动：远处的页还没挂载 ❌）
    * -> -> 拿 `pages.length` 当上限会**算错** ❌
    */
@@ -106,7 +106,7 @@ export function computeVisiblePages(options: ComputeVisiblePagesOptions): number
     for (let offset = -bufferPages; offset <= bufferPages; offset += 1) {
       const target = pageNumber + offset;
       /*
-       * ⚠️⚠️ **上下限都要夹**（审核发现的真 bug）✅
+       * ⚠️⚠️ **上下限都要夹**（审核发现的真 bug）
        *
        * -> 之前**只夹了下限**（`target >= 1`）❌
        * -> -> 滚到最后几页时，缓冲区会算出**越界的页码** ❌

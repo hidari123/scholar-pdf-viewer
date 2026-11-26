@@ -76,7 +76,7 @@ export default function App() {
    * ⚠️ **把 handle 挂到 window 上**（E2E 要用；宿主调试也方便）。
    *
    * -> 审计新增了 `zoomIn` / `zoomOut` / `fitWidth` / `fitPage` / `print` ->
-   *    需要能**从外面验证它们真的能用** ✅
+   *    需要能**从外面验证它们真的能用**
    */
   useEffect(() => {
     // @ts-expect-error 调试用的全局句柄
@@ -92,12 +92,12 @@ export default function App() {
   const [documentId, setDocumentId] = useState('local');
 
   /**
-   * **功能开关的演示**（第 29 轮审核补的 ✅）。
+   * **功能开关的演示**（第 29 轮审核补的）。
    *
    * -> 之前 demo **完全没用过** `features` ❌
    * -> 宿主看不到【怎么关掉某个功能】❌
-   * -> 现在：**可交互地开关** ✅
-   * -> 搜索 / 缩略图 / 目录 / 打印 / 键盘 / 主题按钮 ✅
+   * -> 现在：**可交互地开关**
+   * -> 搜索 / 缩略图 / 目录 / 打印 / 键盘 / 主题按钮
    */
   const [disabledFeatures, setDisabledFeatures] = useState<string[]>([]);
 
@@ -130,9 +130,9 @@ export default function App() {
    * **给 E2E 用的全局 API**（造数据）。
    *
    * ⚠️ **之前是靠工具栏里那个"造两个同一行的批注"按钮** ❌
-   * -> 那个按钮第 27 轮**被删了**（用户说"不需要这个按钮"）✅
+   * -> 那个按钮第 27 轮**被删了**（用户说"不需要这个按钮"）
    * -> E2E 就没法造"同一行的两条批注"了 ❌
-   * -> -> 这里暴露一个**测试专用**的 API ✅
+   * -> -> 这里暴露一个**测试专用**的 API
    */
   useEffect(() => {
     // @ts-expect-error 调试用的全局句柄
@@ -141,25 +141,25 @@ export default function App() {
        * 造两条锚定**同一条高亮**的批注（用来测"合并成一个图标"）。
        */
       /**
-       * **导出时写不写批注文字**（E2E 用）✅
+       * **导出时写不写批注文字**（E2E 用）
        */
       setIncludeAnnotationText(on: boolean) {
         setIncludeAnnotationText(on);
       },
       /**
-       * **设置打印方向**（E2E 用）✅
+       * **设置打印方向**（E2E 用）
        */
       setPrintOrientation(orientation: 'auto' | 'portrait' | 'landscape') {
         setPrintOrientation(orientation);
       },
       /**
-       * **打开工具栏的"高亮"按钮**（E2E 用）✅
+       * **打开工具栏的"高亮"按钮**（E2E 用）
        */
       enableToolbarHighlight() {
         setShowToolbarHighlight(true);
       },
       /**
-       * **开关功能**（第 29 轮新增 ✅）。
+       * **开关功能**（第 29 轮新增）。
        */
       setDisabledFeatures(list: string[]) {
         setDisabledFeatures(list);
@@ -246,10 +246,10 @@ export default function App() {
   );
 
   /**
-   * **清除当前文档的全部高亮** ✅
+   * **清除当前文档的全部高亮**
    *
-   * ⚠️ **用户反馈**："换文章后旧高亮残留" ✅
-   * -> 光靠换 documentId ✅ 不够 ✅ -> 用户要能**手动清** ✅ ✅
+   * ⚠️ **用户反馈**："换文章后旧高亮残留"
+   * -> 光靠换 documentId  不够  -> 用户要能**手动清**
    */
   const clearCurrentHighlights = useCallback(() => {
     setHighlights([]);
@@ -260,24 +260,24 @@ export default function App() {
   /**
    * **要不要显示工具栏的"高亮"按钮**（E2E 用）。
    *
-   * ⚠️ 包的工具栏高亮按钮是**默认隐藏**的 ✅
-   * -> 宿主传 `onToolbarHighlight` 才出现 ✅
-   * -> demo 平时**不传** ✅ -> 保持"默认隐藏"的样子 ✅
-   * -> E2E 里**打开**它来测 ✅
+   * ⚠️ 包的工具栏高亮按钮是**默认隐藏**的
+   * -> 宿主传 `onToolbarHighlight` 才出现
+   * -> demo 平时**不传**  -> 保持"默认隐藏"的样子
+   * -> E2E 里**打开**它来测
    */
   const [showToolbarHighlight, setShowToolbarHighlight] = useState(false);
   /**
    * **打印方向**（E2E 用）。
    *
-   * -> 包新增 `printOrientation` prop ✅（用户确认："允许"）
-   * -> demo 平时用 **auto** ✅
-   * -> E2E 里可以切成 **landscape** 来测横向 ✅
+   * -> 包新增 `printOrientation` prop  （用户确认："允许"）
+   * -> demo 平时用 **auto**
+   * -> E2E 里可以切成 **landscape** 来测横向
    */
   /**
    * **导出时要不要写批注文字**（E2E 用）。
    *
-   * -> 默认 **false**（不写）✅ -> Chrome 里 hover 不会出黄色便签 ✅
-   * -> E2E 测编码时会打开 ✅
+   * -> 默认 **false**（不写） -> Chrome 里 hover 不会出黄色便签
+   * -> E2E 测编码时会打开
    */
   const [includeAnnotationText, setIncludeAnnotationText] = useState(false);
   const [printOrientation, setPrintOrientation] = useState<'auto' | 'portrait' | 'landscape'>(
@@ -296,7 +296,7 @@ export default function App() {
    *
    * → 用户反馈："切换语言还是没变啊"
    * → 根因：**包内文案切换正常**，但 **demo 自己的按钮是硬编码中文** ❌
-   * → demo 是宿主 → 宿主的文案自己管 → 切语言时**整页**都变 ✅
+   * → demo 是宿主 → 宿主的文案自己管 → 切语言时**整页**都变
    */
   const t = useCallback(
     (key: string, vars?: Record<string, string | number>) => demoText(locale, key, vars),
@@ -306,11 +306,11 @@ export default function App() {
   /**
    * **宿主注册的语言表**（JSON）。
    *
-   * → 这就是"宿主通过固定 json 添加语言"的接口 ✅
+   * → 这就是"宿主通过固定 json 添加语言"的接口
    * → 不用写全 → 缺的自动回退到内置文案
    *
-   * ⚠️ **现在包内置了 `ja`**（不用宿主写一整套了）✅
-   * → 下面只**覆盖一句**，演示"宿主的优先级更高" ✅
+   * ⚠️ **现在包内置了 `ja`**（不用宿主写一整套了）
+   * → 下面只**覆盖一句**，演示"宿主的优先级更高"
    */
   const HOST_LOCALES = useMemo(
     () => ({
@@ -330,11 +330,11 @@ export default function App() {
   /** 密度（appearance 的结构开关） */
   const [density, setDensity] = useState<PdfViewerDensity>('cozy');
   /*
-   * ⚠️ **打印模式** ✅
+   * ⚠️ **打印模式**
    *
-   * -> `original` ✅ -> **用隐藏 iframe 打印 PDF 文件** ✅
-   * -> -> **和 Chrome 原生一样** ✅ -> 每页都完整 ✅ ✅
-   * -> `with-highlights` ✅ -> 打印 DOM ✅（带高亮 ✅）✅
+   * -> `original`  -> **用隐藏 iframe 打印 PDF 文件**
+   * -> -> **和 Chrome 原生一样**  -> 每页都完整
+   * -> `with-highlights`  -> 打印 DOM  （带高亮）
    */
   const [printMode, setPrintMode] = useState<'with-highlights' | 'original'>('original');
 
@@ -436,8 +436,8 @@ export default function App() {
   /**
    * 样张 PDF。
    *
-   * 优先用本地真实文档（`/samples/paper.pdf` ✅
-   * —— **双栏论文** ✅ 用来暴露双栏选区的问题 ✅），
+   * 优先用本地真实文档（`/samples/paper.pdf`
+   * —— **双栏论文**  用来暴露双栏选区的问题），
    * 没有时用内置的手写样张（3 页，可测选中）。
    */
   const [sampleUrl, setSampleUrl] = useState<string | undefined>(undefined);
@@ -453,11 +453,11 @@ export default function App() {
       setSampleUrl('/samples/paper.pdf');
       setSampleLabel(t('demo.loadLocal'));
       /*
-       * ⚠️⚠️ **换文档 → 换 documentId** ✅（用户反馈："换文章后旧高亮残留" ✅）
+       * ⚠️⚠️ **换文档 → 换 documentId**  （用户反馈："换文章后旧高亮残留"）
        *
-       * -> 之前用的是 `'local'` ✅ -> **和更早的文档撞了** ✅
+       * -> 之前用的是 `'local'`  -> **和更早的文档撞了**
        * -> -> 旧文档的高亮**直接漏到新文档上** ✅ ❌
-       * -> -> 给每份文档**独立的 id** ✅ ✅
+       * -> -> 给每份文档**独立的 id**
        */
       setDocumentId('local-paper');
       return true;
@@ -584,8 +584,8 @@ export default function App() {
    * ## 为什么只要这一个函数（之前要 100+ 行）
    *
    * → 之前 demo 要自己：收集页引用 → 异步解析 → 建 Map → 通知包
-   * → 现在：**包自己解析**（`resolvePageRef`）✅
-   * → 命名目标（"section.1"）也由宿主在这里先 `getDestination` 展开 ✅
+   * → 现在：**包自己解析**（`resolvePageRef`）
+   * → 命名目标（"section.1"）也由宿主在这里先 `getDestination` 展开
    */
   const resolvePageRef = useCallback(async (ref: unknown): Promise<number | null> => {
     const doc = docRef.current;
@@ -615,7 +615,7 @@ export default function App() {
   /**
    * 取目录（宿主注入）。
    *
-   * → 只要给 `getOutline` + `resolvePageRef`，包就能自己解析页码 ✅
+   * → 只要给 `getOutline` + `resolvePageRef`，包就能自己解析页码
    */
   const getOutline = useCallback(async () => {
     const doc = docRef.current;
@@ -718,7 +718,7 @@ export default function App() {
              *
              * → **页自己提供**比宿主单独传回调更可靠：
              *   宿主的回调通常依赖异步缓存的页尺寸 → 和索引建索引**竞态** ❌
-             *   页自己的 `getViewport` 是**同步**的 → 永远拿得到 ✅
+             *   页自己的 `getViewport` 是**同步**的 → 永远拿得到
              */
             getViewport: (params: { scale: number }) => {
               const viewport = page.getViewport(params);
@@ -748,7 +748,7 @@ export default function App() {
                      *    → **两次调用的 item 边界不一样**
                      *    → 索引 161 项 / 渲染 112 项 → **偏移错位** ❌
                      *
-                     * → 两边**字段完全一致** → item 边界一致 → 偏移才对得上 ✅
+                     * → 两边**字段完全一致** → item 边界一致 → 偏移才对得上
                      */
                     fontName: 'fontName' in item ? item.fontName : undefined,
                     hasEOL: 'hasEOL' in item ? item.hasEOL : false,
@@ -852,16 +852,16 @@ export default function App() {
        * ### 之前的计数器为什么会撞
        *
        * -> `highlightSeq` 在**文档加载完成时归零** ❌
-       * -> 但**持久化恢复**的高亮还带着原来的 id（`h-1`、`h-2`…）✅
+       * -> 但**持久化恢复**的高亮还带着原来的 id（`h-1`、`h-2`…）
        * -> 刷新页面 -> 建一个新高亮 -> 计数器又是 1 -> **又是 `h-1`** ❌
        * -> **两个高亮同 id** ❌
        *    -> 点击一个 -> **两个都变成激活态** ❌
-       *    -> 用户反馈："有时候点击一个高亮 两个高亮都会被选中" ✅
+       *    -> 用户反馈："有时候点击一个高亮 两个高亮都会被选中"
        *
        * ### 修法
        *
-       * -> `crypto.randomUUID()` -> **绝对不会重复** ✅
-       * -> 不依赖任何状态 -> 刷新、恢复、多标签页都安全 ✅
+       * -> `crypto.randomUUID()` -> **绝对不会重复**
+       * -> 不依赖任何状态 -> 刷新、恢复、多标签页都安全
        */
       const id = `h-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${highlightSeq++}`}`;
       setHighlights((prev) => [
@@ -1023,10 +1023,10 @@ export default function App() {
           highlights,
           pageSizesPt: viewerRef.current?.getPageSizesPt() ?? [],
           /*
-           * ⚠️ **批注文字默认【不写】**（第 27 轮）✅
-           * -> 不写 -> Chrome 里 hover 高亮**不会出黄色便签** ✅
-           * -> 用户反馈："导出后 hover 高亮还是会出现黄色便签" ✅
-           * -> E2E 要测**编码** -> 那里显式打开 ✅
+           * ⚠️ **批注文字默认【不写】**（第 27 轮）
+           * -> 不写 -> Chrome 里 hover 高亮**不会出黄色便签**
+           * -> 用户反馈："导出后 hover 高亮还是会出现黄色便签"
+           * -> E2E 要测**编码** -> 那里显式打开
            */
           includeAnnotationText: includeAnnotationText,
         }),
@@ -1176,9 +1176,9 @@ export default function App() {
           {t('demo.loadLocal')}
         </button>
         {/*
-          清除高亮 ✅
-          -> 用户反馈："换文章后旧高亮残留" ✅
-          -> 换 documentId ✅ 只是**隔离** ✅ -> 用户还需要**手动清** ✅ ✅
+          清除高亮
+          -> 用户反馈："换文章后旧高亮残留"
+          -> 换 documentId  只是**隔离**  -> 用户还需要**手动清**
         */}
         <button type="button" className="scpdf-btn" onClick={clearCurrentHighlights}>
           {t('demo.clearHighlights')} ({highlights.length})
@@ -1240,12 +1240,12 @@ export default function App() {
             <option value="comfortable">{t('demo.density.comfortable')}</option>
           </select>
           {/*
-            ⚠️ **打印模式** ✅
+            ⚠️ **打印模式**
             ->
-            -> `original` ✅ -> **用隐藏 iframe 打印 PDF 文件** ✅
-            -> -> **和 Chrome 原生 PDF 阅读器一样** ✅ -> **每页都完整** ✅ ✅
-            -> -> 不会"后面全是空白页" ✅ ✅
-            -> `with-highlights` ✅ -> 打印 DOM ✅（带高亮 ✅）✅
+            -> `original`  -> **用隐藏 iframe 打印 PDF 文件**
+            -> -> **和 Chrome 原生 PDF 阅读器一样**  -> **每页都完整**
+            -> -> 不会"后面全是空白页"
+            -> `with-highlights`  -> 打印 DOM  （带高亮）
           */}
           <span style={{ opacity: 0.7, marginLeft: 12, whiteSpace: 'nowrap' }}>
             {t('demo.printMode')}
@@ -1262,13 +1262,13 @@ export default function App() {
            * ⚠️ **RTL 开关**（审计新增的能力）。
            *
            * -> 之前**完全没有 RTL 支持** -> 阿拉伯语 / 希伯来语的宿主没法用 ❌
-           * -> 现在：\`dir\` prop + CSS 镜像 ✅
+           * -> 现在：\`dir\` prop + CSS 镜像
            */}
           {/*
-           * ⚠️ **功能开关的演示**（第 29 轮审核补的 ✅）。
+           * ⚠️ **功能开关的演示**（第 29 轮审核补的）。
            *
-           * -> 演示宿主怎么**按需关掉**包的功能 ✅
-           * -> 选【全部开启】= 默认行为 ✅
+           * -> 演示宿主怎么**按需关掉**包的功能
+           * -> 选【全部开启】= 默认行为
            */}
           <span style={{ opacity: 0.7, marginLeft: 12, whiteSpace: 'nowrap' }}>功能</span>
           <select
@@ -1327,22 +1327,22 @@ export default function App() {
           /*
            * ⚠️ **主题切换**（包的工具栏里会多一个 🎨 按钮）。
            *
-           * -> 用户需求："包在工具栏那里也可以加上一个按钮让用户进行选择" ✅
-           * -> 传了 `onThemeChange` -> 工具栏显示主题按钮 ✅
+           * -> 用户需求："包在工具栏那里也可以加上一个按钮让用户进行选择"
+           * -> 传了 `onThemeChange` -> 工具栏显示主题按钮
            */
           onThemeChange={setTheme}
           /*
-           * ⚠️ **导出 / 下载**（用户需求 ✅）
+           * ⚠️ **导出 / 下载**（用户需求）
            *
-           * -> 包提供**工具栏按钮** ✅ -> 宿主给**实现** ✅ ✅
-           * -> demo 复用 header 里那三个按钮的逻辑 ✅ ✅
+           * -> 包提供**工具栏按钮**  -> 宿主给**实现**
+           * -> demo 复用 header 里那三个按钮的逻辑
            */
           /*
-           * ⚠️ **"打印原 PDF"** ✅
+           * ⚠️ **"打印原 PDF"**
            *
-           * -> 传 URL ✅ -> 包用**隐藏 iframe** ✅ 打印 PDF 文件 ✅ ✅
-           * -> -> **和 Chrome 原生 PDF 阅读器一样** ✅ -> **每页都完整** ✅ ✅
-           * -> -> 不用 DOM + canvas ✅ -> 不会"后面全是空白页" ✅ ✅
+           * -> 传 URL  -> 包用**隐藏 iframe**  打印 PDF 文件
+           * -> -> **和 Chrome 原生 PDF 阅读器一样**  -> **每页都完整**
+           * -> -> 不用 DOM + canvas  -> 不会"后面全是空白页"
            */
           documentUrl={sampleUrl}
           printMode={printMode}
@@ -1352,10 +1352,10 @@ export default function App() {
           dir={dir}
           appearance={{ density }}
           /*
-           * ⚠️ **功能开关**（演示宿主的【按需关闭】✅）。
+           * ⚠️ **功能开关**（演示宿主的【按需关闭】）。
            *
-           * -> `features` 是 **opt-out** ✅：只有显式 `false` 才关 ✅
-           * -> 这里只把【关掉的】设成 false ✅
+           * -> `features` 是 **opt-out**：只有显式 `false` 才关
+           * -> 这里只把【关掉的】设成 false
            */
           features={{
             search: !disabledFeatures.includes('search'),
@@ -1375,7 +1375,7 @@ export default function App() {
           getOutline={getOutline}
           /*
            * ⚠️ **用包的异步解析器**（不用自己收集页引用 + 建 Map + 通知包）。
-           * -> pdf.js 的 `getPageIndex` 是异步的 -> 包自己处理 ✅
+           * -> pdf.js 的 `getPageIndex` 是异步的 -> 包自己处理
            */
           resolvePageRef={resolvePageRef}
           renderThumbnail={renderThumbnail}
@@ -1397,10 +1397,10 @@ export default function App() {
           }}
           onHighlightColorChange={handleHighlightColorChange}
           /*
-           * ⚠️ **工具栏的"高亮"按钮**（E2E 才打开）✅
+           * ⚠️ **工具栏的"高亮"按钮**（E2E 才打开）
            *
-           * -> 包的这个按钮**默认隐藏** ✅（用户确认："默认隐藏吧"）
-           * -> demo 平时**不传** ✅ -> 保持默认的样子 ✅
+           * -> 包的这个按钮**默认隐藏**  （用户确认："默认隐藏吧"）
+           * -> demo 平时**不传**  -> 保持默认的样子
            */
           printOrientation={printOrientation}
           onToolbarHighlight={
@@ -1425,7 +1425,7 @@ export default function App() {
              * **新建批注**（从选区浮层的"加批注"触发）。
              *
              * → 包已经把**高亮**建好了（用默认颜色）
-             * → 这里只需要挂一个便签 ✅
+             * → 这里只需要挂一个便签
              */
             setStickyNotes((prev) => [
               ...prev.filter((n) => n.id !== id),
@@ -1449,7 +1449,7 @@ export default function App() {
            * ⚠️ **批注内容变化**（"编辑"按钮改完内容时触发）。
            *
            * -> 不传 -> 便签详情的"编辑"按钮**点不动**（面板永远是只读）❌
-           * -> 用户反馈："便签详情打开的时候也是要有按钮可以选编辑的" ✅
+           * -> 用户反馈："便签详情打开的时候也是要有按钮可以选编辑的"
            */
           onAnnotationChange={(id, html) => {
             setStickyNotes((prev) =>
@@ -1460,7 +1460,7 @@ export default function App() {
            * ⚠️ **"展开"按钮**（打开便利贴详情）。
            *
            * -> 不传 -> 包**不渲染**"展开"按钮 ❌
-           * -> 用户反馈："批注的打开详细按钮目前是失效的" ✅
+           * -> 用户反馈："批注的打开详细按钮目前是失效的"
            */
           onAnnotationExpand={(note) => {
             setHint(`【展开批注】${note.content.slice(0, 30)}`);
@@ -1510,17 +1510,17 @@ export default function App() {
              *
              * ### 现在的契约（包自己跳 + 宿主可拦截）
              *
-             * -> `ctx.targetPage` = **目标页**（包解析出来的）✅
+             * -> `ctx.targetPage` = **目标页**（包解析出来的）
              *    -> 之前给的是**链接所在页**（没用）❌
-             * -> `ctx.currentPage` = 链接**所在**的页 ✅
-             * -> `ctx.targetY` = 目标在页内的 y 坐标（跳到**那一行**用）✅
-             * -> `ctx.cancel()` = **取消这次跳转** ✅
+             * -> `ctx.currentPage` = 链接**所在**的页
+             * -> `ctx.targetY` = 目标在页内的 y 坐标（跳到**那一行**用）
+             * -> `ctx.cancel()` = **取消这次跳转**
              *
-             * ### ⚠️ **默认行为：包自己跳** ✅
+             * ### ⚠️ **默认行为：包自己跳**
              *
              * -> **不要**在这里再调 `goToPage` ❌
              *    -> 包已经跳了 -> **会跳两次** ❌
-             * -> 想自己接管（比如弹确认框）-> 调 `ctx.cancel()` ✅
+             * -> 想自己接管（比如弹确认框）-> 调 `ctx.cancel()`
              */
             const named = typeof ctx.dest === 'string' ? ctx.dest : null;
             setHint(
@@ -1530,8 +1530,8 @@ export default function App() {
             );
             /*
              * ⚠️ **这里演示"取消"**（宿主自己接管的情况）。
-             * -> 注释掉下面这行 -> 包**自动跳** ✅
-             * -> 取消它 -> 包**不跳** ✅
+             * -> 注释掉下面这行 -> 包**自动跳**
+             * -> 取消它 -> 包**不跳**
              */
             // ctx.cancel();
           }}

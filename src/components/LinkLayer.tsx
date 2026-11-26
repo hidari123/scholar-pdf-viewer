@@ -143,11 +143,11 @@ export function LinkLayer(props: LinkLayerProps) {
                    *
                    * -> 之前是 `onInternalLink(dest, pageNumber)` ❌
                    *   -> `pageNumber` 是**链接所在页**，不是目标页 ❌
-                   * -> 现在：**一个上下文对象** ✅
-                   *   -> `targetPage` = 包解析出来的**目标页** ✅
-                   *   -> `cancel()` = 宿主可以**取消这次跳转** ✅
+                   * -> 现在：**一个上下文对象**
+                   *   -> `targetPage` = 包解析出来的**目标页**
+                   *   -> `cancel()` = 宿主可以**取消这次跳转**
                    *
-                   * ⚠️ **键盘触发也要走同一条路**（否则键盘和鼠标行为不一致）✅
+                   * ⚠️ **键盘触发也要走同一条路**（否则键盘和鼠标行为不一致）
                    */
                   onInternalLink?.({
                     dest: link.dest,

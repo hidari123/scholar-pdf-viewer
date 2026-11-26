@@ -282,7 +282,7 @@ import { Icon } from '@scholar-space/pdf-viewer/icons';
 ```
 
 > ⚠️ 色板是**语义 key → CSS 颜色**。存高亮时存 **key**（不是颜色值）→
-> 宿主换主题时**高亮自动跟着变** ✅
+> 宿主换主题时**高亮自动跟着变**
 
 ---
 
@@ -300,7 +300,7 @@ import { TipTapEditor } from '@scholar-space/pdf-viewer/editor';
 >
 > ⚠️⚠️ **`@tiptap/extension-text-style` 一定要装**（审计发现的**真 bug**）：
 >
-> -> TipTap 的 `Color` 扩展是**基于 `textStyle` 实现的** ✅
+> -> TipTap 的 `Color` 扩展是**基于 `textStyle` 实现的**
 > -> 但 **StarterKit v3 不包含 `TextStyle`** ❌
 > -> 少了它 -> `setColor` 直接抛错 ❌
 >   -> 报错：`There is no mark type named 'textStyle'` ❌
@@ -313,7 +313,7 @@ import { TipTapEditor } from '@scholar-space/pdf-viewer/editor';
 >   @tiptap/extension-link @tiptap/extension-placeholder
 > ```
 >
-> -> **没装 TipTap** -> 自动**回退到包内置的轻量编辑器** ✅（功能少一点，但能用）
+> -> **没装 TipTap** -> 自动**回退到包内置的轻量编辑器**  （功能少一点，但能用）
 
 ### 用自己的编辑器
 
@@ -339,11 +339,11 @@ const MyEditor: ComponentType<{
 | `textHighlight` | 设**背景色**，**字色不变** ⭐    | `annotationPalette`     |
 | `foreColor`     | 设**字色**（`value` 是颜色值）   | `annotationTextPalette` |
 
--> `value` **可能为空** -> 表示"清除这个格式" ✅
--> 颜色值是 **CSS 颜色字符串**（`#rrggbb` / `rgb(...)`）✅
+-> `value` **可能为空** -> 表示"清除这个格式"
+-> 颜色值是 **CSS 颜色字符串**（`#rrggbb` / `rgb(...)`）
 
 **参考实现**：包内置的 `RichTextEditor`（`execRichTextCommand`）和
-`TipTapEditor`（`run`）都遵守这个约定 ✅
+`TipTapEditor`（`run`）都遵守这个约定
 
 ### ⚠️ 图标要能区分开
 
@@ -358,7 +358,7 @@ const MyEditor: ComponentType<{
 
 -> ⚠️ **默认工具栏只有前三个里的"高亮"和"文字颜色"**（"文字高亮"被去掉了）❌
 
--> 宿主覆盖图标时**也要保持这个区分** ✅
+-> 宿主覆盖图标时**也要保持这个区分**
 
 ---
 

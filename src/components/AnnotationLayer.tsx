@@ -43,8 +43,8 @@ export interface AnnotationLayerProps {
    * -> 宿主可能传了**重复的 id** ❌
    *    （实测：刷新后旧高亮恢复，新建的高亮**又拿到同一个 id** -> 两个高亮同 id）
    * -> 激活态只按 id 判断 -> **两个都加激活态** ❌
-   *    -> 用户反馈："点击一个高亮 两个高亮都会被选中" ✅
-   * -> 加上**矩形** -> **只激活真正点到的那一个** ✅
+   *    -> 用户反馈："点击一个高亮 两个高亮都会被选中"
+   * -> 加上**矩形** -> **只激活真正点到的那一个**
    */
   activeHighlightRect?: { left: number; top: number; width: number; height: number } | null;
   /**
@@ -97,7 +97,7 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
        * > "跨页选择高亮的时候 实测只能高亮第一页的内容
        * >  第二页的内容也高亮到了第一页"
        *
-       * -> 跨页高亮有**多个矩形**（每页一个）✅
+       * -> 跨页高亮有**多个矩形**（每页一个）
        * -> 但 \`position.pageNumber\` 只有**第一页** ❌
        * -> 之前用 \`position.pageNumber !== pageNumber\` 过滤 ❌
        *    -> 第 2 页的图层**看不到这条高亮** ❌
@@ -105,9 +105,9 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
        *
        * ### 修法
        *
-       * -> **每个矩形**按**它自己的** \`pageNumber\` 判断 ✅
-       * -> 一条跨页高亮 -> 第 1 页画它第 1 页的矩形 ✅
-       * ->                     第 2 页画它第 2 页的矩形 ✅
+       * -> **每个矩形**按**它自己的** \`pageNumber\` 判断
+       * -> 一条跨页高亮 -> 第 1 页画它第 1 页的矩形
+       * ->                     第 2 页画它第 2 页的矩形
        */
       for (const norm of position.rects) {
         if (norm.pageNumber !== pageNumber) {
@@ -204,13 +204,13 @@ export function AnnotationLayer(props: AnnotationLayerProps) {
 
       {rects.map(({ highlight, rect }) => {
         /*
-         * ⚠️⚠️ **激活态要按【矩形】判断**（不能只按 id）✅
+         * ⚠️⚠️ **激活态要按【矩形】判断**（不能只按 id）
          *
          * -> 宿主可能传了**重复的 id** ❌
          *    -> 只按 id -> **两个都激活** ❌
-         *    -> 用户反馈："点击一个高亮 两个高亮都会被选中" ✅
-         * -> 有矩形 -> **只激活点到的那一个** ✅
-         * -> 没矩形（老调用方）-> 退回按 id ✅
+         *    -> 用户反馈："点击一个高亮 两个高亮都会被选中"
+         * -> 有矩形 -> **只激活点到的那一个**
+         * -> 没矩形（老调用方）-> 退回按 id
          */
         const isActive =
           activeHighlightRect !== undefined && activeHighlightRect !== null

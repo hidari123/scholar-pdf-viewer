@@ -66,9 +66,9 @@ export interface DomOrderResult {
   /** 丢弃的矩形 */
   dropped: ClientRectLike[];
   /**
-   * ⚠️ **保留的项**（用来做字符级矩形分配 ✅）
+   * ⚠️ **保留的项**（用来做字符级矩形分配）
    *
-   * ⚠️ **一个项可能对应多个矩形** ✅（行盒 + 字形盒 ✅）
+   * ⚠️ **一个项可能对应多个矩形**  （行盒 + 字形盒）
    *    -> `kept` 和 `keptItems` **不是一一对应** ✅ ❌
    *    -> -> 分配时**必须按项分组** ✅ ❌ 不能按数组下标 ✅
    */
@@ -223,10 +223,10 @@ export function clipByDomOrder(input: DomOrderInput): DomOrderResult {
   const kept: ClientRectLike[] = [];
   const dropped: ClientRectLike[] = [];
   /**
-   * ⚠️ **和 `kept` 平行** ✅（下标一一对应 ✅）
+   * ⚠️ **和 `kept` 平行**  （下标一一对应）
    *
-   * -> `sorted` 里是**每个矩形一条** ✅（一个项可能有多个矩形 ✅）
-   * -> -> 所以 `kept[i]` 对应的项就是 `keptItems[i]` ✅ ✅
+   * -> `sorted` 里是**每个矩形一条**  （一个项可能有多个矩形）
+   * -> -> 所以 `kept[i]` 对应的项就是 `keptItems[i]`
    */
   const keptItems: DomOrderItem[] = [];
 
@@ -343,24 +343,24 @@ export function assignRectsToItems(
 }
 
 /**
- * **按【项】把字符级矩形分好组** ✅
+ * **按【项】把字符级矩形分好组**
  *
- * ## ⚠️ **为什么不能按数组下标对应** ✅
+ * ## ⚠️ **为什么不能按数组下标对应**
  *
- * -> 一个 span 会给**多个 rect** ✅（行盒 + 字形盒 ✅）
+ * -> 一个 span 会给**多个 rect**  （行盒 + 字形盒）
  * -> 所以 `kept`（矩形数组）和 `keptItems`（项数组）**长度不同** ✅ ❌
- * -> -> 按下标对应会**错位** ✅
+ * -> -> 按下标对应会**错位**
  *    -> 实测：项漏选 ✅（"T cells and demonstrates" ✅ 没底色 ✅ ❌）
  *
- * ## 做法 ✅
+ * ## 做法
  *
- * -> 按 `(pageNumber, itemIndex)` 把矩形**分组** ✅
- * -> -> 每项一组 ✅ -> 组内是该项的所有矩形 ✅
+ * -> 按 `(pageNumber, itemIndex)` 把矩形**分组**
+ * -> -> 每项一组  -> 组内是该项的所有矩形
  *
- * @param itemRects 各项的矩形（**同一个项的矩形会挨在一起** ✅）
- * @param items 对应的项（顺序与 `itemRects` **一致** ✅）
- * @param rangeRects Range 的矩形（字符级 ✅）
- * @returns 每项该用哪些矩形（key = 项的序号 ✅）
+ * @param itemRects 各项的矩形（**同一个项的矩形会挨在一起**）
+ * @param items 对应的项（顺序与 `itemRects` **一致**）
+ * @param rangeRects Range 的矩形（字符级）
+ * @returns 每项该用哪些矩形（key = 项的序号）
  */
 export function groupRectsByItem(
   itemRects: readonly ClientRectLike[],
@@ -373,10 +373,10 @@ export function groupRectsByItem(
   }
 
   /*
-   * ⚠️ **先建立【项 -> 矩形下标】的映射** ✅
+   * ⚠️ **先建立【项 -> 矩形下标】的映射**
    *
-   * -> `itemRects` 和 `items` 是**平行数组** ✅（一一对应 ✅）
-   * -> -> 但一个项会有**多个矩形** ✅ -> 所以要按 key 分组 ✅
+   * -> `itemRects` 和 `items` 是**平行数组**  （一一对应）
+   * -> -> 但一个项会有**多个矩形**  -> 所以要按 key 分组
    */
   const rectsByKey = new Map<string, ClientRectLike[]>();
   for (let i = 0; i < itemRects.length; i += 1) {
@@ -394,7 +394,7 @@ export function groupRectsByItem(
     }
   }
 
-  // ⚠️ **按【项的矩形范围】判断归属** ✅
+  // ⚠️ **按【项的矩形范围】判断归属**
   for (const rect of rangeRects) {
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
@@ -414,7 +414,7 @@ export function groupRectsByItem(
       }
     }
 
-    // 找不到归属 -> 丢掉（保守 ✅）
+    // 找不到归属 -> 丢掉（保守）
     if (!ownerKey) {
       continue;
     }

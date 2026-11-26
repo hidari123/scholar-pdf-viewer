@@ -55,8 +55,8 @@ describe('mergeConfig（统一配置）', () => {
     expect(merged.theme).toBeUndefined();
     /*
      * ⚠️ **语言不再默认 'zh'** → 按**浏览器语言**推断。
-     * → 用户需求："语言和高亮色都是包需要内置的" ✅
-     * → 英文环境 → 'en'；中文环境 → 'zh' ✅
+     * → 用户需求："语言和高亮色都是包需要内置的"
+     * → 英文环境 → 'en'；中文环境 → 'zh'
      */
     expect(['zh', 'en']).toContain(merged.locale);
     // ⚠️ **高亮色板必须有内置默认**（宿主不传也能用）
@@ -118,7 +118,7 @@ describe('mergeConfig（统一配置）', () => {
 
 /*
  * ⚠️ **默认高亮色**（用户需求："如果没有选择颜色
- * 也按照默认颜色来展示高亮 不必每次都选择颜色"✅）。
+ * 也按照默认颜色来展示高亮 不必每次都选择颜色"）。
  */
 describe('默认高亮色', () => {
   it('**不传时用色板的第一个颜色**', () => {
@@ -146,7 +146,7 @@ describe('默认高亮色', () => {
 /*
  * ⚠️ **`features.themePicker` 必须能被宿主用**（审核发现的真 bug）。
  *
- * -> 代码里一直在读 `features?.themePicker` ✅
+ * -> 代码里一直在读 `features?.themePicker`
  * -> 但 `Features` 接口**没声明它** ❌
  * -> -> 宿主写 `features={{ themePicker: false }}` **TS 报错** ❌
  * -> -> "不显示主题按钮"这个能力**用不了** ❌
@@ -163,7 +163,7 @@ describe('features.themePicker', () => {
   });
 
   it('**单独 prop 优先于 config**', () => {
-    // ⚠️ **签名是 (config, props)** ✅ -> 单独 prop 优先 ✅
+    // ⚠️ **签名是 (config, props)**  -> 单独 prop 优先
     const merged = mergeConfig(
       { features: { themePicker: false } },
       { features: { themePicker: true } },
@@ -173,14 +173,14 @@ describe('features.themePicker', () => {
 });
 
 /*
- * ⚠️ **选区动作的可见性开关**（用户反馈 ✅）
+ * ⚠️ **选区动作的可见性开关**（用户反馈）
  *
  * > "选区工具栏的提问/翻译/加批注/高亮/复制 都需要宿主可以配置是否展示"
  *
- * -> 开关在 `features` 里 ✅ -> 合并进 config ✅ ✅
+ * -> 开关在 `features` 里  -> 合并进 config
  */
-describe('features（选区动作开关 ✅）', () => {
-  it('**默认全都不传** ✅（保持原行为 ✅）', () => {
+describe('features（选区动作开关）', () => {
+  it('**默认全都不传**  （保持原行为）', () => {
     const merged = mergeConfig({}, {});
     expect(merged.features?.selectionHighlight).toBeUndefined();
     expect(merged.features?.selectionCopy).toBeUndefined();
@@ -190,7 +190,7 @@ describe('features（选区动作开关 ✅）', () => {
     expect(merged.features?.selectionNote).toBeUndefined();
   });
 
-  it('**可以逐个关掉** ✅', () => {
+  it('**可以逐个关掉**  ', () => {
     const merged = mergeConfig(
       { features: { selectionAsk: false, selectionTranslate: false } },
       {},

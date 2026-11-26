@@ -56,8 +56,8 @@ export const THEME_LABELS: Record<PdfViewerTheme, string> = {
  *    发现页面上语言还是没换啊"
  * → 主题切换器下拉框里的名字是 `THEME_LABELS` → **永远是中文** ❌
  *
- * → 这里给出**内置的多语言名字** → 宿主直接用 ✅
- * → 宿主想用自己的叫法 → 传 `themeLabels` 覆盖 ✅
+ * → 这里给出**内置的多语言名字** → 宿主直接用
+ * → 宿主想用自己的叫法 → 传 `themeLabels` 覆盖
  */
 export const THEME_LABELS_I18N: Record<string, Record<PdfViewerTheme, string>> = {
   zh: THEME_LABELS,
@@ -159,7 +159,7 @@ export interface PdfViewerAppearance {
  *    **从 core 反向依赖 components** ❌（违反分层：core 不依赖 components）
  * -> 而且 `PdfViewerConfig.toolbar` 是**另一份匿名字面量** -> 两边字段不一致 ❌
  *    -> 里面有 `showPrint`（`ToolbarConfig` 没有）-> **死配置** ❌
- * -> 现在：**只有一份** -> 两边永远一致 ✅
+ * -> 现在：**只有一份** -> 两边永远一致
  */
 export interface ToolbarConfig {
   /** 显示翻页 */
@@ -271,9 +271,9 @@ export function appearanceStyles(appearance?: PdfViewerAppearance): Record<strin
    * -> 之前写的是 \`--scpdf-font-family\` ❌
    *   -> 但 \`.scpdf-root\` 用的是 \`--scpdf-font-reading\`（\`viewer.css:51\`）❌
    *   -> **两个变量从不连通** -> 宿主设了 \`fontFamily\` -> **完全没效果** ❌
-   * -> 现在：**两个都写** ✅
-   *   -> \`--scpdf-font-reading\`（真正生效的）✅
-   *   -> \`--scpdf-font-family\`（保留，万一以后 CSS 用了它）✅
+   * -> 现在：**两个都写**
+   *   -> \`--scpdf-font-reading\`（真正生效的）
+   *   -> \`--scpdf-font-family\`（保留，万一以后 CSS 用了它）
    */
   if (appearance.fontFamily) {
     style['--scpdf-font-reading'] = appearance.fontFamily;

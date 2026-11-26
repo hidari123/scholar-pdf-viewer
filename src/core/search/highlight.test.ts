@@ -170,7 +170,7 @@ describe('hitsToRects', () => {
  *
  * → **边界不同**（pdf.js 的 `getTextContent()` 会按 `fontName`/`height` 合并 item）
  * → 但**拼起来的文本完全一样**
- * → 所以：**按字符位置**在渲染侧找 → 不依赖项的边界 ✅
+ * → 所以：**按字符位置**在渲染侧找 → 不依赖项的边界
  */
 describe('命中定位的"项对齐"（搜索高亮定位不准的修复）', () => {
   /*
@@ -195,7 +195,7 @@ describe('命中定位的"项对齐"（搜索高亮定位不准的修复）', ()
     /*
      * 索引: ["Hello", " ", "World"]   （3 项）
      * 渲染: ["Hello World"]            （1 项，合并了）
-     * → 两边**拼起来的文本一样** → 字符位置一样 → 对得上 ✅
+     * → 两边**拼起来的文本一样** → 字符位置一样 → 对得上
      */
     const indexTexts = ['Hello', ' ', 'World'];
     const renderedTexts = ['Hello World'];

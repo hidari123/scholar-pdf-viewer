@@ -20,10 +20,10 @@
 
 ## ① 去掉"文字高亮"按钮
 
--> 实现上它就是 `hiliteColor` 的**别名** ✅ -> 功能重复 ✅
--> **默认工具栏**去掉 ✅
--> **命令和图标保留** -> 宿主自定义工具栏还能用 ✅
--> 文档同步（"三个颜色命令" -> "两个"）✅
+-> 实现上它就是 `hiliteColor` 的**别名** -> 功能重复
+-> **默认工具栏**去掉
+-> **命令和图标保留** -> 宿主自定义工具栏还能用
+-> 文档同步（"三个颜色命令" -> "两个"）
 
 ---
 
@@ -32,39 +32,39 @@
 **根因**：两个编辑器里**只有 4 处 `setOpenPalette`** -> **没有任何"点击外面关闭"的监听** ❌
 
 **修法**：
--> 面板开着时在 `document` 上挂 `mousedown` ✅
--> 点外面 -> 关闭 ✅ / 点里面 -> **不关** ✅ / **Esc** -> 关闭 ✅
+-> 面板开着时在 `document` 上挂 `mousedown`
+-> 点外面 -> 关闭 / 点里面 -> **不关** / **Esc** -> 关闭
 
 ### ⚠️ 两个 ref 挂点不一样（实测踩到的坑）
 
 -> **TipTap**：面板是 `.scpdf-rich-text__toolbar` 的**兄弟节点** ❌
 -> 用 toolbar 判断 `contains(panel)` = **false** ❌ -> 点面板里也会关 ❌
--> 改挂 `.scpdf-rich-text__toolbar-wrap` ✅
--> **内置编辑器**：面板在 `.scpdf-rich-text__tool` 里 -> 是 toolbar 的**后代** ✅
--> 挂 `.scpdf-rich-text__toolbar` 就行 ✅
+-> 改挂 `.scpdf-rich-text__toolbar-wrap`
+-> **内置编辑器**：面板在 `.scpdf-rich-text__tool` 里 -> 是 toolbar 的**后代**
+-> 挂 `.scpdf-rich-text__toolbar` 就行
 
 ### ⚠️ Esc 会把整个弹窗关掉（顺带发现并修的）
 
 -> 外层（`AnnotationDialog`）有自己的 **Esc -> 关自己** ❌
--> `AnnotationDialog` **本来就有** `onOverlayStateChange` 机制 ✅（给链接弹窗用的）
+-> `AnnotationDialog` **本来就有** `onOverlayStateChange` 机制 （给链接弹窗用的）
 -> 但**编辑器从来没调过它** ❌ -> **接上** ✅
--> ⚠️ **两个 effect 会打架** -> 合并成一个 `anyOverlayOpen` ✅
+-> ⚠️ **两个 effect 会打架** -> 合并成一个 `anyOverlayOpen`
 
 ---
 
 ## ③ "无背景色"选项（飞书样式）
 
--> 色板**第一个**是**斜杠色块** ✅（用户截图里飞书就是这样）
--> 核心加 `NO_COLOR = '__none__'` + `isNoColor()` ✅
--> TipTap：`unsetHighlight()` / `unsetColor()` ✅（比 `transparent` 干净）
--> 内置编辑器：`execCommand('hiliteColor', false, 'transparent')` ✅
--> 新增 i18n key `richtext.noColor` ✅
+-> 色板**第一个**是**斜杠色块** （用户截图里飞书就是这样）
+-> 核心加 `NO_COLOR = '__none__'` + `isNoColor()`
+-> TipTap：`unsetHighlight()` / `unsetColor()` （比 `transparent` 干净）
+-> 内置编辑器：`execCommand('hiliteColor', false, 'transparent')`
+-> 新增 i18n key `richtext.noColor`
 
 **实测**：
 ```
 ① 色板: { count: 7, firstLabel: "无背景色", firstHasNone: true }
 ② 加了颜色: <p><mark style="background-color: rgb(255,243,163); color: inherit;">测试文字</mark></p>
-③ 点斜杠后: <p>测试文字</p>          <- 高亮被清掉了 ✅
+③ 点斜杠后: <p>测试文字</p>          <- 高亮被清掉了
 ```
 
 ---
@@ -81,24 +81,24 @@ if (command === 'removeFormat') {
 -> 而且**整个文件里没有任何"选区是否为空"的检测** ❌
 
 **修法**：
--> `ToolbarActiveState` 加 `hasSelection` ✅
--> TipTap：`editor.state.selection.empty` ✅
--> 内置编辑器：`window.getSelection().isCollapsed` ✅
--> **撤销 / 重做不受影响**（撤销的是上一步操作，不是格式）✅
--> 编辑器不提供这个能力 -> **默认当成"有选区"**（不误伤老宿主）✅
+-> `ToolbarActiveState` 加 `hasSelection`
+-> TipTap：`editor.state.selection.empty`
+-> 内置编辑器：`window.getSelection().isCollapsed`
+-> **撤销 / 重做不受影响**（撤销的是上一步操作，不是格式）
+-> 编辑器不提供这个能力 -> **默认当成"有选区"**（不误伤老宿主）
 
 ### ⚠️ 顺带修的两个问题
 
 **① 颜色按钮置灰后点不开面板了**
 -> 用户只要求"清除格式"置灰 -> 我把**所有**格式命令都置灰 ❌
 -> 结果**颜色按钮也灰了** -> **面板打不开** -> 用户没法选颜色 ❌
--> 改：**颜色命令不禁用**（只用视觉上的"灰"表示不可用）✅
+-> 改：**颜色命令不禁用**（只用视觉上的"灰"表示不可用）
 
 **② `hasSelection` 首次渲染时判断错了**
 -> `editorRef.current` 首次渲染是 **null** ❌
 -> `contains(anchor)` 返回 false -> 误判成"选区在编辑区外面" ❌
 -> -> 按钮**永远不禁用** ❌
--> 改成：**选区文本长度 > 0** 才算"选了文字" ✅
+-> 改成：**选区文本长度 > 0** 才算"选了文字"
 
 ---
 
@@ -117,10 +117,10 @@ containerRect: "8,124"           <- 容器在视口里偏移了 (8, 124)
 
 ### ① 视口坐标 vs 容器坐标
 
--> `computeDialogPosition` 返回**视口坐标** ✅
+-> `computeDialogPosition` 返回**视口坐标**
 -> 但面板是 `position: absolute` -> 父容器是 `.scpdf-container` ❌
 -> 容器的视口偏移 `(8, 124)` 被**再加了一遍** ❌
--> **修法**：减去容器的偏移 ✅
+-> **修法**：减去容器的偏移
 -> ⚠️ **必须用 state + useEffect**（不能在 useMemo 里现量）❌
 -> useMemo 在**渲染期间**跑 -> DOM 还没更新 -> 量到**旧值** ❌
 -> 实测：`top = 124 - 124 = 0` -> 面板贴到容器顶部 ❌
@@ -129,28 +129,28 @@ containerRect: "8,124"           <- 容器在视口里偏移了 (8, 124)
 
 -> 传给 `computeDialogPosition` 的是**滚动容器**的尺寸（1442 × **608**）❌
 -> 容器比窗口矮 -> "下面放不下" -> 面板被**推到上面** ❌
--> **修法**：传**窗口**的尺寸（1442 × **732**）✅
+-> **修法**：传**窗口**的尺寸（1442 × **732**）
 
 ### ③ ⚠️ **面板高度写死 320**（这才是"跑到最上方"的直接原因）
 
 -> 面板的真实高度是 `min(460px, 70%)`，不是固定的 ❌
 -> 实测：`anchor.bottom(391) + 30 + 320 = 741 > 732 - 12` -> **放不下** ❌
 -> -> 走"放上面"分支 -> `top = anchor.top - 30 - 320 = 16` ❌
--> -> **贴在 PDF 最上方** ✅
--> **修法**：高度用 **200** -> **正常贴在下面** ✅
+-> -> **贴在 PDF 最上方**
+-> **修法**：高度用 **200** -> **正常贴在下面**
 
 ### ④ `gap: 30`（默认 8）
 
 -> 便签图标只有 **22px** 宽 ✅ -> gap=8 -> 面板**盖住便签** ❌
--> gap=30 -> 两个都看得见 ✅
+-> gap=30 -> 两个都看得见
 
 ### ⑤ 锚点要等 DOM 画完再量
 
 -> 之前 `activeAnnotationAnchor` 是 `useMemo([activeAnnotationId])` ❌
 -> 它在**渲染期间**算 -> 那时便签图标**可能还没渲染** ❌
--> 改成 `useState` + `useEffect`（必要时下一帧再量一次）✅
+-> 改成 `useState` + `useEffect`（必要时下一帧再量一次）
 
-**结果**：panel y=524 -> **y=421**（便签 y=367 -> 偏 **54px**）✅
+**结果**：panel y=524 -> **y=421**（便签 y=367 -> 偏 **54px**）
 
 ---
 
@@ -169,23 +169,23 @@ containerRect: "8,124"           <- 容器在视口里偏移了 (8, 124)
 
 -> **① 宿主侧**：demo 的 `highlightSeq` 在文档加载时**归零** ❌
 -> 但**持久化恢复**的高亮还带着旧 id ❌ -> **撞了** ❌
--> **修法**：用 `crypto.randomUUID()`（用户选的 A 方案）✅
+-> **修法**：用 `crypto.randomUUID()`（用户选的 A 方案）
 -> **② 包侧**：`activeHighlightId === highlight.id` -> 同 id **两个都激活** ❌
--> **修法**：激活态改成**按矩形**判断 ✅
+-> **修法**：激活态改成**按矩形**判断
 
 ### 包要能**容忍**重复 id（宿主不一定都小心）
 
--> **命中判定**按【几何】找 DOM 元素（不是按 id）✅
--> **层级（zIndex）**按【DOM 顺序】（之前按 id 去重 -> 同 id 拿到同 zIndex -> 永远只能点到第一个）✅
--> **激活态**按【矩形】（`activeHighlightRect`）✅
--> **找到"真正点到的那一条"**（`findHighlightByElement`）✅
--> **换色时也要消歧**（`findHighlightPosition`）✅
+-> **命中判定**按【几何】找 DOM 元素（不是按 id）
+-> **层级（zIndex）**按【DOM 顺序】（之前按 id 去重 -> 同 id 拿到同 zIndex -> 永远只能点到第一个）
+-> **激活态**按【矩形】（`activeHighlightRect`）
+-> **找到"真正点到的那一条"**（`findHighlightByElement`）
+-> **换色时也要消歧**（`findHighlightPosition`）
 
 ### 抽到 core（可单测）
 
--> `isSameRect(a, b, tolerance)` ✅
--> `pickHighlightByRect(candidates, target, toRect)` ✅
--> `HighlightHit` 加 `rect` 字段 ✅
+-> `isSameRect(a, b, tolerance)`
+-> `pickHighlightByRect(candidates, target, toRect)`
+-> `HighlightHit` 加 `rect` 字段
 
 ---
 
@@ -194,25 +194,25 @@ containerRect: "8,124"           <- 容器在视口里偏移了 (8, 124)
 **实测（打印媒体下）**：
 ```
 stickyNotes:  { display: "block", visibility: "visible" }  ❌ 没藏
-annotations:  { display: "none" }                         ✅ 高亮藏对了
+annotations:  { display: "none" }                          高亮藏对了
 ```
 
--> 打印 CSS 的隐藏清单里**有** `.scpdf-annotations` ✅
+-> 打印 CSS 的隐藏清单里**有** `.scpdf-annotations`
 -> 但**没有** `.scpdf-sticky-notes`（便签）❌
 -> 便签带着**批注正文**（用户的私人内容）-> **会被打印出去** ❌
 
-**修法**：把**所有浮层**都加进隐藏清单 ✅
--> 便签 / 详情面板 / 批注弹窗 / 颜色面板 / 链接弹窗 / toast ✅
+**修法**：把**所有浮层**都加进隐藏清单
+-> 便签 / 详情面板 / 批注弹窗 / 颜色面板 / 链接弹窗 / toast
 
-**顺带查了"导出 PDF"那条路** -> 走**真 PDF 批注** -> 本来就没这个问题 ✅
+**顺带查了"导出 PDF"那条路** -> 走**真 PDF 批注** -> 本来就没这个问题
 
 ---
 
 # 覆盖率
 
--> 新增 6 个测试文件/组 -> 覆盖率 **49.98%** -> **52.1%** ✅
--> 阈值同步提高：50/45/40/50 -> **51/47/41/51** ✅
--> 体积：33.5 -> 33.56 kB -> 上限 **34 kB** ✅
+-> 新增 6 个测试文件/组 -> 覆盖率 **49.98%** -> **52.1%**
+-> 阈值同步提高：50/45/40/50 -> **51/47/41/51**
+-> 体积：33.5 -> 33.56 kB -> 上限 **34 kB**
 
 ---
 
@@ -221,7 +221,7 @@ annotations:  { display: "none" }                         ✅ 高亮藏对了
 - `pnpm verify` -> **9/9 全绿**
 - `pnpm test` -> **775 passed**
 - E2E -> **639/639**（含 2 个新套件）
-- 体积：主入口 **33.56 kB / 34 kB** ✅
+- 体积：主入口 **33.56 kB / 34 kB**
 
 ---
 
@@ -262,8 +262,8 @@ PDF: 18 页 / 1.5 MB（大半空白）
 -> **渲染条件**：`renderCanvas={isVisible}` ❌ -> 打印时 `printing || isVisible` ✅
 -> **取页条件**：`pageProxies` 只取可见页 ❌ -> 打印时取**全部** ✅
 
--> 用 `beforeprint` / `afterprint` 事件（**只在打印那个短窗口**放开）✅
--> 平时**完全不影响**性能 ✅
+-> 用 `beforeprint` / `afterprint` 事件（**只在打印那个短窗口**放开）
+-> 平时**完全不影响**性能
 
 ---
 
@@ -278,37 +278,37 @@ PDF: 18 页 / 1.5 MB（大半空白）
  └─ 点按钮 -> **直接用"当前色"高亮**（上次选的 / 默认色）
 ```
 
--> 新增 `defaultHighlightColor`（宿主可配，默认 = 色板第一个）✅
--> 主按钮下面显示**当前色的小色条**（飞书样式）✅
--> 下拉里**当前色打勾** ✅
+-> 新增 `defaultHighlightColor`（宿主可配，默认 = 色板第一个）
+-> 主按钮下面显示**当前色的小色条**（飞书样式）
+-> 下拉里**当前色打勾**
 
 ---
 
 ## ⑤ 主题选择按钮
 
--> `core/theme` 里**已有** 7 个内置主题 ✅
+-> `core/theme` 里**已有** 7 个内置主题
 -> 但**工具栏没有入口** ❌ -> 新增 **🎨 按钮** ✅
--> 传 `onThemeChange` 才显示 ✅（宿主自己有切换 UI -> 不重复）
--> 主题名**跟着语言走**（`THEME_LABELS_I18N`）✅
--> 新图标 `palette`（调色板）✅
+-> 传 `onThemeChange` 才显示 （宿主自己有切换 UI -> 不重复）
+-> 主题名**跟着语言走**（`THEME_LABELS_I18N`）
+-> 新图标 `palette`（调色板）
 
 ---
 
 ## ⑥ 缩放可填 + 上下限可配
 
--> 比例从只读 `<span>` -> **可点击的输入框** ✅
--> 填的值：**夹到上下限** + **量化到 10%** ✅
--> `minScale` / `maxScale` / `allowScaleInput`（都宿主可配）✅
--> `clampScale(scale, min, max)` -> 上下限变成**参数** ✅
--> 宿主配反了（min > max）-> 用默认值 ✅（不能让用户完全不能缩放）
+-> 比例从只读 `<span>` -> **可点击的输入框**
+-> 填的值：**夹到上下限** + **量化到 10%**
+-> `minScale` / `maxScale` / `allowScaleInput`（都宿主可配）
+-> `clampScale(scale, min, max)` -> 上下限变成**参数**
+-> 宿主配反了（min > max）-> 用默认值 （不能让用户完全不能缩放）
 
 ---
 
 ## ⑦⑧ 两个新图标
 
--> `importJson`：文件 + **向下**箭头（和 `upload` 方向相反）✅
--> `exportAnnotated`：文件 + **高亮横线**（和"下载 PDF"明显不同）✅
--> 旧的 `upload` / `exportPdf` **保留** ✅
+-> `importJson`：文件 + **向下**箭头（和 `upload` 方向相反）
+-> `exportAnnotated`：文件 + **高亮横线**（和"下载 PDF"明显不同）
+-> 旧的 `upload` / `exportPdf` **保留**
 
 ---
 
@@ -318,13 +318,13 @@ PDF: 18 页 / 1.5 MB（大半空白）
 > "没选字时格式按钮置灰这个你修错了 应该是没选字的时候清除格式按钮置灰
 >  其他的还是可以用的"
 
-| 场景     | 撤销   | 重做   | 清除格式 | 其余按钮        |
-| -------- | ------ | ------ | -------- | --------------- |
-| 刚进去   | 置灰   | 置灰   | 置灰     | **全部可用** ✅ |
-| 选了文字 | 按逻辑 | 按逻辑 | 恢复     | **全部可用** ✅ |
+| 场景     | 撤销   | 重做   | 清除格式 | 其余按钮     |
+| -------- | ------ | ------ | -------- | ------------ |
+| 刚进去   | 置灰   | 置灰   | 置灰     | **全部可用** |
+| 选了文字 | 按逻辑 | 按逻辑 | 恢复     | **全部可用** |
 
--> `FORMAT_COMMANDS` **只留 `removeFormat`** ✅
--> 去掉"颜色按钮不禁用"的特例 ✅
+-> `FORMAT_COMMANDS` **只留 `removeFormat`**
+-> 去掉"颜色按钮不禁用"的特例
 
 ---
 
@@ -336,7 +336,7 @@ PDF: 18 页 / 1.5 MB（大半空白）
 -> **② 锚点只在打开时量一次** ❌ -> 滚动后失效 ✅
 -> **③ 便签还没画出来就量** ❌ -> 重试到量到为止 ✅
 
-**修复后**：第 1 / 4 / 10 页**都是 55px** ✅
+**修复后**：第 1 / 4 / 10 页**都是 55px**
 
 ---
 
@@ -345,29 +345,29 @@ PDF: 18 页 / 1.5 MB（大半空白）
 **实测（修复前）**：第 1 页 66 个（页眉 + 整页矩形），第 2 页**一个都没有** ❌
 
 -> **① 浏览器自动滚动后 Range 被扩展到页首** ❌
--> 过滤必须在**内容坐标**里做 ✅
--> **只用下界**（起点）—— 上界会被自动滚动搞坏 ✅
+-> 过滤必须在**内容坐标**里做
+-> **只用下界**（起点）—— 上界会被自动滚动搞坏
 -> **② `dragEndRef.y` 永远是起点 y** ❌ -> 改成真实的鼠标 y ✅
 -> **③ `AnnotationLayer` 只画 `position.pageNumber` 那页** ❌
--> 改成**每个矩形按自己的 `pageNumber`** 判断 ✅
+-> 改成**每个矩形按自己的 `pageNumber`** 判断
 
-**修复后**：第 1 页 1 个（页面下半部分）+ 第 2 页 1 个（页面上半部分）✅
+**修复后**：第 1 页 1 个（页面下半部分）+ 第 2 页 1 个（页面上半部分）
 
 ---
 
 ## ⑬ 导出的 PDF hover 出黄色便签
 
-**A/B 对照实验**（我一开始怀疑是 `/F`，**实测证明不是**）✅
+**A/B 对照实验**（我一开始怀疑是 `/F`，**实测证明不是**）
 
-| 变体               | hover 结果      |
-| ------------------ | --------------- |
-| 原始               | ❌ 出黄色便签   |
-| **删 `/Contents`** | ✅ **没有便签** |
-| 只加 `/F = 12`     | ❌ 还是出便签   |
+| 变体               | hover 结果    |
+| ------------------ | ------------- |
+| 原始               | ❌ 出黄色便签 |
+| **删 `/Contents`** | **没有便签**  |
+| 只加 `/F = 12`     | ❌ 还是出便签 |
 
--> **真凶是 `/Contents`** ✅
--> 默认**不写**（新增 `includeAnnotationText`）✅
--> 加 `/F = 4`（Print，规范上该加）✅
+-> **真凶是 `/Contents`**
+-> 默认**不写**（新增 `includeAnnotationText`）
+-> 加 `/F = 4`（Print，规范上该加）
 
 ---
 
@@ -376,6 +376,6 @@ PDF: 18 页 / 1.5 MB（大半空白）
 - `pnpm verify` -> **9/9 全绿**
 - `pnpm test` -> **797 passed**
 - E2E -> 全量通过
-- 体积 -> 主入口 35.29 kB / 36 kB ✅
+- 体积 -> 主入口 35.29 kB / 36 kB
 
 ---

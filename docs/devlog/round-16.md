@@ -36,7 +36,7 @@
 **为什么以前测不出来**：旧 E2E 只检查"高亮框和某个 span **有重叠**" → 太粗。
 必须**逐像素**比（`Range.getBoundingClientRect()`）。
 
-**验证**：新 E2E `scripts/e2e-search-exact.mjs` → **205/205 逐像素对齐** ✅
+**验证**：新 E2E `scripts/e2e-search-exact.mjs` → **205/205 逐像素对齐**
 
 - 提交：`4628d7e`
 
@@ -77,7 +77,7 @@
 **可选 peerDependency + 独立子路径**：
 
 ```
-主入口                          28.48 kB（不变量级）✅
+主入口                          28.48 kB（不变量级）
 @scholar-space/pdf-viewer/editor  5.81 kB  ← 宿主想用富文本批注才装 TipTap
 ```
 

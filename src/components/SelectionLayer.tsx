@@ -64,7 +64,7 @@ export function SelectionLayer({ pageNumber, shape }: SelectionLayerProps) {
        * → clip rect 的 x=449（真实 px）会被放大成 449 × (1408/100) = 6324
        * → 形状跑到页面外 → **选区完全看不见**。
        *
-       * ✅ 正确做法：**不设 viewBox** → SVG 用户坐标 = CSS 像素
+       *  正确做法：**不设 viewBox** → SVG 用户坐标 = CSS 像素
        * → clipPath 的坐标就是真实 px，直接可用。
        */
       width="100%"

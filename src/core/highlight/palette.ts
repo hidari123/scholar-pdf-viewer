@@ -21,19 +21,19 @@ export type HighlightPalette = Record<string, string>;
  * > "语言和高亮色都是包需要内置的 但是有接口宿主可以配置"
  *
  * → 之前宿主**必须**传 `highlightPalette` → 不传就**没有颜色选择器** ❌
- * → 现在内置一套 → **开箱即用** ✅
- * → 宿主传了 → **完全覆盖**（不是合并，见 `mergeConfig`）✅
+ * → 现在内置一套 → **开箱即用**
+ * → 宿主传了 → **完全覆盖**（不是合并，见 `mergeConfig`）
  *
  * ## 颜色说明
  *
  * 取自常见编辑器（WPS / Word / Notion）的高亮笔配色。
  * 颜色是**中性偏亮**的 → 配合 `mix-blend-mode: multiply`
- * 叠在黑字上时，文字仍然清晰可读 ✅
+ * 叠在黑字上时，文字仍然清晰可读
  *
  * ## 语义 key
  *
- * → key 是**语义名**（`yellow` / `green` / …）→ 宿主可以按 key 存"用户选的颜色" ✅
- * → 宿主想换配色 → 传自己的 `highlightPalette`（key 可以自己定）✅
+ * → key 是**语义名**（`yellow` / `green` / …）→ 宿主可以按 key 存"用户选的颜色"
+ * → 宿主想换配色 → 传自己的 `highlightPalette`（key 可以自己定）
  */
 export const DEFAULT_HIGHLIGHT_PALETTE: HighlightPalette = {
   /** 黄（最常用） */
@@ -65,10 +65,10 @@ export const DEFAULT_HIGHLIGHT_PALETTE: HighlightPalette = {
  * -> 界面是中文也显示 \`#ffd54a\`，英文还是 \`#ffd54a\` ❌
  * -> -> **和界面语言完全脱节** ❌
  *
- * -> 现在按 key 查本地化名字 ✅
- * -> 宿主自定义的 key 查不到 -> **退回 key 本身** ✅（不猜）
+ * -> 现在按 key 查本地化名字
+ * -> 宿主自定义的 key 查不到 -> **退回 key 本身**  （不猜）
  *
- * ⚠️ **只覆盖内置色板** ✅ -> 宿主的自定义 key 不在这里 ✅
+ * ⚠️ **只覆盖内置色板**  -> 宿主的自定义 key 不在这里
  */
 export const HIGHLIGHT_COLOR_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   yellow: { zh: '黄色', en: 'Yellow', ja: '黄色', fr: 'Jaune' },
@@ -86,7 +86,7 @@ export const HIGHLIGHT_COLOR_NAMES: Readonly<Record<string, Readonly<Record<stri
  *
  * @param key 色板 key
  * @param locale 语言（\`zh\` / \`en\` / \`ja\` / \`fr\`…）
- * @returns 本地化名字；查不到就**退回 key 本身** ✅
+ * @returns 本地化名字；查不到就**退回 key 本身**
  */
 export function resolveHighlightColorName(key: string, locale: string): string {
   const names = HIGHLIGHT_COLOR_NAMES[key];

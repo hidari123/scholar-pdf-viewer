@@ -54,12 +54,12 @@ export const HIGHLIGHT_ACTION_KEYS = {
  * ```
  *
  * -> 高亮浮层（点高亮块）**永远是中文** ❌
- * -> 选区浮层（选中文字）走 i18n -> **英文** ✅
- * -> **两个浮层并排 -> "中英文混杂"** ✅
+ * -> 选区浮层（选中文字）走 i18n -> **英文**
+ * -> **两个浮层并排 -> "中英文混杂"**
  *   （用户反馈："语言他自己会动来动去的"）
  *
- * -> 现在：**改成 key -> MessageKey 的映射** ✅
- *   -> 标签由**宿主的 `t()`** 解析 -> 跟着语言走 ✅
+ * -> 现在：**改成 key -> MessageKey 的映射**
+ *   -> 标签由**宿主的 `t()`** 解析 -> 跟着语言走
  */
 export const HIGHLIGHT_ACTION_MESSAGE_KEYS = {
   [HIGHLIGHT_ACTION_KEYS.comment]: 'highlight.actionComment',
@@ -85,7 +85,7 @@ export interface HighlightActionOptions {
    * **文案解析**（`key -> 当前语言的文案`）。
    *
    * ⚠️ **必须传** -> 否则标签会退化成 `key` 本身 ❌
-   * -> 宿主传 `t`（包内部已经有了）✅
+   * -> 宿主传 `t`（包内部已经有了）
    */
   t?: (key: MessageKey) => string;
 }
@@ -115,8 +115,8 @@ export function buildHighlightActions(
   /*
    * ⚠️ **标签解析**（跟着语言走）。
    *
-   * -> 宿主没传 `t` -> 退化成 **`key` 本身**（而不是中文）✅
-   *   -> 宁可显示 `highlight.actionCopy`，也不显示错语言的中文 ✅
+   * -> 宿主没传 `t` -> 退化成 **`key` 本身**（而不是中文）
+   *   -> 宁可显示 `highlight.actionCopy`，也不显示错语言的中文
    */
   const resolveLabel = (actionKey: string): string => {
     const messageKey =

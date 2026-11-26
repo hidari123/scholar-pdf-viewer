@@ -21,18 +21,18 @@
 
 - 默认 `content-box` -> `width: 100%` **不含 padding 和 border**
 - 实测：弹窗 340px，输入框实际 **358px** -> 超出 18px ❌
-- 修：弹窗和输入框都加 `box-sizing: border-box` ✅
+- 修：弹窗和输入框都加 `box-sizing: border-box`
 
 ## ② 编辑弹窗贴右边 -> 安全边距翻倍
 
 - 之前 `margin`（12px）-> 贴边时刚好卡在边上 ❌
-- 改成 `margin * 2`（24px）-> 往中间来一点 ✅（实测右边距 206px）
+- 改成 `margin * 2`（24px）-> 往中间来一点 （实测右边距 206px）
 
 ### 顺带修：弹窗底部超出视口（更严重）
 
 - **根因**：第一次量尺寸时富文本编辑器**还没加载完** -> 高度一路 122 -> 237 -> 281 ❌
 - 用偏小的高度算位置 -> **「保存」按钮在屏幕外** -> 连点都点不到 ❌
-- **修**：`ResizeObserver` 盯着尺寸 -> 变一次重算一次位置 ✅
+- **修**：`ResizeObserver` 盯着尺寸 -> 变一次重算一次位置
 
 ## ③⑦ 语言：新增审计工具，全量排查
 
@@ -43,7 +43,7 @@
 3. 工具栏占位符 `{key}` 都存在
 4. 宿主自定义按钮也能走 i18n
 
-**结果**：95 条 key / 4 套语言 / **0 处硬编码** ✅
+**结果**：95 条 key / 4 套语言 / **0 处硬编码**
 
 **排查出 13 处硬编码**（全修）：
 
@@ -66,24 +66,24 @@
 2. **根本没有"高亮底色"按钮**（`annotationPalette` 没内置默认值）❌
 3. `<blockquote>` **完全没有样式** ❌
 
-**实测**：`<mark>hello world</mark>` -> `rgb(255, 243, 163)` ✅
+**实测**：`<mark>hello world</mark>` -> `rgb(255, 243, 163)`
 
 ## ⑤ 编辑器移动光标 -> PDF 高亮被选中
 
 - **根因**：浏览器里所有 contenteditable **共用一份选区**
-- **修**：弹窗打开时根节点加 `data-dialog-open` -> 文本层 `user-select: none` ✅
+- **修**：弹窗打开时根节点加 `data-dialog-open` -> 文本层 `user-select: none`
 
 ## ⑥ 保存按钮 hover 变白
 
 - `filter: brightness(1.06)` -> 蓝色变亮 -> 白字看不清 ❌
-- 改成 `color-mix(in srgb, accent 86%, #000)` -> **变深** ✅
-  - 不用 `filter` -> `getComputedStyle().backgroundColor` **读得到** ✅
-- 取消按钮 hover 用 `#eceef1`（之前 `#f7f8fa` 和白色几乎一样）✅
+- 改成 `color-mix(in srgb, accent 86%, #000)` -> **变深**
+  - 不用 `filter` -> `getComputedStyle().backgroundColor` **读得到**
+- 取消按钮 hover 用 `#eceef1`（之前 `#f7f8fa` 和白色几乎一样）
 
 ## 顺带修：Esc 把整个批注弹窗也关掉了
 
 - 批注弹窗的 Esc 监听在 `document` 且 `capture: true` -> 比输入框的冒泡阶段**先跑** ❌
-- **修**：加 `hasNestedOverlay` -> 嵌套弹窗开着时外层不处理 Esc ✅
+- **修**：加 `hasNestedOverlay` -> 嵌套弹窗开着时外层不处理 Esc
 
 ## 第 20 轮总验证
 

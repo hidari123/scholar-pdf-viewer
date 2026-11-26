@@ -50,7 +50,7 @@ describe('hitsAtPoint（点命中了哪些高亮）', () => {
    *
    * -> 宿主可能传了**重复的 id** ❌
    * -> 按 id 找 DOM 元素 -> 找到**第一个** ❌
-   * -> 按**矩形**找 -> **精确到那一个** ✅
+   * -> 按**矩形**找 -> **精确到那一个**
    */
   it('**命中结果带上那个矩形**（用来精确定位 DOM 元素）', () => {
     const rect = { id: 'a', left: 100, top: 100, width: 100, height: 20, zIndex: 0 };
@@ -59,14 +59,14 @@ describe('hitsAtPoint（点命中了哪些高亮）', () => {
   });
 
   it('**重复 id 的两个高亮 -> 各自的矩形不同**', () => {
-    // ⚠️ **两个矩形有重叠** -> 同一个点能同时命中两个 ✅
+    // ⚠️ **两个矩形有重叠** -> 同一个点能同时命中两个
     const rects = [
       { id: 'dup', left: 100, top: 100, width: 200, height: 20, zIndex: 0 },
       { id: 'dup', left: 200, top: 100, width: 200, height: 20, zIndex: 1 },
     ];
     const hits = hitsAtPoint(250, 110, rects);
     expect(hits).toHaveLength(2);
-    // ⚠️ **id 相同，但矩形不同** -> 靠矩形区分 ✅
+    // ⚠️ **id 相同，但矩形不同** -> 靠矩形区分
     expect(hits[0]?.rect.left).not.toBe(hits[1]?.rect.left);
   });
 
@@ -131,7 +131,7 @@ describe('hitsAtPoint（点命中了哪些高亮）', () => {
       { left: 300, top: 0, width: 50, height: 20 },
       (c) => ({ left: c.x, top: 0, width: 50, height: 20 }),
     );
-    // ⚠️ **必须挑 "b"**（不是第一个）✅
+    // ⚠️ **必须挑 "b"**（不是第一个）
     expect(result?.name).toBe('b');
   });
 

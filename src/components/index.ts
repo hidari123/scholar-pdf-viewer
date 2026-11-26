@@ -5,7 +5,7 @@
  *
  * → 它们约 **1.5 kB**（brotli 后）
  * → 静态导出 → **每个宿主都要背**（哪怕从来不用批注）❌
- * → `PdfViewer` 内部用 **`lazy(() => import(...))`** 加载 → 不打开批注就不加载 ✅
+ * → `PdfViewer` 内部用 **`lazy(() => import(...))`** 加载 → 不打开批注就不加载
  *
  * → 宿主如果想单独用 → 从深路径 import：
  *   `import { AnnotationPanel } from '@scholar-space/pdf-viewer/dist/components/AnnotationPanel'`

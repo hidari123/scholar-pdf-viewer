@@ -88,7 +88,7 @@ try {
    * ⚠️ demo 里没有把 `viewerRef` 挂到 window 上 ->
    * 这里直接测**包的方法存在性**（通过渲染一个最小用法）。
    *
-   * 更实际的做法：测**工具栏按钮**的行为（它们走的是同一套 `zoom` / `print`）✅
+   * 更实际的做法：测**工具栏按钮**的行为（它们走的是同一套 `zoom` / `print`）
    */
   const scaleBefore = await page.evaluate(
     () => document.querySelector('.scpdf-toolbar__scale')?.textContent ?? '',

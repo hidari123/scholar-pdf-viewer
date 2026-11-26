@@ -55,7 +55,7 @@ export interface TextPageLike {
    * → 单独传回调的话，宿主要自己缓存各页尺寸
    * → **缓存的时机和索引建索引的时机是竞态的**（实测踩过）
    *    → 索引可能拿到"还没填好的"尺寸 → 那一页就错位 ❌
-   * → 放在页上 → 包**当场就能拿到**（pdf.js 的 `page.getViewport()` 是同步的）✅
+   * → 放在页上 → 包**当场就能拿到**（pdf.js 的 `page.getViewport()` 是同步的）
    */
   getViewport?: (params: { scale: number }) => SearchViewport;
 }
@@ -94,7 +94,7 @@ interface PageIndex {
    *
    * → 渲染侧的 `PositionedTextItem` 是**筛过 + 排过序**的
    * → 和索引的原始顺序**对不上** → 偏移错位 → 高亮跑到别的字上
-   * → 存一份"索引用了哪些项" → 映射偏移时用它来对齐 ✅
+   * → 存一份"索引用了哪些项" → 映射偏移时用它来对齐
    */
   itemTexts: string[];
 }
@@ -143,7 +143,7 @@ export class PdfSearch {
    *
    * → 渲染侧要用"索引的项文本"算对齐偏移
    * → 索引是**异步**建的 → 页面渲染时索引可能还没建好
-   * → 宿主/组件用这个版本号当依赖 → 索引一变就重算 ✅
+   * → 宿主/组件用这个版本号当依赖 → 索引一变就重算
    */
   private version = 0;
 
@@ -157,7 +157,7 @@ export class PdfSearch {
    *
    * → 索引是**异步**建的 → 组件第一次渲染时索引可能还是空的
    * → 组件要等索引好了才能算出正确的偏移
-   * → 监听 → 索引一变就重渲染 ✅
+   * → 监听 → 索引一变就重渲染
    *
    * @param listener 回调（收到新的版本号）
    * @returns 取消监听
@@ -313,7 +313,7 @@ export class PdfSearch {
              * ### 修法（两条路）
              *
              * ① **宿主传 `viewport`**（推荐）→ 索引用**完全相同的判据**
-             *    → 旋转文字在索引里也不收 → **文本完全一致** ✅
+             *    → 旋转文字在索引里也不收 → **文本完全一致**
              *
              * ② 宿主不传 → 索引收全部 → 渲染侧用**字符位置**兜底对齐
              *    （`mapOffsetToRenderedByText`）→ 尽量准
@@ -343,7 +343,7 @@ export class PdfSearch {
          *
          * → 渲染侧要用"索引的项文本"算对齐偏移
          * → 索引是**异步**建的 → 页面渲染时索引可能还没建好
-         * → 宿主收到通知 → 重新渲染 → 偏移才算得对 ✅
+         * → 宿主收到通知 → 重新渲染 → 偏移才算得对
          */
         this.version += 1;
         this.notifyIndexChange();
@@ -364,7 +364,7 @@ export class PdfSearch {
    * ## 优先级
    *
    * ```
-   * ① page.getViewport({ scale: 1 })   —— 页自己提供（pdf.js 原生）✅ 推荐的
+   * ① page.getViewport({ scale: 1 })   —— 页自己提供（pdf.js 原生） 推荐的
    * ② options.viewport?.(pageNumber)    —— 宿主单独提供（兜底）
    * ③ undefined                          —— 拿不到 → 索引会收旋转文字（对齐会偏）
    * ```
@@ -372,7 +372,7 @@ export class PdfSearch {
    * ⚠️ **为什么优先用页自己的**：
    * → 宿主的 `viewport` 回调通常依赖**异步缓存**的页尺寸
    * → 索引建索引和缓存填充是**竞态的** → 有一页拿到 `undefined` 就错位 ❌
-   * → 页自己的 `getViewport` 是**同步**的 → 永远拿得到 ✅
+   * → 页自己的 `getViewport` 是**同步**的 → 永远拿得到
    *
    * @param page 页
    * @param pageNumber 页码

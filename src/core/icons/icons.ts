@@ -33,7 +33,7 @@
  * <PdfViewer icons={{ upload: <MyUploadIcon />, download: <MyDownloadIcon /> }} />
  * ```
  *
- * → 包用宿主的 → 风格统一 → 宿主想用 `lucide-react` 随时可以换 ✅
+ * → 包用宿主的 → 风格统一 → 宿主想用 `lucide-react` 随时可以换
  */
 
 /** 图标名（内置的全部图标） */
@@ -67,7 +67,7 @@ export type IconName =
    * ⚠️ **两个新图标**（用户反馈）。
    *
    * -> `importJson`：导入高亮 JSON（用户说"目前像是上传pdf"❌）
-   * -> `exportAnnotated`：导出**带高亮**的 PDF（和"下载 PDF"区分）✅
+   * -> `exportAnnotated`：导出**带高亮**的 PDF（和"下载 PDF"区分）
    */
   | 'importJson'
   | 'exportAnnotated'
@@ -110,7 +110,7 @@ export type IconName =
   | 'settings'
   /*
    * ⚠️ **主题选择**（用户需求："包在工具栏那里也可以加上一个按钮
-   * 让用户进行选择"✅）。
+   * 让用户进行选择"）。
    */
   | 'palette';
 
@@ -271,7 +271,7 @@ export function getIconShape(name: IconName): IconShape | null {
      * ### 现在的画法
      * - 云：顶边 y=9，底边 y=19
      * - 箭头：在 **y=16.5 → y=11.5**（完全在云里）
-     * - 箭头宽 3.5，云的左边界在箭头处约 x=7 → 箭头不会碰到云边 ✅
+     * - 箭头宽 3.5，云的左边界在箭头处约 x=7 → 箭头不会碰到云边
      */
     case 'upload':
       return {
@@ -319,8 +319,8 @@ export function getIconShape(name: IconName): IconShape | null {
        * 目前像是上传pdf"❌）。
        *
        * -> `upload` 是"云 + 向上箭头" -> **看起来像上传 PDF** ❌
-       * -> 新图标：**向下箭头进文件**（和"导出"方向相反）✅
-       *    -> 一眼看出"从文件里读进来" ✅
+       * -> 新图标：**向下箭头进文件**（和"导出"方向相反）
+       *    -> 一眼看出"从文件里读进来"
        */
       return {
         paths: [
@@ -338,7 +338,7 @@ export function getIconShape(name: IconName): IconShape | null {
        * 可以作为下载pdf，导出带高亮的pdf的icon再设计一下"❌）。
        *
        * -> 旧的 `exportPdf` 是"文件 + 向下箭头" -> 和"下载 PDF"**重复** ❌
-       * -> 新图标：**文件 + 高亮块**（一眼看出"带高亮的 PDF"）✅
+       * -> 新图标：**文件 + 高亮块**（一眼看出"带高亮的 PDF"）
        */
       return {
         paths: [
@@ -387,9 +387,9 @@ export function getIconShape(name: IconName): IconShape | null {
        * ⚠️ **必须和 `textColor` / `clearFormat` 长得不一样**（用户反馈：
        * "清空format这个功能的按钮和修改文字颜色的按钮一样 需要区分开"）。
        *
-       * -> `textColor`     = "A" + **下面**的色条 ✅
-       * -> `textHighlight` = "A" + **背后**的色块（像马克笔涂在字上）✅
-       * -> `clearFormat`   = "A" + **斜杠**划掉 ✅
+       * -> `textColor`     = "A" + **下面**的色条
+       * -> `textHighlight` = "A" + **背后**的色块（像马克笔涂在字上）
+       * -> `clearFormat`   = "A" + **斜杠**划掉
        */
       return {
         paths: ['M8 17 12 5l4 12', 'M9.5 13h5'],
@@ -417,7 +417,7 @@ export function getIconShape(name: IconName): IconShape | null {
        * - 后面那张纸：8,8 → 20,20（12×12）
        * - 前面那张纸：4,4 → 16,16（12×12）
        * - 前面那张**只有上边和左边**是实线（后面被挡住的部分不画）
-       * → 两张**同样大小**的纸，斜着错开 → 一眼能看出"复制" ✅
+       * → 两张**同样大小**的纸，斜着错开 → 一眼能看出"复制"
        */
       return {
         rects: [{ x: 9, y: 9, width: 12, height: 12, rx: 2 }],
@@ -475,7 +475,7 @@ export function getIconShape(name: IconName): IconShape | null {
        * ### 现在的画法
        * - "文"（左上）：x=2..11, y=3..13
        * - "A"（右下）：x=12..22, y=10..21
-       * → 两部分**完全分开**（中间留 1px）→ 一眼能看出是"翻译" ✅
+       * → 两部分**完全分开**（中间留 1px）→ 一眼能看出是"翻译"
        */
       return {
         paths: [
@@ -529,7 +529,7 @@ export function getIconShape(name: IconName): IconShape | null {
     case 'alert':
       /*
        * **警告**（感叹号 + 三角）。
-       * → Toast 的 warning 类型用 ✅
+       * → Toast 的 warning 类型用
        */
       return {
         paths: ['M12 3.5 22 20H2L12 3.5Z'],
@@ -541,7 +541,7 @@ export function getIconShape(name: IconName): IconShape | null {
     case 'info':
       /*
        * **信息**（圆圈 + 感叹号）。
-       * → Toast 的 info 类型用 ✅
+       * → Toast 的 info 类型用
        */
       return {
         circles: [{ cx: 12, cy: 12, r: 9 }],
@@ -583,9 +583,9 @@ export function getIconShape(name: IconName): IconShape | null {
        *
        * ### 现在
        *
-       * -> 用和 \`italic\` / \`underline\` **同一套画法**：两条折线拼出完整的 "S" ✅
-       * -> 再加一条**贯穿中间的横线**（删除线）✅
-       * -> 上下**对称**（S 的中心正好在 y=12，横线也正好在 y=12）✅
+       * -> 用和 \`italic\` / \`underline\` **同一套画法**：两条折线拼出完整的 "S"
+       * -> 再加一条**贯穿中间的横线**（删除线）
+       * -> 上下**对称**（S 的中心正好在 y=12，横线也正好在 y=12）
        */
       return {
         paths: [
@@ -604,7 +604,7 @@ export function getIconShape(name: IconName): IconShape | null {
        * **清除格式**："A" + **斜杠**划掉（像 Photoshop 的橡皮擦）。
        *
        * ⚠️ **之前和 `textColor` 的几何完全一样**（都是"A" + 下划线）❌
-       *    -> 用户反馈："清空format这个功能的按钮和修改文字颜色的按钮一样 需要区分开" ✅
+       *    -> 用户反馈："清空format这个功能的按钮和修改文字颜色的按钮一样 需要区分开"
        */
       return {
         paths: ['M8 17 12 5l4 12', 'M9.5 13h5'],
@@ -625,7 +625,7 @@ export function getIconShape(name: IconName): IconShape | null {
        * **文字颜色**："A" + **下面一条粗色带**。
        *
        * ⚠️ **之前和 `clearFormat` 的几何完全一样** ❌
-       *    -> 现在：**粗**色带（`clearFormat` 是斜杠，`textHighlight` 是背景块）✅
+       *    -> 现在：**粗**色带（`clearFormat` 是斜杠，`textHighlight` 是背景块）
        */
       return {
         paths: ['M8 17 12 5l4 12', 'M9.5 13h5'],
@@ -660,8 +660,8 @@ export function getIconShape(name: IconName): IconShape | null {
       /*
        * ⚠️ **调色板图标**（主题选择）。
        *
-       * -> 画板（圆角矩形）+ 3 个颜料点 ✅
-       * -> 一眼看出"配色 / 主题" ✅
+       * -> 画板（圆角矩形）+ 3 个颜料点
+       * -> 一眼看出"配色 / 主题"
        */
       return {
         paths: [

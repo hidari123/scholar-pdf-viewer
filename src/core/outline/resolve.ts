@@ -21,8 +21,8 @@
  * ### 现在的做法
  *
  * → 包**自己**接受一个**异步**解析器：`resolvePageRef?: (ref) => Promise<number | null>`
- * → 包在拿到目录后**自动**解析所有页引用 → **建好映射** → 目录立刻可跳转 ✅
- * → 宿主的 `pageRefToNumber` **仍然支持**（优先用它，因为它可能是同步的）✅
+ * → 包在拿到目录后**自动**解析所有页引用 → **建好映射** → 目录立刻可跳转
+ * → 宿主的 `pageRefToNumber` **仍然支持**（优先用它，因为它可能是同步的）
  */
 
 import type { OutlineItemLike } from './outline';
@@ -31,15 +31,15 @@ import { collectOutlineRefs } from './outline';
 /**
  * **异步解析器**（宿主注入）。
  *
- * → 形状和 pdf.js 的 `doc.getPageIndex(ref)` 一致（返回 0-based，要 +1）✅
+ * → 形状和 pdf.js 的 `doc.getPageIndex(ref)` 一致（返回 0-based，要 +1）
  */
 export type ResolvePageRef = (ref: unknown) => Promise<number | null>;
 
 /**
  * **异步解析目录里的所有页引用 → 页码**。
  *
- * → 结果是**同步**的映射函数（和 `pageRefToNumber` 一个形状）✅
- * → 解析不出来就跳过（不抛）✅
+ * → 结果是**同步**的映射函数（和 `pageRefToNumber` 一个形状）
+ * → 解析不出来就跳过（不抛）
  *
  * @param outline 目录树
  * @param resolvePageRef 异步解析器（pdf.js 的 `getPageIndex` 就这个形状）

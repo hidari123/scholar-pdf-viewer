@@ -46,12 +46,12 @@ export interface NormPosition {
  * **空的归一化位置**（找不到高亮时用）。
  *
  * ⚠️ 为什么需要（审计发现的）：
- * -> \`SelectionActionContext.position\` 现在是**具体类型** \`NormPosition\`（不再是 \`unknown\`）✅
+ * -> \`SelectionActionContext.position\` 现在是**具体类型** \`NormPosition\`（不再是 \`unknown\`）
  * -> 但"点高亮块打开浮层"那条路径**可能找不到位置** ❌
  * -> 之前写 \`?? null\` -> **类型不匹配** ❌
- * -> 现在：**用这个空对象** -> 类型对 + 不会崩 ✅
+ * -> 现在：**用这个空对象** -> 类型对 + 不会崩
  *
- * -> \`boundingRect\` 全 0 -> 宿主存下来也是"空的"（不会误当成真位置）✅
+ * -> \`boundingRect\` 全 0 -> 宿主存下来也是"空的"（不会误当成真位置）
  */
 export const EMPTY_NORM_POSITION: NormPosition = {
   boundingRect: { x1: 0, y1: 0, x2: 0, y2: 0, width: 0, height: 0, pageNumber: 1 },

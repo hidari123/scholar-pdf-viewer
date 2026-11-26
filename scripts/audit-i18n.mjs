@@ -9,13 +9,13 @@
  *      -> **匹配不到** ❌
  * -> 实测：旧版跑出来"0 个硬编码"，但源码里**实际有 5 处中文** ❌
  *   （`highlight-actions.ts` 的 5 个高亮动作标签）
- * -> 而且高亮浮层**永远是中文** -> 和选区浮层（英文）并排 -> **中英文混杂** ✅
+ * -> 而且高亮浮层**永远是中文** -> 和选区浮层（英文）并排 -> **中英文混杂**
  *
  * ## 现在的做法
  *
- * -> **扫所有 CJK 字符串字面量**（不管它在什么位置、什么写法）✅
- * -> 加一条**交叉校验**：每个 `Messages` key 必须在**四套内置语言**里都存在 ✅
- * -> 加一条**交叉校验**：每个 `Messages` key 必须在 **ZH / EN 两张表**里都存在 ✅
+ * -> **扫所有 CJK 字符串字面量**（不管它在什么位置、什么写法）
+ * -> 加一条**交叉校验**：每个 `Messages` key 必须在**四套内置语言**里都存在
+ * -> 加一条**交叉校验**：每个 `Messages` key 必须在 **ZH / EN 两张表**里都存在
  *
  * 用法：`node scripts/audit-i18n.mjs`
  */
@@ -51,9 +51,9 @@ const problems = [];
 /**
  * ⚠️ **匹配任何位置的 CJK 字符串字面量**。
  *
- * -> 不再限定是 `label:` / `title=` ✅
- * -> 计算属性（`label: FOO[BAR]`）里的中文**也能抓到** ✅
- * -> 模板字面量（`` `中文 ${x}` ``）也能抓到 ✅
+ * -> 不再限定是 `label:` / `title=`
+ * -> 计算属性（`label: FOO[BAR]`）里的中文**也能抓到**
+ * -> 模板字面量（`` `中文 ${x}` ``）也能抓到
  */
 const cjkLiteralRe = /(['"`])([^'"`\\\n]*[一-鿿][^'"`\\\n]*)\1/g;
 
@@ -61,7 +61,7 @@ const cjkLiteralRe = /(['"`])([^'"`\\\n]*[一-鿿][^'"`\\\n]*)\1/g;
  * **开发者向的中文**（不用翻译）。
  *
  * -> `throw new Error('...')` —— 给开发者看的 ❌
- * -> 翻译了反而难排查 ✅
+ * -> 翻译了反而难排查
  */
 function isDeveloperFacing(context) {
   return (
@@ -72,8 +72,8 @@ function isDeveloperFacing(context) {
      * ⚠️ `pdfViewerError('CODE', { message: '中文' })` —— **开发者向**。
      *
      * -> 这是 `PdfViewerError.message` 的**覆盖值**（排障用）❌
-     * -> **UI 层按 `error.code` 取 i18n 文案** ✅（`PdfViewer.tsx` 的 `t(\`error.\${error.code}\`)`）
-     * -> 所以这里的文案**不会显示给用户** ✅ -> 不用翻译 ✅
+     * -> **UI 层按 `error.code` 取 i18n 文案**  （`PdfViewer.tsx` 的 `t(\`error.\${error.code}\`)`）
+     * -> 所以这里的文案**不会显示给用户**  -> 不用翻译
      */
     context.includes('pdfViewerError(')
   );
@@ -84,8 +84,8 @@ function isDeveloperFacing(context) {
  *
  * ⚠️ `core/errors.ts` 的 `DEFAULT_MESSAGES`：
  * -> 它是 `PdfViewerError.message` 的默认值 ❌
- * -> **UI 层已经按 `error.code` 取 i18n 文案了** ✅（`PdfViewer.tsx:3982`）
- * -> 所以这里的英文**只给宿主排障看** -> 不用翻译 ✅
+ * -> **UI 层已经按 `error.code` 取 i18n 文案了**  （`PdfViewer.tsx:3982`）
+ * -> 所以这里的英文**只给宿主排障看** -> 不用翻译
  */
 const DEVELOPER_FACING_OBJECTS = ['DEFAULT_MESSAGES', 'THEME_LABELS'];
 
@@ -121,14 +121,14 @@ for (const file of files) {
     // 去掉 import 里的类型名（不会有中文，保险起见）
     .replace(/^import[\s\S]*?;$/gm, '');
 
-  // ⚠️ Windows 的 relative() 用反斜杠 -> 统一成正斜杠（好判断）✅
+  // ⚠️ Windows 的 relative() 用反斜杠 -> 统一成正斜杠（好判断）
   const rel = relative(ROOT, file).replace(/\\/g, '/');
 
   /*
    * ⚠️ **找出"开发者向的常量块"**（整个块都放行）。
    *
-   * -> 比如 `DEFAULT_MESSAGES = { ... }` 里的每一行都放行 ✅
-   * -> 不用逐条判断（那个会漏）✅
+   * -> 比如 `DEFAULT_MESSAGES = { ... }` 里的每一行都放行
+   * -> 不用逐条判断（那个会漏）
    */
   const developerBlocks = [];
   for (const name of DEVELOPER_FACING_OBJECTS) {
@@ -246,5 +246,5 @@ if (problems.length > 0) {
   }
   process.exitCode = 1;
 } else {
-  console.log('✅ 没有发现问题');
+  console.log(' 没有发现问题');
 }

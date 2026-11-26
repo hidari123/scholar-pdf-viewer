@@ -14,9 +14,9 @@
  * panelStyleTop: "70.21px" ← 样式是对的，但渲染位置错
  * ```
  *
- * -> 面板是 `position: absolute` -> 相对 **.scpdf-container 的内容原点** ✅
- * -> 锚点是 `getBoundingClientRect()` -> **视口坐标** ✅
- * -> 换算要 `视口坐标 - 容器视口原点 + scrollTop` ✅
+ * -> 面板是 `position: absolute` -> 相对 **.scpdf-container 的内容原点**
+ * -> 锚点是 `getBoundingClientRect()` -> **视口坐标**
+ * -> 换算要 `视口坐标 - 容器视口原点 + scrollTop`
  * -> ⚠️ **只减了视口偏移，漏了 scrollTop** ❌ -> 差 7000px ❌
  *
  * 用法：`node scripts/e2e-annotation-panel-position.mjs`
@@ -70,7 +70,7 @@ console.log('E2E：批注详情贴在便签旁边（不管在第几页）');
  */
 async function scenario(scrollTop, label) {
   /*
-   * ⚠️ **先关掉上一个详情面板** ✅
+   * ⚠️ **先关掉上一个详情面板**
    *
    * -> 不关 -> 上一个面板**还在 DOM 里** ❌
    * -> 后面找"视口内的面板"可能找到**旧的** ❌
@@ -133,7 +133,7 @@ async function scenario(scrollTop, label) {
   await page.waitForTimeout(2500);
 
   /*
-   * ⚠️ **要选"视口内"的便签** ✅
+   * ⚠️ **要选"视口内"的便签**
    *
    * -> 之前的页留下的便签**还在 DOM 里**（只是滚出屏幕了）❌
    * -> `querySelector` 取**第一个** -> 拿到的是**旧页的** ❌
@@ -156,18 +156,18 @@ async function scenario(scrollTop, label) {
   await page.mouse.move(note.x + 12, note.y + 12);
   await page.waitForTimeout(900);
   /*
-   * ⚠️ **要点"视口内"那个便签的"展开"按钮** ✅
+   * ⚠️ **要点"视口内"那个便签的"展开"按钮**
    *
    * -> 之前的页留下的便签**还在 DOM 里**（只是滚出屏幕了）❌
    * -> `querySelectorAll` 取**第一个** -> 拿到的是**旧页的** ❌
    *    -> 点它 -> 打开的是**旧批注**的详情 -> 位置当然对不上 ❌
    */
   /*
-   * ⚠️ **"展开"按钮要【真实点击】**（不是 `element.click()`）✅
+   * ⚠️ **"展开"按钮要【真实点击】**（不是 `element.click()`）
    *
    * -> 按钮在 **hover 时**才出现 ❌
    * -> `element.click()` 不触发 hover -> 按钮**还不存在** ❌
-   * -> 所以：**先 hover 让它出来 -> 再用鼠标点它的位置** ✅
+   * -> 所以：**先 hover 让它出来 -> 再用鼠标点它的位置**
    */
   const expandPos = await page.evaluate((noteId) => {
     const icon = document.querySelector(

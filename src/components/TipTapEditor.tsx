@@ -16,7 +16,7 @@
  * → **TipTap**，但做成**可选 peerDependency** + **独立子路径**：
  *
  * ```
- * 主入口            25 kB（不变）✅
+ * 主入口            25 kB（不变）
  * @scholar-space/pdf-viewer/editor   ← 宿主想用富文本批注才装 TipTap
  * ```
  *
@@ -35,12 +35,12 @@
  * />
  * ```
  *
- * ⚠️ **不传** → 包用**内置的轻量编辑器**（`contenteditable`，无依赖）→ 零成本 ✅
+ * ⚠️ **不传** → 包用**内置的轻量编辑器**（`contenteditable`，无依赖）→ 零成本
  *
  * ## 工具栏
  *
- * → 和包内置的一样：**加粗 / 斜体 / 下划线 / 高亮 / 颜色 / 链接** ✅
- * → 宿主可以传 `toolbar` 覆盖 ✅
+ * → 和包内置的一样：**加粗 / 斜体 / 下划线 / 高亮 / 颜色 / 链接**
+ * → 宿主可以传 `toolbar` 覆盖
  */
 
 import type { ReactNode } from 'react';
@@ -104,7 +104,7 @@ export interface TipTapEditorProps {
    * **嵌套弹窗的状态**（比如链接弹窗开没开）。
    *
    * ⚠️ 外层弹窗用它决定 Esc 的行为：
-   * -> 链接弹窗开着 -> Esc 关**链接弹窗**，不关外层 ✅
+   * -> 链接弹窗开着 -> Esc 关**链接弹窗**，不关外层
    *   （实测踩过的坑：Esc 把整个批注弹窗也关掉了 ❌）
    */
   onOverlayStateChange?: (hasOverlay: boolean) => void;
@@ -114,8 +114,8 @@ export interface TipTapEditorProps {
  * **TipTap 编辑器**。
  *
  * ⚠️ **必须动态 import**（TipTap 是可选 peer）：
- * → 宿主没装 TipTap → 动态 import 失败 → 回退到**内置的轻量编辑器** ✅
- * → 宿主没装 → **主入口体积不变** ✅
+ * → 宿主没装 TipTap → 动态 import 失败 → 回退到**内置的轻量编辑器**
+ * → 宿主没装 → **主入口体积不变**
  *
  * @param props 参数
  */
@@ -150,7 +150,7 @@ export function TipTapEditor(props: TipTapEditorProps) {
    * ⚠️ **为什么要用 ref**：
    * → 动态加载的 effect **依赖数组是空的** → 闭包里的 `onChange` 是**第一次渲染时的**
    * → 宿主换了回调 → 我们还在调旧的 ❌
-   * → 用 ref → 永远是**最新的** ✅
+   * → 用 ref → 永远是**最新的**
    */
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -163,7 +163,7 @@ export function TipTapEditor(props: TipTapEditorProps) {
    * **编辑器最后一次发出的 HTML**。
    *
    * -> 用来判断"内容变化是用户打的还是外部改的"
-   * -> 用户打的 -> 和它一样 -> **不要 setContent**（否则打断输入）✅
+   * -> 用户打的 -> 和它一样 -> **不要 setContent**（否则打断输入）
    */
   const lastHtmlRef = useRef<string>(value);
 
@@ -202,7 +202,7 @@ export function TipTapEditor(props: TipTapEditorProps) {
      *
      * → 如果依赖了 `value` → **每敲一个字就重建编辑器** → **输入全丢** ❌
      *   （实测：打字后 ProseMirror 里还是空的）
-     * → 内容的同步交给下面那个 effect ✅
+     * → 内容的同步交给下面那个 effect
      */
   }, [value]);
 
@@ -224,8 +224,8 @@ export function TipTapEditor(props: TipTapEditorProps) {
      *   （实测：12 个字只打进去 1 个 "这"）
      *
      * → 判据：用 `lastHtmlRef` 记住"编辑器最后一次发出的内容"
-     *   → 外部改的 → 和它不同 → 同步 ✅
-     *   → 用户打的 → 它已经是新的 → **不碰** ✅
+     *   → 外部改的 → 和它不同 → 同步
+     *   → 用户打的 → 它已经是新的 → **不碰**
      */
     if (lastHtmlRef.current === value) {
       return;
@@ -244,8 +244,8 @@ export function TipTapEditor(props: TipTapEditorProps) {
    * → 第二次挂载时容器已经有 root → 编辑器**渲染不出来** ❌
    *   （实测：`.ProseMirror` 直接变成 undefined）
    *
-   * → 解法：**只在真正卸载时销毁**（用 `useRef` 记"是否已经挂载过"）✅
-   * → 开发模式的假卸载 → **不销毁** ✅
+   * → 解法：**只在真正卸载时销毁**（用 `useRef` 记"是否已经挂载过"）
+   * → 开发模式的假卸载 → **不销毁**
    */
   const aliveRef = useRef(true);
   useEffect(() => {
@@ -261,7 +261,7 @@ export function TipTapEditor(props: TipTapEditorProps) {
     }
     /*
      * → 用 `queueMicrotask` 推迟销毁 →
-     *   给 StrictMode 的"再挂载"留出时间（再挂载会复用同一个 editor）✅
+     *   给 StrictMode 的"再挂载"留出时间（再挂载会复用同一个 editor）
      */
     return () => {
       queueMicrotask(() => {
@@ -326,7 +326,7 @@ export function TipTapEditor(props: TipTapEditorProps) {
 /**
  * **要检查"激活状态"的格式**（用于轮询的签名）。
  *
- * ⚠️ **和 `computeToolbarActiveState` 里的映射保持一致** ✅
+ * ⚠️ **和 `computeToolbarActiveState` 里的映射保持一致**
  */
 const FORMAT_CHECKS = [
   'bold',
@@ -351,7 +351,7 @@ function TipTapToolbar(props: {
   textPalette?: RichTextPalette;
   t: (key: keyof Messages, vars?: Record<string, string | number>) => string;
   /**
-   * **当前语言**（色块的 tooltip 要本地化）✅
+   * **当前语言**（色块的 tooltip 要本地化）
    *
    * ⚠️ 之前色块的 `title={key}` -> 显示英文 key ❌ -> 和界面语言不一致 ❌
    */
@@ -369,7 +369,7 @@ function TipTapToolbar(props: {
    * -> 之前点"文字颜色"-> **直接应用第一个颜色** ❌
    *   -> 用户反馈："点击会打开一个空的窄的框" ❌
    * -> 内置编辑器（`RichTextEditor`）**有**面板 ✅ -> 两边行为不一致 ❌
-   * -> 现在：**两边一致** ✅
+   * -> 现在：**两边一致**
    */
   const [openPalette, setOpenPalette] = useState<string | null>(null);
 
@@ -377,7 +377,7 @@ function TipTapToolbar(props: {
    * ⚠️ **工具栏【外层容器】的 ref**（点外面关闭面板时判断"点在哪儿"）。
    *
    * -> ⚠️ **必须是 `.scpdf-rich-text__toolbar-wrap`**（不是 `.scpdf-rich-text__toolbar`）❌
-   *    -> **颜色面板是 toolbar 的【兄弟节点】**（都在 wrap 里）✅
+   *    -> **颜色面板是 toolbar 的【兄弟节点】**（都在 wrap 里）
    *    -> 用 toolbar 判断 -> `contains(panel)` = false ❌ -> 点面板里也会关 ❌
    */
   const toolbarRef = useRef<HTMLDivElement | null>(null);
@@ -387,10 +387,10 @@ function TipTapToolbar(props: {
    * "富文本编辑框里的文字颜色和高亮这两个按钮选择完颜色之后
    *  如果点击非选择颜色框的区域 是需要关闭这个选择框的 目前没有关闭"）。
    *
-   * -> 和内置编辑器（`RichTextEditor`）**行为一致** ✅
-   * -> 点**面板外面** -> 关闭 ✅
-   * -> 点**面板里面** -> **不关** ✅
-   * -> **Esc** -> 也关闭 ✅
+   * -> 和内置编辑器（`RichTextEditor`）**行为一致**
+   * -> 点**面板外面** -> 关闭
+   * -> 点**面板里面** -> **不关**
+   * -> **Esc** -> 也关闭
    */
   useEffect(() => {
     if (!openPalette) {
@@ -399,7 +399,7 @@ function TipTapToolbar(props: {
 
     const onMouseDown = (event: MouseEvent) => {
       const target = event.target as Node | null;
-      // 点在工具栏里（含面板）-> 不关 ✅
+      // 点在工具栏里（含面板）-> 不关
       if (target && toolbarRef.current?.contains(target)) {
         return;
       }
@@ -425,9 +425,9 @@ function TipTapToolbar(props: {
    *
    * ⚠️ **从 DOM 上取**（`host.editor`），不要从 React state 取。
    *
-   * → `editor.mount(host)` 会把实例挂在 DOM 元素上（`el.editor`）✅
+   * → `editor.mount(host)` 会把实例挂在 DOM 元素上（`el.editor`）
    * → React state 里的那个可能是**旧的**（StrictMode 双挂载）❌
-   * → 从 DOM 取 → **永远是当前那个** ✅
+   * → 从 DOM 取 → **永远是当前那个**
    */
   const getEditor = useCallback(() => {
     const host = hostRef.current;
@@ -438,7 +438,7 @@ function TipTapToolbar(props: {
      * ⚠️ **编辑器实例在 ProseMirror 元素上**（`el.editor`），
      *    **不在 host 上**。
      * -> `editor.mount(host)` 会往 host 里插一个 `.ProseMirror` 元素
-     * -> 实例挂在**那个元素**上 ✅
+     * -> 实例挂在**那个元素**上
      */
     const pm = host.querySelector('.ProseMirror') as
       | (HTMLElement & {
@@ -453,7 +453,7 @@ function TipTapToolbar(props: {
    *
    * ⚠️ **不能只 setTimeout(0)** -> 动态 import 是异步的
    * -> 那一刻编辑器**还没挂载** -> 工具栏永远不显示 ❌
-   * -> 用**轮询**（最多等 3 秒）✅
+   * -> 用**轮询**（最多等 3 秒）
    */
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -475,7 +475,7 @@ function TipTapToolbar(props: {
    * "点了加粗之后 加粗按钮没加深颜色 别的按钮也一样 看不出点击了"）。
    *
    * → 之前工具栏**不知道当前选区是什么格式** -> 按钮永远不变 ❌
-   * → 现在：**轮询编辑器的状态** -> 变了就重算 ✅
+   * → 现在：**轮询编辑器的状态** -> 变了就重算
    *
    * ### 为什么用"轮询"而不是订阅事件
    *
@@ -483,8 +483,8 @@ function TipTapToolbar(props: {
    *   - TipTap v3 的事件在**某些路径下不触发**（命令执行、程序化改内容）❌
    *   - React StrictMode 下 effect 会跑两次 -> 监听器**注册了两份** ❌
    *   - 事件触发时 React 的批处理时机**不好控** ❌
-   * → 轮询（`requestAnimationFrame`）**永远拿到最新状态**，且实现简单 ✅
-   * → 开销：每帧一次 `isActive` -> **可以忽略** ✅
+   * → 轮询（`requestAnimationFrame`）**永远拿到最新状态**，且实现简单
+   * → 开销：每帧一次 `isActive` -> **可以忽略**
    */
   const [activeTick, forceActiveUpdate] = useState(0);
   useEffect(() => {
@@ -513,8 +513,8 @@ function TipTapToolbar(props: {
        *
        * ### 现在
        *
-       * → 签名 = **选区位置 + 文档大小 + 各格式的激活状态** ✅
-       * → 格式变了 -> 签名变了 -> 重算 ✅
+       * → 签名 = **选区位置 + 文档大小 + 各格式的激活状态**
+       * → 格式变了 -> 签名变了 -> 重算
        */
       const sel = ed?.state?.selection;
       const raw = ed as unknown as { isActive?: (n: string) => boolean } | null;
@@ -542,7 +542,7 @@ function TipTapToolbar(props: {
      * → 它是**依赖** -> 必须**在回调里读到** -> 否则 biome 会把它从依赖数组里**删掉** ❌
      *   （实测：biome 的 `useExhaustiveDependencies`  autofix 把 `activeTick` 从 deps 里删了
      *    -> `useMemo` 永远用缓存 -> 按钮的 `data-active` 一直是 "false" ❌）
-     * → 这里读一下（不用它的值，只为满足依赖检查）✅
+     * → 这里读一下（不用它的值，只为满足依赖检查）
      */
     void activeTick;
 
@@ -559,8 +559,8 @@ function TipTapToolbar(props: {
     /*
      * ⚠️ **适配 TipTap 的 `can()` API**。
      *
-     * → TipTap 的撤销判断是 `editor.can().undo()`（不是 `editor.canUndo()`）✅
-     * → 我们把它包成统一的接口 -> core 那边不用知道 TipTap ✅
+     * → TipTap 的撤销判断是 `editor.can().undo()`（不是 `editor.canUndo()`）
+     * → 我们把它包成统一的接口 -> core 那边不用知道 TipTap
      */
     const adapter: ToolbarStateEditor = {
       isActive: (nameOrAttrs, attributes) => raw.isActive?.(nameOrAttrs, attributes) ?? false,
@@ -569,17 +569,17 @@ function TipTapToolbar(props: {
       canRedo: () => Boolean(raw.can?.().redo?.()),
       /*
        * ⚠️⚠️ **"当前有没有选中文字"**（用户需求：
-       * "清除格式按钮如果没有选择文字 应该置灰"✅）。
+       * "清除格式按钮如果没有选择文字 应该置灰"）。
        *
-       * -> TipTap 的 `editor.state.selection.empty` ✅
-       *    -> `empty = true` 表示**没有选区**（光标在那儿）✅
-       *    -> `empty = false` 表示**选中了文字** ✅
-       * -> 没选文字 -> 格式按钮**置灰** ✅
+       * -> TipTap 的 `editor.state.selection.empty`
+       *    -> `empty = true` 表示**没有选区**（光标在那儿）
+       *    -> `empty = false` 表示**选中了文字**
+       * -> 没选文字 -> 格式按钮**置灰**
        */
       hasSelection: () => {
         const state = (raw as unknown as { state?: { selection?: { empty?: boolean } } }).state;
         const empty = state?.selection?.empty;
-        // ⚠️ **拿不到就当成"有选区"**（不误伤）✅
+        // ⚠️ **拿不到就当成"有选区"**（不误伤）
         return empty === undefined ? true : !empty;
       },
     };
@@ -595,11 +595,11 @@ function TipTapToolbar(props: {
   /*
    * ⚠️⚠️ **链接弹窗的状态**。
    *
-   * → `open` —— 是否打开 ✅
-   * → `anchor` —— 链接按钮的位置（视口坐标）-> 弹窗贴着它显示 ✅
-   * → `selection` —— **打开那一刻的选区**（位置 + 文字）✅
-   *   → 确定链接时用它来打标记 ✅
-   *   → 用户在弹窗里操作时，编辑器的选区可能变了 -> 必须记住打开时的 ✅
+   * → `open` —— 是否打开
+   * → `anchor` —— 链接按钮的位置（视口坐标）-> 弹窗贴着它显示
+   * → `selection` —— **打开那一刻的选区**（位置 + 文字）
+   *   → 确定链接时用它来打标记
+   *   → 用户在弹窗里操作时，编辑器的选区可能变了 -> 必须记住打开时的
    */
   const [linkState, setLinkState] = useState<{
     open: boolean;
@@ -622,7 +622,7 @@ function TipTapToolbar(props: {
    * -> 外层（`AnnotationDialog`）有自己的 **Esc -> 关自己** ❌
    * -> 嵌套浮层开着时按 Esc -> **整个弹窗被关掉** ❌
    *    （实测：Esc 之后 `.scpdf-annotation-dialog` 整个消失了）
-   * -> 通知外层 -> 外层在 Esc 时**让出** Esc ✅
+   * -> 通知外层 -> 外层在 Esc 时**让出** Esc
    *
    * ⚠️ **必须合并成一个 effect** ❌
    * -> 两个 effect 都调 `onOverlayStateChange` -> **后写的覆盖先写的** ❌
@@ -650,7 +650,7 @@ function TipTapToolbar(props: {
 
     /*
      * ⚠️ **记下选中的文字**（第 2 行的默认值）。
-     * → 用 `state.doc.textBetween(from, to)` ✅
+     * → 用 `state.doc.textBetween(from, to)`
      * → 不要用 `window.getSelection()`（弹窗打开后会变）❌
      */
     const doc = (
@@ -660,7 +660,7 @@ function TipTapToolbar(props: {
 
     /*
      * ⚠️ **按钮的位置**（弹窗的锚点）。
-     * → 用链接按钮的 `getBoundingClientRect()` ✅
+     * → 用链接按钮的 `getBoundingClientRect()`
      */
     const rect = linkButtonRef.current?.getBoundingClientRect();
 
@@ -689,7 +689,7 @@ function TipTapToolbar(props: {
      * ⚠️ **不要调 `focus()`**。
      * → TipTap 的 `chain().focus()` 会**重置选区到开头** ❌
      * → 选区没了 → `toggleBold` 作用不到任何文字 ❌
-     * → 选区的保持靠按钮的 `onMouseDown` + `preventDefault` ✅
+     * → 选区的保持靠按钮的 `onMouseDown` + `preventDefault`
      */
     /*
      * ⚠️ **TipTap 的命令名和包内置的略有不同**。
@@ -731,16 +731,16 @@ function TipTapToolbar(props: {
     /*
      * ⚠️⚠️ **颜色命令要带颜色值**（审计修复）。
      *
-     * -> `foreColor` -> `setColor(value)` ✅
-     * -> `hiliteColor` -> `toggleHighlight({ color: value })` ✅
+     * -> `foreColor` -> `setColor(value)`
+     * -> `hiliteColor` -> `toggleHighlight({ color: value })`
      *   （之前没传 value -> **高亮用的是默认色** -> 选哪个都一样 ❌）
-     * -> 没传值 -> `unsetColor` / `unsetHighlight`（清除）✅
+     * -> 没传值 -> `unsetColor` / `unsetHighlight`（清除）
      */
     /*
-     * ⚠️⚠️ **"无背景色"（`NO_COLOR`）-> 当成"清除"** ✅
+     * ⚠️⚠️ **"无背景色"（`NO_COLOR`）-> 当成"清除"**
      *
-     * -> 用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"✅
-     * -> `unsetHighlight()` / `unsetColor()` **比 `transparent` 干净** ✅
+     * -> 用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"
+     * -> `unsetHighlight()` / `unsetColor()` **比 `transparent` 干净**
      *    -> `transparent` 会留一个 `background-color: transparent` 在 HTML 里 ❌
      */
     const isNone = isNoColor(value);
@@ -773,8 +773,8 @@ function TipTapToolbar(props: {
        * → 样式**完全不可控** ❌
        * → 只能填一个值 -> 没法同时填"链接"和"展示文字" ❌
        *
-       * → 现在：**打开自己的 `LinkPopover`** ✅
-       * → 打开时**先记下当前选区**（位置 + 文字）-> 确定时用 ✅
+       * → 现在：**打开自己的 `LinkPopover`**
+       * → 打开时**先记下当前选区**（位置 + 文字）-> 确定时用
        */
       openLinkPopover();
       return;
@@ -790,21 +790,21 @@ function TipTapToolbar(props: {
    *
    * | 场景 | 做法 |
    * |---|---|
-   * | **选了文字** | 给选区打链接标记 ✅ |
-   * | **没选文字 + 展示文字 = 网址** | **插入**一个带链接的文本 ✅ |
-   * | **没选文字 + 展示文字 ≠ 网址** | **插入**"展示文字"并给它打链接 ✅ |
+   * | **选了文字** | 给选区打链接标记  |
+   * | **没选文字 + 展示文字 = 网址** | **插入**一个带链接的文本  |
+   * | **没选文字 + 展示文字 ≠ 网址** | **插入**"展示文字"并给它打链接  |
    *
    * ⚠️ **插入后光标要放到链接之后**，且**清掉 storedMarks** ❌
    * → 否则继续打字会**继承链接样式**（用户反馈："输入了链接之后再往后加文字
-   *   还是链接的样式 这逻辑就没有一个是对的"）✅
+   *   还是链接的样式 这逻辑就没有一个是对的"）
    */
   const applyLink = useCallback(
     (href: string, text: string) => {
       /*
        * ⚠️ **用一个宽松的链式类型**（避免依赖 TipTap 的具体泛型）。
        *
-       * → 每个命令返回**链本身**（可以继续 `.xxx()`）✅
-       * → 最后用 `.run()` 执行 ✅
+       * → 每个命令返回**链本身**（可以继续 `.xxx()`）
+       * → 最后用 `.run()` 执行
        */
       type LinkChain = {
         setLink: (attrs: { href: string }) => LinkChain;
@@ -828,9 +828,9 @@ function TipTapToolbar(props: {
         /*
          * ⚠️ **选了文字** -> 打链接标记。
          *
-         * → 如果用户改了"显示文字" -> **要把选中的文字替换成它** ✅
+         * → 如果用户改了"显示文字" -> **要把选中的文字替换成它**
          *   （用户需求："框内可以修改文字"）
-         * → 没改 -> 保持原样 ✅
+         * → 没改 -> 保持原样
          */
         const selected = linkState.text;
         if (text && text !== selected) {
@@ -856,10 +856,10 @@ function TipTapToolbar(props: {
        * → TipTap 的 link mark 默认 `inclusive: true` -> 继续打字会**继承链接** ❌
        *   （实测："click here" + " MORE" -> "click her MOREe" 全是链接）
        * -> 解法：
-       *   1. `inclusive: () => false`（在 runtime 里改）-> 新文字不自动继承 ✅
-       *   2. 光标放到**段落末尾**（链接之后）✅
-       *   3. `unsetMark('link')` -> 清掉光标处的 storedMarks ✅
-       *   4. **聚焦编辑器** -> 用户能接着打字 ✅
+       *   1. `inclusive: () => false`（在 runtime 里改）-> 新文字不自动继承
+       *   2. 光标放到**段落末尾**（链接之后）
+       *   3. `unsetMark('link')` -> 清掉光标处的 storedMarks
+       *   4. **聚焦编辑器** -> 用户能接着打字
        *      （实测：不聚焦的话弹窗一关，键盘输入**完全没反应** ❌）
        *
        * ⚠️⚠️ **每一步都要用"新的 chain"**（实测踩过的坑）。
@@ -867,7 +867,7 @@ function TipTapToolbar(props: {
        * → `ed.chain()` 会**捕获当时的 state**（一个 transaction 的快照）
        * → 用同一个 chain 连着跑 -> 后面的命令作用在**旧的 state** 上 ❌
        *   （实测：选区设了还是 1-12，不是末尾）
-       * -> 每步**重新 `ed.chain()`** -> 拿到最新的 state ✅
+       * -> 每步**重新 `ed.chain()`** -> 拿到最新的 state
        */
       const end = ed.state.doc.content.size - 1;
 
@@ -878,7 +878,7 @@ function TipTapToolbar(props: {
        *
        * 1. `chain()` 捕获**当时的 state** -> 用同一个 chain 连着跑，
        *    后面的命令作用在**旧 state** 上 ❌
-       *    -> 每步**重新 `ed.chain()`** ✅
+       *    -> 每步**重新 `ed.chain()`**
        *
        * 2. `unsetMark('link')` 在**链接文本上** -> **把链接本身删掉了** ❌
        *    （实测：`<a href=...>hello world</a>` -> `<p>hello world</p>`，链接没了）
@@ -889,16 +889,16 @@ function TipTapToolbar(props: {
        *
        * ### 正确的做法
        *
-       * -> **先移开选区**（到链接之后）✅
-       * -> **再直接改 transaction 的 storedMarks**（不是用命令）✅
+       * -> **先移开选区**（到链接之后）
+       * -> **再直接改 transaction 的 storedMarks**（不是用命令）
        */
       ed.chain().setTextSelection(end).run();
 
       /*
        * ⚠️ **直接清 storedMarks**（不用 `unsetMark` 命令）。
        *
-       * → 我们要的只是"光标处不要再自动带上链接" ✅
-       * -> `tr.setStoredMarks(...)` 只影响**光标处的"待用格式"** ✅
+       * → 我们要的只是"光标处不要再自动带上链接"
+       * -> `tr.setStoredMarks(...)` 只影响**光标处的"待用格式"**
        */
       const view = (ed as unknown as { view?: { dispatch?: (tr: unknown) => void } }).view;
       const tr = (ed as unknown as { state?: { tr?: unknown } }).state?.tr;
@@ -919,7 +919,7 @@ function TipTapToolbar(props: {
        * ⚠️ **聚焦要单独调**（不能放进 chain 里）。
        *
        * → `chain().focus()` 会**重置选区到开头** ❌
-       * → 所以：先 `setTextSelection`（设好选区），再单独 `focus()` ✅
+       * → 所以：先 `setTextSelection`（设好选区），再单独 `focus()`
        */
       ed.focus?.();
 
@@ -928,7 +928,7 @@ function TipTapToolbar(props: {
        *
        * -> 点"确定"按钮 -> 焦点在**按钮**上 -> 弹窗关闭 -> 按钮被卸载
        * -> 焦点**掉到 body** 上了 ❌ -> 键盘输入**完全没反应** ❌
-       * -> 所以要**直接聚焦 DOM 元素**（`.ProseMirror`）✅
+       * -> 所以要**直接聚焦 DOM 元素**（`.ProseMirror`）
        */
       const pmEl = (getEditor() as unknown as { view?: { dom?: HTMLElement } } | null)?.view?.dom;
       if (pmEl) {
@@ -952,11 +952,11 @@ function TipTapToolbar(props: {
           const active = state?.active ?? false;
           /*
            * ⚠️⚠️ **"没选文字 -> 格式按钮置灰**（用户需求：
-           * "清除格式按钮如果没有选择文字 应该置灰"✅）。
+           * "清除格式按钮如果没有选择文字 应该置灰"）。
            *
-           * -> `state.disabled` 是 TipTap 自己的判断（撤销/重做）✅
-           * -> **再合并**"格式类命令 + 没选文字" ✅
-           * -> ⚠️ **撤销/重做不受影响**（它们不是格式类）✅
+           * -> `state.disabled` 是 TipTap 自己的判断（撤销/重做）
+           * -> **再合并**"格式类命令 + 没选文字"
+           * -> ⚠️ **撤销/重做不受影响**（它们不是格式类）
            */
           const tipTapDisabled = state?.disabled ?? false;
           const disabled =
@@ -965,15 +965,15 @@ function TipTapToolbar(props: {
           /*
            * ⚠️ **颜色命令**（文字颜色 / 高亮底色）-> 要弹**颜色面板**。
            *
-           * -> 和内置编辑器（`RichTextEditor`）**保持一致** ✅
+           * -> 和内置编辑器（`RichTextEditor`）**保持一致**
            */
           /*
            * ⚠️ **三个颜色命令都会弹面板**（用户需求）。
            *
-           * -> `hiliteColor`    = 高亮底色 ✅
-           * -> `textHighlight` = 文字高亮（背景色，字色不变）✅
-           * -> `foreColor`     = 文字颜色（深色）✅
-           * -> `removeFormat`（清除格式）**不弹面板** -> 直接执行 ✅
+           * -> `hiliteColor`    = 高亮底色
+           * -> `textHighlight` = 文字高亮（背景色，字色不变）
+           * -> `foreColor`     = 文字颜色（深色）
+           * -> `removeFormat`（清除格式）**不弹面板** -> 直接执行
            */
           const hasPalette =
             item.command === 'hiliteColor' ||
@@ -990,14 +990,14 @@ function TipTapToolbar(props: {
                * ⚠️⚠️ **按下态**（用户需求：
                * "点了加粗之后 加粗按钮没加深颜色 别的按钮也一样 看不出点击了"）。
                *
-               * → `data-active` -> CSS 画**明显的按下态**（主色底 + 主色图标）✅
-               * → `aria-pressed` -> 无障碍也能读出"这个格式开着" ✅
+               * → `data-active` -> CSS 画**明显的按下态**（主色底 + 主色图标）
+               * → `aria-pressed` -> 无障碍也能读出"这个格式开着"
                */
               data-active={active ? 'true' : 'false'}
               aria-pressed={active}
               disabled={disabled}
               /*
-               * ⚠️ **链接按钮要记位置**（弹窗的锚点）✅
+               * ⚠️ **链接按钮要记位置**（弹窗的锚点）
                */
               ref={isLink ? linkButtonRef : undefined}
               /*
@@ -1007,8 +1007,8 @@ function TipTapToolbar(props: {
                * → 之后 `toggleBold` 作用在**空选区**上 → 什么都没发生 ❌
                *   （实测：点"加粗"后 HTML 完全没变）
                *
-               * → `preventDefault` → **阻止焦点转移** → 选区还在 → 命令生效 ✅
-               * → 并且 `mousedown` 比 `click` 更早 → 命令在选区还在时执行 ✅
+               * → `preventDefault` → **阻止焦点转移** → 选区还在 → 命令生效
+               * → 并且 `mousedown` 比 `click` 更早 → 命令在选区还在时执行
                */
               onMouseDown={(event) => {
                 event.preventDefault();
@@ -1019,7 +1019,7 @@ function TipTapToolbar(props: {
                * -> 之前直接应用 `Object.values(item.palette)[0]` ❌
                *   -> 用户只能用一个颜色 -> **没法选** ❌
                *   -> 用户反馈："点击会打开一个空的窄的框" ❌
-               * -> 现在：**和内置编辑器一致** -> 弹出**颜色面板** ✅
+               * -> 现在：**和内置编辑器一致** -> 弹出**颜色面板**
                */
               onClick={() => {
                 if (hasPalette) {
@@ -1044,10 +1044,10 @@ function TipTapToolbar(props: {
         <span className="scpdf-rich-text__palette">
           {/*
            * ⚠️⚠️ **"无背景色"色块**（第一个，斜杠）——
-           * 用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"✅
+           * 用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"
            *
-           * -> 点它 -> **清除**这个颜色/高亮 ✅
-           * -> TipTap 用 `unsetHighlight()` / `unsetColor()` ✅（比 transparent 干净）
+           * -> 点它 -> **清除**这个颜色/高亮
+           * -> TipTap 用 `unsetHighlight()` / `unsetColor()`  （比 transparent 干净）
            */}
           <button
             type="button"
@@ -1081,7 +1081,7 @@ function TipTapToolbar(props: {
                *  有时候hover上去 title显示中文 有时候英文"）。
                *
                * -> 之前 `title={key}` -> 显示英文 key ❌ -> 和界面语言不一致 ❌
-               * -> -> 现在按 key 查**本地化名字** ✅
+               * -> -> 现在按 key 查**本地化名字**
                */
               title={resolveHighlightColorName(key, locale)}
               aria-label={resolveHighlightColorName(key, locale)}
@@ -1099,7 +1099,7 @@ function TipTapToolbar(props: {
       ) : null}
 
       {/*
-       **链接弹窗**（自己写的，不用 `window.prompt`）✅
+       **链接弹窗**（自己写的，不用 `window.prompt`）
        */}
       <LinkPopover
         open={linkState.open}

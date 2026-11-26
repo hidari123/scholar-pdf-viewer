@@ -125,9 +125,9 @@ import '@scholar-space/pdf-viewer/themes.css'; // 可选
 | `allowScaleInput` | `boolean`                 | `true` | 能不能**填写**缩放比例     |
 | `onZoomChange`    | `(scale: number) => void` | —      | 缩放变化（宿主可自己存）   |
 
-> ⚠️ **工具栏的比例可以点一下就填** ✅
-> -> 填的值会**夹到上下限** + **量化到 10%**（和 +/- 按钮一致）✅
-> -> 上下限**宿主可配** ✅
+> ⚠️ **工具栏的比例可以点一下就填**
+> -> 填的值会**夹到上下限** + **量化到 10%**（和 +/- 按钮一致）
+> -> 上下限**宿主可配**
 
 ### 2.5c 主题
 
@@ -137,11 +137,11 @@ import '@scholar-space/pdf-viewer/themes.css'; // 可选
 | `onThemeChange` | `(theme: PdfViewerTheme) => void` | —         | **传了**才显示工具栏的 🎨 按钮 |
 | `themeOptions`  | `readonly PdfViewerTheme[]`       | 内置 7 个 | 主题列表（宿主可自定义）       |
 
-> ⚠️ **不传 `onThemeChange` -> 不显示主题按钮** ✅
-> -> 宿主自己已经有主题切换 UI -> 不重复 ✅
+> ⚠️ **不传 `onThemeChange` -> 不显示主题按钮**
+> -> 宿主自己已经有主题切换 UI -> 不重复
 
-> ⚠️ 主题是**受控**的 ✅
-> -> 包**不自己存**主题状态 ✅ -> 调 `onThemeChange` -> **宿主**改 `theme` prop ✅
+> ⚠️ 主题是**受控**的
+> -> 包**不自己存**主题状态  -> 调 `onThemeChange` -> **宿主**改 `theme` prop
 
 ### 2.6 多语言
 
@@ -218,34 +218,34 @@ hover 便签 → 点"展开"
    └─ 点"✕"    → 关闭
 ```
 
-- 详情面板**贴在便签旁边**（不是页面最右）✅
-- **打印时所有浮层都藏起来**（便签 / 详情面板 / 弹窗 / 颜色面板）✅
+- 详情面板**贴在便签旁边**（不是页面最右）
+- **打印时所有浮层都藏起来**（便签 / 详情面板 / 弹窗 / 颜色面板）
   -> 否则**批注正文会被打印出去**（隐私泄露）❌✅
-- 合并组（同一行多条批注）的**选择列表**里点某项 → **打开那一条的详情** ✅
-- 列表**自动翻边**（右边放不下就往左开）✅
+- 合并组（同一行多条批注）的**选择列表**里点某项 → **打开那一条的详情**
+- 列表**自动翻边**（右边放不下就往左开）
 
 ### 2.9b 工具栏的"高亮"按钮（第 28 轮新增）
 
-| Prop                    | 类型                      | 默认       | 说明                                |
-| ----------------------- | ------------------------- | ---------- | ----------------------------------- |
-| `onToolbarHighlight`    | `(color: string) => void` | —          | **传了**才显示工具栏的"高亮"按钮 ✅ |
-| `highlightPalette`      | `HighlightPalette`        | 内置       | 高亮色板（语义 key -> CSS 颜色）    |
-| `defaultHighlightColor` | `string`                  | 色板第一个 | **默认色**的 key（没选过颜色时用）  |
+| Prop                    | 类型                      | 默认       | 说明                               |
+| ----------------------- | ------------------------- | ---------- | ---------------------------------- |
+| `onToolbarHighlight`    | `(color: string) => void` | —          | **传了**才显示工具栏的"高亮"按钮   |
+| `highlightPalette`      | `HighlightPalette`        | 内置       | 高亮色板（语义 key -> CSS 颜色）   |
+| `defaultHighlightColor` | `string`                  | 色板第一个 | **默认色**的 key（没选过颜色时用） |
 
-> ⚠️ **默认【隐藏】** ✅
-> -> 宿主自己已经有"加高亮"按钮 -> 不重复 ✅
-> -> 用户确认："默认隐藏吧" ✅
+> ⚠️ **默认【隐藏】**
+> -> 宿主自己已经有"加高亮"按钮 -> 不重复
+> -> 用户确认："默认隐藏吧"
 
-> ⚠️ 传了之后工具栏出现 **🖍 + ▾** 的**分裂按钮** ✅
-> -> 点**主按钮** -> 直接用"当前色"高亮 ✅
-> -> 点 **▾** -> 展开颜色下拉 ✅
-> -> 和**选区浮层**的分裂按钮**完全一致**（飞书 / WPS）✅
+> ⚠️ 传了之后工具栏出现 **🖍 + ▾** 的**分裂按钮**
+> -> 点**主按钮** -> 直接用"当前色"高亮
+> -> 点 **▾** -> 展开颜色下拉
+> -> 和**选区浮层**的分裂按钮**完全一致**（飞书 / WPS）
 
 ```tsx
 <PdfViewer
   onToolbarHighlight={(color) => {
     // color 是**语义 key**（'yellow' / 'green' / …）
-    // -> 宿主用 key 存"用户选的颜色" ✅
+    // -> 宿主用 key 存"用户选的颜色"
   }}
   defaultHighlightColor="green"
 />;
@@ -287,8 +287,8 @@ export interface InternalLinkContext {
 点内部链接
   → 包解析 dest -> targetPage
   → 调 onInternalLink(ctx)
-      → 宿主不调 cancel() -> **包跳** ✅
-      → 宿主调 cancel()     -> **包不跳** ✅
+      → 宿主不调 cancel() -> **包跳**
+      → 宿主调 cancel()     -> **包不跳**
 ```
 
 > ⚠️ **宿主在回调里**不要**再调 `goToPage`**（包已经跳了 -> 会跳两次）。
@@ -296,13 +296,13 @@ export interface InternalLinkContext {
 
 **鲁棒性**：
 
-| 情况                                          | 处理                                             |
-| --------------------------------------------- | ------------------------------------------------ |
-| 宿主没给 `resolvePageRef` / `pageRefToNumber` | 解析不出 -> **toast 提示**（不静默）             |
-| dest 是**数组** `[ref, ...]`                  | `resolveDestPageAsync` 支持 ✅                   |
-| dest 是**字符串**（具名目标 `"section.1"`）   | 走宿主的 `resolvePageRef`（异步展开）✅          |
-| **目标页 == 当前页**                          | **照样跳**，而且滚到**那一行**（用 `targetY`）✅ |
-| 同一目标页 200ms 内重复触发                   | **幂等锁** -> 只跳一次 ✅                        |
+| 情况                                          | 处理                                           |
+| --------------------------------------------- | ---------------------------------------------- |
+| 宿主没给 `resolvePageRef` / `pageRefToNumber` | 解析不出 -> **toast 提示**（不静默）           |
+| dest 是**数组** `[ref, ...]`                  | `resolveDestPageAsync` 支持                    |
+| dest 是**字符串**（具名目标 `"section.1"`）   | 走宿主的 `resolvePageRef`（异步展开）          |
+| **目标页 == 当前页**                          | **照样跳**，而且滚到**那一行**（用 `targetY`） |
+| 同一目标页 200ms 内重复触发                   | **幂等锁** -> 只跳一次                         |
 
 ---
 
@@ -709,9 +709,9 @@ interface PdfViewerError {
 
 | 分类   | code                   | retryable |
 | ------ | ---------------------- | --------- |
-| 加载 7 | `E_LOAD_HTTP`          | ✅        |
-|        | `E_LOAD_NETWORK`       | ✅        |
-|        | `E_LOAD_TIMEOUT`       | ✅        |
+| 加载 7 | `E_LOAD_HTTP`          |           |
+|        | `E_LOAD_NETWORK`       |           |
+|        | `E_LOAD_TIMEOUT`       |           |
 |        | `E_PDF_INVALID`        | ❌        |
 |        | `E_EMPTY`              | ❌        |
 |        | `E_PDF_ENCRYPTED`      | ❌        |
@@ -787,13 +787,13 @@ interface AnnotationRecord {
 | ---------------------- | ----------------------------------------------------------- |
 | `exportHighlightedPdf` | 把高亮导出成**真正的 PDF 批注**（Acrobat / Preview 都能看） |
 
-> ⚠️ **导出的高亮【默认不带批注文字】** ✅
-> -> 选项：`includeAnnotationText`（默认 `false`）✅
+> ⚠️ **导出的高亮【默认不带批注文字】**
+> -> 选项：`includeAnnotationText`（默认 `false`）
 > -> **为什么**：Chrome 的 PDF 阅读器里，**hover 到高亮上会弹出黄色便签框** ❌
->    -> 那个框显示的就是批注的 `/Contents`（弹出文字）✅
->    -> A/B 对照实验证明：**真凶是 `/Contents`**（不是 `/F` 标志位）✅
-> -> 高亮本身**不需要**文字 ✅ -> 默认不写 ✅
-> -> 宿主确实要（给 Acrobat / WPS 看）-> `includeAnnotationText: true` ✅
+>    -> 那个框显示的就是批注的 `/Contents`（弹出文字）
+>    -> A/B 对照实验证明：**真凶是 `/Contents`**（不是 `/F` 标志位）
+> -> 高亮本身**不需要**文字  -> 默认不写
+> -> 宿主确实要（给 Acrobat / WPS 看）-> `includeAnnotationText: true`
 > | `sanitizeRichText`                                    | 清洗富文本 HTML（**XSS 防线**）                             |
 > | `richTextToPlain`                                     | HTML → 纯文本                                               |
 > | `defaultRichTextToolbar`                              | 默认工具栏                                                  |

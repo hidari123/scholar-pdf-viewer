@@ -14,9 +14,9 @@
  *
  * ## 修法
  *
- * - demo 补上 `onAnnotationExpand` + `onAnnotationChange` ✅
- * - 面板**贴着便签**（`anchorRect`）-> 右边放不下就翻到左边 ✅
- * - 面板**默认只读** + 标题栏加 **"编辑"按钮** -> 点它**就地变成编辑器** ✅
+ * - demo 补上 `onAnnotationExpand` + `onAnnotationChange`
+ * - 面板**贴着便签**（`anchorRect`）-> 右边放不下就翻到左边
+ * - 面板**默认只读** + 标题栏加 **"编辑"按钮** -> 点它**就地变成编辑器**
  *
  * 用法：`node scripts/e2e-annotation-detail.mjs`
  */

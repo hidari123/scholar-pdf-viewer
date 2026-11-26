@@ -8,7 +8,7 @@
  *   -> 界面还是从左往右 ❌
  *   -> **上一页 / 下一页的箭头方向也是反的** ❌
  *
- * -> 这是**纯函数**（零 DOM）-> 可以直接测 ✅
+ * -> 这是**纯函数**（零 DOM）-> 可以直接测
  */
 
 import { describe, expect, it } from 'vitest';
@@ -72,7 +72,7 @@ describe('resolveDirection', () => {
      * ⚠️ **这里很容易想反**（实测踩到的）：
      * -> 宿主页面 \`dir="rtl"\`（阿拉伯语站点），组件 \`locale="en"\` ❌
      *   -> 如果按页面的 \`dir\` 走 -> **英文按钮全反了** ❌
-     *   -> 组件的语言**是显式选的** -> 应该**跟着语言走** ✅
+     *   -> 组件的语言**是显式选的** -> 应该**跟着语言走**
      */
     expect(resolveDirection(undefined, 'en', 'rtl')).toBe('ltr');
     expect(resolveDirection(undefined, 'zh-CN', 'rtl')).toBe('ltr');
@@ -88,9 +88,9 @@ describe('resolveDirection', () => {
      * ⚠️ 这里有个容易想反的点：
      *
      * -> 宿主页面 \`dir="rtl"\`（比如阿拉伯语站点），但组件的 \`locale\` 是**英文** ❌
-     *   -> 组件界面应该**保持 LTR**（英文界面从左往右）✅
+     *   -> 组件界面应该**保持 LTR**（英文界面从左往右）
      *   -> 否则英文按钮全反了 ❌
-     * -> 反过来：locale 是阿拉伯语，页面 \`dir="ltr"\` -> 组件应该 **rtl** ✅
+     * -> 反过来：locale 是阿拉伯语，页面 \`dir="ltr"\` -> 组件应该 **rtl**
      */
     expect(resolveDirection(undefined, 'en', 'rtl')).toBe('ltr');
     expect(resolveDirection(undefined, 'ar', 'ltr')).toBe('rtl');

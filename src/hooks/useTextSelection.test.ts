@@ -34,20 +34,20 @@ function makePage(text: string, pageNumber = 1): HTMLElement {
   const span = document.createElement('span');
   span.setAttribute('data-page-number', String(pageNumber));
   /*
-   * ⚠️ **必须带 `data-item-index`** ✅
-   * -> 选区现在按【文档顺序】裁剪 ✅ -> 靠这个属性定位"选了哪一段" ✅
-   * -> 没有它 ✅ -> 项会被跳过 ✅ -> 选区算不出来 ✅
+   * ⚠️ **必须带 `data-item-index`**
+   * -> 选区现在按【文档顺序】裁剪  -> 靠这个属性定位"选了哪一段"
+   * -> 没有它  -> 项会被跳过  -> 选区算不出来
    */
   span.setAttribute('data-item-index', '0');
   /*
-   * ⚠️ **必须有 `scpdf-text-layer__item` 这个 class** ✅
-   * -> `closest(TEXT_LAYER_ITEM_CLASS)` 靠它找到 span ✅
+   * ⚠️ **必须有 `scpdf-text-layer__item` 这个 class**
+   * -> `closest(TEXT_LAYER_ITEM_CLASS)` 靠它找到 span
    */
   span.className = 'scpdf-text-layer__item';
   span.textContent = text;
   layer.appendChild(span);
   /*
-   * ⚠️ **必须加"内容结束"的哨兵** ✅
+   * ⚠️ **必须加"内容结束"的哨兵**
    * -> hook 靠它判断选区的结束边界 ✅（没有就不算几何 ❌）
    */
   const end = document.createElement('div');
@@ -80,20 +80,20 @@ async function waitFrames(n = 3) {
 }
 
 /**
- * ⚠️⚠️ **jsdom 的 `getClientRects()` 全是 0 尺寸** ✅
+ * ⚠️⚠️ **jsdom 的 `getClientRects()` 全是 0 尺寸**
  *
  * -> 而 hook 的 `collectPages` 会**跳过 0 尺寸的矩形** ❌
  * -> -> jsdom 里**永远选不中** ❌
- * -> -> 所以要**手动 mock** 一个有尺寸的矩形 ✅
+ * -> -> 所以要**手动 mock** 一个有尺寸的矩形
  *
  * @param rect 矩形
  */
 function mockClientRects(rect: { top: number; left: number; width: number; height: number }) {
   const list = [rect] as unknown as DOMRectList;
   /*
-   * ⚠️⚠️ **jsdom 的 `Range` 上【没有】`getClientRects`** ✅
+   * ⚠️⚠️ **jsdom 的 `Range` 上【没有】`getClientRects`**
    * -> `vi.spyOn` 会直接抛"property is not defined" ❌
-   * -> 所以要**自己定义** ✅
+   * -> 所以要**自己定义**
    */
   Object.defineProperty(Range.prototype, 'getClientRects', {
     configurable: true,
@@ -102,18 +102,18 @@ function mockClientRects(rect: { top: number; left: number; width: number; heigh
   });
 
   /*
-   * ⚠️⚠️ **还要 mock `Element.prototype.getClientRects`** ✅
+   * ⚠️⚠️ **还要 mock `Element.prototype.getClientRects`**
    *
-   * -> 选区现在按【文档顺序】裁剪 ✅
-   * -> -> `collectDomOrderItems` 读的是**每个 span 自己**的 rect ✅
-   *    -> `span.getClientRects()` ✅（不是 Range 的 ✅）
-   * -> jsdom 里 span 的 rect 也是 0 尺寸 ✅ -> 必须 mock ✅
+   * -> 选区现在按【文档顺序】裁剪
+   * -> -> `collectDomOrderItems` 读的是**每个 span 自己**的 rect
+   *    -> `span.getClientRects()`  （不是 Range 的）
+   * -> jsdom 里 span 的 rect 也是 0 尺寸  -> 必须 mock
    */
   Object.defineProperty(Element.prototype, 'getClientRects', {
     configurable: true,
     writable: true,
     value: function (this: Element) {
-      // ⚠️ 只有文本项才有尺寸 ✅（哨兵 / 页容器没有 ✅）
+      // ⚠️ 只有文本项才有尺寸  （哨兵 / 页容器没有）
       if (!(this instanceof HTMLElement) || !this.classList.contains('scpdf-text-layer__item')) {
         return [] as unknown as DOMRectList;
       }
@@ -165,7 +165,7 @@ describe('useTextSelection（审核补测）', () => {
     const last = onSelectionChange.mock.calls.at(-1)?.[0];
     expect(last).not.toBeNull();
     expect(last?.text).toBe('Hello World');
-    // ⚠️ **`pages` 是数组**（跨页时有多个）✅
+    // ⚠️ **`pages` 是数组**（跨页时有多个）
     expect(last?.pages).toContain(1);
     expect(last?.anchor.pageNumber).toBe(1);
   });
@@ -197,10 +197,10 @@ describe('useTextSelection（审核补测）', () => {
     await waitFrames();
 
     /*
-     * ⚠️ **没选中 -> 不该产生选区** ✅
+     * ⚠️ **没选中 -> 不该产生选区**
      * -> 之前用"最后一次是 null"来判断 ❌
      * -> 但 jsdom 里选区本来就选不中 ❌ -> **测不出来** ❌
-     * -> -> 改成"【从来没有】产生过选区" ✅
+     * -> -> 改成"【从来没有】产生过选区"
      */
     for (const call of onSelectionChange.mock.calls) {
       expect(call[0]).toBeNull();

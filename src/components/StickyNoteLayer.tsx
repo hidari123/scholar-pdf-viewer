@@ -51,14 +51,14 @@ export interface StickyNoteLayerProps {
   /**
    * **点"编辑"**（宿主实现：打开编辑框）。
    *
-   * → 宿主没传 → **不显示编辑按钮** ✅（"宿主没配就不渲染"）
-   * → 第二个参数是**按钮元素** -> 宿主可以拿它算弹窗锚点 ✅
+   * → 宿主没传 → **不显示编辑按钮**  （"宿主没配就不渲染"）
+   * → 第二个参数是**按钮元素** -> 宿主可以拿它算弹窗锚点
    */
   onAnnotationEdit?: (annotation: AnnotationRecord, element?: HTMLElement) => void;
   /**
    * **点"展开"**（宿主实现：打开详情）。
    *
-   * → 宿主没传 → **不显示展开按钮** ✅
+   * → 宿主没传 → **不显示展开按钮**
    */
   onAnnotationExpand?: (annotation: AnnotationRecord) => void;
   /** 图标覆盖 */
@@ -121,14 +121,14 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
    * -> 鼠标从**图标**移向**内容框** -> 图标触发 \`mouseleave\` ❌
    * -> 之前**立刻**清掉 hover 状态 -> 内容框**瞬间消失** ❌
    *    -> 用户根本**点不到**里面的按钮 ❌
-   *    -> 用户反馈："试了很多次都失败了 无法hover上" ✅
+   *    -> 用户反馈："试了很多次都失败了 无法hover上"
    *
    * ### 修法：**延迟关闭**
    *
-   * -> \`mouseleave\` -> **等 200ms** 再关 ✅
-   * -> 这 200ms 里如果鼠标**进入了**内容框 -> **取消关闭** ✅
-   *    -> 内容框**不会消失** ✅
-   * -> 鼠标真的走了 -> 200ms 后**关掉** ✅（不会粘着不走）✅
+   * -> \`mouseleave\` -> **等 200ms** 再关
+   * -> 这 200ms 里如果鼠标**进入了**内容框 -> **取消关闭**
+   *    -> 内容框**不会消失**
+   * -> 鼠标真的走了 -> 200ms 后**关掉**  （不会粘着不走）
    */
   const closeTimerRef = useRef(0);
 
@@ -215,7 +215,7 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
        * -> 并集的 `left` 是**所有行**的最左边 ❌
        * -> 一条跨 3 行的高亮 -> 并集 left 是**第 3 行**的位置 ❌
        * -> 分组排序按它 -> **列表顺序反了** ❌
-       * -> `startLeft` = **第一行**的左边界 -> **文档顺序** ✅
+       * -> `startLeft` = **第一行**的左边界 -> **文档顺序**
        */
       let startLeft = Infinity;
       let startTop = Infinity;
@@ -298,11 +298,11 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
          * -> 列表默认 `left: 26px`（图标的**右边**）❌
          * -> 便签在页面**偏右**时 -> 列表跑到**屏幕外面** ❌
          *    -> 实测：列表的 x=1544，视口只有 1442 -> **点在屏幕外** ❌
-         *    -> 用户点不到任何一项 -> "点击每一项没反应" ✅
+         *    -> 用户点不到任何一项 -> "点击每一项没反应"
          *
          * ### 修法
          *
-         * -> 右边放不下（超出页宽）-> **往左边开** ✅
+         * -> 右边放不下（超出页宽）-> **往左边开**
          */
         const pickerWidth = 200;
         const flipLeft = pos.left + 26 + pickerWidth > viewport.width;
@@ -320,8 +320,8 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
              * -> 内容框在 `left: 26px` -> 图标右边**有 4px 空隙** ❌
              * -> 鼠标从图标移向内容框 -> **穿过**那 4px ❌
              *    -> 图标触发 `mouseleave` -> 内容框消失 ❌
-             * -> 这个**透明**元素**盖住**那段空隙 ✅
-             *    -> 鼠标**不会**经过空隙 -> 不会触发 `mouseleave` ✅
+             * -> 这个**透明**元素**盖住**那段空隙
+             *    -> 鼠标**不会**经过空隙 -> 不会触发 `mouseleave`
              */}
             <span
               className="scpdf-sticky-note__bridge"
@@ -333,7 +333,7 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
               className="scpdf-sticky-note__icon"
               /*
                * ⚠️ **带上批注 id**（给"便利贴详情面板"当锚点用）。
-               * -> 面板要**贴在便签旁边** -> 要找到便签的位置 ✅
+               * -> 面板要**贴在便签旁边** -> 要找到便签的位置
                */
               data-note-id={first.id}
               /*
@@ -341,14 +341,14 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                * "如果同一位置两个批注 那么第一个批注点击之后展示位置正常
                *  第二个批注详情点击之后还是会出现在pdf的首页位置"）。
                *
-               * -> 合并组**只渲染 1 个图标** ✅
+               * -> 合并组**只渲染 1 个图标**
                * -> DOM 上只有 \`data-note-id={first.id}\` ❌
                * -> 选**第二条**批注 -> 按第二条的 id **找不到元素** ❌
                * -> -> 锚点**保持上一次的旧值** ❌
                * -> -> 面板停在上次的位置（第一次是**首页**）❌
                *
-               * -> 现在把**整组的 id** 都写上 ✅
-               * -> 面板找"包含这个 id 的图标" ✅ -> 任何一条都能定位 ✅
+               * -> 现在把**整组的 id** 都写上
+               * -> 面板找"包含这个 id 的图标"  -> 任何一条都能定位
                */
               data-note-ids={group.annotations.map((a) => a.id).join(',')}
               style={{ width: STICKY_NOTE_SIZE, height: STICKY_NOTE_SIZE }}
@@ -363,7 +363,7 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                   : t('annotation.withContent', { content: firstRecord.content.slice(0, 20) })
               }
               onMouseEnter={() => {
-                // ⚠️ **取消"即将关闭"**（延迟关闭的另一半）✅
+                // ⚠️ **取消"即将关闭"**（延迟关闭的另一半）
                 cancelClose();
                 setHoveredGroupKey(group.key);
                 setHoveredId(first.id);
@@ -380,15 +380,15 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                  * → 鼠标从图标移到内容框 → 图标触发 mouseleave
                  * → 如果这时清状态 → **内容框立刻消失** → 用户根本点不到里面的按钮 ❌
                  *
-                 * → 修法：判断"鼠标是不是移到相关的兄弟节点上" → 是就不清 ✅
+                 * → 修法：判断"鼠标是不是移到相关的兄弟节点上" → 是就不清
                  * → （用 `relatedTarget` 判断，比 `contains` 更准）
                  */
                 const related = event.relatedTarget as Node | null;
                 if (related && event.currentTarget.parentElement?.contains(related)) {
                   return;
                 }
-                // ⚠️ **延迟 200ms 再关**（而不是立刻关）✅
-                // -> 鼠标从图标移向内容框时，穿过空隙也不会消失 ✅
+                // ⚠️ **延迟 200ms 再关**（而不是立刻关）
+                // -> 鼠标从图标移向内容框时，穿过空隙也不会消失
                 scheduleClose();
               }}
               onFocus={() => {
@@ -428,7 +428,7 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
               ⚠️ **内容要按富文本渲染**（用户需求：
               "展示的时候要展示富文本形式的 不要带上标签 翻译成html展示出来"）。
               → 之前直接渲染 `content`（HTML 字符串）→ 用户看到 `<p>...</p>` ❌
-              → 现在用 `<RichTextPreview>` → **排版好的富文本** ✅
+              → 现在用 `<RichTextPreview>` → **排版好的富文本**
             */}
             {!isGroup ? (
               <span
@@ -440,11 +440,11 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                  * "移动鼠标到批注的文字上面 框就消失了"）。
                  *
                  * → 鼠标从图标移过来时，图标已经触发 mouseleave
-                 * → 这里再把它设回来 → **框不会消失** ✅
-                 * → 用户能点里面的"编辑 / 展开"按钮 ✅
+                 * → 这里再把它设回来 → **框不会消失**
+                 * → 用户能点里面的"编辑 / 展开"按钮
                  */
                 onMouseEnter={() => {
-                  // ⚠️ **取消"即将关闭"** -> 鼠标进来了，内容框**不会消失** ✅
+                  // ⚠️ **取消"即将关闭"** -> 鼠标进来了，内容框**不会消失**
                   cancelClose();
                   setHoveredGroupKey(group.key);
                   setHoveredId(first.id);
@@ -454,7 +454,7 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                   if (related && event.currentTarget.parentElement?.contains(related)) {
                     return;
                   }
-                  // ⚠️ **延迟 200ms 再关** ✅
+                  // ⚠️ **延迟 200ms 再关**
                   scheduleClose();
                 }}
               >
@@ -476,8 +476,8 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                            * ⚠️ **把按钮元素传出去**（用来算弹窗的锚点）。
                            *
                            * → 用户需求："富文本点了编辑 怎么富文本编辑框还在文档最上面啊
-                           *   要出现在视野里啊 就点的旁边" ✅
-                           * -> 宿主用它的 `getBoundingClientRect()` 当锚点 ✅
+                           *   要出现在视野里啊 就点的旁边"
+                           * -> 宿主用它的 `getBoundingClientRect()` 当锚点
                            */
                           onAnnotationEdit(firstRecord, event.currentTarget);
                         }}
@@ -509,7 +509,7 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
               <span
                 className="scpdf-sticky-note__picker"
                 data-visible={isHovered ? 'true' : 'false'}
-                /* ⚠️ **往左边开**（右边放不下时）✅ */
+                /* ⚠️ **往左边开**（右边放不下时）*/
                 data-flip={flipLeft ? 'true' : 'false'}
                 role="menu"
               >
@@ -545,12 +545,12 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                          *    -> demo 里只是 \`setHint(...)\` -> **看不到任何变化** ❌
                          *    -> 用户以为"点了没反应" ❌
                          *
-                         * -> 现在：**调 \`onAnnotationExpand\`**（包会打开详情面板）✅
-                         * -> **同时**通知宿主 ✅
+                         * -> 现在：**调 \`onAnnotationExpand\`**（包会打开详情面板）
+                         * -> **同时**通知宿主
                          */
                         onAnnotationExpand?.(record);
                         onAnnotationClick?.(record);
-                        // 关闭选择列表 -> 别挡住刚打开的详情 ✅
+                        // 关闭选择列表 -> 别挡住刚打开的详情
                         setHoveredGroupKey(null);
                         setHoveredId(null);
                       }}
@@ -563,10 +563,10 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
                        *    -> React **转义** HTML -> 用户看到字面量 \`<p>第一条</p>\` ❌
                        *    -> 实测：\`itemHTML: "&lt;p&gt;第一条&lt;/p&gt;"\` ❌
                        *
-                       * -> 现在用 \`<RichTextPreview>\` ✅
-                       *    -> **渲染成排版好的富文本** ✅
-                       *    -> 而且**自带消毒**（白名单）✅
-                       *    -> 和单条便签的浮层**行为一致** ✅
+                       * -> 现在用 \`<RichTextPreview>\`
+                       *    -> **渲染成排版好的富文本**
+                       *    -> 而且**自带消毒**（白名单）
+                       *    -> 和单条便签的浮层**行为一致**
                        */}
                       <RichTextPreview
                         className="scpdf-sticky-note__picker-text"

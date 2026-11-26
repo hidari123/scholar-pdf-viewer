@@ -70,7 +70,7 @@ describe('i18n 文案', () => {
      * ⚠️ **覆盖现在是"按语言绑定"的**（审计修复）。
      * -> 之前是 `{ 'load.loading': '…' }`（不绑语言）❌
      *   -> 那个形状在**任何语言**下都生效 -> 切语言还是中文 ❌
-     * -> 现在：`{ ja: { ... } }` ✅
+     * -> 现在：`{ ja: { ... } }`
      */
     const overrides = { ja: { 'load.loading': '单独的覆盖' } };
 
@@ -89,7 +89,7 @@ describe('i18n 文案', () => {
 
     // 对应语言 -> 生效
     expect(resolveMessage('en', 'search.placeholder', overrides)).toBe('Full-text search');
-    // 别的语言 -> **不生效**（回退到内置英文）✅
+    // 别的语言 -> **不生效**（回退到内置英文）
     expect(resolveMessage('zh', 'search.placeholder', overrides)).toBe('搜索文档');
     expect(resolveMessage('ja', 'search.placeholder', overrides)).toBe('Search document');
   });

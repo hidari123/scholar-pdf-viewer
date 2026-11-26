@@ -85,7 +85,7 @@ try {
   // ——— ③ 用 demo 的开关切到 RTL ———
   /*
    * ⚠️ demo 可能没有 RTL 开关 -> 那就**直接注入**验证 CSS 规则。
-   * -> 注入 \`dir="rtl"\` + \`scpdf-root--rtl\` -> 检查镜像规则是否生效 ✅
+   * -> 注入 \`dir="rtl"\` + \`scpdf-root--rtl\` -> 检查镜像规则是否生效
    */
   const hasToggle = await page.evaluate(() =>
     Boolean(
@@ -120,7 +120,7 @@ try {
 
   /*
    * ⚠️ 侧栏：默认**没打开** -> DOM 里没有 -> 断言会"空过"。
-   * -> 这里改成断言**CSS 规则存在**（用 `document.styleSheets` 找规则）✅
+   * -> 这里改成断言**CSS 规则存在**（用 `document.styleSheets` 找规则）
    */
   const rtlRuleExists = await page.evaluate(() => {
     for (const sheet of Array.from(document.styleSheets)) {

@@ -78,10 +78,10 @@ describe('computeToolbarActiveState', () => {
       ['removeFormat', 'bold', 'foreColor', 'hiliteColor'],
       editor,
     );
-    // 只有"清除格式"置灰 ✅
+    // 只有"清除格式"置灰
     expect(states[0]?.disabled, 'removeFormat').toBe(true);
     expect(states[0]?.hasSelection, 'removeFormat').toBe(false);
-    // 其余按钮**永远可用** ✅
+    // 其余按钮**永远可用**
     for (const s of states.slice(1)) {
       expect(s.disabled, s.command).toBe(false);
     }

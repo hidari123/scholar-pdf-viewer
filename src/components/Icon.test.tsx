@@ -8,7 +8,7 @@
  * -> 之前 \`Icon\` 里是 \`const label = title ?? name;\` ❌
  *   -> 生成的 DOM：\`<svg aria-hidden="true"><title>highlight</title>...</svg>\` ❌
  *   -> **同一个按钮里有两个 title** ❌
- *     -> 按钮的 \`title\` 是宿主传的中文 ✅
+ *     -> 按钮的 \`title\` 是宿主传的中文
  *     -> SVG 的 \`title\` 是**英文图标名** ❌
  *   -> 浏览器/AT/扩展**可能取 SVG 的那个** -> 悬浮显示英文 ❌
  *
@@ -31,7 +31,7 @@ describe('Icon', () => {
 
     const svg = container.querySelector('svg');
     expect(svg).toBeTruthy();
-    // ⚠️ 关键断言：**没有 <title>** ✅
+    // ⚠️ 关键断言：**没有 <title>**
     expect(svg?.querySelector('title')).toBeNull();
   });
 

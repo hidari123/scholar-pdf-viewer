@@ -48,7 +48,7 @@ describe('glyphExtentOf', () => {
 describe('itemBoxOf', () => {
   /*
    * ⚠️ `PositionedTextItem` 的**完整形状**（`text-layer/layout.ts` 排版出来的）。
-   * -> 少字段 -> 类型报错 -> 这里补全 ✅
+   * -> 少字段 -> 类型报错 -> 这里补全
    */
   const item = {
     text: '示例文字',

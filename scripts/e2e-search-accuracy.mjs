@@ -23,7 +23,7 @@
  * ⚠️ **验证方法**：文本层的 span 是**按屏幕坐标排序**的，
  *    而高亮矩形是按**字符比例**裁出来的 →
  *    所以要按**比例**算出"命中落在 span 的哪个字符"，
- *    再看那几个字符是不是关键词 ✅
+ *    再看那几个字符是不是关键词
  */
 
 import { existsSync, readdirSync } from 'node:fs';
@@ -93,11 +93,11 @@ async function searchAndVerify(keyword) {
      * ⚠️⚠️ **不能用"字符比例"算**（实测踩过的坑）：
      * -> 比例字体里每个字符宽度不一样 ❌
      * -> 用比例算出来的位置是**错的** -> 会误判 ❌
-     * -> 必须用 **Range.getBoundingClientRect()** 逐字符量 ✅
+     * -> 必须用 **Range.getBoundingClientRect()** 逐字符量
      *
      * ⚠️ **也不能只看"重叠面积最大的那个 span"**：
      * -> 高亮框可能横跨多个 span；也可能和别的 span 有重叠
-     * -> 要在**整页所有 span** 里找"离高亮框最近"的那次出现 ✅
+     * -> 要在**整页所有 span** 里找"离高亮框最近"的那次出现
      */
     const checked = rects.map((rect) => {
       // 在整页里找关键词的所有出现位置

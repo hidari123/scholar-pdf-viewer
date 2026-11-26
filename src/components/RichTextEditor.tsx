@@ -12,7 +12,7 @@
  * - **不是** `<textarea>`（默认样式很丑）→ 自研外观
  * - 编辑区 = `contenteditable`（浏览器原生）
  * - **工具栏完全由宿主配置**（`toolbar` prop）
- *   → 宿主传什么就显示什么 → "可以自主控制展示哪些富文本内容" ✅
+ *   → 宿主传什么就显示什么 → "可以自主控制展示哪些富文本内容"
  * - 不传 `toolbar` → 用默认的（高亮 / 加粗 / 颜色 / 链接 …）
  *
  * ## 包的边界
@@ -103,7 +103,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
    * 文案解析。
    *
    * ⚠️ 用户反馈："语言切换了 但是切换之后实际上 title 啊什么东西都没切换语言呢"
-   * → 之前编辑器的 title / aria-label 是**硬编码中文** → 现在全走文案表 ✅
+   * → 之前编辑器的 title / aria-label 是**硬编码中文** → 现在全走文案表
    */
   const t = useCallback(
     (key: keyof Messages) => resolveMessage(locale, key, messages, undefined, locales),
@@ -119,8 +119,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
   /*
    * **工具栏的 ref**（点外面关闭颜色面板时判断"点在哪儿"）。
    *
-   * ⚠️ **内置编辑器的面板在 `.scpdf-rich-text__tool` 里** -> 是 toolbar 的**后代** ✅
-   *    -> 用 toolbar 判断 `contains(panel)` = true ✅ -> 点面板里不会误关 ✅
+   * ⚠️ **内置编辑器的面板在 `.scpdf-rich-text__tool` 里** -> 是 toolbar 的**后代**
+   *    -> 用 toolbar 判断 `contains(panel)` = true  -> 点面板里不会误关
    */
   const toolbarRef = useRef<HTMLDivElement | null>(null);
 
@@ -136,11 +136,11 @@ export function RichTextEditor(props: RichTextEditorProps) {
    *
    * ### 修法
    *
-   * -> 面板开着时，在 `document` 上挂 `mousedown` ✅
-   * -> 点在**工具栏外面**（含面板外面）-> 关闭 ✅
-   * -> 点在**面板里面** -> **不关**（在选颜色）✅
-   * -> **Esc** -> 也关闭 ✅
-   * -> 面板关闭 / 组件卸载 -> 卸载监听 ✅
+   * -> 面板开着时，在 `document` 上挂 `mousedown`
+   * -> 点在**工具栏外面**（含面板外面）-> 关闭
+   * -> 点在**面板里面** -> **不关**（在选颜色）
+   * -> **Esc** -> 也关闭
+   * -> 面板关闭 / 组件卸载 -> 卸载监听
    */
   useEffect(() => {
     if (!openPalette) {
@@ -149,7 +149,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
     const onMouseDown = (event: MouseEvent) => {
       const target = event.target as Node | null;
-      // 点在工具栏里（含面板）-> 不关 ✅
+      // 点在工具栏里（含面板）-> 不关
       if (target && toolbarRef.current?.contains(target)) {
         return;
       }
@@ -176,7 +176,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
    * ⚠️⚠️ **之前内置编辑器根本没有链接弹窗** ❌
    * -> 它直接调 `document.execCommand('createLink', false, '')` -> **插了个空链接** ❌
    * -> 宿主**没装 TipTap** 时（或者用内置编辑器）-> 点"链接"**什么都不会发生** ❌
-   * -> 现在：**和 TipTap 编辑器用同一个 `LinkPopover`** ✅
+   * -> 现在：**和 TipTap 编辑器用同一个 `LinkPopover`**
    */
   const [linkState, setLinkState] = useState<{
     open: boolean;
@@ -192,7 +192,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
    * -> 外层（`AnnotationDialog`）有自己的 **Esc -> 关自己** ❌
    * -> 嵌套浮层开着时按 Esc -> **整个弹窗被关掉** ❌
    *    （实测：Esc 之后 `.scpdf-annotation-dialog` 整个消失了）
-   * -> 通知外层 -> 外层在 Esc 时**让出** Esc ✅
+   * -> 通知外层 -> 外层在 Esc 时**让出** Esc
    *
    * ⚠️ **必须把两种浮层【合并】成一个状态** ❌
    * -> 两个 effect 都调 `onOverlayStateChange` -> **后写的覆盖先写的** ❌
@@ -212,7 +212,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
    * **工具栏项的文案**（解析 `{key}` 形式的 i18n 占位符）。
    *
    * ⚠️ 用户反馈："语言切换了 但是切换之后实际上 title 啊什么东西都没切换语言呢"
-   * → 工具栏的 label 之前是**硬编码中文** → 现在走文案表 ✅
+   * → 工具栏的 label 之前是**硬编码中文** → 现在走文案表
    *
    * @param label 原始 label（可能是 `{richtext.bold}`）
    * @param vars 变量
@@ -234,8 +234,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
    * ⚠️ **选区变化的计数器**（用来刷新工具栏的按下态）。
    *
    * → contenteditable 的选区变化**不会触发 React 重渲染** ❌
-   * → 用户移动光标 / 选中一段文字 -> 工具栏的"按下态"要跟着变 ✅
-   * → 用一个递增的计数器 -> 变了就重渲染 ✅
+   * → 用户移动光标 / 选中一段文字 -> 工具栏的"按下态"要跟着变
+   * → 用一个递增的计数器 -> 变了就重渲染
    */
   const [selectionTick, setSelectionTick] = useState(0);
 
@@ -253,24 +253,24 @@ export function RichTextEditor(props: RichTextEditorProps) {
   /**
    * **问浏览器"当前选区是不是这个格式"**。
    *
-   * → `document.queryCommandState('bold')` -> 内置编辑器（execCommand）能问出结果 ✅
-   * → 浏览器不支持 -> 返回 false（按钮不高亮，不影响使用）✅
+   * → `document.queryCommandState('bold')` -> 内置编辑器（execCommand）能问出结果
+   * → 浏览器不支持 -> 返回 false（按钮不高亮，不影响使用）
    */
   /**
    * ⚠️⚠️ **"当前有没有选中文字"**（用户需求：
-   * "清除格式按钮如果没有选择文字 应该置灰"✅）。
+   * "清除格式按钮如果没有选择文字 应该置灰"）。
    *
-   * -> 内置编辑器用 `window.getSelection()` ✅
-   *    -> `isCollapsed = true` 表示**没有选区**（只有光标）✅
-   *    -> `isCollapsed = false` 表示**选中了文字** ✅
-   * -> **拿不到选区** -> 当成"有选区"（不误伤）✅
+   * -> 内置编辑器用 `window.getSelection()`
+   *    -> `isCollapsed = true` 表示**没有选区**（只有光标）
+   *    -> `isCollapsed = false` 表示**选中了文字**
+   * -> **拿不到选区** -> 当成"有选区"（不误伤）
    */
   const hasSelection = useCallback((): boolean => {
     /*
-     * ⚠️ **读一下 `selectionTick`**（让它成为依赖）✅
+     * ⚠️ **读一下 `selectionTick`**（让它成为依赖）
      *
-     * -> 选区变化 -> `setSelectionTick` -> 重渲染 ✅
-     * -> 重渲染 -> 重算 `hasSelection()` -> 按钮的 disabled 跟着变 ✅
+     * -> 选区变化 -> `setSelectionTick` -> 重渲染
+     * -> 重渲染 -> 重算 `hasSelection()` -> 按钮的 disabled 跟着变
      * -> ⚠️ **不读它** -> biome 会把它从依赖里删掉 -> **按钮永远不刷新** ❌
      */
     void selectionTick;
@@ -289,7 +289,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
      * -> 首次渲染时 `editorRef.current` 还是 **null** ❌
      * -> `contains` 返回 false -> 误判成"选区在编辑区外面" ❌
      * -> -> 按钮**永远不禁用** ❌
-     * -> 改成：**选区文本长度 > 0** 才算"选了文字" ✅
+     * -> 改成：**选区文本长度 > 0** 才算"选了文字"
      */
     return selection.toString().trim().length > 0;
   }, [selectionTick]);
@@ -299,7 +299,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
      * ⚠️ **只有部分命令能问状态**。
      * → `queryCommandState` 只认：bold / italic / underline / strikeThrough /
      *   insertUnorderedList / insertOrderedList / formatBlock 等
-     * → 问不出来的（颜色、高亮、链接）-> 直接 false ✅
+     * → 问不出来的（颜色、高亮、链接）-> 直接 false
      */
     const queryable = new Set([
       'bold',
@@ -347,7 +347,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
        *
        * → 普通的 `focus()` 会让浏览器**把元素滚动到可视区**
        * → 编辑器在"页面中间偏右" → 浏览器会滚动容器 → **页面跳走** ❌
-       * → `preventScroll: true` → **只聚焦，不滚动** ✅
+       * → `preventScroll: true` → **只聚焦，不滚动**
        */
       editorRef.current?.focus({ preventScroll: true });
     }
@@ -402,7 +402,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
        * ⚠️ **没选文字** -> 插入"展示文字"（带链接）。
        *
        * -> `execCommand('createLink', false, href)` 会把**光标处的字**变成链接 ❌
-       * -> 正确做法：**插入一段 HTML**（`<a href="...">文字</a>`）✅
+       * -> 正确做法：**插入一段 HTML**（`<a href="...">文字</a>`）
        */
       const selection = window.getSelection();
       const hasSelection = !!selection && !selection.isCollapsed && selection.toString().length > 0;
@@ -476,11 +476,11 @@ export function RichTextEditor(props: RichTextEditorProps) {
           /*
            * ⚠️ **三个颜色命令都会弹面板**（用户需求）。
            *
-           * -> `hiliteColor`    = 高亮底色（浅色）✅
-           * -> `textHighlight` = 文字高亮（背景色，**字色不变**）✅
-           * -> `foreColor`     = 文字颜色（**深色**）✅
+           * -> `hiliteColor`    = 高亮底色（浅色）
+           * -> `textHighlight` = 文字高亮（背景色，**字色不变**）
+           * -> `foreColor`     = 文字颜色（**深色**）
            *
-           * -> `removeFormat`（清除格式）**不弹面板** -> 直接执行 ✅
+           * -> `removeFormat`（清除格式）**不弹面板** -> 直接执行
            *    （用户反馈："清空format这个功能的按钮和修改文字颜色的按钮一样 需要区分开"）
            */
           const hasPalette =
@@ -492,17 +492,17 @@ export function RichTextEditor(props: RichTextEditorProps) {
            * ⚠️ **按下态**（用户需求：
            * "点了加粗之后 加粗按钮没加深颜色 别的按钮也一样 看不出点击了"）。
            *
-           * → 内置编辑器用的是 `document.execCommand` -> 用 `queryCommandState` 问浏览器 ✅
-           * → 选区变化时 React 不一定重渲染 -> 用 `onFocus/onBlur` + 一个 tick 强制刷新 ✅
+           * → 内置编辑器用的是 `document.execCommand` -> 用 `queryCommandState` 问浏览器
+           * → 选区变化时 React 不一定重渲染 -> 用 `onFocus/onBlur` + 一个 tick 强制刷新
            */
           const active = queryCommandActive(item.command);
           /*
            * ⚠️⚠️ **没选文字 -> 格式按钮置灰**（用户需求：
-           * "清除格式按钮如果没有选择文字 应该置灰"✅）。
+           * "清除格式按钮如果没有选择文字 应该置灰"）。
            *
-           * -> `hasSelection` 跟着 `selectionTick` 一起刷新 ✅
-           *    -> 用户选中文字 -> 立刻可用 ✅
-           *    -> 取消选择 -> 立刻置灰 ✅
+           * -> `hasSelection` 跟着 `selectionTick` 一起刷新
+           *    -> 用户选中文字 -> 立刻可用
+           *    -> 取消选择 -> 立刻置灰
            */
           const selectionEmpty = !hasSelection();
           const isFormatCommand = FORMAT_COMMANDS.has(item.command);
@@ -514,7 +514,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
                 type="button"
                 className="scpdf-rich-text__btn"
                 /*
-                 * ⚠️ **链接按钮要记位置** -> 弹窗贴在它下面 ✅
+                 * ⚠️ **链接按钮要记位置** -> 弹窗贴在它下面
                  */
                 ref={item.command === 'createLink' ? linkButtonRef : undefined}
                 title={resolveLabel(item.label)}
@@ -525,11 +525,11 @@ export function RichTextEditor(props: RichTextEditorProps) {
                 /*
                  * ⚠️⚠️ **没选文字 -> 置灰**（用户需求：
                  * "没选字时格式按钮置灰这个你修错了 应该是没选字的时候
-                 *  清除格式按钮置灰 其他的还是可以用的"✅）。
+                 *  清除格式按钮置灰 其他的还是可以用的"）。
                  *
-                 * -> \`FORMAT_COMMANDS\` 现在**只有 \`removeFormat\`** ✅
-                 * -> 所以这里**只会**把"清除格式"置灰 ✅
-                 * -> 其余按钮（加粗 / 颜色 / 高亮…）**永远可用** ✅
+                 * -> \`FORMAT_COMMANDS\` 现在**只有 \`removeFormat\`**
+                 * -> 所以这里**只会**把"清除格式"置灰
+                 * -> 其余按钮（加粗 / 颜色 / 高亮…）**永远可用**
                  */
                 disabled={disabled}
                 onMouseDown={(event) => {
@@ -558,9 +558,9 @@ export function RichTextEditor(props: RichTextEditorProps) {
                 <span className="scpdf-rich-text__palette">
                   {/*
                    * ⚠️⚠️ **"无背景色"色块**（第一个，斜杠）——
-                   * 用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"✅
+                   * 用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"
                    *
-                   * -> 点它 -> **清除**这个颜色/高亮 ✅
+                   * -> 点它 -> **清除**这个颜色/高亮
                    */}
                   <button
                     type="button"
@@ -585,8 +585,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
                        *
                        * -> 之前 `title={key}` -> 显示英文 key（`yellow`）❌
                        * -> 中文界面上也显示 `yellow` ❌ -> **和界面语言不一致** ❌
-                       * -> -> 现在按 key 查**本地化名字** ✅
-                       * -> 宿主自定义的 key 查不到 -> **退回 key 本身** ✅
+                       * -> -> 现在按 key 查**本地化名字**
+                       * -> 宿主自定义的 key 查不到 -> **退回 key 本身**
                        */
                       title={resolveHighlightColorName(key, locale)}
                       aria-label={resolveHighlightColorName(key, locale)}
@@ -601,7 +601,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
         })}
 
         {/*
-         * **链接弹窗**（和 TipTap 编辑器共用同一个组件）✅
+         * **链接弹窗**（和 TipTap 编辑器共用同一个组件）
          *
          * ⚠️ 用户反馈："现在点击链接按钮 弹框不出现了"
          * -> 之前内置编辑器**根本没有弹窗** -> 直接插了个空链接 ❌
@@ -658,8 +658,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
         带事件处理器的元素必须有合适的 role）。
 
         → `contentEditable` 的 div 挂 `onInput` → 必须声明 role
-        → `role="textbox"` + `aria-multiline` + `aria-label` 是标准组合 ✅
-        → 再配 `tabIndex={0}` → 键盘可达 ✅
+        → `role="textbox"` + `aria-multiline` + `aria-label` 是标准组合
+        → 再配 `tabIndex={0}` → 键盘可达
 
         ⚠️ **biome 的 `useSemanticElements` 建议改成 `<textarea>`** → 但那是**错的**：
         → `<textarea>` **只能纯文本** → 富文本（加粗/高亮/链接）会全部丢掉 ❌

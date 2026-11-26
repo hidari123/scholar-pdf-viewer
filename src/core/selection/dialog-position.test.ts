@@ -13,11 +13,11 @@ import { computeDialogPosition, dialogSafeMargin } from './dialog-position';
  *   -> 480px 弹窗 + 24px 右边距 -> **几乎贴着屏幕边** ❌
  *
  * -> 现在：
- *   1. **安全边距跟视口宽度成比例** ✅
- *   2. **锚点靠右时按右边缘对齐**（左边缘对齐必然贴边）✅
+ *   1. **安全边距跟视口宽度成比例**
+ *   2. **锚点靠右时按右边缘对齐**（左边缘对齐必然贴边）
  *
  * ⚠️ **之前这个逻辑内嵌在组件里** -> jsdom 没布局 -> **没法单测** ❌
- * -> 现在抽成**纯函数** -> **可以单测** ✅
+ * -> 现在抽成**纯函数** -> **可以单测**
  */
 
 describe('dialogSafeMargin', () => {
@@ -58,11 +58,11 @@ describe('computeDialogPosition', () => {
 
     /*
      * -> 右边缘对齐 -> 期望 left = 1490 - 480 = 1010
-     * -> 但 **安全区** 是 1500 - 480 - 90 = 930 -> 1010 超出 -> **clamp 到 930** ✅
-     *   （锚点太靠右时，弹窗不能跟着贴边 -> 这正是用户要的"往中间来点"）✅
+     * -> 但 **安全区** 是 1500 - 480 - 90 = 930 -> 1010 超出 -> **clamp 到 930**
+     *   （锚点太靠右时，弹窗不能跟着贴边 -> 这正是用户要的"往中间来点"）
      */
     expect(result.left).toBe(930);
-    // 弹窗右边离视口右边 90px ✅
+    // 弹窗右边离视口右边 90px
     expect(1500 - (result.left + size.width)).toBe(90);
     expect(1500 - (result.left + size.width)).toBeGreaterThanOrEqual(48);
   });
@@ -74,9 +74,9 @@ describe('computeDialogPosition', () => {
       viewport: { width: 1500, height: 950 },
     });
 
-    // 右边缘对齐会得到 1500 - 480 = 1020 -> **超出安全区** -> clamp 到 930 ✅
+    // 右边缘对齐会得到 1500 - 480 = 1020 -> **超出安全区** -> clamp 到 930
     expect(result.left).toBe(930);
-    // 右边距 >= 48 ✅
+    // 右边距 >= 48
     expect(1500 - (result.left + size.width)).toBeGreaterThanOrEqual(48);
   });
 
@@ -155,8 +155,8 @@ describe('computeDialogPosition', () => {
    * -> 便利贴详情面板的**真实高度**不是固定的（`min(460px, 70%)`）❌
    * -> 之前写死 **320** -> 算"下面放不下" -> 面板被放到**上面** ❌
    *    -> 实测：`anchor.bottom(391) + 30 + 320 = 741 > 732 - 12` ❌
-   *    -> -> `top = anchor.top - 30 - 320 = 16` -> **贴在 PDF 最上方** ✅
-   * -> 用 **200**（比"锚点下面能放下的高度"小）-> **正常贴在下面** ✅
+   *    -> -> `top = anchor.top - 30 - 320 = 16` -> **贴在 PDF 最上方**
+   * -> 用 **200**（比"锚点下面能放下的高度"小）-> **正常贴在下面**
    */
   it('**高度够小 -> 贴在锚点下面**（不会翻到上面）', () => {
     const result = computeDialogPosition({
@@ -166,7 +166,7 @@ describe('computeDialogPosition', () => {
       gap: 30,
     });
 
-    // 391 + 30 = 421 -> 下面放得下（421 + 200 = 621 < 720）✅
+    // 391 + 30 = 421 -> 下面放得下（421 + 200 = 621 < 720）
     expect(result.top).toBe(421);
   });
 

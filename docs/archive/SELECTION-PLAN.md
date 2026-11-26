@@ -68,7 +68,7 @@ for (const clientRect of clientRects) {
 ### 2.1 一个 text item 一个 span
 
 pdf.js 的 `#appendText(geom)` **每个 item 建一个 `<span>`** —— 与我上一轮实施的
-`layoutTextItems()` 方向一致 ✅
+`layoutTextItems()` 方向一致
 
 ### 2.2 关键：字号用 `Math.hypot(tx[2], tx[3])`，不是 `item.height`
 
@@ -189,7 +189,7 @@ if (geom.str.length > 1) {
 | 方案                                          | 评价                                                     |
 | --------------------------------------------- | -------------------------------------------------------- |
 | **A. 直接用 pdf.js 的 `TextLayer`**           | 包会依赖 pdfjs-dist → **违反"包不依赖 pdf.js"的边界** ❌ |
-| **B. 包内自建，算法对齐 pdf.js**              | 包保持零 pdf.js 依赖，宿主注入字体信息 ✅ **推荐**       |
+| **B. 包内自建，算法对齐 pdf.js**              | 包保持零 pdf.js 依赖，宿主注入字体信息  **推荐**         |
 | C. 维持现状（我上一轮的逐 item + 固定 width） | 边界准但字形位置仍偏 → 不够准 ⚠️                         |
 
 **推荐 B**：包内实现 pdf.js 的**算法**（ascent + scaleX），
@@ -429,7 +429,7 @@ getFontInfo?: (pageNumber: number) => Promise<Record<string, { family: string; v
 | 选区起点 Δ                  | 0.0px（已修）                | 0.0px（保持）              |
 | **span 总宽度 vs PDF 宽度** | 176.5 vs 176.53 ✓            | ✓（scaleX 后**完全**一致） |
 | **每个字的边界**            | ❌ 按系统字体排布 → 逐渐偏移 | ✅ **误差 < 2px**          |
-| 中文选区                    | ⚠️ 系统字体与 PDF 不同       | ✅ scaleX 补偿             |
+| 中文选区                    | ⚠️ 系统字体与 PDF 不同       | scaleX 补偿                |
 | 整页选中                    | ❌ 可能被丢弃                | ✅ 保留                    |
 
 ### 四个 Bug

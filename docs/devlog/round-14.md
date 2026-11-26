@@ -151,7 +151,7 @@ dict.set(PDFName.of('Contents'), PDFHexString.of(contents)); // ❌
 
 ```
 PDFHexString.of('中文测试 Hello')       → <中文测试 Hello>          ← ❌
-PDFHexString.fromText('中文测试 Hello') → <FEFF4E2D65876D4B8BD5002…>  ← ✅
+PDFHexString.fromText('中文测试 Hello') → <FEFF4E2D65876D4B8BD5002…>  ←
 ```
 
 - `of()` 把 JS 字符串**当成字节序列**直接写进 PDF
@@ -211,7 +211,7 @@ PASS **是 UTF-16BE + BOM**（FEFF 开头 → 阅读器能正确识别中文）
   - 高亮旁边渲染一个**小便签图标**（纸片 + 折角的 SVG）
   - **hover** → 显示**便签内容**（带边框 + 阴影的纸片）
   - 内容用 `visibility` 而不是 `display:none` → 保留在无障碍树里（读屏能读到），
-    但 `visibility:hidden` 时**不接收鼠标事件** → 不会挡住下面的文字 ✅
+    但 `visibility:hidden` 时**不接收鼠标事件** → 不会挡住下面的文字
 - **新增** `PdfViewer` 的 props
   - `onHighlightComment?: (id: string) => void` —— 抛事件（宿主弹编辑框 + 存）
   - `stickyNotes?: AnnotationRecord[]` —— **受控**（包不存数据）
@@ -278,7 +278,7 @@ A4 可打印区: 703 × 1032 px
   → 远超 A4 → **18 页印成 33 页**（每页溢出到第二张纸）❌
 
 正确做法: min(703/1407.6, 1032/1821.6) = 0.499
-  → 703 × 909 px = 186 × 240 mm → **正好落在 A4 可打印区里** ✅
+  → 703 × 909 px = 186 × 240 mm → **正好落在 A4 可打印区里**
 ```
 
 **新增** `computePrintScaleForRender()`（按**渲染后的像素**算缩放）。
@@ -308,15 +308,15 @@ zoom 加在 .scpdf-page 上:
   → 截图上表现为标题只显示 "An End-to-End A"
 
 zoom 加在 .scpdf-pages 上:
-  → 整个内容树只缩一次 ✅
-  → 页 = 703px，canvas 也 = 703px ✅
+  → 整个内容树只缩一次
+  → 页 = 703px，canvas 也 = 703px
 ```
 
 #### 结果
 
 ```
 修复前: 原 PDF 18 页 → 打印出来 33 页（大半是空白），内容被裁掉
-修复后: 原 PDF 18 页 → 打印出来 18 页 ✅，内容完整 ✅
+修复后: 原 PDF 18 页 → 打印出来 18 页，内容完整
 ```
 
 **测试**：E2E（`scripts/e2e-print-preview.mjs`，7 项）+ 单测

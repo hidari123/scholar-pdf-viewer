@@ -52,8 +52,8 @@
  * ```
  *
  * **优先级：单独的 prop > `config` 里的同名项**
- * → 已有代码**完全不受影响** ✅
- * → 宿主可以"先用 config 配一套默认，再单独覆盖某一项" ✅
+ * → 已有代码**完全不受影响**
+ * → 宿主可以"先用 config 配一套默认，再单独覆盖某一项"
  */
 
 import type { ReactNode } from 'react';
@@ -75,7 +75,7 @@ import {
 /**
  * **统一配置对象**。
  *
- * ⚠️ **每一项都是可选的** → 宿主只写关心的 ✅
+ * ⚠️ **每一项都是可选的** → 宿主只写关心的
  */
 export interface PdfViewerConfig {
   /* —— 外观 —— */
@@ -90,7 +90,7 @@ export interface PdfViewerConfig {
   /**
    * **图标覆盖**（宿主 → 包）。
    *
-   * → 宿主有自己的图标体系（`lucide-react` 等）时逐个替换 ✅
+   * → 宿主有自己的图标体系（`lucide-react` 等）时逐个替换
    */
   icons?: Partial<Record<IconName, ReactNode>>;
 
@@ -99,18 +99,18 @@ export interface PdfViewerConfig {
   /**
    * **高亮色板**（语义 key → CSS 颜色）。
    *
-   * → 高亮记录的 `color: 'my-1'` 会渲染成色板里的颜色 ✅
+   * → 高亮记录的 `color: 'my-1'` 会渲染成色板里的颜色
    */
   highlightPalette?: HighlightPalette;
 
   /**
    * **默认高亮色**（语义 key）。
    *
-   * → 用户**不选颜色**时用这个 ✅
+   * → 用户**不选颜色**时用这个
    *    （用户需求："如果没有选择颜色 也按照默认颜色来展示高亮
-   *    不必每次都选择颜色"✅）
-   * → 不传 -> 用色板里的**第一个**颜色 ✅
-   * → 传了但色板里没有这个 key -> 也用色板第一个 ✅
+   *    不必每次都选择颜色"）
+   * → 不传 -> 用色板里的**第一个**颜色
+   * → 传了但色板里没有这个 key -> 也用色板第一个
    */
   defaultHighlightColor?: string;
 
@@ -119,25 +119,25 @@ export interface PdfViewerConfig {
   /**
    * **最小缩放**（宿主可配）。
    *
-   * -> 不传 -> **20%**（`MIN_SCALE`）✅
+   * -> 不传 -> **20%**（`MIN_SCALE`）
    * -> 用户需求："包默认最大是250%，最小是20%，
-   *   这个上限下限宿主也可以配置" ✅
+   *   这个上限下限宿主也可以配置"
    */
   minScale?: number;
 
   /**
    * **最大缩放**（宿主可配）。
    *
-   * -> 不传 -> **250%**（`MAX_SCALE`）✅
+   * -> 不传 -> **250%**（`MAX_SCALE`）
    */
   maxScale?: number;
 
   /**
    * **允许用户直接填写缩放比例**。
    *
-   * -> `true`（默认）-> 工具栏的比例**可以点一下改成输入框** ✅
-   * -> `false` -> 只读（只有 +/- 按钮）✅
-   * -> 用户需求："放大缩小这个 是可以用户进行填写比例的" ✅
+   * -> `true`（默认）-> 工具栏的比例**可以点一下改成输入框**
+   * -> `false` -> 只读（只有 +/- 按钮）
+   * -> 用户需求："放大缩小这个 是可以用户进行填写比例的"
    */
   allowScaleInput?: boolean;
 
@@ -176,8 +176,8 @@ export interface PdfViewerConfig {
    * />
    * ```
    *
-   * → **换语言只影响对应语言的那份** ✅
-   * → **切换时引用稳定** -> 不会重新渲染 -> **tooltip 不再跳** ✅
+   * → **换语言只影响对应语言的那份**
+   * → **切换时引用稳定** -> 不会重新渲染 -> **tooltip 不再跳**
    */
   messages?: LocaleMessagesMap;
 
@@ -186,7 +186,7 @@ export interface PdfViewerConfig {
   /**
    * **选区动作**（浮层里的按钮）。
    *
-   * → 宿主传什么就显示什么 → "没配就不显示" ✅
+   * → 宿主传什么就显示什么 → "没配就不显示"
    */
   selectionActions?: SelectionAction[];
   /**
@@ -203,9 +203,9 @@ export interface PdfViewerConfig {
    * ⚠️⚠️ **和 `annotationPalette` 分开**（用户反馈：
    * "富文本的那个文字颜色 如果是放在文字上 就太浅了 文字可以适当加深颜色"）。
    *
-   * -> `annotationPalette` = **浅色**（\`#fff3a3\` 这种）-> 当**高亮底色** ✅
+   * -> `annotationPalette` = **浅色**（\`#fff3a3\` 这种）-> 当**高亮底色**
    * -> 拿来当**文字颜色** -> **浅得看不见** ❌
-   * -> 所以**单独一份深色板** ✅
+   * -> 所以**单独一份深色板**
    */
   annotationTextPalette?: RichTextPalette;
 
@@ -217,7 +217,7 @@ export interface PdfViewerConfig {
    * ⚠️ **用的是和 `Toolbar` 组件**同一个类型**（审计发现的 bug）：
    * -> 之前这里是一份**匿名对象字面量** -> 和 `ToolbarConfig` **字段不一致** ❌
    *   -> 里面有 `showPrint`（`ToolbarConfig` 没有）-> **死配置** ❌
-   * -> 现在直接用 `ToolbarConfig` -> **两边永远一致** ✅
+   * -> 现在直接用 `ToolbarConfig` -> **两边永远一致**
    */
   toolbar?: ToolbarConfig;
   /** 功能开关（默认全开；只有显式写 `false` 才关） */
@@ -226,7 +226,7 @@ export interface PdfViewerConfig {
    * **打印纸张**（默认 `'A4'`）。
    *
    * ⚠️ **之前写死 A4** -> 美洲市场的 Letter 用户**打印会超出页面** ❌
-   * -> 现在：**宿主可配** ✅
+   * -> 现在：**宿主可配**
    */
   printPaper?: keyof typeof PAPER_SIZES | PaperSize;
   /** 打印边距（mm，部分覆盖） */
@@ -237,14 +237,14 @@ export interface PdfViewerConfig {
  * **功能开关**（哪些功能开 / 关）。
  *
  * ⚠️ **默认全开**（opt-out）——
- * -> 传 `{ search: false }` -> 关掉搜索 ✅
- * -> 传 `{}` -> **什么都不关** ✅
- * -> 只有显式写 `false` 才关 ✅
+ * -> 传 `{ search: false }` -> 关掉搜索
+ * -> 传 `{}` -> **什么都不关**
+ * -> 只有显式写 `false` 才关
  *
  * ⚠️ **之前这里是 `Record<string, boolean>`**（审计发现的 bug）：
  * -> 任何 key 都能写 -> **拼错也编译通过**（比如 `serach`）❌
  * -> 拼错了**静默无效** -> 宿主以为关掉了搜索，其实没关 ❌
- * -> 现在**用具体的类型** -> 拼错**直接编译报错** ✅
+ * -> 现在**用具体的类型** -> 拼错**直接编译报错**
  */
 export interface Features {
   /** 搜索 */
@@ -260,30 +260,30 @@ export interface Features {
   /**
    * **工具栏的主题选择按钮**（🎨）。
    *
-   * ⚠️ **不传 `onThemeChange` -> 本来就不显示** ✅
-   * -> 这个开关是给"**已经传了 `onThemeChange`** 但临时想关掉"的场景用的 ✅
-   * -> `false` -> 按钮**不显示**（但 `onThemeChange` 回调依然有效）✅
+   * ⚠️ **不传 `onThemeChange` -> 本来就不显示**
+   * -> 这个开关是给"**已经传了 `onThemeChange`** 但临时想关掉"的场景用的
+   * -> `false` -> 按钮**不显示**（但 `onThemeChange` 回调依然有效）
    */
   themePicker?: boolean;
   /*
-   * ⚠️⚠️ **选区浮层的动作开关**（用户反馈 ✅）
+   * ⚠️⚠️ **选区浮层的动作开关**（用户反馈）
    *
    * > "选区工具栏的提问/翻译/加批注/高亮/复制 都需要宿主可以配置是否展示"
    *
-   * ## 为什么需要 ✅
+   * ## 为什么需要
    *
-   * -> 之前**只有"传了回调才显示"** ✅
-   *    -> `onTranslate` ✅ -> 翻译按钮出现 ✅
+   * -> 之前**只有"传了回调才显示"**
+   *    -> `onTranslate`  -> 翻译按钮出现
    *    -> -> 但宿主**传了回调又不想显示** ✅ -> **做不到** ✅ ❌
-   *    -> -> 有些场景 ✅ 回调要留着 ✅（业务逻辑 ✅）但**按钮先藏着** ✅ ✅
+   *    -> -> 有些场景  回调要留着  （业务逻辑）但**按钮先藏着**
    *
-   * -> 这组开关 ✅ 让宿主**显式控制每个动作的可见性** ✅ ✅
+   * -> 这组开关  让宿主**显式控制每个动作的可见性**
    *
-   * ## 语义 ✅
+   * ## 语义
    *
-   * -> `undefined`（不传）✅ -> **保持原行为** ✅（回调在就显示 ✅）✅
-   * -> `true` ✅ -> **强制显示** ✅
-   * -> `false` ✅ -> **强制隐藏** ✅（哪怕回调在 ✅）✅
+   * -> `undefined`（不传） -> **保持原行为**  （回调在就显示）
+   * -> `true`  -> **强制显示**
+   * -> `false`  -> **强制隐藏**  （哪怕回调在）
    */
   /** 选区浮层：高亮 */
   selectionHighlight?: boolean;
@@ -311,8 +311,8 @@ export interface Features {
  * ```
  *
  * ⚠️ **为什么单独 prop 优先**：
- * → 已有代码（`<PdfViewer theme="paper" />`）**行为不变** ✅
- * → 宿主可以"config 配一套默认 + 单独覆盖一项" ✅
+ * → 已有代码（`<PdfViewer theme="paper" />`）**行为不变**
+ * → 宿主可以"config 配一套默认 + 单独覆盖一项"
  *
  * @param propValue 单独 prop 的值
  * @param configValue config 里的值
@@ -365,19 +365,19 @@ export function mergeConfig(
      * ⚠️⚠️ **内置默认值**（用户需求：
      * "语言和高亮色都是包需要内置的 但是有接口宿主可以配置 现在你都放宿主这里了"）。
      *
-     * -> 高亮色板：**不传也有**（内置 6 色）✅
-     * -> 语言表：**内置了 ja / fr** → 宿主不用再写一整套 ✅
-     * -> 宿主的值**优先级更高**（prop > config > 内置）✅
+     * -> 高亮色板：**不传也有**（内置 6 色）
+     * -> 语言表：**内置了 ja / fr** → 宿主不用再写一整套
+     * -> 宿主的值**优先级更高**（prop > config > 内置）
      */
     highlightPalette:
       resolveConfigValue(props.highlightPalette, c.highlightPalette) ?? BUILTIN_HIGHLIGHT_PALETTE,
     /*
      * ⚠️ **默认高亮色**（用户需求："如果没有选择颜色
-     * 也按照默认颜色来展示高亮 不必每次都选择颜色"✅）。
+     * 也按照默认颜色来展示高亮 不必每次都选择颜色"）。
      *
-     * -> 宿主可以指定（语义 key）✅
-     * -> 没指定 / 色板里没这个 key -> 用色板的**第一个** ✅
-     *    -> 保证"点高亮按钮一定有颜色" ✅
+     * -> 宿主可以指定（语义 key）
+     * -> 没指定 / 色板里没这个 key -> 用色板的**第一个**
+     *    -> 保证"点高亮按钮一定有颜色"
      */
     defaultHighlightColor:
       resolveConfigValue(props.defaultHighlightColor, c.defaultHighlightColor) ??
@@ -387,20 +387,20 @@ export function mergeConfig(
     /*
      * ⚠️ **没指定语言时按浏览器语言推断**（而不是硬编码 'zh'）。
      * -> 很多宿主是英文站点 -> 默认中文 -> 用户看到"怎么是中文" ❌
-     * -> 推断成浏览器语言 -> **开箱即用** ✅
+     * -> 推断成浏览器语言 -> **开箱即用**
      */
     /*
      * ⚠️ **缩放上下限**（宿主可配）。
      *
-     * -> 用户需求："这个上限下限宿主也可以配置" ✅
-     * -> 不传 -> 用默认（20% ~ 250%）✅
+     * -> 用户需求："这个上限下限宿主也可以配置"
+     * -> 不传 -> 用默认（20% ~ 250%）
      */
     minScale: resolveConfigValue(props.minScale, c.minScale),
     maxScale: resolveConfigValue(props.maxScale, c.maxScale),
     /*
      * ⚠️ **能不能填写比例**（宿主可配）。
      *
-     * -> 默认**允许**（用户需求："是可以用户进行填写比例的"）✅
+     * -> 默认**允许**（用户需求："是可以用户进行填写比例的"）
      */
     allowScaleInput: resolveConfigValue(props.allowScaleInput, c.allowScaleInput) ?? true,
     locale: resolveConfigValue(props.locale, c.locale) ?? detectDefaultLocale(),
@@ -414,7 +414,7 @@ export function mergeConfig(
      *
      * -> 之前不传就没有色板 -> **工具栏里没有"高亮底色"按钮** ❌
      * -> 用户以为高亮坏了 -> 其实是**按钮根本没渲染** ❌
-     * -> 现在：**内置一份** -> 不传也有 ✅
+     * -> 现在：**内置一份** -> 不传也有
      */
     annotationPalette:
       resolveConfigValue(props.annotationPalette, c.annotationPalette) ??
@@ -423,8 +423,8 @@ export function mergeConfig(
      * ⚠️⚠️ **文字颜色色板（深色）**（用户反馈：
      * "富文本的那个文字颜色 如果是放在文字上 就太浅了 文字可以适当加深颜色"）。
      *
-     * -> `annotationPalette` 是**浅色**（当高亮底色用）✅
-     * -> **文字颜色必须用深色** -> **单独一份** ✅
+     * -> `annotationPalette` 是**浅色**（当高亮底色用）
+     * -> **文字颜色必须用深色** -> **单独一份**
      */
     annotationTextPalette:
       resolveConfigValue(props.annotationTextPalette, c.annotationTextPalette) ??
@@ -434,7 +434,7 @@ export function mergeConfig(
     /*
      * ⚠️ **打印纸张 / 边距**（审计发现的：之前**写死 A4**）。
      * -> 美洲市场的 Letter 用户打印会**超出页面** ❌
-     * -> 现在：**宿主可配**（prop > config > 默认 A4）✅
+     * -> 现在：**宿主可配**（prop > config > 默认 A4）
      */
     printPaper: resolveConfigValue(props.printPaper, c.printPaper),
     printMargin: resolveConfigValue(props.printMargin, c.printMargin),
@@ -447,7 +447,7 @@ export function mergeConfig(
  * → `src/core/config/index.ts` 是 `core` 子路径的出口
  * → 不重新导出 -> 宿主 `import { BUILTIN_LOCALES } from '@scholar-space/pdf-viewer/core'`
  *   -> **undefined** ❌（实测：core 子路径里查不到）
- * -> 重新导出 -> 宿主从哪个子路径都能拿到 ✅
+ * -> 重新导出 -> 宿主从哪个子路径都能拿到
  */
 export {
   /** 内置的批注色板（富文本"高亮底色"，6 色） */

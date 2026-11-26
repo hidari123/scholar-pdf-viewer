@@ -161,8 +161,8 @@ export interface SelectionPopoverProps {
 ## 实测（已复现）
 
 ```
-无面板:  contLeft=8,   pageLeftViewport=8,   pageLeftContent=0    ✅
-有面板:  contLeft=253, pageLeftViewport=253, pageLeftContent=0    ✅
+无面板:  contLeft=8,   pageLeftViewport=8,   pageLeftContent=0
+有面板:  contLeft=253, pageLeftViewport=253, pageLeftContent=0
 ```
 
 但**自绘选区块的位置**：
@@ -190,7 +190,7 @@ const left = Math.round(pageEl.offsetLeft - container.offsetLeft);
 pageOffsetParent: "scpdf-pages"     ← 页的 offsetParent 不是容器！
 containerOffsetLeft: 245            ← 面板打开后容器的 offsetLeft 变成 245
 myFormula: 0 - 245 = -245           ← ❌ 错的
-correctFormula: 0                   ← ✅ 对的
+correctFormula: 0                   ←  对的
 ```
 
 → 面板打开 → `container.offsetLeft` 变 245 → `pageLeft = -245`

@@ -93,12 +93,12 @@ export interface PdfLibLike {
    *
    * ```
    * PDFHexString.of('中文测试')      → <中文测试>        ← ❌ 乱码
-   * PDFHexString.fromText('中文测试') → <FEFF4E2D65876D…>  ← ✅ UTF-16BE + BOM
+   * PDFHexString.fromText('中文测试') → <FEFF4E2D65876D…>  ←  UTF-16BE + BOM
    * ```
    *
    * → `of` 把字符串**当原始字节**写进 PDF
    * → 阅读器按 **PDFDocEncoding** 解码 → 中文全变乱码
-   * → `fromText` 会做 **UTF-16BE + BOM** 编码 → 阅读器能正确识别 ✅
+   * → `fromText` 会做 **UTF-16BE + BOM** 编码 → 阅读器能正确识别
    */
   PDFHexString: { of(value: string): unknown; fromText?(value: string): unknown };
   PDFString: { of(value: string): unknown };
@@ -172,20 +172,20 @@ export interface ExportHighlightedPdfOptions {
    *
    * > "在导出的pdf上hover到高亮上还是会出现黄色便签"
    *
-   * -> PDF 的 `/Contents` 是**批注的弹出文字** ✅
+   * -> PDF 的 `/Contents` 是**批注的弹出文字**
    * -> Chrome 的 PDF 阅读器：**hover 到高亮上就显示一个黄色的便签框** ❌
    *    -> 里面显示的就是 `/Contents` 的内容 ❌
    *    -> 用户看到"一个大黄框" ❌
-   *    -> 用户反馈："不要这个" ✅
+   *    -> 用户反馈："不要这个"
    *
    * -> **A/B 对照实验**（实测，在 Chrome 里 hover 同一个位置）：
    *    - 原始（有 `/Contents`）-> **出黄色便签** ❌
-   *    - 变体 A（删 `/Contents`）-> **没有便签** ✅
+   *    - 变体 A（删 `/Contents`）-> **没有便签**
    *    - 变体 B（只加 `/F` 标志位）-> **还是出便签** ❌
-   *    -> **真凶是 `/Contents`**，不是 `/F` ✅
+   *    -> **真凶是 `/Contents`**，不是 `/F`
    *
-   * -> 高亮本身**不需要**文字 ✅ -> 默认不写 ✅
-   * -> 宿主如果**确实要**批注文字（比如给 Acrobat/WPS 看）-> 打开 ✅
+   * -> 高亮本身**不需要**文字  -> 默认不写
+   * -> 宿主如果**确实要**批注文字（比如给 Acrobat/WPS 看）-> 打开
    */
   includeAnnotationText?: boolean;
 }
@@ -380,30 +380,30 @@ export async function exportHighlightedPdf(
     /*
      * ⚠️ **批注标志位（/F）**。
      *
-     * -> PDF 的 `/F` 是**标志位**（位掩码）✅
-     *    - 位 1（值 1）= Invisible（完全不可见）✅
-     *    - 位 2（值 2）= Hidden（不显示，但打印）✅
-     *    - 位 3（值 4）= Print（打印时显示）✅
-     *    - 位 4（值 8）= NoZoom ✅
-     * -> 高亮批注：**不显示图标、但要能打印** ✅
-     *    -> `/F = 4`（Print）✅
-     *    -> 阅读器**不画便签图标** ✅
+     * -> PDF 的 `/F` 是**标志位**（位掩码）
+     *    - 位 1（值 1）= Invisible（完全不可见）
+     *    - 位 2（值 2）= Hidden（不显示，但打印）
+     *    - 位 3（值 4）= Print（打印时显示）
+     *    - 位 4（值 8）= NoZoom
+     * -> 高亮批注：**不显示图标、但要能打印**
+     *    -> `/F = 4`（Print）
+     *    -> 阅读器**不画便签图标**
      *
-     * ⚠️ **但这不是"黄色便签"的真凶**（实测）✅
+     * ⚠️ **但这不是"黄色便签"的真凶**（实测）
      * -> A/B 对照：只加 `/F` -> **还是出便签** ❌
-     * -> **真凶是 `/Contents`** ✅（见上面的说明）
-     * -> `/F` 还是要加（规范 + 部分阅读器认它）✅
+     * -> **真凶是 `/Contents`**  （见上面的说明）
+     * -> `/F` 还是要加（规范 + 部分阅读器认它）
      */
     dict.set(pdfLib.PDFName.of('F'), pdfLib.PDFNumber.of(4));
 
     /*
-     * ⚠️⚠️ **批注文字（/Contents）默认【不写】**（实测踩到的坑）✅
+     * ⚠️⚠️ **批注文字（/Contents）默认【不写】**（实测踩到的坑）
      *
-     * -> `/Contents` 是**批注的弹出文字** ✅
+     * -> `/Contents` 是**批注的弹出文字**
      * -> Chrome 的 PDF 阅读器 hover 到高亮上就显示**一个黄色便签框** ❌
-     *    -> 用户反馈："导出后 hover 高亮还是会出现黄色便签 不要这个" ✅
-     * -> A/B 对照实验证明：**真凶是 `/Contents`**（不是 `/F`）✅
-     * -> 宿主确实要批注文字 -> `includeAnnotationText: true` ✅
+     *    -> 用户反馈："导出后 hover 高亮还是会出现黄色便签 不要这个"
+     * -> A/B 对照实验证明：**真凶是 `/Contents`**（不是 `/F`）
+     * -> 宿主确实要批注文字 -> `includeAnnotationText: true`
      */
     const contents = (first?.text ?? '').slice(0, 2000);
     if (contents && includeAnnotationText) {
@@ -413,12 +413,12 @@ export async function exportHighlightedPdf(
        *
        * ```
        * PDFHexString.of('中文测试')      → <中文测试>        ← ❌ 乱码
-       * PDFHexString.fromText('中文测试') → <FEFF4E2D65876D…>  ← ✅
+       * PDFHexString.fromText('中文测试') → <FEFF4E2D65876D…>  ←
        * ```
        *
        * → `of` 把字符串**当原始字节**写进 PDF
        * → 阅读器按 **PDFDocEncoding** 解码 → 中文全变乱码
-       * → `fromText` 做 **UTF-16BE + BOM** 编码 → 阅读器能正确识别 ✅
+       * → `fromText` 做 **UTF-16BE + BOM** 编码 → 阅读器能正确识别
        *
        * ⚠️ 老版本 pdf-lib 没有 `fromText` → 退回 `of`（至少英文是对的）。
        */

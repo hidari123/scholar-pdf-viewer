@@ -40,7 +40,7 @@ function check(name, ok, detail = '') {
  *
  * ⚠️ **不能假设 `p.firstChild` 是文本节点**：
  * -> 加粗之后 ProseMirror 会把文字拆成多个节点（`<strong>` 里一个、外面一个）❌
- * -> 要用 **TreeWalker** 找到第一个文本节点 ✅
+ * -> 要用 **TreeWalker** 找到第一个文本节点
  */
 async function selectFirstChars(page, count) {
   await page.evaluate((n) => {

@@ -82,8 +82,8 @@ async function makeHighlight() {
  * 造两个同一行的批注。
  *
  * ⚠️ **之前是靠工具栏里那个"造两个同一行的批注"按钮** ❌
- * -> 那个按钮第 27 轮**被删了**（用户说"不需要这个按钮"）✅
- * -> -> 改成调 demo 暴露的**测试 API** ✅
+ * -> 那个按钮第 27 轮**被删了**（用户说"不需要这个按钮"）
+ * -> -> 改成调 demo 暴露的**测试 API**
  */
 async function makeSameLineNotes() {
   await page.evaluate(() => {
@@ -218,23 +218,23 @@ try {
 
   // ④ 富文本能真的格式化（加粗）
   //
-  // ⚠️ **必须用【真鼠标】点，不能用 `element.click()`** ✅
-  // -> `element.click()` 不产生 `mousedown` ✅
+  // ⚠️ **必须用【真鼠标】点，不能用 `element.click()`**
+  // -> `element.click()` 不产生 `mousedown`
   // -> 按钮的 `onMouseDown` + `preventDefault`（用来**保住选区**）不会触发 ❌
   // -> -> 选区被清掉 -> `toggleBold` 作用不到任何文字 ❌
-  // -> -> 用 `page.mouse.click()`（**真事件**）✅
+  // -> -> 用 `page.mouse.click()`（**真事件**）
   const boldBtn = page.locator('.scpdf-rich-text__btn[aria-label*="加粗"]');
   const boldCount = await boldBtn.count();
   check('**有"加粗"按钮**', boldCount > 0, `${boldCount} 个`);
 
   /*
-   * ⚠️⚠️ **要选【真正的 contenteditable】**（实测踩到的坑）✅
+   * ⚠️⚠️ **要选【真正的 contenteditable】**（实测踩到的坑）
    *
    * -> `.scpdf-rich-text__editor` 是 TipTap 的**宿主 div** ❌
-   *    -> 真正的 contenteditable 是它的**子元素** `.tiptap` ✅
+   *    -> 真正的 contenteditable 是它的**子元素** `.tiptap`
    * -> 选中了宿主 div -> TipTap 内部的 state **不知道** ❌
    *    -> `toggleBold` 作用不到任何文字 ❌
-   * -> -> 必须选 `.tiptap`（或者 contenteditable=true 的那个）✅
+   * -> -> 必须选 `.tiptap`（或者 contenteditable=true 的那个）
    */
   await page.evaluate(() => {
     const editor = document.querySelector('.scpdf-rich-text__editor [contenteditable="true"]');
@@ -245,7 +245,7 @@ try {
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
-    // ⚠️ **发一个真的 `selectionchange`**（TipTap 靠它同步选区）✅
+    // ⚠️ **发一个真的 `selectionchange`**（TipTap 靠它同步选区）
     document.dispatchEvent(new Event('selectionchange'));
   });
   await page.waitForTimeout(300);

@@ -7,7 +7,7 @@
  *
  * → 之前工具栏和选区浮层是**两套**画法（16×16，风格不一致）
  * → 现在统一到 **24×24 / stroke 1.75 / round cap**（Lucide / Feather 的视觉语言）
- * → 一套规范 → 整体观感统一 ✅
+ * → 一套规范 → 整体观感统一
  *
  * → 而且**宿主可以逐个覆盖**（`icons` prop）→ 想用 `lucide-react` 随时可以换。
  */
@@ -41,12 +41,12 @@ export interface SelectionActionIconProps {
   /** 宿主的图标覆盖表 */
   overrides?: Partial<Record<IconName, ReactNode>>;
   /**
-   * **提示文案** ✅（用户反馈："选区浮层 title 中英混杂" ✅）
+   * **提示文案**  （用户反馈："选区浮层 title 中英混杂"）
    *
-   * -> 之前是 `title={name}` ✅ -> 显示**英文图标名** ✅（`highlight` ✅）
+   * -> 之前是 `title={name}`  -> 显示**英文图标名**  （`highlight`）
    * -> -> 中文界面里混着英文 ✅ ❌
-   * -> -> 现在**由调用方传本地化文案** ✅ ✅
-   * -> 不传 ✅ -> 不渲染 `<title>` ✅ ✅
+   * -> -> 现在**由调用方传本地化文案**
+   * -> 不传  -> 不渲染 `<title>`
    */
   title?: string;
 }
@@ -67,7 +67,7 @@ export function SelectionActionIconView({
     return null;
   }
   /*
-   * ⚠️ **title 由调用方给** ✅
+   * ⚠️ **title 由调用方给**
    *
    * -> 之前是 `title={name}` ✅ -> 显示**英文图标名** ✅ ❌
    * -> -> 中文界面里混着英文 ✅ ❌

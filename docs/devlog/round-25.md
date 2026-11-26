@@ -26,13 +26,13 @@ Error: There is no mark type named 'textStyle'.
 
 ### 根因
 
--> TipTap 的 `Color` 扩展是**基于 `textStyle` 实现的** ✅
--> `setColor` 内部会 `setMark('textStyle', { color })` ✅
+-> TipTap 的 `Color` 扩展是**基于 `textStyle` 实现的**
+-> `setColor` 内部会 `setMark('textStyle', { color })`
 -> 但 **StarterKit v3 不包含 `TextStyle`** ❌
--> 实测它的 dist 里只有 18 个扩展（bold/italic/...）**没有 textStyle** ✅
+-> 实测它的 dist 里只有 18 个扩展（bold/italic/...）**没有 textStyle**
 -> 只注册 `Color` 不注册 `TextStyle` -> **调用 setColor 直接抛错** ❌
 -> **文字颜色功能 100% 失效** ❌
--> 用户看到："点击会打开一个空的窄的框" ✅
+-> 用户看到："点击会打开一个空的窄的框"
 
 > ⚠️ **第 24 轮只修了【内置编辑器】**（`execCommand('styleWithCSS')`）❌
 > -> 但 **demo 用的是 TipTap**（`annotationEditor={TipTapEditor}`）❌
@@ -40,25 +40,25 @@ Error: There is no mark type named 'textStyle'.
 
 ### 修法
 
--> **显式注册 `TextStyle`** ✅
--> `@tiptap/extension-text-style` 加为 devDep + **optional peerDep** ✅
+-> **显式注册 `TextStyle`**
+-> `@tiptap/extension-text-style` 加为 devDep + **optional peerDep**
 
 ### ⭐ 顺带补上 TipTap 缺失的颜色面板
 
 -> 之前 TipTap 的工具栏**根本没有颜色面板** ❌
 -> 点"文字颜色"-> **直接应用第一个颜色** ❌
 -> 内置编辑器**有**面板 -> **两边行为不一致** ❌
--> 现在：**两边一致** ✅
+-> 现在：**两边一致**
 
 ### ⭐ 修 `hiliteColor` 没传颜色值
 
 -> 之前 `toggleHighlight`（**不带值**）-> 选哪个色都一样 ❌
--> 现在：`toggleHighlight({ color: value })` ✅
+-> 现在：`toggleHighlight({ color: value })`
 
 ### "清空格式"和"文字颜色"区分开
 
--> 只有 `hiliteColor` / `foreColor` 会弹面板 ✅
--> `removeFormat` -> `unsetAllMarks` -> **直接执行** ✅
+-> 只有 `hiliteColor` / `foreColor` 会弹面板
+-> `removeFormat` -> `unsetAllMarks` -> **直接执行**
 
 ## ② 批注期间点到底下的高亮 -> 蓝色选区框消失
 
@@ -70,14 +70,14 @@ Error: There is no mark type named 'textStyle'.
 
 ### 修法
 
--> **正在批注**（`isPendingNoteRef.current`）-> **不清选区** ✅
+-> **正在批注**（`isPendingNoteRef.current`）-> **不清选区**
 
 ### 实测
 
 |        | 蓝色框              | 批注弹窗 |
 | ------ | ------------------- | -------- |
 | 修复前 | `shapes: 1 -> 0` ❌ | 还在     |
-| 修复后 | `shapes: 1 -> 1` ✅ | 还在 ✅  |
+| 修复后 | `shapes: 1 -> 1`    | 还在     |
 
 ## 测试
 
@@ -88,18 +88,18 @@ Error: There is no mark type named 'textStyle'.
 | `scripts/e2e-richtext-color.mjs`             | 13   | 面板弹出 / 有色块 / 不是空的窄框 / 选色生效 / 没有 textStyle 报错 / 两个按钮不同 / 清除格式生效 |
 | `scripts/e2e-annotation-highlight-under.mjs` | 7    | 蓝色框保留 / 弹窗没被点掉 / `::selection` 透明                                                  |
 
-**顺带修的 E2E**：`e2e-ui-polish.mjs` 点"高亮"后要**先选色块**（行为变了）✅
+**顺带修的 E2E**：`e2e-ui-polish.mjs` 点"高亮"后要**先选色块**（行为变了）
 
 ## 文档
 
--> README / EXTENDING.md 加了 **TipTap peer 依赖清单** ✅
--> 明确写出 `@tiptap/extension-text-style` 少了会怎样 ✅
+-> README / EXTENDING.md 加了 **TipTap peer 依赖清单**
+-> 明确写出 `@tiptap/extension-text-style` 少了会怎样
 
 ## 验证
 
 - `pnpm test` -> **737 passed**
 - `pnpm verify` -> **9/9 全绿**
 - E2E -> **579/579**（0 套件失败，比上轮 +20）
-- 体积：主入口 **32.85 / 33 kB** ✅
+- 体积：主入口 **32.85 / 33 kB**
 
 ---

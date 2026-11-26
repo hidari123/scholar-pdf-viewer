@@ -19,7 +19,7 @@
  * 面板左边 = W * 0.5 + (W * 0.5 - panelW) * 0.5   ← 中间偏右
  * ```
  *
- * → 落在**可视区中间偏右** → 完整可见 ✅
+ * → 落在**可视区中间偏右** → 完整可见
  * → 而且是"贴着页面"的（不是贴着屏幕边缘）
  *
  * ## 包的边界
@@ -50,7 +50,7 @@ import { RichTextEditor } from './RichTextEditor';
  * >  这样转成编辑页面的时候 工具栏不会分成两行展示"
  *
  * -> 实测：面板 320px 时，13 个按钮的工具栏**占 2 行** ❌
- * -> -> 宽度不够 ✅ -> 提到 360px ✅
+ * -> -> 宽度不够  -> 提到 360px
  */
 export const ANNOTATION_PANEL_WIDTH = 360;
 
@@ -65,17 +65,17 @@ export interface AnnotationPanelProps {
    *
    * ⚠️ **之前面板固定在"页面中间偏右"** ❌
    *    -> 便签在 \`x=571\`，面板在 \`x=918\` -> **离得很远** ❌
-   *    -> 用户反馈："打开详细按钮目前是失效的 需要点击能打开一个稍微大一点的便利贴的样式" ✅
+   *    -> 用户反馈："打开详细按钮目前是失效的 需要点击能打开一个稍微大一点的便利贴的样式"
    *
-   * -> 传了 -> **贴在便签旁边**（优先放右边，放不下就翻到左边）✅
+   * -> 传了 -> **贴在便签旁边**（优先放右边，放不下就翻到左边）
    */
   anchorRect?: { left: number; top: number; right: number; bottom: number } | null;
   /**
    * **滚动容器的 ref**（用来把"视口坐标"换成"容器坐标"）。
    *
    * ⚠️ **必须传** ❌
-   * -> 面板是 `position: absolute` -> 相对 `.scpdf-container` ✅
-   * -> 但 `computeDialogPosition` 返回的是**视口坐标** ✅
+   * -> 面板是 `position: absolute` -> 相对 `.scpdf-container`
+   * -> 但 `computeDialogPosition` 返回的是**视口坐标**
    * -> 不减掉容器的偏移 -> 面板**整体偏移** ❌
    *    （实测：偏了 124px -> "出现在 PDF 的最上方"❌）
    */
@@ -159,7 +159,7 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
    * 文案解析。
    *
    * ⚠️ 用户反馈："语言切换了 但是切换之后实际上 title 啊什么东西都没切换语言呢"
-   * → 之前面板的 title 是**硬编码中文** → 现在全走文案表 ✅
+   * → 之前面板的 title 是**硬编码中文** → 现在全走文案表
    */
   const t = useCallback(
     (key: keyof Messages) => resolveMessage(locale, key, messages, undefined, locales),
@@ -222,9 +222,9 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
    *
    * ### 现在的做法（用户选的 **B 方案**："先试试B的效果"）
    *
-   * -> **默认只读**（显示排版好的富文本）✅
-   * -> 点"编辑" -> **就地变成编辑器**（**不弹窗**）✅
-   * -> 点"完成" -> 回到只读 ✅
+   * -> **默认只读**（显示排版好的富文本）
+   * -> 点"编辑" -> **就地变成编辑器**（**不弹窗**）
+   * -> 点"完成" -> 回到只读
    *
    * -> 之前是**直接进编辑器**（没这一步）❌
    *   -> 打开详情就看到一个工具栏 -> 不像"详情" ❌
@@ -256,7 +256,7 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
    *
    * ### ⚠️⚠️ **坐标系必须对齐**（实测踩到的坑）
    *
-   * -> `computeDialogPosition` 返回的是**视口坐标** ✅
+   * -> `computeDialogPosition` 返回的是**视口坐标**
    * -> 但面板是 `position: absolute` -> **父容器是 `.scpdf-container`** ❌
    * -> 容器的 `offsetParent` 在视口里是 `(x=8, y=124)` ❌
    *    -> 绝对定位会**再加一遍这个偏移** ❌
@@ -272,15 +272,15 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
    *
    * ### 修法
    *
-   * -> **减去容器的偏移** ✅（视口坐标 -> 容器坐标）
-   * -> 和"编辑批注"（`position: fixed`）**定位逻辑一致** ✅
+   * -> **减去容器的偏移**  （视口坐标 -> 容器坐标）
+   * -> 和"编辑批注"（`position: fixed`）**定位逻辑一致**
    */
   /*
    * ⚠️⚠️ **滚动容器在视口里的偏移**（视口坐标 -> 容器坐标）。
    *
-   * -> 面板是 `position: absolute` -> 相对 `.scpdf-container` ✅
-   * -> 但 `computeDialogPosition` 返回的是**视口坐标** ✅
-   * -> **必须减去这个偏移** ✅
+   * -> 面板是 `position: absolute` -> 相对 `.scpdf-container`
+   * -> 但 `computeDialogPosition` 返回的是**视口坐标**
+   * -> **必须减去这个偏移**
    *
    * -> ⚠️ **必须用 state + useEffect**（不能在 useMemo 里现量）❌
    *    -> useMemo 在**渲染期间**跑 -> DOM 还没更新 -> 量到**旧值** ❌
@@ -291,11 +291,11 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
     top: number;
     /*
      * ⚠️⚠️ **容器的滚动量**（用户反馈：
-     * "不管在哪个页面哪个地方点击批注按钮 批注详情都会出现在pdf首页的位置"✅）。
+     * "不管在哪个页面哪个地方点击批注按钮 批注详情都会出现在pdf首页的位置"）。
      *
-     * -> 面板是 `position: absolute` -> 相对 **.scpdf-container 的内容原点** ✅
-     * -> 而锚点是 `getBoundingClientRect()` -> **视口坐标** ✅
-     * -> 换算：`内容坐标 = 视口坐标 - 容器视口原点 + scrollTop` ✅
+     * -> 面板是 `position: absolute` -> 相对 **.scpdf-container 的内容原点**
+     * -> 而锚点是 `getBoundingClientRect()` -> **视口坐标**
+     * -> 换算：`内容坐标 = 视口坐标 - 容器视口原点 + scrollTop`
      * -> ⚠️ **只减视口偏移、不加 scrollTop** ❌ -> 差了整个滚动量 ❌
      *    -> 实测（第 4 页，scrollTop=7000）：面板 y = **-6806** ❌
      */
@@ -318,8 +318,8 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
      * ⚠️ **滚动时要重新量**。
      *
      * -> 容器滚动 -> 内容在动 -> 锚点（视口坐标）变了 ❌
-     *    -> 但面板是**内容坐标** -> **不用动** ✅
-     *    -> 但**scrollTop 变了** -> 换算要跟着变 ✅
+     *    -> 但面板是**内容坐标** -> **不用动**
+     *    -> 但**scrollTop 变了** -> 换算要跟着变
      * -> 不监听滚动 -> 用户滚一下 -> 面板**飘了** ❌
      */
     el.addEventListener('scroll', measure, { passive: true });
@@ -343,14 +343,14 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
     /*
      * ⚠️⚠️ **视口尺寸必须是"窗口"的**，不是"滚动容器"的** ❌
      *
-     * -> `computeDialogPosition` 拿 `viewport` 来判断"放不放得下" ✅
+     * -> `computeDialogPosition` 拿 `viewport` 来判断"放不放得下"
      * -> 传**滚动容器**的尺寸（1442 × 608）❌
      *    -> 容器比窗口矮 -> "下面放不下" -> 面板被**推到上面** ❌
      *    -> 实测：`top = 124` -> 面板贴在**容器顶部** ❌
-     *    -> "出现在 PDF 的最上方" ✅
-     * -> 传**窗口**的尺寸（1442 × 732）✅ -> 判断正确 ✅
+     *    -> "出现在 PDF 的最上方"
+     * -> 传**窗口**的尺寸（1442 × 732） -> 判断正确
      *
-     * -> ⚠️ 容器尺寸只用来做"没锚点时的兜底位置" ✅
+     * -> ⚠️ 容器尺寸只用来做"没锚点时的兜底位置"
      */
     const viewport = {
       width: typeof window === 'undefined' ? container.width : window.innerWidth,
@@ -359,9 +359,9 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
     /*
      * ⚠️ **`gap: 30`**（默认是 8）——
      *
-     * -> 便签图标只有 **22px** 宽 ✅
+     * -> 便签图标只有 **22px** 宽
      * -> gap=8 -> 面板**盖住便签**（图标被挡住，看不到"这是哪条批注"）❌
-     * -> gap=30 -> 面板在便签**右边 30px** -> 两个都看得见 ✅
+     * -> gap=30 -> 面板在便签**右边 30px** -> 两个都看得见
      */
     const dialog = computeDialogPosition({
       anchor: anchorRect,
@@ -372,7 +372,7 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
        * -> 之前写死 **320** -> 算"下面放不下" -> 面板被放到**上面** ❌
        *    -> 实测：`anchor.bottom(391) + 30 + 320 = 741 > 732 - 12` ❌
        *    -> -> `top = anchor.top - 30 - 320 = 16` -> **贴在 PDF 最上方** ❌
-       * -> 用 **200**（比"锚点下面能放下的高度"小）-> **正常贴在下面** ✅
+       * -> 用 **200**（比"锚点下面能放下的高度"小）-> **正常贴在下面**
        */
       size: { width: ANNOTATION_PANEL_WIDTH, height: 200 },
       viewport,
@@ -380,28 +380,28 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
     });
 
     /*
-     * ⚠️⚠️ **视口坐标 -> 容器坐标**（绝对定位的坐标系）✅
+     * ⚠️⚠️ **视口坐标 -> 容器坐标**（绝对定位的坐标系）
      *
-     * -> 锚点是 `getBoundingClientRect()` -> **视口坐标** ✅
-     * -> 面板是 `position: absolute` -> **相对 `.scpdf-container`** ✅
-     * -> **必须减去容器的视口偏移** ✅
+     * -> 锚点是 `getBoundingClientRect()` -> **视口坐标**
+     * -> 面板是 `position: absolute` -> **相对 `.scpdf-container`**
+     * -> **必须减去容器的视口偏移**
      *
      * ⚠️ **容器偏移要用 state**（不能在 useMemo 里现量）❌
      * -> useMemo 在**渲染期间**跑 -> 那时 DOM 还没更新 ❌
      * -> 量到的是**旧值**（甚至 0）❌
      * -> 实测：top 算成 `124 - 124 = 0` -> 面板贴到容器顶部 ❌
-     * -> "出现在 PDF 的最上方" ✅
+     * -> "出现在 PDF 的最上方"
      */
     const offsetX = containerOffset?.left ?? 0;
     const offsetY = containerOffset?.top ?? 0;
     /*
      * ⚠️⚠️ **必须加上 `scrollTop`**（实测踩到的坑）。
      *
-     * -> 视口坐标 -> 内容坐标：`y - 容器视口top + scrollTop` ✅
+     * -> 视口坐标 -> 内容坐标：`y - 容器视口top + scrollTop`
      * -> 之前**只减了视口偏移** ❌
      *    -> 容器滚到第 4 页（scrollTop=7000）-> 差 7000px ❌
      *    -> 实测：便签在 y=140，面板在 y=**-6806** ❌
-     *    -> "批注详情都会出现在pdf首页的位置" ✅
+     *    -> "批注详情都会出现在pdf首页的位置"
      */
     const scrollTop = containerOffset?.scrollTop ?? 0;
 
@@ -424,8 +424,8 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
       className="scpdf-annotation-panel"
       /*
        * ⚠️ **给容器的点击委托一个"我是浮层"的标记**。
-       * -> 容器上挂了高亮的点击委托（按鼠标坐标命中）✅
-       * -> 浮层里的点击**不能**触发它（否则下面的高亮会被误激活）✅
+       * -> 容器上挂了高亮的点击委托（按鼠标坐标命中）
+       * -> 浮层里的点击**不能**触发它（否则下面的高亮会被误激活）
        */
       data-scpdf-floating="true"
       style={{ left, top, width: ANNOTATION_PANEL_WIDTH }}
@@ -443,9 +443,9 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
            * ⚠️ **"编辑"按钮**（用户需求：
            * "便签详情打开的时候也是要有按钮可以选编辑的"）。
            *
-           * -> **默认只读**（详情）✅
-           * -> 点"编辑" -> **就地变成编辑器**（B 方案：不弹窗）✅
-           * -> 编辑中 -> 按钮变成"完成" ✅
+           * -> **默认只读**（详情）
+           * -> 点"编辑" -> **就地变成编辑器**（B 方案：不弹窗）
+           * -> 编辑中 -> 按钮变成"完成"
            */}
           {!readOnly ? (
             <button
@@ -527,11 +527,11 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
  *
  * -> 之前是**直接渲染宿主的 html** ❌
  *    -> 安全责任全推给宿主 ❌
- *    -> 但**包自己已经导出了 `sanitizeRichTextHtml`** ✅
+ *    -> 但**包自己已经导出了 `sanitizeRichTextHtml`**
  *    -> 而且**同一个包的 `RichTextPreview` 就消毒了** ✅ -> **不一致** ❌
- * -> -> 现在：**渲染前一律消毒** ✅
- *    -> **纵深防御** ✅ -> 宿主传了脏数据也不会出事 ✅
- *    -> 和 `RichTextPreview` **行为一致** ✅
+ * -> -> 现在：**渲染前一律消毒**
+ *    -> **纵深防御**  -> 宿主传了脏数据也不会出事
+ *    -> 和 `RichTextPreview` **行为一致**
  *
  * biome 的 `noDangerouslySetInnerHtml` 在这里是**误报**
  * → 富文本内容**必须**用 innerHTML 渲染（否则标签会显示成文本）
@@ -540,8 +540,8 @@ export function AnnotationPanel(props: AnnotationPanelProps) {
  */
 function ReadOnlyContent({ html }: { html: string }) {
   /*
-   * ⚠️ **渲染前消毒**（纵深防御）✅
-   * -> `sanitizeRichTextHtml` 是**纯正则**的 ✅ -> SSR / Node 也能用 ✅
+   * ⚠️ **渲染前消毒**（纵深防御）
+   * -> `sanitizeRichTextHtml` 是**纯正则**的  -> SSR / Node 也能用
    */
   const safe = useMemo(() => sanitizeRichTextHtml(html ?? ''), [html]);
   return (

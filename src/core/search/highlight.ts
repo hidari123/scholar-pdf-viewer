@@ -17,7 +17,7 @@
  *
  * → **边界不同**（pdf.js 的 `getTextContent()` 会按 `fontName`/`height` 合并 item）
  * → 但**拼起来的文本完全一样**
- * → 所以：**按字符位置**在渲染侧找 → 不依赖项的边界 ✅
+ * → 所以：**按字符位置**在渲染侧找 → 不依赖项的边界
  *
  * @see `align.ts` 的 `mapOffsetToRenderedByText`
  */
@@ -68,7 +68,7 @@ export function mapRangeToItemsByText(
    * → 索引的项和渲染的项**边界不同**（pdf.js 按 `fontName`/`height` 合并 item）
    *   实测：索引 161 项 / 渲染 112 项 → 差 49 项
    * → 但**拼起来的文本完全一样** → 所以只要按**字符位置**找就行
-   * → 不依赖索引的项边界 → 两边切分不同也不影响 ✅
+   * → 不依赖索引的项边界 → 两边切分不同也不影响
    */
   const mapped = mapOffsetToRenderedByText(
     items.map((i) => i.text),

@@ -177,7 +177,7 @@ try {
   );
 
   // ⑤ 撤销真的能撤销
-  // ⚠️ **撤销是"撤销最近一步"** -> 上面刚加过斜体 -> 撤销掉的是**斜体** ✅
+  // ⚠️ **撤销是"撤销最近一步"** -> 上面刚加过斜体 -> 撤销掉的是**斜体**
   //    （不是加粗！加粗是更早的一步）
   await page.locator('.scpdf-annotation-dialog button[aria-label="撤销"]').first().click();
   await page.waitForTimeout(800);

@@ -25,9 +25,9 @@ import { ToolbarHighlightButton } from './ToolbarHighlightButton';
  *
  * ⚠️ **定义在 `core/theme`**（审计修复）：
  * -> `core/config` 要引用它 -> core **不能反向依赖 components** ❌
- * -> 现在住在 core -> **两边共用同一份** ✅
+ * -> 现在住在 core -> **两边共用同一份**
  *
- * -> 这里**重新导出**，保持对外 API 不变 ✅
+ * -> 这里**重新导出**，保持对外 API 不变
  */
 export type { ToolbarConfig } from '../core/theme';
 
@@ -48,7 +48,7 @@ export interface ToolbarProps {
   /**
    * **宿主注册的语言表**（可添加任意语言）。
    *
-   * → 内置 zh / en；宿主用这个加别的语言 ✅
+   * → 内置 zh / en；宿主用这个加别的语言
    */
   locales?: LocaleTable;
   /** 翻页 */
@@ -61,13 +61,13 @@ export interface ToolbarProps {
   /**
    * **缩放上下限**（宿主可配）。
    *
-   * -> 不传 -> 20% ~ 250% ✅
+   * -> 不传 -> 20% ~ 250%
    */
   scaleBounds?: { min: number; max: number };
   /**
    * **允许用户填写缩放比例**。
    *
-   * -> `false` -> 只读（只有 +/- 按钮）✅
+   * -> `false` -> 只读（只有 +/- 按钮）
    */
   allowScaleInput?: boolean;
   onFitWidth: () => void;
@@ -81,34 +81,34 @@ export interface ToolbarProps {
   /** 打印 */
   onPrint?: () => void;
   /**
-   * **下载原 PDF** ✅（用户需求："包需要内置 PDF 下载" ✅）
+   * **下载原 PDF**  （用户需求："包需要内置 PDF 下载"）
    *
-   * -> 不传 -> 不渲染 ✅ ✅
+   * -> 不传 -> 不渲染
    */
   onDownloadPdf?: () => void;
   /**
-   * **导出带高亮的 PDF** ✅（用户需求："包需要内置导出带高亮的 PDF" ✅）
+   * **导出带高亮的 PDF**  （用户需求："包需要内置导出带高亮的 PDF"）
    *
-   * -> 不传 -> 不渲染 ✅ ✅
+   * -> 不传 -> 不渲染
    */
   onExportAnnotatedPdf?: () => void;
   /**
-   * **导出高亮 JSON** ✅（用户需求："包需要内置导出高亮" ✅）
+   * **导出高亮 JSON**  （用户需求："包需要内置导出高亮"）
    *
-   * -> 不传 -> 不渲染 ✅ ✅
+   * -> 不传 -> 不渲染
    */
   onExportHighlights?: () => void;
   /**
    * **当前主题**（受控）。
    *
-   * -> 配合 \`onThemeChange\` -> 工具栏显示主题选择按钮 ✅
+   * -> 配合 \`onThemeChange\` -> 工具栏显示主题选择按钮
    */
   theme?: PdfViewerTheme;
   /**
    * **切换主题**（宿主改 \`theme\` prop）。
    *
-   * ⚠️ **不传就不渲染主题按钮** ✅
-   * -> 宿主自己已经有主题切换 UI -> 不要重复 ✅
+   * ⚠️ **不传就不渲染主题按钮**
+   * -> 宿主自己已经有主题切换 UI -> 不要重复
    */
   onThemeChange?: (theme: PdfViewerTheme) => void;
   /**
@@ -116,8 +116,8 @@ export interface ToolbarProps {
    * "包工具栏的高亮也需要加个下拉箭头 可以选择颜色
    *  如果没有选就是默认的高亮色"）。
    *
-   * -> ⚠️ **不传 -> 不渲染** ✅（用户确认："默认隐藏吧"）
-   * -> 宿主自己已经有"加高亮"按钮 -> 不重复 ✅
+   * -> ⚠️ **不传 -> 不渲染**  （用户确认："默认隐藏吧"）
+   * -> 宿主自己已经有"加高亮"按钮 -> 不重复
    *
    * @param color 语义 key（宿主用 key 存"用户选的颜色"）
    */
@@ -129,13 +129,13 @@ export interface ToolbarProps {
   /**
    * **可选的主题列表**（宿主可自定义）。
    *
-   * -> 不传 -> 用**内置的全部 7 个** ✅
+   * -> 不传 -> 用**内置的全部 7 个**
    */
   themeOptions?: readonly PdfViewerTheme[];
   /**
    * **图标覆盖**（宿主 → 包）。
    *
-   * ⚠️ 宿主可以用自己的图标体系（`lucide-react` 等）覆盖内置图标 → 风格统一 ✅
+   * ⚠️ 宿主可以用自己的图标体系（`lucide-react` 等）覆盖内置图标 → 风格统一
    */
   icons?: Partial<Record<IconName, ReactNode>>;
 }
@@ -304,7 +304,7 @@ export function Toolbar(props: ToolbarProps) {
        *   -> 宿主写 `toolbar={{ showZoom: false }}`（不要缩放按钮）❌
        *     -> **打印按钮跟着一起消失** ❌
        *   -> 但"打印"和"缩放"是**两个独立的功能** ❌
-       * -> 现在：**独立** ✅
+       * -> 现在：**独立**
        *
        * ### ② `rightSlot` 也在 `showZoom` 块里（bug）
        *
@@ -316,7 +316,7 @@ export function Toolbar(props: ToolbarProps) {
        *
        * -> 拆成两个 div 会让 `rightSlot` **渲染两次** ❌
        *   -> 出现两个"分享"按钮 ❌
-       * -> 现在：**一个 div** -> 缩放 + 打印 + 插槽**各一次** ✅
+       * -> 现在：**一个 div** -> 缩放 + 打印 + 插槽**各一次**
        */}
       <div className="scpdf-toolbar__right">
         {showZoom ? (
@@ -387,20 +387,20 @@ export function Toolbar(props: ToolbarProps) {
         ) : null}
 
         {/*
-         * ⚠️⚠️ **导出 / 下载**（用户需求 ✅）
+         * ⚠️⚠️ **导出 / 下载**（用户需求）
          *
          * > "包需要内置导出带高亮的 PDF、导出高亮、PDF 下载、主题色"
          *
-         * ## 为什么是"宿主传回调"而不是"包自己实现" ✅
+         * ## 为什么是"宿主传回调"而不是"包自己实现"
          *
-         * -> **下载原 PDF** ✅ -> 包**拿不到原始字节** ✅
-         *    -> 宿主是通过 URL / ArrayBuffer 加载的 ✅ -> 包不知道 ✅ ✅
-         * -> **导出带高亮的 PDF** ✅ -> 需要 `pdf-lib` ✅
-         *    -> **宿主决定用哪个版本 / 怎么打包** ✅ -> 包不该硬塞 ✅ ✅
-         * -> **导出高亮 JSON** ✅ -> 高亮数据在**宿主手里** ✅ ✅
+         * -> **下载原 PDF**  -> 包**拿不到原始字节**
+         *    -> 宿主是通过 URL / ArrayBuffer 加载的  -> 包不知道
+         * -> **导出带高亮的 PDF**  -> 需要 `pdf-lib`
+         *    -> **宿主决定用哪个版本 / 怎么打包**  -> 包不该硬塞
+         * -> **导出高亮 JSON**  -> 高亮数据在**宿主手里**
          *
-         * -> 所以：**包提供按钮和入口** ✅ -> **宿主给实现** ✅ ✅
-         * -> 不传回调 ✅ -> **按钮不渲染** ✅ ✅
+         * -> 所以：**包提供按钮和入口**  -> **宿主给实现**
+         * -> 不传回调  -> **按钮不渲染**
          */}
         {onDownloadPdf ? (
           <button
@@ -441,20 +441,20 @@ export function Toolbar(props: ToolbarProps) {
         {/*
          * ⚠️⚠️ **主题选择按钮**（用户需求：
          * "主题应该是包里面内置的 然后宿主可以进行选择配置
-         *  包在工具栏那里也可以加上一个按钮让用户进行选择"✅）。
+         *  包在工具栏那里也可以加上一个按钮让用户进行选择"）。
          *
-         * -> **独立分组**（和缩放/打印隔开）-> 视觉更清楚 ✅
-         * -> 宿主不传 \`onThemeChange\` -> **不渲染** ✅
-         *    -> 宿主自己已经有主题切换 UI -> 不重复 ✅
+         * -> **独立分组**（和缩放/打印隔开）-> 视觉更清楚
+         * -> 宿主不传 \`onThemeChange\` -> **不渲染**
+         *    -> 宿主自己已经有主题切换 UI -> 不重复
          */}
         {/*
          * ⚠️⚠️ **工具栏的"高亮"按钮**（用户需求：
          * "包工具栏的高亮也需要加个下拉箭头 可以选择颜色
          *  如果没有选就是默认的高亮色"）。
          *
-         * -> **分裂按钮**：主按钮 = 用当前色高亮，▾ = 选颜色 ✅
-         * -> **不传 `onToolbarHighlight` -> 不渲染** ✅
-         *    -> 用户确认："默认隐藏吧" ✅
+         * -> **分裂按钮**：主按钮 = 用当前色高亮，▾ = 选颜色
+         * -> **不传 `onToolbarHighlight` -> 不渲染**
+         *    -> 用户确认："默认隐藏吧"
          */}
         {onToolbarHighlight ? (
           <ToolbarHighlightButton

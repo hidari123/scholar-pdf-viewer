@@ -11,16 +11,16 @@
  * ```
  * stickyNotes:  { display: "block", visibility: "visible" }  ❌ 没藏
  * stickyIcon:   { display: "flex",  visibility: "visible" }  ❌ 黄色便签框会印出来
- * annotations:  { display: "none" }                         ✅ 高亮藏对了
+ * annotations:  { display: "none" }                          高亮藏对了
  * ```
  *
- * -> 打印 CSS 的隐藏清单里**有** `.scpdf-annotations`（高亮）✅
+ * -> 打印 CSS 的隐藏清单里**有** `.scpdf-annotations`（高亮）
  * -> 但**没有** `.scpdf-sticky-notes`（便签）❌
  * -> 便签带着**批注正文**（用户的私人内容）-> **会被打印出来** ❌
  *
  * ## 修法
  *
- * -> 把**所有浮层**（便签 / 详情面板 / 批注弹窗 / 链接弹窗 / 颜色面板）都加进隐藏清单 ✅
+ * -> 把**所有浮层**（便签 / 详情面板 / 批注弹窗 / 链接弹窗 / 颜色面板）都加进隐藏清单
  *
  * 用法：`node scripts/e2e-print-hide-overlays.mjs`
  */

@@ -1,7 +1,7 @@
 /**
  * E2E：宿主怎么**按需关掉**包的功能（`features`）。
  *
- * ⚠️ **为什么要有这个用例**（第 29 轮审核补的 ✅）：
+ * ⚠️ **为什么要有这个用例**（第 29 轮审核补的）：
  *
  * -> 之前 demo **完全没用过** `features` ❌
  *    -> 宿主看不到"怎么关掉某个功能" ❌
@@ -9,13 +9,13 @@
  * -> 而且 `features.themePicker` **类型上原本不存在** ❌（第 29 轮才补上 ✅）
  *
  * 覆盖：
- * 1. 默认全开 ✅
- * 2. 关掉搜索 -> 搜索按钮消失 ✅
- * 3. 关掉缩略图 -> 缩略图按钮消失 ✅
- * 4. 关掉目录 -> 目录按钮消失 ✅
- * 5. 关掉打印 -> 打印按钮消失 ✅
- * 6. 关掉主题 -> 主题按钮消失 ✅
- * 7. 恢复 -> 全部回来 ✅
+ * 1. 默认全开
+ * 2. 关掉搜索 -> 搜索按钮消失
+ * 3. 关掉缩略图 -> 缩略图按钮消失
+ * 4. 关掉目录 -> 目录按钮消失
+ * 5. 关掉打印 -> 打印按钮消失
+ * 6. 关掉主题 -> 主题按钮消失
+ * 7. 恢复 -> 全部回来
  */
 
 import { existsSync, readdirSync } from 'node:fs';
@@ -24,7 +24,7 @@ import { chromium } from 'playwright';
 import { E2E_BASE_URL } from './e2e-base.mjs';
 
 /**
- * 找到本机装的 Chromium（Playwright 默认的 headless shell 没装 ✅）。
+ * 找到本机装的 Chromium（Playwright 默认的 headless shell 没装）。
  *
  * @returns {string | undefined} 可执行文件路径
  */

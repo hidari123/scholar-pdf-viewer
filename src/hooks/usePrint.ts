@@ -38,7 +38,7 @@ import {
  * ⚠️ 审计发现的**无限 rAF 风险**：
  * -> 宿主给的 \`pageCount\` 永远对不上 -> **无限递归 rAF** ❌
  *    -> CPU 100% + **永远停不下来** ❌
- * -> 现在：**有上限** -> 放弃也算完成 ✅
+ * -> 现在：**有上限** -> 放弃也算完成
  */
 const MAX_PRINT_RETRIES = 60;
 
@@ -85,29 +85,29 @@ export interface UsePrintResult {
  * @returns 打印函数 + 准备状态
  */
 /**
- * **等所有页的 canvas 都画完** ✅（用户反馈："打印的页面显示也不全 后面都是空白页" ✅）
+ * **等所有页的 canvas 都画完**  （用户反馈："打印的页面显示也不全 后面都是空白页"）
  *
- * ## 为什么需要 ✅
+ * ## 为什么需要
  *
- * -> 页是**虚拟化渲染**的 ✅ -> 平时只渲染**看得见的** ✅ ✅
- * -> -> 打印时 `beforeprint` ✅ -> 开始渲染**所有页** ✅
- * -> -> **但 canvas 渲染是异步的** ✅（pdf.js 的 `render().promise` ✅）✅
+ * -> 页是**虚拟化渲染**的  -> 平时只渲染**看得见的**
+ * -> -> 打印时 `beforeprint`  -> 开始渲染**所有页**
+ * -> -> **但 canvas 渲染是异步的**  （pdf.js 的 `render().promise`）
  * -> -> 原来只等 **2 帧** ✅ -> **14 页画不完** ✅ ❌
  * -> -> 打印开始时 ✅ -> **只有前 2~3 页有内容** ✅ -> 后面**全是空白页** ✅ ❌
  *
- * ## 怎么判断"画完了" ✅
+ * ## 怎么判断"画完了"
  *
- * -> 用 `getImageData` ✅ 读 canvas 的一小块 ✅
- * -> -> 全透明 ✅ -> 还没画 ✅
- * -> -> 有内容 ✅ -> 画好了 ✅ ✅
+ * -> 用 `getImageData`  读 canvas 的一小块
+ * -> -> 全透明  -> 还没画
+ * -> -> 有内容  -> 画好了
  *
- * ⚠️ **canvas 会被 `getImageData` 弄脏** ✅（浏览器会警告 ✅）
+ * ⚠️ **canvas 会被 `getImageData` 弄脏**  （浏览器会警告）
  * -> 所以读**一次**就**恢复** ✅（`clearRect` + 重画 ❌ 做不到 ✅）
- * -> -> 用 `willReadFrequently` 避免警告 ✅ ✅
+ * -> -> 用 `willReadFrequently` 避免警告
  *
- * @param pages 页元素列表 ✅
- * @param timeout 超时（ms ✅）—— 兜底 ✅ 不能无限等 ✅
- * @returns 全部画完（或超时）✅
+ * @param pages 页元素列表
+ * @param timeout 超时（ms）—— 兜底  不能无限等
+ * @returns 全部画完（或超时）
  */
 async function waitForCanvases(pages: readonly HTMLElement[], timeout: number): Promise<void> {
   if (pages.length === 0) {
@@ -116,7 +116,7 @@ async function waitForCanvases(pages: readonly HTMLElement[], timeout: number): 
 
   const deadline = Date.now() + timeout;
 
-  /* ⚠️ **等所有页都"有内容"** ✅ */
+  /* ⚠️ **等所有页都"有内容"***/
   while (Date.now() < deadline) {
     const pending = pages.filter((page) => !isCanvasPainted(page));
     if (pending.length === 0) {
@@ -127,15 +127,15 @@ async function waitForCanvases(pages: readonly HTMLElement[], timeout: number): 
 }
 
 /**
- * **canvas 是不是已经画上有内容** ✅
+ * **canvas 是不是已经画上有内容**
  *
- * @param page 页元素 ✅
- * @returns 有内容 -> true ✅
+ * @param page 页元素
+ * @returns 有内容 -> true
  */
 function isCanvasPainted(page: HTMLElement): boolean {
   const canvas = page.querySelector('canvas');
   if (!canvas) {
-    // ⚠️ **没有 canvas** -> 认为是空白页 ✅ -> 一直等 ✅ -> 超时兜底 ✅
+    // ⚠️ **没有 canvas** -> 认为是空白页  -> 一直等  -> 超时兜底
     return true;
   }
   const width = canvas.width;
@@ -148,7 +148,7 @@ function isCanvasPainted(page: HTMLElement): boolean {
     if (!context) {
       return true;
     }
-    // ⚠️ **只读一小块** ✅（读全图太慢 ✅）
+    // ⚠️ **只读一小块**  （读全图太慢）
     const data = context.getImageData(0, 0, Math.min(width, 4), Math.min(height, 4)).data;
     for (let i = 3; i < data.length; i += 4) {
       if (data[i] !== 0) {
@@ -157,12 +157,12 @@ function isCanvasPainted(page: HTMLElement): boolean {
     }
     return false;
   } catch {
-    // ⚠️ **跨域污染的 canvas** -> 读不了 ✅ -> 认为画好了 ✅（不阻塞 ✅）
+    // ⚠️ **跨域污染的 canvas** -> 读不了  -> 认为画好了  （不阻塞）
     return true;
   }
 }
 
-/** 等 canvas 的超时（ms ✅） */
+/** 等 canvas 的超时（ms）*/
 const CANVAS_WAIT_TIMEOUT = 15000;
 
 export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
@@ -220,7 +220,7 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
    * ### 修法
    *
    * **用一个 effect 把变量一直写好**（页尺寸变化时更新）：
-   * → 任何打印路径（按钮 / Ctrl+P / 宿主自己的按钮）都能拿到正确的缩放 ✅
+   * → 任何打印路径（按钮 / Ctrl+P / 宿主自己的按钮）都能拿到正确的缩放
    *
    * ⚠️ 打印**结束后**不用恢复（因为它本来就该是"打印时的正确值"）
    *    → 屏幕上的显示**不受影响**（这些变量只在 `@media print` 里用）。
@@ -250,7 +250,7 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
      *   → 远超 A4 → **18 页的 PDF 打印成 36 页**（每页溢出到第二张纸）❌
      *
      * 正确做法: min(703/1408, 1032/1821.6) = 0.499
-     *   → 703 × 909 px = 186 × 240 mm → **正好落在 A4 可打印区里** ✅
+     *   → 703 × 909 px = 186 × 240 mm → **正好落在 A4 可打印区里**
      */
     const applyPrintScale = () => {
       const firstPage = target.querySelector<HTMLElement>('.scpdf-page');
@@ -334,7 +334,7 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
        * -> 如果宿主给的 \`pageCount\` **永远对不上**（比如数错了）❌
        *   -> 这里会**无限递归 rAF** -> **永远停不下来** ❌
        *   -> 每次 rAF 都重新量所有页 -> **CPU 100%** ❌
-       * -> 现在：**最多重试 60 帧（约 1 秒）** -> 之后放弃 ✅
+       * -> 现在：**最多重试 60 帧（约 1 秒）** -> 之后放弃
        */
       if (pageCount !== undefined && pages.length !== pageCount && retryCount < MAX_PRINT_RETRIES) {
         requestAnimationFrame(() => {
@@ -405,7 +405,7 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
      *   → 远超 A4 → **18 页的 PDF 打印成 36 页**（每页溢出到第二张纸）❌
      *
      * 正确做法: min(703/1408, 1032/1821.6) = 0.499
-     *   → 703 × 909 px = 186 × 240 mm → **正好落在 A4 可打印区里** ✅
+     *   → 703 × 909 px = 186 × 240 mm → **正好落在 A4 可打印区里**
      */
     const firstPage = pages[0];
     if (firstPage) {
@@ -452,22 +452,22 @@ export function usePrint(options: UsePrintOptions = {}): UsePrintResult {
     setPreparing(true);
 
     /*
-     * ⚠️⚠️⚠️ **必须等【所有页的 canvas】都画完**（用户反馈 ✅）
+     * ⚠️⚠️⚠️ **必须等【所有页的 canvas】都画完**（用户反馈）
      *
      * > "打印的页面显示也不全 只能展示出来已经缓存的一些 后面都是空白页"
      *
-     * ## 根因 ✅
+     * ## 根因
      *
-     * -> 页是**虚拟化渲染**的 ✅ -> 平时只渲染**看得见的** ✅ ✅
-     * -> -> `beforeprint` ✅ 触发 ✅ -> `setPrinting(true)` ✅ -> 开始渲染**所有页** ✅
-     * -> -> **但 canvas 渲染是异步的** ✅（pdf.js 的 `render().promise` ✅）✅
+     * -> 页是**虚拟化渲染**的  -> 平时只渲染**看得见的**
+     * -> -> `beforeprint`  触发  -> `setPrinting(true)`  -> 开始渲染**所有页**
+     * -> -> **但 canvas 渲染是异步的**  （pdf.js 的 `render().promise`）
      * -> -> 原来只等 **2 帧** ✅ → **14 页根本画不完** ✅ ❌
      * -> -> 打印开始时 ✅ -> **只有前 2~3 页画完** ✅ -> 后面是**空白页** ✅ ❌
      *
-     * ## 修法 ✅
+     * ## 修法
      *
-     * -> 等到**每个 canvas 都有内容** ✅ 或者**超时兜底** ✅ ✅
-     * -> -> `waitForCanvases` ✅ ✅
+     * -> 等到**每个 canvas 都有内容**  或者**超时兜底**
+     * -> -> `waitForCanvases`
      */
     void waitForCanvases([...pages], CANVAS_WAIT_TIMEOUT).then(() => {
       /*

@@ -22,7 +22,7 @@ import type { NormPosition } from '../types';
  * -> 但 \`SelectionActionContext.event\` 引用了 \`React.MouseEvent\` ❌
  *   -> 只靠 React 的 **UMD 全局命名空间**才能编译 ❌
  *   -> 在 \`isolatedModules\` / 非 UMD 消费者下**会炸** ❌
- * -> 现在：**自己定义一个结构化类型** -> core 彻底不碰 React ✅
+ * -> 现在：**自己定义一个结构化类型** -> core 彻底不碰 React
  */
 export interface PointerEventLike {
   preventDefault: () => void;
@@ -34,7 +34,7 @@ export interface PointerEventLike {
  *
  * ⚠️ 和 `core/icons` 的 `IconName` **同一套规范**（24×24 / stroke 1.75）。
  *
- * → 用户反馈"按钮不好看" → 工具栏和选区浮层统一风格 ✅
+ * → 用户反馈"按钮不好看" → 工具栏和选区浮层统一风格
  */
 /**
  * ⚠️ **必须是 `IconName` 的子集**（审计发现的 bug）。
@@ -42,7 +42,7 @@ export interface PointerEventLike {
  * -> 之前这里有 `'delete'` -> 但 `IconName` 里叫 `'trash'` ❌
  *   -> 两套图标词汇 -> 宿主写 `icons={{ delete: <X/> }}` **类型报错** ❌
  *   -> 运行时靠 `SelectionActionIcons.tsx` 里的 `delete: 'trash'` 映射兜底 ❌
- * -> 现在：**用 `IconName` 的真名** -> 两边永远一致 ✅
+ * -> 现在：**用 `IconName` 的真名** -> 两边永远一致
  */
 export type SelectionActionIcon = Extract<
   IconName,
@@ -69,7 +69,7 @@ export interface SelectionActionContext {
    * ⚠️ **之前是 `unknown`**（审计发现的 bug）：
    * -> 宿主每次用都要写 \`ctx.position as NormPosition\` -> **到处是强制转换** ❌
    * -> 拼错了字段名**编译不报错**（因为是 `unknown`）❌
-   * -> 现在：**具体类型** -> 拼错**直接报错** ✅
+   * -> 现在：**具体类型** -> 拼错**直接报错**
    */
   position: NormPosition;
   /**
@@ -79,7 +79,7 @@ export interface SelectionActionContext {
    * -> 但"点高亮块打开浮层"那条路径**根本没有事件** ❌
    *   -> 调用处写的是 \`event: undefined as never\` ❌
    *   -> 宿主写 \`ctx.event.preventDefault()\` -> **运行时崩** ❌
-   * -> 现在：**可选** -> 宿主要用就判断一下 ✅
+   * -> 现在：**可选** -> 宿主要用就判断一下
    */
   event?: PointerEventLike;
   /**
@@ -117,19 +117,19 @@ export interface SelectionAction {
   /** 提示文案（也用作 aria-label） */
   label?: string;
   /**
-   * **文案表的 key** ✅（用户反馈："选区浮层 title 中英混杂" ✅）
+   * **文案表的 key**  （用户反馈："选区浮层 title 中英混杂"）
    *
-   * ## 为什么 ✅
+   * ## 为什么
    *
-   * -> 宿主自定义动作 ✅ 传 `label: '翻译'` ✅
+   * -> 宿主自定义动作  传 `label: '翻译'`
    * -> -> 切到英文 ✅ -> **还是中文** ✅ ❌
    * -> -> 因为 `label` 是**写死的字符串** ✅ -> 不会跟着语言变 ✅ ❌
    *
-   * -> 修法：宿主传 `messageKey` ✅ -> **包按当前语言解析** ✅ ✅
-   * -> -> 例：`{ key: 'ask2', messageKey: 'selection.actionAsk' }` ✅
-   * -> -> 没传 `messageKey` ✅ -> 退回 `label` ✅ ✅
+   * -> 修法：宿主传 `messageKey`  -> **包按当前语言解析**
+   * -> -> 例：`{ key: 'ask2', messageKey: 'selection.actionAsk' }`
+   * -> -> 没传 `messageKey`  -> 退回 `label`
    *
-   * ⚠️ **必须是包文案表里已有的 key** ✅（见 `src/i18n/messages.ts` ✅）
+   * ⚠️ **必须是包文案表里已有的 key**  （见 `src/i18n/messages.ts`）
    */
   messageKey?: keyof Messages;
   /** 点击回调 */
@@ -165,8 +165,8 @@ export const BUILTIN_ACTION_KEYS = {
  *
  * -> 它是**死代码**（全仓库零引用，且没从 `src/index.ts` 导出）❌
  * -> 但它**误导人**：宿主以为"内置动作的标签就是它" ❌
- *   -> 实际上内置动作走的是 `t('selection.actionCopy')` 等 ✅
- * -> 现在：**没有这个误导源**了 ✅
+ *   -> 实际上内置动作走的是 `t('selection.actionCopy')` 等
+ * -> 现在：**没有这个误导源**了
  */
 
 /**

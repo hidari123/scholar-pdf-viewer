@@ -48,7 +48,7 @@ export interface HighlightPickerProps {
    * **语言**（宿主侧的文案）。
    *
    * → 用户反馈："切换语言还是没变啊"
-   * → 这个选择器是**宿主组件** → 它的文案也得跟着切 ✅
+   * → 这个选择器是**宿主组件** → 它的文案也得跟着切
    */
   locale?: DemoLocale;
 }

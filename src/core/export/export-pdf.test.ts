@@ -223,11 +223,11 @@ describe('exportHighlightedPdf（真 pdf-lib）', async () => {
    *
    * ```
    * PDFHexString.of('中文')      → <中文>        ← ❌ 乱码（当原始字节写）
-   * PDFHexString.fromText('中文') → <FEFF4E2D6587…> ← ✅ UTF-16BE + BOM
+   * PDFHexString.fromText('中文') → <FEFF4E2D6587…> ←  UTF-16BE + BOM
    * ```
    *
    * → 阅读器按 PDFDocEncoding 解码裸字节 → 中文全乱码
-   * → `fromText` 会做 UTF-16BE + BOM → 阅读器能正确识别 ✅
+   * → `fromText` 会做 UTF-16BE + BOM → 阅读器能正确识别
    */
   it('**批注文字用 UTF-16BE + BOM 编码**（中文不乱码）', async () => {
     const doc = await pdfLib.PDFDocument.create();
@@ -242,10 +242,10 @@ describe('exportHighlightedPdf（真 pdf-lib）', async () => {
       highlights: [chinese],
       pageSizesPt,
       /*
-       * ⚠️ **要显式开启批注文字**（第 27 轮改成默认不写）✅
+       * ⚠️ **要显式开启批注文字**（第 27 轮改成默认不写）
        *
-       * -> 用户反馈："导出后 hover 高亮还是会出现黄色便签" ✅
-       * -> A/B 对照：**真凶是 `/Contents`** ✅
+       * -> 用户反馈："导出后 hover 高亮还是会出现黄色便签"
+       * -> A/B 对照：**真凶是 `/Contents`**
        */
       includeAnnotationText: true,
       pdfLib: pdfLib as unknown as PdfLibLike,
@@ -274,7 +274,7 @@ describe('exportHighlightedPdf（真 pdf-lib）', async () => {
     expect(contents.startsWith('<FEFF')).toBe(true);
     // ⚠️ **不能有裸的中文字符**（那是被当原始字节写进去的乱码源）
     expect(/[一-龥]/.test(contents)).toBe(false);
-    // ✅ "中" = U+4E2D → UTF-16BE 是 4E2D
+    //  "中" = U+4E2D → UTF-16BE 是 4E2D
     expect(contents).toContain('4E2D');
   });
 });
@@ -285,9 +285,9 @@ describe('exportHighlightedPdf（真 pdf-lib）', async () => {
  * 用户反馈：
  * > "在导出的pdf上hover到高亮上还是会出现黄色便签"
  *
- * -> PDF 的 `/Contents` 是**批注的弹出文字** ✅
+ * -> PDF 的 `/Contents` 是**批注的弹出文字**
  * -> Chrome 的 PDF 阅读器：hover 到高亮上就显示**一个黄色便签框** ❌
- * -> A/B 对照实验：**真凶是 `/Contents`**（不是 `/F`）✅
+ * -> A/B 对照实验：**真凶是 `/Contents`**（不是 `/F`）
  */
 
 /** 记录写到字典里的 key */

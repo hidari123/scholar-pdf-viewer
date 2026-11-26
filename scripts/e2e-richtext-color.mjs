@@ -16,7 +16,7 @@
  * 2. **TipTap 没有颜色面板**
  *    -> 点"文字颜色"-> **直接应用第一个颜色** ❌
  *    -> 用户反馈："点击会打开一个空的窄的框" ❌
- *    -> 现在：**弹出颜色面板**（和内置编辑器一致）✅
+ *    -> 现在：**弹出颜色面板**（和内置编辑器一致）
  *
  * 3. **TipTap 的 `hiliteColor` 没传颜色值**
  *    -> 选哪个色都一样（用的是默认色）❌
@@ -175,9 +175,9 @@ try {
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       /*
-       * ⚠️ **色板第一个是"无背景色"（斜杠）**（第 27 轮加的）✅
+       * ⚠️ **色板第一个是"无背景色"（斜杠）**（第 27 轮加的）
        * -> 点**第一个** = **清除颜色** ❌
-       * -> 要点**第二个**（第一个真实颜色）✅
+       * -> 要点**第二个**（第一个真实颜色）
        */
       const sw = document.querySelectorAll('.scpdf-rich-text__palette .scpdf-rich-text__swatch')[1];
       sw?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));

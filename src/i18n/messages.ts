@@ -17,7 +17,7 @@
  * ③ 内置 MESSAGES     —— zh / en 的内置文案
  * ```
  *
- * → **缺哪条就回退到下一层** → 宿主只写自己关心的文案即可 ✅
+ * → **缺哪条就回退到下一层** → 宿主只写自己关心的文案即可
  *
  * ## 宿主的用法
  *
@@ -42,7 +42,7 @@ export type BuiltinLocale = 'zh' | 'en';
  * 语言标识（**可以是任意字符串**）。
  *
  * ⚠️ 之前是 `'zh' | 'en'` 的固定联合类型 → 宿主加语言要改源码 ❌
- * → 现在放宽成 `string` → 宿主传 `'ja'` / `'ko-FR'` 都行 ✅
+ * → 现在放宽成 `string` → 宿主传 `'ja'` / `'ko-FR'` 都行
  */
 export type Locale = BuiltinLocale | (string & {});
 
@@ -89,11 +89,11 @@ export interface Messages {
   'outline.title': string;
   'thumbnails.title': string;
   'print.title': string;
-  /** 下载原 PDF ✅ */
+  /** 下载原 PDF*/
   'export.downloadPdf': string;
-  /** 导出带高亮的 PDF ✅ */
+  /** 导出带高亮的 PDF*/
   'export.annotatedPdf': string;
-  /** 导出高亮 JSON ✅ */
+  /** 导出高亮 JSON*/
   'export.highlightsJson': string;
   /* —— 主题 —— */
   /** 主题选择按钮 */
@@ -106,7 +106,7 @@ export interface Messages {
    * —— 工具栏 / 浮层 ——
    *
    * ⚠️ **这些之前是硬编码的中文**（用户反馈："语言切换了 但是切换之后
-   *    实际上 title 啊什么东西都没切换语言呢"）→ 全部收进文案表 ✅
+   *    实际上 title 啊什么东西都没切换语言呢"）→ 全部收进文案表
    */
   'page.prev': string;
   'page.next': string;
@@ -136,8 +136,8 @@ export interface Messages {
    *
    * -> 之前在 \`core/selection/highlight-actions.ts\` 里写死 ❌
    *   -> 高亮浮层（点高亮块）**永远是中文** ❌
-   *   -> 选区浮层（选中文字）走 i18n -> 英文 ✅
-   *   -> **两个浮层并排 -> "中英文混杂"** ✅
+   *   -> 选区浮层（选中文字）走 i18n -> 英文
+   *   -> **两个浮层并排 -> "中英文混杂"**
    */
   /*
    * ⚠️ **内部链接跳转**（审计修复：之前解析不出来时**什么都不做** -> 点了没反应）。
@@ -184,10 +184,10 @@ export interface Messages {
    * -> 之前色块的 `title` 直接写**原始色值**（`#ffd54a`）❌
    * -> 界面是中文也显示 `#ffd54a`，英文还是 `#ffd54a` ❌
    * -> -> **和界面语言完全脱节** ❌
-   * -> -> 用户的体感就是"title 变来变去" ✅
+   * -> -> 用户的体感就是"title 变来变去"
    *
-   * -> 现在按 key 查本地化名字 ✅（`yellow` -> 黄色 / Yellow / イエロー）✅
-   * -> 宿主自定义的 key 查不到 -> **退回 key 本身** ✅（不用猜）
+   * -> 现在按 key 查本地化名字  （`yellow` -> 黄色 / Yellow / イエロー）
+   * -> 宿主自定义的 key 查不到 -> **退回 key 本身**  （不用猜）
    */
   'selection.highlightColorName': string;
   /* —— 富文本工具栏 —— */
@@ -217,7 +217,7 @@ export type MessageKey = keyof Messages;
  * **宿主的语言表**（locale → 文案）。
  *
  * ⚠️ **必须是"部分"的** —— 宿主只想写自己关心的文案，
- *    缺的会自动回退到内置文案 ✅
+ *    缺的会自动回退到内置文案
  */
 export type LocaleMessages = Partial<Messages>;
 
@@ -512,13 +512,13 @@ export const MESSAGES: Record<BuiltinLocale, Messages> = {
  *
  * ⚠️ **为什么最后兜底到英文而不是中文**：
  * → 一个没配置全的语言，用中文兜底会"中英混杂"，更糟
- * → 用英文兜底至少是**一致的一种语言** ✅
+ * → 用英文兜底至少是**一致的一种语言**
  *
  * ⚠️⚠️ **① 现在是"按语言"的**（审计发现的**真 bug**）：
  * -> 之前是 \`overrides?.[key]\`（**不带 locale 判断**）❌
  *   -> 实测：\`en + overrides\` 依然返回**中文** ❌
  *   -> 宿主切语言 -> **被覆盖的 key 还是中文** -> **中英文混杂** ❌
- * -> 现在：\`overrides?.[locale]?.[key]\` ✅
+ * -> 现在：\`overrides?.[locale]?.[key]\`
  *
  * @param locale 语言（可以是宿主的任意语言）
  * @param key 文案 key
@@ -539,15 +539,15 @@ export function resolveMessage(
    *
    * -> `overrides`（messages prop）：宿主的**覆盖**
    * -> `locales`（locales prop）：宿主的**语言表**
-   * -> 两个都是 `Record<locale, Partial<Messages>>` ✅
+   * -> 两个都是 `Record<locale, Partial<Messages>>`
    *
    * ⚠️ **为什么 `overrides` 优先**：
-   * -> `messages` 是"更细粒度的覆盖" -> 优先级更高 ✅
+   * -> `messages` 是"更细粒度的覆盖" -> 优先级更高
    * -> （和之前的语义一致：覆盖 > 语言表 > 内置）
    *
    * ⚠️ **为什么 `locale` 在最前面查**：
    * -> 之前 `overrides?.[key]` **不绑语言**（审计发现的真 bug）❌
-   * -> 现在 `overrides?.[locale]?.[key]` ✅
+   * -> 现在 `overrides?.[locale]?.[key]`
    */
   const template =
     overrides?.[locale]?.[key] ??

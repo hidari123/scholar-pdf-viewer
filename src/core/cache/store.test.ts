@@ -172,7 +172,7 @@ describe('DocumentCache（内存模式）', () => {
     await cache.set('old', bytes(10));
     await cache.set('new', bytes(10));
 
-    // ⚠️ **刚写的这条还在** ✅
+    // ⚠️ **刚写的这条还在**
     expect(await cache.get('new')).not.toBeNull();
   });
 

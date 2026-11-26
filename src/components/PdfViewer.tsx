@@ -97,7 +97,7 @@ import { Toolbar } from './Toolbar';
  * → 便利贴面板 + 富文本编辑器约 **1.5 kB**（brotli 后）
  * → 但**只有"打开批注"时才需要**
  * → 静态 import → 每个宿主都要背这 1.5 kB ❌
- * → 懒加载 → **不打开批注就永远不加载** ✅
+ * → 懒加载 → **不打开批注就永远不加载**
  */
 const AnnotationPanel = lazy(() =>
   import('./AnnotationPanel').then((mod) => ({ default: mod.AnnotationPanel })),
@@ -110,7 +110,7 @@ const AnnotationPanel = lazy(() =>
  * → 弹窗 + 富文本编辑器约 **1.4 kB**（brotli 后）
  * → 但**只有"点加批注"时才需要**
  * → 静态 import → 每个宿主都要背 ❌
- * → 懒加载 → **不用就不加载** ✅
+ * → 懒加载 → **不用就不加载**
  */
 /**
  * **Toast 容器**（懒加载）。
@@ -119,7 +119,7 @@ const AnnotationPanel = lazy(() =>
  * -> Toast 的组件 + 样式约 1.5 kB（brotli 后）
  * -> 但**只有弹提示时才需要**
  * -> 静态 import -> 每个宿主都要背 ❌
- * -> 懒加载 -> **不弹就不加载** ✅
+ * -> 懒加载 -> **不弹就不加载**
  */
 const Toast = lazy(() => import('./Toast').then((mod) => ({ default: mod.Toast })));
 
@@ -187,7 +187,7 @@ export interface PdfViewerHandle {
   /**
    * **放大**（和工具栏的"+"一样）。
    *
-   * ⚠️ **宿主替换了内置工具栏（`slots.toolbar`）时靠它驱动缩放** ✅
+   * ⚠️ **宿主替换了内置工具栏（`slots.toolbar`）时靠它驱动缩放**
    *    （之前文档写了但方法**根本不存在** -> 宿主照做点按钮没反应 ❌）
    */
   zoomIn: () => void;
@@ -196,7 +196,7 @@ export interface PdfViewerHandle {
   /**
    * **适配宽度**（和工具栏的"适应宽度"一样）。
    *
-   * -> 页的**左右留白**由包处理 ✅
+   * -> 页的**左右留白**由包处理
    */
   fitWidth: () => void;
   /** **适配整页**（整页完整可见） */
@@ -204,7 +204,7 @@ export interface PdfViewerHandle {
   /**
    * **打印**（和工具栏的"打印"一样）。
    *
-   * -> 走包内置的 \`@media print\` 样式（高亮保留 / 只打原 PDF 由 \`printMode\` 决定）✅
+   * -> 走包内置的 \`@media print\` 样式（高亮保留 / 只打原 PDF 由 \`printMode\` 决定）
    */
   print: () => void;
 }
@@ -274,7 +274,7 @@ export interface PdfViewerProps {
    * ⚠️ 用户的诉求："页面要支持多种语言，先配置中英文，
    *    这个可以宿主通过固定json进行添加 要给出接口"
    *
-   * → 内置 zh / en；宿主用这个 prop **加**别的语言 ✅
+   * → 内置 zh / en；宿主用这个 prop **加**别的语言
    *
    * ```tsx
    * const locales = {
@@ -291,8 +291,8 @@ export interface PdfViewerProps {
    *
    * ⚠️ 用户需求："需要设计一套toast 失败成功这种 具体照着antd设计"
    *
-   * → 包**内置**一套（antd 风格）→ 宿主不干预也能用 ✅
-   * → 宿主传了 `onToast` → **完全接管**（用自己的 toast 组件）✅
+   * → 包**内置**一套（antd 风格）→ 宿主不干预也能用
+   * → 宿主传了 `onToast` → **完全接管**（用自己的 toast 组件）
    */
   onToast?: (toast: ToastController) => void;
   /**
@@ -300,13 +300,13 @@ export interface PdfViewerProps {
    *
    * ⚠️ 用户需求："自研的很多问题 不要自研的富文本了 用一个现成的吧 集成进来 选配需要的工具"
    *
-   * → 不传 → 用**包内置的轻量编辑器**（contenteditable，零依赖）✅
-   * → 传了 → 用**宿主的编辑器**（比如 TipTapEditor）✅
+   * → 不传 → 用**包内置的轻量编辑器**（contenteditable，零依赖）
+   * → 传了 → 用**宿主的编辑器**（比如 TipTapEditor）
    *
    * 用法：`import { TipTapEditor } from '@scholar-space/pdf-viewer/editor'`
    * 然后 `<PdfViewer annotationEditor={TipTapEditor} />`
    *
-   * ⚠️ **TipTap 是可选 peerDependency** → 主入口体积不变（25 kB）✅
+   * ⚠️ **TipTap 是可选 peerDependency** → 主入口体积不变（25 kB）
    */
   annotationEditor?: React.ComponentType<{
     value?: string;
@@ -325,10 +325,10 @@ export interface PdfViewerProps {
    * ⚠️ 用户需求："需要万物可配置 比如说图标、高亮颜色等很多功能都要能支持宿主自主配置。"
    *
    * → 之前可配置项**散落在十几个 props** 上 → 啰嗦、容易漏 ❌
-   * → 现在：**一个 config 对象** → 宿主能整体替换 / 合并 / 做预设 ✅
+   * → 现在：**一个 config 对象** → 宿主能整体替换 / 合并 / 做预设
    *
    * ⚠️ **优先级：单独的 prop > config 里的同名项**
-   * → 已有代码（`<PdfViewer theme="paper" />`）**行为完全不变** ✅
+   * → 已有代码（`<PdfViewer theme="paper" />`）**行为完全不变**
    */
   config?: PdfViewerConfig;
   /** 主题 */
@@ -362,19 +362,19 @@ export interface PdfViewerProps {
    */
   printMode?: 'with-highlights' | 'original';
   /**
-   * **文档的 URL** ✅（"打印原 PDF" 用 ✅）
+   * **文档的 URL**  （"打印原 PDF" 用）
    *
-   * ⚠️ **只在 `printMode="original"`** 时需要 ✅
+   * ⚠️ **只在 `printMode="original"`** 时需要
    *
-   * -> **为什么需要** ✅
-   *    -> 我们是**用 DOM + canvas 打印**的 ✅
-   *    -> -> **Chrome 的打印【不等】canvas** ✅（实测 ✅）
+   * -> **为什么需要**
+   *    -> 我们是**用 DOM + canvas 打印**的
+   *    -> -> **Chrome 的打印【不等】canvas**  （实测）
    *    -> -> 打印快照时只有前几页画完 ✅ -> **后面全是空白页** ✅ ❌
-   *    -> -> **Chrome 原生 PDF 阅读器** ✅ 不打印 DOM ✅ -> **直接打印 PDF 文件** ✅ ✅
-   *    -> -> **我们也这样** ✅ -> **每一页都完整** ✅ ✅
+   *    -> -> **Chrome 原生 PDF 阅读器**  不打印 DOM  -> **直接打印 PDF 文件**
+   *    -> -> **我们也这样**  -> **每一页都完整**
    *
-   * -> 宿主有 URL ✅ -> 传上来 ✅ -> 我们用**隐藏 iframe** ✅ 加载它 ✅ ✅
-   * -> 不传 ✅ -> **退回 DOM 打印** ✅ ✅
+   * -> 宿主有 URL  -> 传上来  -> 我们用**隐藏 iframe**  加载它
+   * -> 不传  -> **退回 DOM 打印**
    */
   documentUrl?: string;
   /**
@@ -384,16 +384,16 @@ export interface PdfViewerProps {
    * -> 阿拉伯语 / 希伯来语的宿主**没法用** ❌
    *   -> 界面还是从左往右 ❌
    *   -> **上一页 / 下一页的箭头方向也是反的** ❌
-   * -> 现在：**镜像整个界面** ✅
+   * -> 现在：**镜像整个界面**
    *
    * ```tsx
    * <PdfViewer dir="rtl" locale="ar" />
    * ```
    *
    * ⚠️ **不传 = 自动判断**：
-   * -> 先看 `locale`（阿拉伯语 / 希伯来语等 -> rtl）✅
-   * -> 再看 `document.dir` ✅
-   * -> 都没有 -> `'ltr'` ✅
+   * -> 先看 `locale`（阿拉伯语 / 希伯来语等 -> rtl）
+   * -> 再看 `document.dir`
+   * -> 都没有 -> `'ltr'`
    */
   dir?: 'ltr' | 'rtl';
   /**
@@ -402,7 +402,7 @@ export interface PdfViewerProps {
    * ⚠️ **之前写死 A4**（审计发现的）：
    * -> 美洲市场用 **Letter**（215.9 × 279.4mm）❌
    *   -> 包按 A4 算缩放 -> 打印出来**可能超出页面** ❌
-   * -> 现在：**宿主可以指定** ✅
+   * -> 现在：**宿主可以指定**
    *
    * ```tsx
    * <PdfViewer printPaper="Letter" />
@@ -419,7 +419,7 @@ export interface PdfViewerProps {
    * - `landscape` 横向（**竖版 PDF 旋转 90° 打印**，像 WPS / Word）
    * - `auto` 跟着用户打印对话框走
    *
-   * ⚠️ **横向时缩放必须按【横向纸张】算** ✅
+   * ⚠️ **横向时缩放必须按【横向纸张】算**
    * -> 不算的话 -> 每页占 **2 张纸** ❌（用户反馈："横向打印有很多空白页"）
    */
   printOrientation?: PrintOrientation;
@@ -430,30 +430,30 @@ export interface PdfViewerProps {
    * <PdfViewer printMargin={{ top: 20, bottom: 20 }} />
    * ```
    *
-   * ⚠️ **不传就用 `DEFAULT_PRINT_MARGIN`（四边 12mm）** ✅
+   * ⚠️ **不传就用 `DEFAULT_PRINT_MARGIN`（四边 12mm）**
    */
   printMargin?: Partial<PrintMargin>;
   /**
-   * **下载原 PDF** ✅（用户需求："包需要内置 PDF 下载" ✅）
+   * **下载原 PDF**  （用户需求："包需要内置 PDF 下载"）
    *
-   * ⚠️ **包不自己下载** ✅
-   * -> 包**拿不到原始字节** ✅（宿主是通过 URL / ArrayBuffer 加载的 ✅）
-   * -> 宿主给回调 ✅ -> 包在工具栏渲染按钮 ✅ ✅
-   * -> 不传 -> **按钮不渲染** ✅ ✅
+   * ⚠️ **包不自己下载**
+   * -> 包**拿不到原始字节**  （宿主是通过 URL / ArrayBuffer 加载的）
+   * -> 宿主给回调  -> 包在工具栏渲染按钮
+   * -> 不传 -> **按钮不渲染**
    */
   onDownloadPdf?: () => void;
   /**
-   * **导出带高亮的 PDF** ✅（用户需求 ✅）
+   * **导出带高亮的 PDF**  （用户需求）
    *
-   * ⚠️ **包不自己导出** ✅
-   * -> 需要 `pdf-lib` ✅ -> **宿主决定版本和打包方式** ✅ ✅
-   * -> 宿主可以先用 `exportHighlightedPdf` ✅（包已导出 ✅）✅
+   * ⚠️ **包不自己导出**
+   * -> 需要 `pdf-lib`  -> **宿主决定版本和打包方式**
+   * -> 宿主可以先用 `exportHighlightedPdf`  （包已导出）
    */
   onExportAnnotatedPdf?: () => void;
   /**
-   * **导出高亮 JSON** ✅（用户需求 ✅）
+   * **导出高亮 JSON**  （用户需求）
    *
-   * -> 宿主可以先用 `exportHighlights` ✅（包已导出 ✅）✅
+   * -> 宿主可以先用 `exportHighlights`  （包已导出）
    */
   onExportHighlights?: () => void;
   /**
@@ -503,7 +503,7 @@ export interface PdfViewerProps {
    *   收集页引用 → 异步解析 → 建 Map → 再通知包（`outlineResolveToken`）
    * → **宿主漏了最后一步 → 目录点了没反应** ❌（用户看到的现象）
    *
-   * → 现在：**包自己解析** → 宿主只要给一个 async 函数就行 ✅
+   * → 现在：**包自己解析** → 宿主只要给一个 async 函数就行
    *
    * ```tsx
    * <PdfViewer
@@ -552,7 +552,7 @@ export interface PdfViewerProps {
    *
    * → 包**自带**一套现代图标（24×24 / stroke 1.75，零依赖）
    * → 但宿主可能有自己的图标体系（`lucide-react` / `heroicons` …）
-   * → 所以**逐个图标可覆盖** → 风格统一 ✅
+   * → 所以**逐个图标可覆盖** → 风格统一
    *
    * ```tsx
    * <PdfViewer icons={{ upload: <Upload />, download: <Download /> }} />
@@ -575,7 +575,7 @@ export interface PdfViewerProps {
    * ⚠️ **可以返回"新建的高亮 id"**（可选）。
    *
    * → "加批注"流程需要这个 id（批注要挂在高亮上）
-   * → 宿主返回它 → 包用它建批注 ✅
+   * → 宿主返回它 → 包用它建批注
    * → 不返回 → 包自己生成一个 id（宿主需要自己对齐）
    */
   onHighlight?: (ctx: SelectionActionContext) => string | undefined;
@@ -632,15 +632,15 @@ export interface PdfViewerProps {
   /**
    * **点批注上的"编辑"按钮**（宿主实现：打开编辑框）。
    *
-   * → 用户需求："hover之后会出现编辑按钮，点击可以进行编辑" ✅
-   * → **不传 ⇒ 不渲染编辑按钮** ✅
+   * → 用户需求："hover之后会出现编辑按钮，点击可以进行编辑"
+   * → **不传 ⇒ 不渲染编辑按钮**
    */
   onAnnotationEdit?: (annotation: AnnotationRecord) => void;
   /**
    * **点批注上的"展开"按钮**（宿主实现：打开详情）。
    *
-   * → 用户需求："也可以点击展开，查看批注详情" ✅
-   * → **不传 ⇒ 不渲染展开按钮** ✅
+   * → 用户需求："也可以点击展开，查看批注详情"
+   * → **不传 ⇒ 不渲染展开按钮**
    */
   onAnnotationExpand?: (annotation: AnnotationRecord) => void;
   /**
@@ -652,7 +652,7 @@ export interface PdfViewerProps {
   /**
    * **保存批注**（富文本 HTML + 纯文本）。
    *
-   * ⚠️ HTML 已经过 `sanitizeRichText` 清洗（防 XSS）✅
+   * ⚠️ HTML 已经过 `sanitizeRichText` 清洗（防 XSS）
    */
   onAnnotationSave?: (id: string, html: string, plain: string) => void;
   /**
@@ -662,7 +662,7 @@ export interface PdfViewerProps {
    *   写了批注之后用默认高亮。"
    *
    * → 包已经把**高亮**建好了（用默认颜色）
-   * → 这个回调告诉宿主：**这个批注挂在哪个高亮上** ✅
+   * → 这个回调告诉宿主：**这个批注挂在哪个高亮上**
    * → 宿主只需要 `setStickyNotes([...])` 就行
    *
    * @param id 批注 id
@@ -696,8 +696,8 @@ export interface PdfViewerProps {
    * ⚠️ **和 `annotationPalette` 分开**（用户反馈：
    * "富文本的那个文字颜色 如果是放在文字上 就太浅了 文字可以适当加深颜色"）。
    *
-   * -> `annotationPalette` = 浅色 -> 当**高亮底色** ✅
-   * -> **文字颜色必须深色** ✅
+   * -> `annotationPalette` = 浅色 -> 当**高亮底色**
+   * -> **文字颜色必须深色**
    */
   annotationTextPalette?: RichTextPalette;
   /** 换色 */
@@ -705,36 +705,36 @@ export interface PdfViewerProps {
   /**
    * **最小缩放**（宿主可配）。
    *
-   * → 不传 → **20%** ✅
-   * → 用户需求："这个上限下限宿主也可以配置" ✅
+   * → 不传 → **20%**
+   * → 用户需求："这个上限下限宿主也可以配置"
    */
   minScale?: number;
   /**
    * **最大缩放**（宿主可配）。
    *
-   * → 不传 → **250%** ✅
+   * → 不传 → **250%**
    */
   maxScale?: number;
   /**
    * **允许用户直接填写缩放比例**。
    *
-   * → `true`（默认）→ 工具栏比例**可以点一下改成输入框** ✅
-   * → 用户需求："是可以用户进行填写比例的" ✅
+   * → `true`（默认）→ 工具栏比例**可以点一下改成输入框**
+   * → 用户需求："是可以用户进行填写比例的"
    */
   allowScaleInput?: boolean;
   /**
    * **切换主题**（宿主改 `theme` prop）。
    *
-   * ⚠️ **不传就不显示工具栏的主题按钮** ✅
-   * -> 宿主自己已经有主题切换 UI -> 不要重复 ✅
-   * -> 传了 -> 工具栏出现 🎨 按钮 -> 点它选主题 ✅
-   * -> 用户需求："包在工具栏那里也可以加上一个按钮让用户进行选择" ✅
+   * ⚠️ **不传就不显示工具栏的主题按钮**
+   * -> 宿主自己已经有主题切换 UI -> 不要重复
+   * -> 传了 -> 工具栏出现 🎨 按钮 -> 点它选主题
+   * -> 用户需求："包在工具栏那里也可以加上一个按钮让用户进行选择"
    */
   onThemeChange?: (theme: PdfViewerTheme) => void;
   /**
    * **可选的主题列表**（宿主可自定义）。
    *
-   * -> 不传 -> 用**内置的全部 7 个** ✅
+   * -> 不传 -> 用**内置的全部 7 个**
    */
   themeOptions?: readonly PdfViewerTheme[];
   /**
@@ -742,8 +742,8 @@ export interface PdfViewerProps {
    * "包工具栏的高亮也需要加个下拉箭头 可以选择颜色
    *  如果没有选就是默认的高亮色"）。
    *
-   * ⚠️ **不传 -> 不显示** ✅（用户确认："默认隐藏吧"）
-   * -> 宿主自己已经有"加高亮"按钮 -> 不要重复 ✅
+   * ⚠️ **不传 -> 不显示**  （用户确认："默认隐藏吧"）
+   * -> 宿主自己已经有"加高亮"按钮 -> 不要重复
    *
    * @param color 语义 key（宿主用 key 存"用户选的颜色"）
    */
@@ -779,7 +779,7 @@ export interface PdfViewerProps {
    * onInternalLink?: (ctx: InternalLinkContext) => void;
    * ```
    *
-   * -> 字段见 `InternalLinkContext` ✅
+   * -> 字段见 `InternalLinkContext`
    *
    * ### 流程（**跳转只有一个执行者** -> 不会跳两次）
    *
@@ -787,15 +787,15 @@ export interface PdfViewerProps {
    * 点内部链接
    *   → 包用 resolvePageRef 解析 dest -> targetPage
    *   → 调 onInternalLink({ dest, targetPage, currentPage, cancel })
-   *       → 宿主不调 cancel() -> **包跳** ✅
-   *       → 宿主调 cancel()     -> **包不跳** ✅
+   *       → 宿主不调 cancel() -> **包跳**
+   *       → 宿主调 cancel()     -> **包不跳**
    * ```
    *
    * ### ⚠️ **为什么"目标页 == 当前页"也要跳**
    *
-   * -> dest 里还有 **y 坐标**（\`dest[3]\`）-> 目标在当前页的**某一行** ✅
+   * -> dest 里还有 **y 坐标**（\`dest[3]\`）-> 目标在当前页的**某一行**
    * -> 只跳页顶的话 -> **看不到目标** ❌
-   * -> 所以：**跳到那一行**（不是页顶）✅
+   * -> 所以：**跳到那一行**（不是页顶）
    */
   onInternalLink?: (ctx: InternalLinkContext) => void;
   /** 自定义内容（渲染在工具栏下方，宿主可放自己的面板） */
@@ -882,8 +882,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * → 宿主可以两种写法混用：
    *   `<PdfViewer config={{ theme: 'paper' }} theme="dark" />`
-   *   → **单独的 prop 优先** → theme = 'dark' ✅
-   * → 已有代码（只用单独 props）**行为完全不变** ✅
+   *   → **单独的 prop 优先** → theme = 'dark'
+   * → 已有代码（只用单独 props）**行为完全不变**
    */
   const merged = useMemo(
     () =>
@@ -905,7 +905,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         printMargin: props.printMargin,
         /*
          * ⚠️ **缩放上下限 / 能不能填写**（用户需求：
-         * "这个上限下限宿主也可以配置，包括是否用户可以填写" ✅）。
+         * "这个上限下限宿主也可以配置，包括是否用户可以填写"）。
          */
         minScale: props.minScale,
         maxScale: props.maxScale,
@@ -942,8 +942,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * ### 为什么需要它
    *
-   * -> 浮层在 React 树里是 container 的后代 -> 点击会冒泡到容器 ✅
-   * -> 容器上有**高亮的点击委托**（按鼠标坐标命中）✅
+   * -> 浮层在 React 树里是 container 的后代 -> 点击会冒泡到容器
+   * -> 容器上有**高亮的点击委托**（按鼠标坐标命中）
    * -> 在浮层里点按钮 -> 坐标可能正好落在**下面的高亮**上 ❌
    *    -> 高亮被误激活 -> **蓝色选中态** ❌
    *
@@ -951,9 +951,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * -> 捕获阶段 `stopPropagation()` -> 事件**到不了它自己的 target** ❌
    *    -> 浮层里的"新建批注 / 关闭 / 取消 / 保存"**全部点不动** ❌
-   *    -> 用户反馈："新建批注这个按钮现在无法点击了" ✅
+   *    -> 用户反馈："新建批注这个按钮现在无法点击了"
    *
-   * -> 所以：**捕获阶段只打标记**，**冒泡阶段自己跳过** ✅
+   * -> 所以：**捕获阶段只打标记**，**冒泡阶段自己跳过**
    */
   const clickFromFloatingRef = useRef(false);
 
@@ -971,14 +971,14 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * -> 实测：18 页里**只有 4 页**渲染了 canvas ❌
    *    -> 打印时**没渲染的页 = 白页** ❌
-   *    -> 用户看到"只有标题没有内容" ✅
+   *    -> 用户看到"只有标题没有内容"
    * -> 根因：`renderCanvas={isVisible}` -> 只渲染**可见**的页 ❌
    *
    * ### 修法
    *
-   * -> 打印前（`beforeprint`）-> **临时**渲染全部页 ✅
-   * -> 打印完（`afterprint`）-> **恢复**虚拟化 ✅
-   * -> 平时**不受影响**（性能不变）✅
+   * -> 打印前（`beforeprint`）-> **临时**渲染全部页
+   * -> 打印完（`afterprint`）-> **恢复**虚拟化
+   * -> 平时**不受影响**（性能不变）
    */
   const [printing, setPrinting] = useState(false);
 
@@ -1000,18 +1000,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * -> 根因：`<Page renderCanvas={isVisible} />` -> 只渲染**可见**的页 ❌
    * -> 打印时**没渲染的页 = 白页** ❌ -> 用户看到"只有标题没有内容" ✅
-   * -> **不是缓存问题**（缓存是浏览器的事，和这个无关）✅
+   * -> **不是缓存问题**（缓存是浏览器的事，和这个无关）
    *
    * ### 修法
    *
-   * -> 打印前（`beforeprint`）-> **临时**渲染全部页 ✅
-   * -> 打印完（`afterprint`）-> **恢复**虚拟化 ✅
-   * -> 平时**完全不受影响**（性能不变）✅
+   * -> 打印前（`beforeprint`）-> **临时**渲染全部页
+   * -> 打印完（`afterprint`）-> **恢复**虚拟化
+   * -> 平时**完全不受影响**（性能不变）
    *
    * ### ⚠️ 为什么用 `beforeprint` 而不是"一直全渲染"
    *
    * -> 18 页全渲染 = 18 个 canvas 同时画 -> **卡顿** ❌
-   * -> 虚拟化是**性能的核心** ✅ -> 只能在打印这个**短窗口**里放开 ✅
+   * -> 虚拟化是**性能的核心**  -> 只能在打印这个**短窗口**里放开
    */
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -1026,28 +1026,28 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     };
 
     /*
-     * ⚠️⚠️⚠️ **打印意图检测**（用户反馈："后面的页全是空白" ✅）
+     * ⚠️⚠️⚠️ **打印意图检测**（用户反馈："后面的页全是空白"）
      *
-     * ## 根因 ✅
+     * ## 根因
      *
-     * -> `beforeprint` ✅ 触发时 ✅ -> `setPrinting(true)` ✅ -> 开始渲染**所有页** ✅
-     * -> -> **但 canvas 渲染是异步的** ✅
+     * -> `beforeprint`  触发时  -> `setPrinting(true)`  -> 开始渲染**所有页**
+     * -> -> **但 canvas 渲染是异步的**
      * -> -> **Chrome 的打印【不等】** ✅（实测：`page.pdf()` ✅ 和 **CDP** ✅ 都一样 ✅ ❌）
      * -> -> 打印快照的时刻 ✅ -> **只有前 2~4 页画完** ✅ -> 后面**全是空白页** ✅ ❌
      *
-     * ## 解法：**提前【一点】开始渲染** ✅
+     * ## 解法：**提前【一点】开始渲染**
      *
-     * -> 用户按 **Ctrl+P** ✅ 之前 ✅ -> 我们**先猜** ✅ ✅
-     * -> -> 捕获 `keydown` ✅（Ctrl+P ✅ / Cmd+P ✅）✅
-     * -> -> **提前**打开 `printing` ✅ -> 开始渲染所有页 ✅ ✅
-     * -> -> Chrome 的打印对话框**要弹出来** ✅ -> **这中间有几百毫秒** ✅
-     * -> -> 够渲染几页 ✅ ✅
+     * -> 用户按 **Ctrl+P**  之前  -> 我们**先猜**
+     * -> -> 捕获 `keydown`  （Ctrl+P  / Cmd+P）
+     * -> -> **提前**打开 `printing`  -> 开始渲染所有页
+     * -> -> Chrome 的打印对话框**要弹出来**  -> **这中间有几百毫秒**
+     * -> -> 够渲染几页
      *
-     * ⚠️ **只是"提前"** ✅ -> 不保证全部 ✅
-     * -> -> **最可靠** ✅：**用工具栏的"打印"按钮** ✅ -> 走 `print()` ✅ -> **等全部画完** ✅ ✅
+     * ⚠️ **只是"提前"**  -> 不保证全部
+     * -> -> **最可靠**：**用工具栏的"打印"按钮**  -> 走 `print()`  -> **等全部画完**
      */
     const onKeyDown = (event: KeyboardEvent) => {
-      // ⚠️ **Ctrl+P（Win/Linux ✅）或 Cmd+P（Mac ✅）** ✅
+      // ⚠️ **Ctrl+P（Win/Linux）或 Cmd+P（Mac）**
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
         setPrinting(true);
       }
@@ -1071,8 +1071,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * -> 宿主可能传了**重复的 id** ❌
    *    （实测：刷新页面 -> 旧高亮从持久化恢复 -> 新建的高亮**又拿到同一个 id**）
    * -> 激活态只按 id 判断 -> **两个高亮都加激活态** ❌
-   *    -> 用户反馈："点击一个高亮 两个高亮都会被选中" ✅
-   * -> 加上**矩形** -> **只激活真正点到的那一个** ✅
+   *    -> 用户反馈："点击一个高亮 两个高亮都会被选中"
+   * -> 加上**矩形** -> **只激活真正点到的那一个**
    */
   const [activeHighlightRect, setActiveHighlightRect] = useState<{
     left: number;
@@ -1107,8 +1107,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     /*
      * ⚠️ **这条高亮的颜色**（语义 key）。
      *
-     * -> 用于在颜色下拉里**标出当前色** ✅
-     * -> （用户需求："如果没有选择颜色 也按照默认颜色来展示高亮"✅）
+     * -> 用于在颜色下拉里**标出当前色**
+     * -> （用户需求："如果没有选择颜色 也按照默认颜色来展示高亮"）
      */
     color?: string | null;
   } | null>(null);
@@ -1122,7 +1122,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   /**
    * **包自己解析出来的页码映射**（用 `resolvePageRef` 时）。
    *
-   * → 宿主没给 `pageRefToNumber` 时用它 ✅
+   * → 宿主没给 `pageRefToNumber` 时用它
    */
   const [outlinePageMapper, setOutlinePageMapper] = useState<
     ((ref: unknown) => number | null) | null
@@ -1142,7 +1142,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * > "写批注的时候不要用系统默认的alert，设计一个富文本弹窗来写批注"
    *
    * → 存的是**整个选区上下文**（文本 + 归一化位置 + 事件）
-   * → 提交时直接丢给 `onHighlight` → 宿主拿到的和高亮按钮**完全一致** ✅
+   * → 提交时直接丢给 `onHighlight` → 宿主拿到的和高亮按钮**完全一致**
    */
   const [pendingNote, setPendingNote] = useState<SelectionActionContext | null>(null);
 
@@ -1152,20 +1152,20 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * ⚠️⚠️ **必须是 ref，不能是 state**（审计修复的关键细节）。
    *
    * -> 用途：编辑器 focus 会塌缩原生选区 -> \`selectionchange\` -> 清形状 ❌
-   *    -> 批注期间**不清** -> 蓝色块保留 ✅
+   *    -> 批注期间**不清** -> 蓝色块保留
    *
    * ⚠️ **为什么不能加进 \`handleSelectionChange\` 的依赖数组**：
    * -> \`handleSelectionChange\` 是 \`useTextSelection\` 的回调 ❌
    * -> 加进去 -> 每次批注开关都**重新绑定 document 监听器** ❌
    *    -> 监听器反复解绑/重绑 -> 选区状态错乱 ❌
-   * -> 用 ref -> **不触发重渲染** -> 依赖数组不动 ✅
+   * -> 用 ref -> **不触发重渲染** -> 依赖数组不动
    */
   const pendingNoteShapesRef = useRef<Map<number, PageSelectionShape> | null>(null);
 
   /**
    * **"正在批注"的标志**（ref，不参与渲染）。
    *
-   * ⚠️ 同样**不能进依赖数组**（理由同 \`pendingNoteShapesRef\`）✅
+   * ⚠️ 同样**不能进依赖数组**（理由同 \`pendingNoteShapesRef\`）
    */
   const isPendingNoteRef = useRef(false);
 
@@ -1175,7 +1175,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * ⚠️ 用户反馈："这个富文本编辑框没有定位到批注旁边啊
    *   你这个编辑框定位到文档最上面谁看得到啊"
    *
-   * → 打开弹窗时记下**选区的视口矩形** → 弹窗贴着它显示 ✅
+   * → 打开弹窗时记下**选区的视口矩形** → 弹窗贴着它显示
    */
   const [noteAnchor, setNoteAnchor] = useState<{
     left: number;
@@ -1187,8 +1187,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   /*
    * **toast**（antd 风格）。
    *
-   * → 包内置一套 → 宿主不干预也能用 ✅
-   * → 宿主传 `onToast` → **完全接管** ✅
+   * → 包内置一套 → 宿主不干预也能用
+   * → 宿主传 `onToast` → **完全接管**
    */
   const [toastItems, setToastItems] = useState<ToastContent[]>([]);
   const toast = useToastController(setToastItems, merged.locale, merged.locales, merged.messages);
@@ -1276,18 +1276,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * ### 问题
    *
-   * -> README 的"最小接入"是 `<PdfViewer file={url} />` ✅
+   * -> README 的"最小接入"是 `<PdfViewer file={url} />`
    * -> 但**照抄是不工作的** ❌（实测 `pages: 0` + **无任何报错** ❌）
-   * -> 因为宿主必须自己接 pdf.js（`getDocInfo` / `getPage` / `getPageSizes`）✅
+   * -> 因为宿主必须自己接 pdf.js（`getDocInfo` / `getPage` / `getPageSizes`）
    * -> 漏了就**白屏且不知道原因** ❌
    *
    * ### 修法
    *
-   * -> 宿主**不传** -> 用**包内置的默认接线** ✅ -> **开箱即用** ✅
-   * -> 宿主**传了** -> 用**宿主的** ✅（完全覆盖 ✅）
+   * -> 宿主**不传** -> 用**包内置的默认接线**  -> **开箱即用**
+   * -> 宿主**传了** -> 用**宿主的**  （完全覆盖）
    *
-   * ⚠️ **默认接线是【动态 import】的** ✅
-   * -> `pdfjs-dist` 体积不小 ✅ -> 不该拖慢没用 PDF 的页面 ✅
+   * ⚠️ **默认接线是【动态 import】的**
+   * -> `pdfjs-dist` 体积不小  -> 不该拖慢没用 PDF 的页面
    */
   const [defaultBridge, setDefaultBridge] = useState<PdfJsBridge | null>(null);
 
@@ -1297,24 +1297,24 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * ### 为什么需要（实测踩到的坑）
    *
    * -> 加载文档的 effect 依赖是 `[file, documentId, reloadSignal]` ❌
-   *    -> 它**只跑一次** ✅
+   *    -> 它**只跑一次**
    * -> 如果这时候**桥接还没加载好** ❌
    *    -> `getDocInfo` 会抛"引擎没准备好" ❌
    *    -> -> 加载**失败** ❌ -> **永远不重试** ❌ -> **白屏** ❌
    *
-   * -> 修法：**让加载等桥接** ✅
-   *    -> `defaultBridgePromise` 是**模块级**的 ✅
-   *    -> `effectiveGetDocInfo` 里 **await 它** ✅
-   *    -> -> 不管加载时机如何，都能拿到桥接 ✅
+   * -> 修法：**让加载等桥接**
+   *    -> `defaultBridgePromise` 是**模块级**的
+   *    -> `effectiveGetDocInfo` 里 **await 它**
+   *    -> -> 不管加载时机如何，都能拿到桥接
    */
   const defaultBridgePromise = useRef<Promise<PdfJsBridge> | null>(null);
 
   /**
-   * ⚠️ **只在宿主没传自己的接线时**才加载默认的 ✅
+   * ⚠️ **只在宿主没传自己的接线时**才加载默认的
    */
   useEffect(() => {
     if (getDocInfo) {
-      // 宿主有自己的 -> 不用默认的 ✅
+      // 宿主有自己的 -> 不用默认的
       return;
     }
     let cancelled = false;
@@ -1328,7 +1328,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         }
       })
       .catch(() => {
-        // ⚠️ **加载失败也不要炸**（宿主可能自己有别的方案）✅
+        // ⚠️ **加载失败也不要炸**（宿主可能自己有别的方案）
       });
     return () => {
       cancelled = true;
@@ -1336,7 +1336,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   }, [getDocInfo]);
 
   /**
-   * ⚠️ **实际的"取页"回调**（宿主的优先）✅
+   * ⚠️ **实际的"取页"回调**（宿主的优先）
    */
   const effectiveGetPage = useCallback(
     async (pageNumber: number) => {
@@ -1353,7 +1353,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   );
 
   /**
-   * ⚠️ **实际的"取文档信息"回调** ✅
+   * ⚠️ **实际的"取文档信息"回调**
    */
   const effectiveGetDocInfo = useCallback(
     async (bytes: Uint8Array) => {
@@ -1361,14 +1361,14 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         return getDocInfo(bytes);
       }
       /*
-       * ⚠️ **加密文档要把密码传给桥接** ✅
+       * ⚠️ **加密文档要把密码传给桥接**
        * -> 不传 -> 加密 PDF 打不开 ❌
        */
       const password = currentPassword;
       /*
-       * ⚠️ **等桥接就绪**（实测踩到的坑）✅
+       * ⚠️ **等桥接就绪**（实测踩到的坑）
        * -> 加载 effect 只跑一次 ❌ -> 桥接没好就**永远失败** ❌
-       * -> -> 这里 **await** 桥接的 promise ✅
+       * -> -> 这里 **await** 桥接的 promise
        */
       const bridge = defaultBridge ?? (await defaultBridgePromise.current?.catch(() => null));
       if (!bridge) {
@@ -1386,7 +1386,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   );
 
   /**
-   * ⚠️ **实际的"取各页尺寸"回调** ✅
+   * ⚠️ **实际的"取各页尺寸"回调**
    */
   const effectiveGetPageSizes = useCallback(
     async (numPages: number) => {
@@ -1605,8 +1605,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
          *   收集页引用 → 异步 `getPageIndex` → 建 Map → 再 `outlineResolveToken` +1
          * → 宿主漏了最后一步 → **目录点了没反应** ❌
          *
-         * → 现在：宿主给一个**异步**的 `resolvePageRef` → 包自己解析 ✅
-         * → 宿主的同步 `pageRefToNumber` **优先**（可能是同步的，更快）✅
+         * → 现在：宿主给一个**异步**的 `resolvePageRef` → 包自己解析
+         * → 宿主的同步 `pageRefToNumber` **优先**（可能是同步的，更快）
          */
         if (!pageRefToNumber && resolvePageRef) {
           const mapper = await resolveOutlinePageNumbers(tree, resolvePageRef);
@@ -1624,7 +1624,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
              * ⚠️⚠️ **必须用函数包一层**！
              * -> \setOutlinePageMapper(mapper)\ -> mapper **是个函数**
              * -> React 会把它当成**惰性初始化器**调用 -> 返回 mapper(...) 的结果 -> null ❌
-             * -> 所以要 \() => mapper\ ✅
+             * -> 所以要 \() => mapper\
              */
             setOutlinePageMapper(() => mapper);
             // 解析完 → 触发一次重渲染（目录项从"解析中"变成"可跳转"）
@@ -1681,11 +1681,11 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     /*
      * ⚠️⚠️ **打印时要把【所有页】的 proxy 都取出来**（实测踩到的坑）。
      *
-     * -> 页面元素虽然都在 DOM 里 ✅
+     * -> 页面元素虽然都在 DOM 里
      * -> 但 `pageProxies` 只有**可见页**的 ❌
-     * -> -> 打印时 `renderCanvas` 打开了 ✅
+     * -> -> 打印时 `renderCanvas` 打开了
      *    -> 但**没 proxy 的页渲染不出来** ❌ -> 还是白页 ❌
-     * -> -> 打印时改成取**全部页** ✅
+     * -> -> 打印时改成取**全部页**
      */
     const targetPages =
       printing && numPages > 0 ? Array.from({ length: numPages }, (_, i) => i + 1) : visiblePages;
@@ -1794,9 +1794,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * ### 修法
    *
-   * -> 等**页尺寸算出来**（\`pageTops\` 有内容）-> 跳到 \`initialPage\` ✅
-   * -> **只跳一次**（用 ref 记住）-> 用户自己翻页后不会被拉回去 ✅
-   * -> 换文档（\`documentId\` 变了）-> **重新跳一次** ✅
+   * -> 等**页尺寸算出来**（\`pageTops\` 有内容）-> 跳到 \`initialPage\`
+   * -> **只跳一次**（用 ref 记住）-> 用户自己翻页后不会被拉回去
+   * -> 换文档（\`documentId\` 变了）-> **重新跳一次**
    */
   const initialPageAppliedRef = useRef<string | null>(null);
   useEffect(() => {
@@ -1815,7 +1815,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       return;
     }
     initialPageAppliedRef.current = key;
-    // ⚠️ **不用平滑** -> 初次打开要"立刻到"（平滑滚几千像素要好几秒）✅
+    // ⚠️ **不用平滑** -> 初次打开要"立刻到"（平滑滚几千像素要好几秒）
     scrollToPage(initialPage, { smooth: false });
   }, [numPages, pageTops, initialPage, documentId, scrollToPage]);
 
@@ -1849,7 +1849,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       if (domSelection && domSelection.rangeCount > 0 && !domSelection.isCollapsed) {
         const range = domSelection.getRangeAt(0);
         /*
-         * ⚠️ **防一手**（审核补测发现的健壮性问题）✅
+         * ⚠️ **防一手**（审核补测发现的健壮性问题）
          * -> `Range.getBoundingClientRect` 在某些环境里**不存在** ❌
          * -> 抛在 rAF 回调里 ❌ -> **没人接** ❌ -> unhandled error ❌
          */
@@ -1912,7 +1912,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     /*
      * ⚠️ **缩放上下限**（宿主可配）。
      *
-     * -> 用户需求："这个上限下限宿主也可以配置" ✅
+     * -> 用户需求："这个上限下限宿主也可以配置"
      */
     minScale: merged.minScale,
     maxScale: merged.maxScale,
@@ -1929,15 +1929,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * → 现在统一走 `usePrint` → 它负责：算缩放 → 应用 → 等重排 → 打印 → **恢复**。
    */
   /*
-   * ⚠️⚠️ **打印原 PDF** ✅（像 Chrome 一样 ✅）
+   * ⚠️⚠️ **打印原 PDF**  （像 Chrome 一样）
    *
-   * -> 我们是**用 DOM + canvas 打印**的 ✅
-   * -> -> **Chrome 的打印【不等】canvas** ✅（实测 ✅）
+   * -> 我们是**用 DOM + canvas 打印**的
+   * -> -> **Chrome 的打印【不等】canvas**  （实测）
    * -> -> 打印快照时只有前几页画完 ✅ -> **后面全是空白页** ✅ ❌
-   * -> -> **Chrome 原生 PDF 阅读器** ✅ 不打印 DOM ✅ -> **直接打印 PDF 文件** ✅ ✅
-   * -> -> **我们也这样** ✅ -> **每一页都完整** ✅ ✅
+   * -> -> **Chrome 原生 PDF 阅读器**  不打印 DOM  -> **直接打印 PDF 文件**
+   * -> -> **我们也这样**  -> **每一页都完整**
    *
-   * ⚠️ **只用于 `printMode="original"`** ✅（高亮不在 PDF 里 ✅ -> 只能走 DOM ✅）
+   * ⚠️ **只用于 `printMode="original"`**  （高亮不在 PDF 里  -> 只能走 DOM）
    */
   const { print: printOriginalPdf } = usePrintOriginal({
     url: printMode === 'original' ? (documentUrl ?? null) : null,
@@ -1950,7 +1950,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
      *
      * -> 之前是 \`paper: 'A4'\` ❌
      *   -> 美洲市场用 Letter -> 包按 A4 算缩放 -> **打印可能超出页面** ❌
-     * -> 现在：**宿主可配**（\`printPaper\` prop 或 \`config.printPaper\`）✅
+     * -> 现在：**宿主可配**（\`printPaper\` prop 或 \`config.printPaper\`）
      */
     paper: merged.printPaper ?? printPaper,
     /** 方向（横向时按横向纸张算缩放） */
@@ -1977,7 +1977,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * -> 之前 ref **永远不重置** ❌
    *   -> 换一份文档 -> 还是**上次的缩放**（可能大到看不见内容）❌
-   * -> 现在：**按 \`documentId\` 记住** -> 换文档就重新适配 ✅
+   * -> 现在：**按 \`documentId\` 记住** -> 换文档就重新适配
    */
   const initialScaleDocRef = useRef<string | null>(null);
 
@@ -1992,9 +1992,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     }
 
     /*
-     * ⚠️ **换文档 -> 重新适配**（按 \`documentId\` 区分）✅
+     * ⚠️ **换文档 -> 重新适配**（按 \`documentId\` 区分）
      *
-     * -> 没有 \`documentId\` 时用 \`'default'\` -> 同一份文档只适配一次 ✅
+     * -> 没有 \`documentId\` 时用 \`'default'\` -> 同一份文档只适配一次
      */
     const key = documentId ?? 'default';
     if (initialScaleDocRef.current === key) {
@@ -2070,7 +2070,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         /*
          * ⚠️ **也传高度** -> 整页完整可见（下面不会有滚动条）。
          *
-         * ⚠️ **但高度变化不能触发重适配**（会抖）-> 这里用容器的**当前**高度 ✅
+         * ⚠️ **但高度变化不能触发重适配**（会抖）-> 这里用容器的**当前**高度
          */
         zoom.fitWidth(width, pt.width, height, pt.height);
         return;
@@ -2106,7 +2106,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        * pageOffsetParent: "scpdf-pages"      ← 页的 offsetParent 不是容器！
        * 面板打开后: pageOffsetLeft=0, containerOffsetLeft=245
        *   offsetLeft 公式 = 0 - 245 = -245     ← ❌ 整个选区偏 245px（面板宽度）
-       *   正确公式       = 0                   ← ✅
+       *   正确公式       = 0                   ←
        * ```
        *
        * `offsetLeft` 是相对 **offsetParent** 的，而页的 offsetParent 是
@@ -2224,15 +2224,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * ### 现在的做法
    *
-   * -> **直接改 DOM 的 style**（不触发 React 重渲染）✅
-   * -> 只有光标样式变了，DOM 结构没变 -> 文本层不会被重建 ✅
-   * -> 拖选完全不受影响 ✅
+   * -> **直接改 DOM 的 style**（不触发 React 重渲染）
+   * -> 只有光标样式变了，DOM 结构没变 -> 文本层不会被重建
+   * -> 拖选完全不受影响
    */
   const handleContainerMouseMove = useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
       const container = event.currentTarget;
       /*
-       * ⚠️ **直接改 style** -> 不 setState -> 不会重渲染 -> 不会打断拖选 ✅
+       * ⚠️ **直接改 style** -> 不 setState -> 不会重渲染 -> 不会打断拖选
        *
        * ⚠️⚠️ **离开链接时要恢复成 `text`，不能设成空字符串**（审计修复）。
        *
@@ -2241,8 +2241,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        *   -> 而文本层是 \`cursor: inherit\` -> 继承到"浏览器默认"（箭头）❌
        *   -> 用户看到：**光标在文字上变成了箭头** ❌
        *
-       * -> 现在：离开链接时显式设 \`'text'\` ✅
-       *   -> 和 CSS 里 \`.scpdf-container { cursor: text }\` 一致 ✅
+       * -> 现在：离开链接时显式设 \`'text'\`
+       *   -> 和 CSS 里 \`.scpdf-container { cursor: text }\` 一致
        */
       const cursor = findLinkAtPoint(event.clientX, event.clientY) ? 'pointer' : 'text';
       if (container.style.cursor !== cursor) {
@@ -2255,7 +2255,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   /*
    * ⚠️⚠️ **内部链接的幂等锁**（用户要求："宿主为什么跳两次？这个逻辑我不认可 需要加鲁棒性"）。
    *
-   * -> 同一目标页 **200ms 内**不重复跳 ✅
+   * -> 同一目标页 **200ms 内**不重复跳
    * -> 防"包跳了 + 宿主也跳了" -> **滚两下** ❌
    */
   const lastInternalJumpRef = useRef<{ page: number; time: number } | null>(null);
@@ -2266,18 +2266,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * ## ⚠️⚠️ **必须是【异步】的**（审计发现的**真 bug**）
    *
    * -> 之前只用了**同步**的 `pageRefToNumber` ❌
-   *   -> 但 PDF 里的链接**大量是"命名目标"**（`"section.1"`）✅
+   *   -> 但 PDF 里的链接**大量是"命名目标"**（`"section.1"`）
    *   -> 命名目标要 `getDestination()`（**异步**）才能展开 ❌
-   *   -> 宿主的 `resolvePageRef` 正是干这个的 ✅
+   *   -> 宿主的 `resolvePageRef` 正是干这个的
    *   -> 不用它 -> **内部链接永远解析不出来** ❌
    *   ->   -> 用户点链接**没反应** ❌（用户反馈："点击目录或者是可以跳转的链接还是没办法进行跳转"）
    *
    * ### 现在的解析顺序
    *
-   * 1. 宿主的 **`resolvePageRef`**（异步，能处理命名目标）✅
-   * 2. 宿主的 **`pageRefToNumber`**（同步）✅
-   * 3. 包自己解析出来的 **`outlinePageMapper`**（目录解析的结果）✅
-   * 4. 都没有 -> `null` -> **提示"链接无法跳转"**（不静默）✅
+   * 1. 宿主的 **`resolvePageRef`**（异步，能处理命名目标）
+   * 2. 宿主的 **`pageRefToNumber`**（同步）
+   * 3. 包自己解析出来的 **`outlinePageMapper`**（目录解析的结果）
+   * 4. 都没有 -> `null` -> **提示"链接无法跳转"**（不静默）
    */
   const resolveRefAsync = useCallback(
     async (ref: unknown): Promise<number | null> => {
@@ -2311,8 +2311,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   /**
    * **解析 dest -> 目标页**（异步）。
    *
-   * -> 数组形态：第一个元素是页引用 -> 查映射 ✅
-   * -> 字符串形态：**命名目标** -> 先展开（异步）-> 再查映射 ✅
+   * -> 数组形态：第一个元素是页引用 -> 查映射
+   * -> 字符串形态：**命名目标** -> 先展开（异步）-> 再查映射
    */
   const resolveDestPageAsync = useCallback(
     async (dest: string | unknown[]): Promise<number | null> => {
@@ -2338,8 +2338,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   /**
    * **同步的**解析器（目录面板用 —— 它要立刻显示"能不能跳"）。
    *
-   * ⚠️ 目录用的是**页引用**（不是命名目标）-> 同步映射够用 ✅
-   * -> 命名目标（内部链接）走 `resolveRefAsync` ✅
+   * ⚠️ 目录用的是**页引用**（不是命名目标）-> 同步映射够用
+   * -> 命名目标（内部链接）走 `resolveRefAsync`
    */
   const resolveRefSync = useCallback(
     (ref: unknown): number | null => {
@@ -2357,12 +2357,12 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   /*
    * ⚠️ **PDF 点坐标 -> 容器内的 px 偏移**（页内跳转用）。
    *
-   * -> dest[3] 是 PDF 的 y 坐标（**从页面底部往上**）✅
-   * -> 要换成"容器里往下多少 px" ✅
-   * -> 需要页的 pt 高度 -> 缩放比例 = 渲染高度 / pt 高度 ✅
+   * -> dest[3] 是 PDF 的 y 坐标（**从页面底部往上**）
+   * -> 要换成"容器里往下多少 px"
+   * -> 需要页的 pt 高度 -> 缩放比例 = 渲染高度 / pt 高度
    *
    * ⚠️ **为什么需要它**：
-   * -> 用户要求："目标页=当前页 如果定位行数不一样也是要跳转的" ✅
+   * -> 用户要求："目标页=当前页 如果定位行数不一样也是要跳转的"
    * -> 只跳页顶 -> **看不到目标那一行** ❌
    */
   const ptToContainerOffset = useCallback(
@@ -2391,7 +2391,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * 否则链接矩形会"盖住"文本层 → 从链接上拖选 → **选区完全出不来**。
    *
    * → 在容器上监听 `click`，按**点击坐标**去命中链接矩形。
-   * → 拖动时根本不触发 `click` → 文本层正常选区 ✅
+   * → 拖动时根本不触发 `click` → 文本层正常选区
    */
   const handleContainerClick = useCallback(
     async (event: React.MouseEvent<HTMLElement>) => {
@@ -2452,11 +2452,11 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        *
        * ### 跳转只有一个执行者（**不会跳两次**）
        *
-       * -> 包解析 dest -> targetPage ✅
-       * -> 调 `onInternalLink(ctx)`（带 `cancel()`）✅
-       *    -> 宿主**不调** `cancel()` -> **包跳** ✅
-       *    -> 宿主**调** `cancel()`     -> **包不跳** ✅
-       * -> 宿主的回调**只被通知**，**不要求宿主再跳一次** ✅
+       * -> 包解析 dest -> targetPage
+       * -> 调 `onInternalLink(ctx)`（带 `cancel()`）
+       *    -> 宿主**不调** `cancel()` -> **包跳**
+       *    -> 宿主**调** `cancel()`     -> **包不跳**
+       * -> 宿主的回调**只被通知**，**不要求宿主再跳一次**
        *    -> 之前的设计是"包跳 + 宿主也跳" -> **跳两次** ❌
        */
       let dest: string | unknown[];
@@ -2473,19 +2473,19 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       /*
        * ⚠️⚠️ **解析目标页是【异步】的**（审计修复）。
        *
-       * -> PDF 里的链接**大量是"命名目标"**（`"section.1"`）✅
+       * -> PDF 里的链接**大量是"命名目标"**（`"section.1"`）
        * -> 命名目标要 `getDestination()`（**异步**）才能展开成页引用 ❌
        * -> 之前只用**同步**的 `pageRefToNumber` -> **永远解析不出来** ❌
        *   -> 用户点链接**没反应** ❌
-       * -> 现在：用 `resolveRefAsync`（优先宿主的 `resolvePageRef`）✅
+       * -> 现在：用 `resolveRefAsync`（优先宿主的 `resolvePageRef`）
        */
       const targetPage = await resolveDestPageAsync(dest);
 
       /*
        * ⚠️ **dest 里的 y 坐标**（PDF 点坐标）。
        *
-       * -> 目标页 == 当前页时 -> 要滚到**那一行** ✅
-       *   -> 用户要求："目标页=当前页 如果定位行数不一样也是要跳转的" ✅
+       * -> 目标页 == 当前页时 -> 要滚到**那一行**
+       *   -> 用户要求："目标页=当前页 如果定位行数不一样也是要跳转的"
        */
       const targetY = Array.isArray(dest) && typeof dest[3] === 'number' ? dest[3] : null;
 
@@ -2510,9 +2510,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       /*
        * ⚠️ **解析不出目标页 -> 不能静默**（鲁棒性）。
        *
-       * -> 宿主没给 `resolvePageRef` / `pageRefToNumber` -> 解析不出来 ✅
+       * -> 宿主没给 `resolvePageRef` / `pageRefToNumber` -> 解析不出来
        * -> 之前：**什么都不做** -> 用户点了链接"没反应" ❌
-       * -> 现在：**提示** ✅
+       * -> 现在：**提示**
        */
       if (targetPage === null) {
         toast.info(t('link.unresolved'));
@@ -2522,8 +2522,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       /*
        * ⚠️ **幂等锁**：同一目标页 200ms 内不重复跳。
        *
-       * -> 防"宿主和包都跳"导致**滚两下** ✅
-       * -> 用户明确要求："宿主为什么跳两次？这个逻辑我不认可 需要加鲁棒性" ✅
+       * -> 防"宿主和包都跳"导致**滚两下**
+       * -> 用户明确要求："宿主为什么跳两次？这个逻辑我不认可 需要加鲁棒性"
        */
       if (
         lastInternalJumpRef.current &&
@@ -2537,8 +2537,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       /*
        * ⚠️ **目标页 == 当前页 -> 滚到"那一行"**（不是页顶）。
        *
-       * -> dest[3] 是 PDF 点坐标 -> 要换算成容器内的 px ✅
-       * -> `getPageSizes` 给出页的 pt 尺寸 -> 用它换算缩放 ✅
+       * -> dest[3] 是 PDF 点坐标 -> 要换算成容器内的 px
+       * -> `getPageSizes` 给出页的 pt 尺寸 -> 用它换算缩放
        */
       const offsetY =
         targetPage === (Number.isFinite(pageNumber) ? pageNumber : 1) && targetY !== null
@@ -2574,7 +2574,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * **收集所有高亮的矩形**（用于重叠命中判定）。
    *
    * ⚠️ 用户需求："如果两个高亮叠加在一起 删除的话两个都一起删掉了 逻辑不对"
-   * → 需要知道**所有**高亮的位置，才能判断"点在重叠区还是独有区" ✅
+   * → 需要知道**所有**高亮的位置，才能判断"点在重叠区还是独有区"
    */
   const collectHighlightRects = useCallback((): HitRect[] => {
     const container = containerRef.current;
@@ -2594,15 +2594,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         continue;
       }
       /*
-       * ⚠️ **层级必须按【DOM 顺序】**（不能按 id）✅
+       * ⚠️ **层级必须按【DOM 顺序】**（不能按 id）
        *
        * -> 之前按 id 去重：`seen.set(id, seen.size)` ❌
        * -> **重复 id** 时两个元素拿到**同一个 zIndex** ❌
        *    -> `pickHighlightAtPoint` 排序后取第一个 ❌
        *    -> **永远只能点到第一个** ❌
-       * -> 直接用**数组下标**（DOM 顺序 = 渲染顺序 = 层级）✅
-       *    -> 每个元素**层级唯一** ✅
-       *    -> 重叠时选**最上面**的那个 ✅
+       * -> 直接用**数组下标**（DOM 顺序 = 渲染顺序 = 层级）
+       *    -> 每个元素**层级唯一**
+       *    -> 重叠时选**最上面**的那个
        */
       rects.push({
         id,
@@ -2631,10 +2631,10 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *  bbbbbbbbbbb     ← 部分重叠（重叠部分 = c）
    * ```
    *
-   * → 点 a 的独有部分 → 选 **a** ✅
-   * → 点 b 的独有部分 → 选 **b** ✅
-   * → 点重叠部分 c → 选**在上面那个** ✅
-   * → 完全重叠 → 下面的永远选不到 ✅
+   * → 点 a 的独有部分 → 选 **a**
+   * → 点 b 的独有部分 → 选 **b**
+   * → 点重叠部分 c → 选**在上面那个**
+   * → 完全重叠 → 下面的永远选不到
    *
    * @param clientX 视口 X
    * @param clientY 视口 Y
@@ -2658,7 +2658,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        *
        * ### 问题：宿主传了**重复的 id**
        *
-       * -> 用户反馈："有时候会出现有时候点击一个高亮 两个高亮都会被选中的情况"✅
+       * -> 用户反馈："有时候会出现有时候点击一个高亮 两个高亮都会被选中的情况"
        * -> 复现：刷新页面（旧高亮从持久化恢复，id 还是 `h-1`）-> 新建一个高亮
        *    -> demo 的计数器归零 -> 新高亮**又拿到 `h-1`** ❌
        *    -> **两个高亮同 id** ❌
@@ -2668,14 +2668,14 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        *
        * ### 修法
        *
-       * -> `pickHighlightAtPoint` 已经返回了**命中的矩形** ✅
-       * -> 按**矩形的位置**找元素 -> **精确到那一个** ✅
+       * -> `pickHighlightAtPoint` 已经返回了**命中的矩形**
+       * -> 按**矩形的位置**找元素 -> **精确到那一个**
        */
       const hitRect = hit.rect;
       const elements = container.querySelectorAll<HTMLElement>('[data-highlight-id]');
       for (const el of elements) {
         const r = el.getBoundingClientRect();
-        // ⚠️ **位置对得上**（允许 1px 的误差）-> 就是它 ✅
+        // ⚠️ **位置对得上**（允许 1px 的误差）-> 就是它
         if (
           Math.abs(r.left - hitRect.left) < 1 &&
           Math.abs(r.top - hitRect.top) < 1 &&
@@ -2685,7 +2685,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           return el;
         }
       }
-      // ⚠️ **兜底**：几何对不上 -> 退回按 id（老行为）✅
+      // ⚠️ **兜底**：几何对不上 -> 退回按 id（老行为）
       for (const el of elements) {
         if (el.getAttribute('data-highlight-id') === hit.id) {
           return el;
@@ -2716,7 +2716,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * → 用**基线 + ascent/descent** 推算会偏（基线位置取决于字体的自然 ascent）
    * → 直接用 **`item.top`（= span 的 top）和 `item.fontSize`（= span 的盒高）**
-   *   → 实测 `item.top` 与渲染后的 `span.getBoundingClientRect().top` **完全相等** ✅
+   *   → 实测 `item.top` 与渲染后的 `span.getBoundingClientRect().top` **完全相等**
    */
   const baselinesByPage = useMemo<BaselinesByPage>(() => {
     const result: BaselinesByPage = new Map();
@@ -2891,15 +2891,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         /*
          * ⚠️⚠️ **但"正在批注"时不能清**（审计发现的**真 bug**）。
          *
-         * -> 打开批注弹窗 -> 编辑器 `focus()` -> **浏览器塌缩原生选区** ✅
-         * -> `selectionchange` -> 这里收到 `null` ✅
+         * -> 打开批注弹窗 -> 编辑器 `focus()` -> **浏览器塌缩原生选区**
+         * -> `selectionchange` -> 这里收到 `null`
          * -> 如果照常 `setSelectionShapes(new Map())` -> **自绘的蓝色块被擦掉** ❌
          * -> 而原生 `::selection` 是 transparent（我们自己关的）❌
          *   -> 用户看到的**只有自绘层** -> 一擦就消失 ❌
-         *   -> 用户反馈：**"选中文字的选中效果会消失"** ✅
+         *   -> 用户反馈：**"选中文字的选中效果会消失"**
          *
-         * -> 所以：**批注期间保留冻结的形状** ✅
-         * -> 用户点 X 取消 -> 主动清掉（用户要的"取消就把高亮取消掉"）✅
+         * -> 所以：**批注期间保留冻结的形状**
+         * -> 用户点 X 取消 -> 主动清掉（用户要的"取消就把高亮取消掉"）
          */
         if (!isPendingNoteRef.current) {
           setSelectionShapes(new Map());
@@ -3043,15 +3043,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * ### 问题
    *
    * -> 高亮的"激活态"（`.scpdf-annotation--active` → **蓝色边框**）❌
-   * -> 之前只有 `handleHighlightClick` 里那条路径会**设置定时器** ✅
+   * -> 之前只有 `handleHighlightClick` 里那条路径会**设置定时器**
    * -> 别的路径（比如浮层里的点击冒泡到容器）设了激活态却**没有定时器** ❌
    *    -> 高亮**一直蓝着** -> 用户以为"被选中了" ❌
-   *    -> 用户反馈："我在上面的批注上输入 但是下面的高亮也变成选中态了" ✅
+   *    -> 用户反馈："我在上面的批注上输入 但是下面的高亮也变成选中态了"
    *
    * ### 现在的做法
    *
-   * -> **只要 `activeHighlightId` 非空，就保证 1.5s 后清掉** ✅
-   * -> 任何代码路径都不可能留下"永久蓝着"的高亮 ✅
+   * -> **只要 `activeHighlightId` 非空，就保证 1.5s 后清掉**
+   * -> 任何代码路径都不可能留下"永久蓝着"的高亮
    */
   useEffect(() => {
     if (!activeHighlightId) {
@@ -3168,15 +3168,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        *
        * ### 修法
        *
-       * -> 把这些方法**真的加到 handle 上** ✅
-       * -> 宿主替换了内置工具栏（\`slots.toolbar\`）-> **靠这个驱动缩放/打印** ✅
+       * -> 把这些方法**真的加到 handle 上**
+       * -> 宿主替换了内置工具栏（\`slots.toolbar\`）-> **靠这个驱动缩放/打印**
        */
       zoomIn: () => zoom.zoomIn(),
       zoomOut: () => zoom.zoomOut(),
       /**
        * **适配宽度**（和工具栏的"适应宽度"一样）。
        *
-       * -> 宿主替换了工具栏 -> 靠它实现"适应宽度"按钮 ✅
+       * -> 宿主替换了工具栏 -> 靠它实现"适应宽度"按钮
        */
       fitWidth: () => {
         const container = containerRef.current;
@@ -3265,12 +3265,12 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
      *
      * → 容器上的监听**要求容器有焦点** → 用户点完高亮，焦点可能还在 body
      *   → 按退格**没反应** ❌
-     * → `document` 上的监听 → **任何时候按退格都生效** ✅
+     * → `document` 上的监听 → **任何时候按退格都生效**
      *
      * → 但要排除：
      *   - 输入框 / 可编辑元素（不能打断打字）❌
      *   - 有文字选区（用户想删文字）❌
-     *   - 没选中高亮 / 宿主没给删除回调 → 不响应 ✅
+     *   - 没选中高亮 / 宿主没给删除回调 → 不响应
      */
     const onDocumentKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Backspace' && event.key !== 'Delete') {
@@ -3377,17 +3377,17 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        *   -> 用户在弹窗里操作（比如点工具栏）❌
        *   -> **点到了下面的高亮块** -> `handleHighlightClick` 被触发 ❌
        *   -> 它无条件 `setSelectionShapes(new Map())` -> **原来的蓝色选区框消失** ❌
-       *   -> 用户反馈："原来的准备进行批注的已经选择的区域会消失选区的蓝色框选的底" ✅
+       *   -> 用户反馈："原来的准备进行批注的已经选择的区域会消失选区的蓝色框选的底"
        *
        * -> 而且：高亮块被点 -> **浏览器把它"选中"** ❌
-       *   -> 用户反馈："下面的高亮会选中" ✅
+       *   -> 用户反馈："下面的高亮会选中"
        *
        * ### 现在的做法
        *
-       * -> **正在批注** -> **不清**选区 ✅
-       *   -> 蓝色框保留 ✅
-       *   -> 也不弹高亮的操作条（免得和批注弹窗打架）✅
-       * -> 不正在批注 -> 行为**完全不变** ✅
+       * -> **正在批注** -> **不清**选区
+       *   -> 蓝色框保留
+       *   -> 也不弹高亮的操作条（免得和批注弹窗打架）
+       * -> 不正在批注 -> 行为**完全不变**
        */
       if (isPendingNoteRef.current) {
         /*
@@ -3400,13 +3400,13 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
          * -> 结果：**批注弹窗盖在高亮上**时，用户在弹窗里点工具栏按钮 ❌
          *    -> 点击冒泡到 container -> 高亮的点击委托按坐标命中 ❌
          *    -> 高亮加上 `.scpdf-annotation--active` -> **蓝色选中边框** ❌
-         *    -> 用户反馈："我在上面的批注上输入 但是下面的高亮也变成选中态了" ✅
+         *    -> 用户反馈："我在上面的批注上输入 但是下面的高亮也变成选中态了"
          *
          * ### 现在的做法
          *
-         * -> **不设置激活态**（高亮不该有"被选中"的样子）✅
-         * -> 也**不弹**高亮的操作条（免得和批注弹窗打架）✅
-         * -> 也**不清**选区（蓝色框要留着）✅
+         * -> **不设置激活态**（高亮不该有"被选中"的样子）
+         * -> 也**不弹**高亮的操作条（免得和批注弹窗打架）
+         * -> 也**不清**选区（蓝色框要留着）
          */
         return;
       }
@@ -3466,16 +3466,16 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * ### 修法
    *
-   * -> 用元素的**视口矩形**和高亮的 `position.rects`（归一化）比对 ✅
-   * -> 归一化 -> 视口 px 的换算：`norm × (viewport / reference)` ✅
-   * -> 对上了 -> 就是它 ✅
+   * -> 用元素的**视口矩形**和高亮的 `position.rects`（归一化）比对
+   * -> 归一化 -> 视口 px 的换算：`norm × (viewport / reference)`
+   * -> 对上了 -> 就是它
    */
   const findHighlightByElement = useCallback(
     (element: HTMLElement, id: string): HighlightRecord | undefined => {
       const r = element.getBoundingClientRect();
       const candidates = highlights.filter((h) => h.id === id);
 
-      // ⚠️ **多个同 id** -> 按**几何**挑 ✅
+      // ⚠️ **多个同 id** -> 按**几何**挑
       return pickHighlightByRect(candidates, r, (candidate) => {
         const position = candidate.position;
         if (!position) {
@@ -3514,7 +3514,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *   （实测：拖动起点落在 `BUTTON.scpdf-annotation` 上 → 选不中）。
    *
    * → 在容器上监听 `click`，按**坐标**命中高亮 → 和链接层一个套路。
-   * → 拖动时不触发 `click` → 文本层正常选区 ✅
+   * → 拖动时不触发 `click` → 文本层正常选区
    */
   const handleHighlightContainerClick = useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
@@ -3536,18 +3536,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        *
        * ### 问题
        *
-       * -> 批注弹窗 / 便利贴面板在 **React 树里是 container 的后代** ✅
-       *    （DOM 上靠 `position: fixed` 浮着，但 React 的合成事件照样冒泡）✅
-       * -> 容器上挂了**高亮的点击委托**，按**鼠标坐标**命中高亮 ✅
+       * -> 批注弹窗 / 便利贴面板在 **React 树里是 container 的后代**
+       *    （DOM 上靠 `position: fixed` 浮着，但 React 的合成事件照样冒泡）
+       * -> 容器上挂了**高亮的点击委托**，按**鼠标坐标**命中高亮
        * -> 用户在弹窗里打字 / 点工具栏按钮 -> 坐标正好落在**下面的高亮**上 ❌
        *    -> 高亮被误判成"被点击" -> 变成**蓝色选中态** ❌
-       *    -> 用户反馈："我在上面的批注上输入 但是下面的高亮也变成选中态了" ✅
+       *    -> 用户反馈："我在上面的批注上输入 但是下面的高亮也变成选中态了"
        *
        * ### 三层防御
        *
-       * 1. 弹窗内部 `stopPropagation`（`AnnotationDialog` / `AnnotationPanel`）✅
-       * 2. **这里再挡一次**（防止将来新增的浮窗忘了加）✅
-       * 3. 正在批注时**根本不设置**激活态（见 `handleHighlightClick`）✅
+       * 1. 弹窗内部 `stopPropagation`（`AnnotationDialog` / `AnnotationPanel`）
+       * 2. **这里再挡一次**（防止将来新增的浮窗忘了加）
+       * 3. 正在批注时**根本不设置**激活态（见 `handleHighlightClick`）
        */
       if (target?.closest?.('[data-scpdf-floating]')) {
         return;
@@ -3570,8 +3570,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        *
        * ### 现在的行为
        *
-       * → 点空白 → **立刻**关掉高亮浮层 + 取消激活 ✅
-       * → 一次就取消 ✅
+       * → 点空白 → **立刻**关掉高亮浮层 + 取消激活
+       * → 一次就取消
        */
       if (!highlightEl) {
         if (highlightPopover || activeHighlightId) {
@@ -3593,14 +3593,14 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       }
 
       /*
-       * ⚠️⚠️ **要找到"真正点到的那一条"**（不能只按 id 找）✅
+       * ⚠️⚠️ **要找到"真正点到的那一条"**（不能只按 id 找）
        *
        * -> 宿主可能传了**重复的 id** ❌
        *    （实测：刷新页面 -> 旧高亮从持久化恢复 -> 新建的高亮**又拿到同一个 id**）
        * -> `highlights.find(h => h.id === id)` -> 找到的是**第一个** ❌
        *    -> 点的是第二个 -> 操作条弹在**错的那条**上 ❌
        *    -> 改色 / 删除也会**改错那条** ❌
-       * -> 用**几何位置**（`position.rects`）匹配 -> **精确** ✅
+       * -> 用**几何位置**（`position.rects`）匹配 -> **精确**
        */
       const highlight = findHighlightByElement(highlightEl, id);
       if (!highlight) {
@@ -3611,7 +3611,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       event.stopPropagation();
 
       /*
-       * ⚠️ **记录"点到的是哪个矩形"** -> 激活态**只给那一个** ✅
+       * ⚠️ **记录"点到的是哪个矩形"** -> 激活态**只给那一个**
        */
       const elRect = highlightEl.getBoundingClientRect();
       setActiveHighlightRect({
@@ -3644,7 +3644,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * → 选区的**文字**和某条高亮的**文字完全一样**
    * → 且选区的**归一化位置**和那条高亮**完全重合**
    *
-   * → 只是文字一样但位置不同（比如同一句话在别处）→ **不算** ✅
+   * → 只是文字一样但位置不同（比如同一句话在别处）→ **不算**
    *
    * @param text 选中的文字
    * @returns 被完全覆盖则 true
@@ -3710,10 +3710,10 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
            *
            * > "如果是全部重叠 则不能进行再次高亮，各种操作还是在原有高亮进行"
            *
-           * → 新选区和某条已有高亮**完全重合** → 跳过（不新建）✅
-           * → 操作仍然在**原有高亮**上进行 ✅
+           * → 新选区和某条已有高亮**完全重合** → 跳过（不新建）
+           * → 操作仍然在**原有高亮**上进行
            *
-           * → **部分重叠**是允许的（用户要的就是这个场景）✅
+           * → **部分重叠**是允许的（用户要的就是这个场景）
            */
           if (isFullyCoveredByExistingHighlight(ctx.text)) {
             toast.info(t('highlight.fullyCovered'));
@@ -3724,10 +3724,10 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           /*
            * ⚠️⚠️ **颜色：当前色 -> 默认色**（用户需求：
            * "如果没有选择颜色 也按照默认颜色来展示高亮
-           *  不必每次都选择颜色"✅）。
+           *  不必每次都选择颜色"）。
            *
-           * → \`pickedColor\` = 上次在**下拉里选**的颜色 ✅
-           * → 没有 -> **默认色**（宿主可配 \`defaultHighlightColor\`）✅
+           * → \`pickedColor\` = 上次在**下拉里选**的颜色
+           * → 没有 -> **默认色**（宿主可配 \`defaultHighlightColor\`）
            * → 之前是 \`undefined\` -> 宿主那边自己决定 -> **不统一** ❌
            */
           onHighlight?.({ ...ctx, color: pickedColor ?? merged.defaultHighlightColor });
@@ -3770,16 +3770,16 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     ];
 
     /*
-     * ⚠️⚠️ **动作的可见性由宿主显式控制**（用户反馈 ✅）
+     * ⚠️⚠️ **动作的可见性由宿主显式控制**（用户反馈）
      *
      * > "选区工具栏的提问/翻译/加批注/高亮/复制 都需要宿主可以配置是否展示"
      *
-     * ## 规则 ✅
+     * ## 规则
      *
-     * -> `features.selectionXxx === false` ✅ -> **强制隐藏** ✅
-     *    -> 哪怕宿主**传了回调** ✅ -> 也不显示 ✅ ✅
-     *    -> -> 场景：回调要留着 ✅（业务 ✅）但**按钮先藏着** ✅ ✅
-     * -> `undefined` ✅ -> **保持原行为** ✅（回调在就显示 ✅）✅
+     * -> `features.selectionXxx === false`  -> **强制隐藏**
+     *    -> 哪怕宿主**传了回调**  -> 也不显示
+     *    -> -> 场景：回调要留着  （业务）但**按钮先藏着**
+     * -> `undefined`  -> **保持原行为**  （回调在就显示）
      */
     if (onTranslate && merged.features?.selectionTranslate !== false) {
       actions.push({
@@ -3818,8 +3818,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
      * ⚠️ **"加批注"是内置动作**（用户需求）。
      *
      * → 以前只有宿主传 `onNote` 才显示 → 很多宿主没传 → 用户看不到 ❌
-     * → 现在：**始终显示** → 点击打开**包自带的富文本弹窗** ✅
-     * → 宿主仍然可以用 `onNote` 覆盖（自己实现弹窗）✅
+     * → 现在：**始终显示** → 点击打开**包自带的富文本弹窗**
+     * → 宿主仍然可以用 `onNote` 覆盖（自己实现弹窗）
      */
     actions.push({
       key: BUILTIN_ACTION_KEYS.note,
@@ -3836,7 +3836,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
          * ⚠️ **记下选区的视口矩形**（弹窗的锚点）。
          *
          * → 用户反馈："这个富文本编辑框没有定位到批注旁边啊" ❌
-         * → 记下锚点 → 弹窗**贴着选区**显示 ✅
+         * → 记下锚点 → 弹窗**贴着选区**显示
          */
         const selection = window.getSelection();
         const rect =
@@ -3859,27 +3859,27 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
          * ### 问题
          *
          * -> 打开批注弹窗 -> 编辑器 \`focus()\` ❌
-         *   -> **浏览器会塌缩原生选区** ✅
-         *   -> 触发 \`selectionchange\` ✅
-         *   -> \`computeGeometry()\` 返回 false ✅
-         *   -> \`clearSelection()\` ✅
-         *   -> \`onSelectionChange(null)\` ✅
+         *   -> **浏览器会塌缩原生选区**
+         *   -> 触发 \`selectionchange\`
+         *   -> \`computeGeometry()\` 返回 false
+         *   -> \`clearSelection()\`
+         *   -> \`onSelectionChange(null)\`
          *   -> **\`setSelectionShapes(new Map())\` -> 自绘的蓝色选区块被擦掉** ❌
          *
          * -> 而原生 \`::selection\` 本来就是 transparent（我们自己关的）❌
          *   -> 用户看到的**只有自绘层** ❌
          *   -> 一擦就没了 ❌
-         *   -> 用户反馈：**"在选中文字进行批注的时候 选中文字的选中效果会消失"** ✅
+         *   -> 用户反馈：**"在选中文字进行批注的时候 选中文字的选中效果会消失"**
          *
          * ### 现在的做法
          *
-         * -> **冻结**一份形状（\`pendingNoteShapesRef\`）✅
-         * -> \`handleSelectionChange\` 在"正在批注"时**不清**形状 ✅
-         * -> 用户点 X 取消 -> 清掉冻结形状 ✅（用户要的"取消就把高亮取消掉"）
-         * -> 保存成功 -> 走已有的 \`clearSelectionAfterHighlight()\` ✅
+         * -> **冻结**一份形状（\`pendingNoteShapesRef\`）
+         * -> \`handleSelectionChange\` 在"正在批注"时**不清**形状
+         * -> 用户点 X 取消 -> 清掉冻结形状  （用户要的"取消就把高亮取消掉"）
+         * -> 保存成功 -> 走已有的 \`clearSelectionAfterHighlight()\`
          */
         pendingNoteShapesRef.current = new Map(selectionShapes);
-        // ⚠️ **标记"正在批注"** -> handleSelectionChange 不清自绘层 ✅
+        // ⚠️ **标记"正在批注"** -> handleSelectionChange 不清自绘层
         isPendingNoteRef.current = true;
         // 打开包自带的富文本弹窗
         setPendingNote(ctx);
@@ -3914,20 +3914,20 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   ]);
 
   /*
-   * ⚠️⚠️ **动作的可见性开关**（用户反馈 ✅）
+   * ⚠️⚠️ **动作的可见性开关**（用户反馈）
    *
    * > "选区工具栏的提问/翻译/加批注/高亮/复制 都需要宿主可以配置是否展示"
    *
-   * ## 为什么在这里过滤 ✅
+   * ## 为什么在这里过滤
    *
-   * -> **一处**管全部 ✅ -> 不用在每个动作的构造处都写判断 ✅ ✅
-   * -> -> 合并完再过滤 ✅ -> **宿主自定义的动作也受控** ✅ ✅
+   * -> **一处**管全部  -> 不用在每个动作的构造处都写判断
+   * -> -> 合并完再过滤  -> **宿主自定义的动作也受控**
    *
-   * ## 规则 ✅
+   * ## 规则
    *
-   * -> `features.selectionXxx === false` ✅ -> **强制隐藏** ✅
-   *    -> 哪怕宿主传了回调 ✅ -> 也不显示 ✅ ✅
-   * -> `undefined` ✅ -> **保持原行为** ✅ ✅
+   * -> `features.selectionXxx === false`  -> **强制隐藏**
+   *    -> 哪怕宿主传了回调  -> 也不显示
+   * -> `undefined`  -> **保持原行为**
    */
   const popoverActions = useMemo(() => {
     const mergedActions = mergeSelectionActions(builtinActions, merged.selectionActions);
@@ -4108,7 +4108,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * -> 宿主可能传了**重复的 id** ❌
    * -> `highlights.find(h => h.id === id)` -> 永远找到**第一个** ❌
    * -> 换色 / 删除 -> **改错那条高亮** ❌
-   * -> 有 `activeHighlightRect` -> 按**几何**挑到真正的那条 ✅
+   * -> 有 `activeHighlightRect` -> 按**几何**挑到真正的那条
    */
   const findHighlightPosition = useCallback(
     (id: string): NormPosition | undefined => {
@@ -4118,11 +4118,11 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       }
 
       /*
-       * ⚠️ **按"激活的矩形"消歧** ✅
+       * ⚠️ **按"激活的矩形"消歧**
        *
-       * -> `activeHighlightRect` 是**视口 px** ✅
-       * -> 高亮的 `position.boundingRect` 是**归一化** ✅
-       * -> 换算：`norm.width * (视口宽 / 归一化宽)` ✅
+       * -> `activeHighlightRect` 是**视口 px**
+       * -> 高亮的 `position.boundingRect` 是**归一化**
+       * -> 换算：`norm.width * (视口宽 / 归一化宽)`
        */
       const active = activeHighlightRect;
       if (active) {
@@ -4143,7 +4143,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         }
       }
 
-      // ⚠️ **消歧不了** -> 退回第一个（老行为）✅
+      // ⚠️ **消歧不了** -> 退回第一个（老行为）
       return candidates[0]?.position;
     },
     [highlights, activeHighlightRect],
@@ -4254,8 +4254,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        * ⚠️ **传 `t`**（审计发现的：之前标签是**硬编码中文**）。
        *
        * -> 不传 -> 高亮浮层的 5 个按钮**永远是中文** ❌
-       *   -> 选区浮层（选中文字）走 i18n -> 英文 ✅
-       *   -> **两个浮层并排 -> "中英文混杂"** ✅
+       *   -> 选区浮层（选中文字）走 i18n -> 英文
+       *   -> **两个浮层并排 -> "中英文混杂"**
        */
       t,
     });
@@ -4285,16 +4285,16 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
          *
          * -> 之前写的是 \`event: undefined as never\` ❌
          *   -> 类型上骗过编译器 -> 宿主写 \`ctx.event.preventDefault()\` **运行时崩** ❌
-         * -> 现在：**\`event\` 是可选的** -> 不传就是"没有" ✅
-         * -> \`position\` 找不到时用**空对象**而不是 \`null\`（类型是 \`NormPosition\`）✅
+         * -> 现在：**\`event\` 是可选的** -> 不传就是"没有"
+         * -> \`position\` 找不到时用**空对象**而不是 \`null\`（类型是 \`NormPosition\`）
          */
         position: findHighlightPosition(highlightPopover.id) ?? EMPTY_NORM_POSITION,
         /*
          * ⚠️ **换色动作带上颜色**（用户需求：
-         * "如果没有选择颜色 也按照默认颜色来展示高亮 不必每次都选择颜色"✅）。
+         * "如果没有选择颜色 也按照默认颜色来展示高亮 不必每次都选择颜色"）。
          *
-         * -> 点高亮的 🖍（不选色）-> 用**当前色**换 ✅
-         * -> 没选过 -> 用**默认色** ✅
+         * -> 点高亮的 🖍（不选色）-> 用**当前色**换
+         * -> 没选过 -> 用**默认色**
          */
         color:
           action.key === HIGHLIGHT_ACTION_KEYS.color
@@ -4372,7 +4372,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * → 索引是**异步**建的 → 第一次渲染时索引可能还是空的
    * → 渲染侧要用"索引的项文本"算对齐偏移 → 索引好了要重算
-   * → 订阅 `searchEngine` 的索引变化 → 变了就重渲染 ✅
+   * → 订阅 `searchEngine` 的索引变化 → 变了就重渲染
    */
   const [_searchIndexVersion, setSearchIndexVersion] = useState(0);
 
@@ -4393,7 +4393,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * → 索引那次 `getTextContent()` 和渲染那次 **item 边界可能不同**
    *   （pdf.js 按 `fontName`/`height` 合并 item）
    * → 实测：索引 161 项 / 渲染 112 项 → 直接累加字符数会错 49 项
-   * → 渲染时用这份数据**按内容对齐** ✅
+   * → 渲染时用这份数据**按内容对齐**
    */
   const searchIndexItemTexts = useMemo(() => {
     const map = new Map<number, string[]>();
@@ -4418,7 +4418,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * → 索引里 "A2E" 是**一个**项；渲染侧是 "A"、"2"、"E" **三个**项
    * → 直接拿索引偏移去切渲染项 → **只切到 "A"** ❌
    *
-   * → 所以要把偏移**换算**成渲染坐标 → 需要这张对齐表 ✅
+   * → 所以要把偏移**换算**成渲染坐标 → 需要这张对齐表
    */
   const searchAlignmentByPage = useMemo(() => {
     const map = new Map<number, number[]>();
@@ -4450,7 +4450,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * → 实测：索引 161 项（更细）/ 渲染 112 项（更粗）→ 差 49 项
    * → 直接累加字符数 → 偏移错位 → **高亮跑到别的字上** ❌
    *
-   * → 所以：**在搜索的时候**（索引已经建好了）按内容对齐 → 再算偏移 ✅
+   * → 所以：**在搜索的时候**（索引已经建好了）按内容对齐 → 再算偏移
    */
   const searchOffsetsByPage = useMemo(() => {
     const offsetsByPage = new Map<number, IndexOffset[]>();
@@ -4696,7 +4696,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * ⚠️ **用 state 而不是每次 render 去读 DOM**：
    * → 读 DOM 会触发重排 → 性能差
-   * → 用 ResizeObserver → 尺寸变了才更新 ✅
+   * → 用 ResizeObserver → 尺寸变了才更新
    */
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
@@ -4736,9 +4736,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * ⚠️ **之前面板固定在"页面中间偏右"** ❌
    *    -> 便签在 \`x=571\`、面板在 \`x=918\` -> **离得很远** ❌
-   *    -> 用户反馈："打开详细按钮目前是失效的 需要点击能打开一个稍微大一点的便利贴的样式" ✅
+   *    -> 用户反馈："打开详细按钮目前是失效的 需要点击能打开一个稍微大一点的便利贴的样式"
    *
-   * -> 现在：**量便签图标的位置** -> 面板**贴在它旁边** ✅
+   * -> 现在：**量便签图标的位置** -> 面板**贴在它旁边**
    */
   /*
    * ⚠️⚠️ **便签的位置要在 DOM 画出来之后才能量**（实测踩到的坑）。
@@ -4752,8 +4752,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * ### 现在的做法
    *
-   * -> 用 `state` + `useEffect` -> **DOM 画完之后**再量 ✅
-   * -> 量不到就**再试一次**（下一帧）✅
+   * -> 用 `state` + `useEffect` -> **DOM 画完之后**再量
+   * -> 量不到就**再试一次**（下一帧）
    */
   const [activeAnnotationAnchor, setActiveAnnotationAnchor] = useState<{
     left: number;
@@ -4773,13 +4773,13 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
      * "如果同一位置两个批注 那么第一个批注点击之后展示位置正常
      *  第二个批注详情点击之后还是会出现在pdf的首页位置"）。
      *
-     * -> 同一位置的多个批注**合并成一个图标** ✅
+     * -> 同一位置的多个批注**合并成一个图标**
      * -> 那个图标上只有 `data-note-id={first.id}`（第一条）❌
      * -> 选**第二条** -> 精确匹配**找不到** ❌
      * -> -> 锚点**保持旧值** ❌ -> 面板停在**首页** ❌
      *
-     * -> 现在用 `findStickyNoteIcon` -> 找"**包含这个 id**"的图标 ✅
-     * -> 合并组用 `data-note-ids` 匹配 ✅
+     * -> 现在用 `findStickyNoteIcon` -> 找"**包含这个 id**"的图标
+     * -> 合并组用 `data-note-ids` 匹配
      */
     const measure = () => {
       const el = findStickyNoteIcon(containerRef.current, activeAnnotationId);
@@ -4799,15 +4799,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
      * ⚠️⚠️ **一个 rAF 循环干两件事**（实测踩到的坑）。
      *
      * -> 之前是**两套逻辑** ❌
-     *    1. rAF 重试（最多 10 帧）-> 为了等便签画出来 ✅
-     *    2. `scroll` 事件监听 -> 为了滚动时重新量 ✅
+     *    1. rAF 重试（最多 10 帧）-> 为了等便签画出来
+     *    2. `scroll` 事件监听 -> 为了滚动时重新量
      * -> 两套**各自独立** ❌ -> 会**打架** ❌
-     *    -> 用户反馈："滚动的时候 定位也跑来跑去的" ✅
+     *    -> 用户反馈："滚动的时候 定位也跑来跑去的"
      *
-     * -> 现在：**一个循环**负责"量到为止 + 一直跟随" ✅
-     *    -> 便签还没画出来 -> **继续等** ✅
-     *    -> 便签画出来了 -> **每一帧都跟着** ✅
-     *    -> 用户滚动 -> 面板**贴着便签走** ✅（不抖 ✅）
+     * -> 现在：**一个循环**负责"量到为止 + 一直跟随"
+     *    -> 便签还没画出来 -> **继续等**
+     *    -> 便签画出来了 -> **每一帧都跟着**
+     *    -> 用户滚动 -> 面板**贴着便签走**  （不抖）
      */
     let raf = 0;
     let tries = 0;
@@ -4824,14 +4824,14 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           bottom: r.bottom,
         });
       } else if (tries >= 10) {
-        // ⚠️ **量不到 -> 放弃**（不让 rAF 一直跑）✅
+        // ⚠️ **量不到 -> 放弃**（不让 rAF 一直跑）
         return;
       }
 
       /*
-       * ⚠️ **量到了就继续跑**（跟随模式）✅
-       * -> 滚动时便签在视口里的位置变了 ✅ -> 面板要跟着 ✅
-       * -> 组件卸载时 cleanup 会 cancel ✅
+       * ⚠️ **量到了就继续跑**（跟随模式）
+       * -> 滚动时便签在视口里的位置变了  -> 面板要跟着
+       * -> 组件卸载时 cleanup 会 cancel
        */
       raf = requestAnimationFrame(tick);
     };
@@ -4877,10 +4877,10 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    *
    * ### 现在
    *
-   * -> 点"编辑" -> 打开**锚点弹窗**（`AnnotationDialog`）✅
-   * -> 弹窗**贴在批注图标下面**（飞书评论气泡的感觉）✅
-   * -> 弹窗里**有「保存」「取消」按钮** ✅
-   * -> 和"新建批注"**同一套组件**（行为一致）✅
+   * -> 点"编辑" -> 打开**锚点弹窗**（`AnnotationDialog`）
+   * -> 弹窗**贴在批注图标下面**（飞书评论气泡的感觉）
+   * -> 弹窗里**有「保存」「取消」按钮**
+   * -> 和"新建批注"**同一套组件**（行为一致）
    */
   const [editAnnotation, setEditAnnotation] = useState<{
     id: string;
@@ -4932,7 +4932,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
    * ⚠️ **文字方向**（审计发现的：之前**完全没有 RTL 支持**）。
    *
    * -> 阿拉伯语 / 希伯来语的宿主**没法用** ❌
-   * -> 现在：**自动判断**（显式 prop > locale > 宿主的 `document.dir` > ltr）✅
+   * -> 现在：**自动判断**（显式 prop > locale > 宿主的 `document.dir` > ltr）
    */
   const direction: Direction = resolveDirection(
     dir,
@@ -4942,7 +4942,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
   const className = [
     'scpdf-root',
-    // ⚠️ RTL -> 加一个 class -> CSS 镜像整个界面 ✅
+    // ⚠️ RTL -> 加一个 class -> CSS 镜像整个界面
     direction === 'rtl' ? 'scpdf-root--rtl' : '',
     // ⚠️ 主题 + 外观 → class 名（见 `core/theme` 的 `themeClasses`）
     ...themeClasses(merged.theme ?? 'auto', merged.appearance),
@@ -4969,8 +4969,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       /*
        * ⚠️ **\`dir\` 属性**（RTL 支持）。
        *
-       * -> 不只是加 class -> **浏览器会自己镜像文字和内边距** ✅
-       * -> 阿拉伯语 / 希伯来语的正文**方向本来就该由浏览器决定** ✅
+       * -> 不只是加 class -> **浏览器会自己镜像文字和内边距**
+       * -> 阿拉伯语 / 希伯来语的正文**方向本来就该由浏览器决定**
        */
       dir={direction}
       data-testid="pdf-viewer"
@@ -4981,7 +4981,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
        *
        * → 浏览器里所有 contenteditable **共用一份选区** ⚠️
        * → 在编辑器里移动光标 -> 原生选区可能**延伸到 PDF 的文本层** ❌
-       * -> 标记一下 -> CSS 让文本层**不可选** ✅
+       * -> 标记一下 -> CSS 让文本层**不可选**
        */
       data-dialog-open={pendingNote !== null || editAnnotation !== null ? 'true' : 'false'}
     >
@@ -5054,21 +5054,21 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
             merged.features?.print === false
               ? undefined
               : /*
-                 * ⚠️ **"打印原 PDF" 模式** ✅
+                 * ⚠️ **"打印原 PDF" 模式**
                  *
-                 * -> 传了 `documentUrl` ✅ -> **用隐藏 iframe** ✅ 打印 PDF 文件 ✅ ✅
-                 * -> -> **和 Chrome 原生一样** ✅ -> **每页都完整** ✅ ✅
-                 * -> 没传 ✅ -> 退回 DOM 打印 ✅ ✅
+                 * -> 传了 `documentUrl`  -> **用隐藏 iframe**  打印 PDF 文件
+                 * -> -> **和 Chrome 原生一样**  -> **每页都完整**
+                 * -> 没传  -> 退回 DOM 打印
                  */
                 printMode === 'original' && documentUrl
                 ? printOriginalPdf
                 : printDocument
           }
           /*
-           * ⚠️ **导出 / 下载**（用户需求 ✅）
+           * ⚠️ **导出 / 下载**（用户需求）
            *
-           * -> 包提供**按钮** ✅ -> 宿主给**实现** ✅ ✅
-           * -> 不传 ✅ -> **按钮不渲染** ✅ ✅
+           * -> 包提供**按钮**  -> 宿主给**实现**
+           * -> 不传  -> **按钮不渲染**
            */
           onDownloadPdf={onDownloadPdf}
           onExportAnnotatedPdf={onExportAnnotatedPdf}
@@ -5076,19 +5076,19 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           /*
            * ⚠️ **缩放比例可填写 + 上下限可配**（用户需求）。
            *
-           * -> "是可以用户进行填写比例的" ✅
-           * -> "这个上限下限宿主也可以配置" ✅
-           * -> "包括是否用户可以填写 这个宿主也要可以进行配置" ✅
+           * -> "是可以用户进行填写比例的"
+           * -> "这个上限下限宿主也可以配置"
+           * -> "包括是否用户可以填写 这个宿主也要可以进行配置"
            */
           scaleBounds={zoom.bounds}
           allowScaleInput={merged.allowScaleInput}
           onScaleChange={handleZoomChange}
           /*
            * ⚠️ **主题选择按钮**（用户需求：
-           * "包在工具栏那里也可以加上一个按钮让用户进行选择"✅）。
+           * "包在工具栏那里也可以加上一个按钮让用户进行选择"）。
            *
-           * -> 宿主传了 `onThemeChange` -> 显示 ✅
-           * -> 宿主关掉了 \`features.themePicker\` -> 不显示 ✅
+           * -> 宿主传了 `onThemeChange` -> 显示
+           * -> 宿主关掉了 \`features.themePicker\` -> 不显示
            */
           theme={merged.theme}
           onThemeChange={merged.features?.themePicker === false ? undefined : onThemeChange}
@@ -5147,7 +5147,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               <OutlinePanel
                 outline={outline}
                 /*
-                 * ⚠️ **宿主的同步映射优先** → 宿主的**异步映射**（包解析的）兜底 ✅
+                 * ⚠️ **宿主的同步映射优先** → 宿主的**异步映射**（包解析的）兜底
                  * → 都不给 → 目录项显示"解析中"，点了会记下意图（等映射好了自动跳）
                  */
                 /*
@@ -5159,10 +5159,10 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                  *   -> 目录**每次渲染都重算** ❌
                  *   -> 而且**永远返回 null** -> **目录点了没反应** ❌
                  *
-                 * -> 现在：用**稳定的** `resolveRefSync` ✅
-                 *   -> 宿主的 `pageRefToNumber` 优先 ✅
-                 *   -> 否则用包自己解析出来的 `outlinePageMapper` ✅
-                 *   -> 都没有 -> 返回 null -> **给出可见提示**（不静默）✅
+                 * -> 现在：用**稳定的** `resolveRefSync`
+                 *   -> 宿主的 `pageRefToNumber` 优先
+                 *   -> 否则用包自己解析出来的 `outlinePageMapper`
+                 *   -> 都没有 -> 返回 null -> **给出可见提示**（不静默）
                  */
                 pageRefToNumber={resolveRefSync}
                 resolveToken={internalResolveToken + (outlineResolveToken ?? 0)}
@@ -5197,7 +5197,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
            * 链接元素自己已经处理了 Enter/Space，这里只需要不阻断冒泡。
            */
           onMouseLeave={(event) => {
-            // ⚠️ **直接改 style** -> 不 setState -> 不会重渲染 -> 不会打断拖选 ✅
+            // ⚠️ **直接改 style** -> 不 setState -> 不会重渲染 -> 不会打断拖选
             event.currentTarget.style.cursor = '';
           }}
           onMouseMove={handleContainerMouseMove}
@@ -5206,19 +5206,19 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
            *
            * ### 问题
            *
-           * -> 批注弹窗 / 便利贴面板在 **React 树里是 container 的后代** ✅
-           *    （DOM 上靠 `position: fixed` 浮着，但 React 的合成事件照样冒泡）✅
-           * -> 容器上有**高亮的点击委托**（按鼠标坐标命中）✅
+           * -> 批注弹窗 / 便利贴面板在 **React 树里是 container 的后代**
+           *    （DOM 上靠 `position: fixed` 浮着，但 React 的合成事件照样冒泡）
+           * -> 容器上有**高亮的点击委托**（按鼠标坐标命中）
            * -> 用户在弹窗里打字 / 点工具栏按钮 -> 坐标正好落在**下面的高亮**上 ❌
            *    -> 高亮被误判成"被点击" -> **蓝色选中态** ❌
-           *    -> 用户反馈："我在上面的批注上输入 但是下面的高亮也变成选中态了" ✅
+           *    -> 用户反馈："我在上面的批注上输入 但是下面的高亮也变成选中态了"
            *
            * ### 为什么用**捕获阶段**
            *
-           * -> 冒泡阶段拦截的话，浮层内部的 `stopPropagation` 就够了 ✅
+           * -> 冒泡阶段拦截的话，浮层内部的 `stopPropagation` 就够了
            *    但**万一将来新增的浮层忘了加** -> 又会漏 ❌
-           * -> **捕获阶段**在浮层之前跑 -> **一网打尽** ✅
-           *    -> 浮层自己处理点击，不往上走 ✅
+           * -> **捕获阶段**在浮层之前跑 -> **一网打尽**
+           *    -> 浮层自己处理点击，不往上走
            */
           onClickCapture={(event) => {
             /*
@@ -5228,13 +5228,13 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
              *
              * -> 捕获阶段 `stopPropagation()` -> 事件**到不了它自己的 target** ❌
              *    -> 弹窗里的"新建批注 / 关闭 / 取消 / 保存"**全部点不动** ❌
-             *    -> 用户反馈："新建批注这个按钮现在无法点击了" ✅
+             *    -> 用户反馈："新建批注这个按钮现在无法点击了"
              *
              * ### 正确做法
              *
-             * -> 捕获阶段**只打一个标记**（不改事件流）✅
-             * -> **冒泡阶段**的 `onClick` 看到标记 -> **自己跳过**高亮委托 ✅
-             * -> 事件**照常到达按钮** -> 按钮正常响应 ✅
+             * -> 捕获阶段**只打一个标记**（不改事件流）
+             * -> **冒泡阶段**的 `onClick` 看到标记 -> **自己跳过**高亮委托
+             * -> 事件**照常到达按钮** -> 按钮正常响应
              */
             const target = event.target as HTMLElement | null;
             if (target?.closest?.('[data-scpdf-floating]')) {
@@ -5245,12 +5245,12 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
             /*
              * ⚠️⚠️ **点击来自浮层内部 → 跳过链接 / 高亮的委托**（实测踩过的坑）。
              *
-             * -> 批注弹窗 / 便利贴面板在 React 树里是 container 的后代 ✅
-             * -> 容器上有**高亮的点击委托**（按鼠标坐标命中）✅
+             * -> 批注弹窗 / 便利贴面板在 React 树里是 container 的后代
+             * -> 容器上有**高亮的点击委托**（按鼠标坐标命中）
              * -> 在浮层里点按钮 -> 坐标可能正好落在**下面的高亮**上 ❌
              *    -> 高亮被误激活 -> **蓝色选中态** ❌
-             * -> 捕获阶段打的标记在这里用上 -> **只跳过委托**，**不拦事件** ✅
-             *    -> 按钮**照常响应** ✅
+             * -> 捕获阶段打的标记在这里用上 -> **只跳过委托**，**不拦事件**
+             *    -> 按钮**照常响应**
              */
             if (clickFromFloatingRef.current) {
               clickFromFloatingRef.current = false;
@@ -5268,8 +5268,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
              *
              * ### 现在
              *
-             * -> **先**处理链接：命中链接就 `stopPropagation()` -> 高亮不会被处理 ✅
-             * -> **再**处理高亮 ✅
+             * -> **先**处理链接：命中链接就 `stopPropagation()` -> 高亮不会被处理
+             * -> **再**处理高亮
              */
             handleContainerClick(event);
             if (event.defaultPrevented) {
@@ -5299,8 +5299,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
              * ### 现在
              *
              * → 焦点在**输入类元素**里（编辑器 / 输入框 / contenteditable）
-             *   -> **放行**，让空格正常输入 ✅
-             * → 焦点在容器自身（用户只是用键盘翻页）-> 照旧阻止滚动 ✅
+             *   -> **放行**，让空格正常输入
+             * → 焦点在容器自身（用户只是用键盘翻页）-> 照旧阻止滚动
              */
             const target = event.target as HTMLElement | null;
             const inEditable =
@@ -5342,9 +5342,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                *
                * → 之前直接显示 `error.message` -> 那是**开发者用的中文** ❌
                *   （比如 "文档加载失败（HTTP 404）"）-> **不跟语言切换** ❌
-               * -> 现在：**按 `error.code` 查内置文案** ✅
-               * -> 没有对应文案 -> 兜底到 `error.generic` ✅
-               * -> 原始 `message` 仍然保留在错误对象里 -> **宿主自己要用时还能拿到** ✅
+               * -> 现在：**按 `error.code` 查内置文案**
+               * -> 没有对应文案 -> 兜底到 `error.generic`
+               * -> 原始 `message` 仍然保留在错误对象里 -> **宿主自己要用时还能拿到**
                */}
               <p className="scpdf-state__hint">
                 {t((error.code ? `error.${error.code}` : 'error.generic') as keyof Messages)}
@@ -5354,9 +5354,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                *
                * -> 之前**无条件**显示 -> "文件不是 PDF"也给"重试" ❌
                *   -> 用户点了还是同一个错 -> **白点一次** ❌
-               * -> 现在：用 \`error.retryable\` ✅
-               *   -> 网络 / 超时 / HTTP 错误 -> **给重试** ✅
-               *   -> 文件坏了 / 密码错 -> **不给**（给别的出路）✅
+               * -> 现在：用 \`error.retryable\`
+               *   -> 网络 / 超时 / HTTP 错误 -> **给重试**
+               *   -> 文件坏了 / 密码错 -> **不给**（给别的出路）
                */}
               {error.retryable !== false ? (
                 <button type="button" className="scpdf-btn" onClick={reload}>
@@ -5378,7 +5378,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           {/*
             **toast**（antd 风格）。
 
-            ⚠️ 宿主传了 `onToast` → **完全接管** → 包不渲染自己的 ✅
+            ⚠️ 宿主传了 `onToast` → **完全接管** → 包不渲染自己的
           */}
           {onToast ? null : (
             <Suspense fallback={null}>
@@ -5405,17 +5405,17 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               open={pendingNote !== null}
               /*
                * ⚠️ **锚点**（选区的视口矩形）→ 弹窗贴着批注显示。
-               * → 用户需求："这个富文本编辑框没有定位到批注旁边啊" ✅
+               * → 用户需求："这个富文本编辑框没有定位到批注旁边啊"
                */
               anchorRect={noteAnchor}
               onClose={() => {
                 /*
                  * ⚠️⚠️ **用户点了 X 取消** -> **取消这次高亮**（用户要的）。
                  *
-                 * -> 清掉"正在批注"的标志 ✅
-                 * -> 清掉冻结的选区形状 -> **蓝色块消失** ✅
+                 * -> 清掉"正在批注"的标志
+                 * -> 清掉冻结的选区形状 -> **蓝色块消失**
                  *   （用户反馈："如果批注用户选择取消（点击x）就把这个高亮取消调"）
-                 * -> 顺便把原生选区也收掉 ✅
+                 * -> 顺便把原生选区也收掉
                  */
                 isPendingNoteRef.current = false;
                 pendingNoteShapesRef.current = null;
@@ -5426,7 +5426,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
               }}
               onSubmit={(html, plain) => {
                 const note = pendingNote;
-                // ⚠️ **批注结束** -> 恢复"选区变化会清自绘层"的行为 ✅
+                // ⚠️ **批注结束** -> 恢复"选区变化会清自绘层"的行为
                 isPendingNoteRef.current = false;
                 pendingNoteShapesRef.current = null;
                 setPendingNote(null);
@@ -5438,7 +5438,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                  * ⚠️ **"写了批注之后用默认高亮"**（用户需求）。
                  *
                  * → 先建一条**高亮**（用当前选的颜色）→ 批注的锚点就是它
-                 * → 便签图标落在高亮上 ✅
+                 * → 便签图标落在高亮上
                  *
                  * ⚠️ **只调 `onHighlight`**（不要同时调 `onHighlightCreate`）
                  * → 两个都调 → 宿主保存两次（实测：点一次生成 3 条）
@@ -5477,15 +5477,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
              而且 富文本点了编辑 怎么富文本编辑框还在文档最上面啊
              要出现在视野里啊 就点的旁边"）。
 
-            -> 和"新建批注"**同一个组件** -> 行为一致 ✅
-            -> 弹窗**贴在批注图标下面**（飞书评论气泡的感觉）✅
-            -> 弹窗里**有「保存」「取消」** ✅
+            -> 和"新建批注"**同一个组件** -> 行为一致
+            -> 弹窗**贴在批注图标下面**（飞书评论气泡的感觉）
+            -> 弹窗里**有「保存」「取消」**
           */}
           <Suspense fallback={null}>
             <AnnotationDialog
               open={editAnnotation !== null}
               /*
-               * ⚠️ **锚点**（批注按钮的视口矩形）-> 弹窗贴着它显示 ✅
+               * ⚠️ **锚点**（批注按钮的视口矩形）-> 弹窗贴着它显示
                */
               anchorRect={editAnnotation?.anchor ?? null}
               anchorVersion={editAnchorTick}
@@ -5503,8 +5503,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                 /*
                  * ⚠️ **保存**（用户需求："富文本编辑完之后没有保存按钮啊 保存都保存不了"）。
                  *
-                 * -> `onAnnotationSave(id, html, plain)` -> 宿主更新这条批注 ✅
-                 * -> 和"新建"走的是**同一个回调** -> 宿主的处理逻辑一致 ✅
+                 * -> `onAnnotationSave(id, html, plain)` -> 宿主更新这条批注
+                 * -> 和"新建"走的是**同一个回调** -> 宿主的处理逻辑一致
                  */
                 onAnnotationSave?.(editing.id, html, plain);
               }}
@@ -5528,7 +5528,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                 /*
                  * ⚠️ **滚动容器的 ref**（视口坐标 -> 容器坐标）。
                  *
-                 * -> 面板是 `position: absolute` -> 相对 `.scpdf-container` ✅
+                 * -> 面板是 `position: absolute` -> 相对 `.scpdf-container`
                  * -> 不传 -> 面板**整体偏移** -> "出现在 PDF 的最上方" ❌
                  */
                 containerRef={containerRef}
@@ -5609,7 +5609,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                          *  要出现在视野里啊 就点的旁边"）。
                          *
                          * → 之前打开的是**右侧的便利贴面板** -> 离批注很远 ❌
-                         * → 现在打开**锚点弹窗** -> **贴在批注旁边** ✅
+                         * → 现在打开**锚点弹窗** -> **贴在批注旁边**
                          */
                         handleAnnotationEdit(annotation, element);
                         onAnnotationEdit?.(annotation);
@@ -5618,7 +5618,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                         /*
                          * ⚠️ **点"展开" → 打开便利贴面板**（看完整内容）。
                          *
-                         * → 用户需求："也可以点击展开，查看批注详情" ✅
+                         * → 用户需求："也可以点击展开，查看批注详情"
                          */
                         setActiveAnnotationId(annotation.id);
                         onAnnotationExpand?.(annotation);

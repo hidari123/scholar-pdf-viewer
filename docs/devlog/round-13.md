@@ -346,7 +346,7 @@ position: absolute; top: 16px / 1854px / 3691px …   ← 18 页各自定位
 
 ```
 position: static
-rectTop: 8 / 1842 / 3675 / 5509 / 7342   ← 依次排列，没有重叠 ✅
+rectTop: 8 / 1842 / 3675 / 5509 / 7342   ← 依次排列，没有重叠
 ```
 
 **回归测试**：E2E `e2e-print.mjs` **+2 项**（12 → **14 项**）
@@ -406,7 +406,7 @@ height: calc(var(--scpdf-page-height, 100%) * var(--scpdf-print-scale, 1));
 ```
 clientTop = 321.19   ← 行盒（浏览器给的）
 spanTop   = 326.00   ← 字形（文字实际的位置）
-drawnTop  = 326.20   ← 自绘块 ✅ 贴着字形（差 0.2px）
+drawnTop  = 326.20   ← 自绘块  贴着字形（差 0.2px）
 ```
 
 → 自绘块是**刻意贴着字形**的（这样高亮块和文字才对齐）

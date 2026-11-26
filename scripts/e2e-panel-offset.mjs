@@ -136,8 +136,8 @@ try {
        *
        * 浏览器的 client rect = **字体的自然行盒**（比文字高、偏上）
        * ```
-       * 无面板: clientTop=198.33（行盒）  spanTop=200（字形）  drawnTop=200.34 ✅
-       * 有面板: clientTop=321.19（行盒）  spanTop=326（字形）  drawnTop=326.20 ✅
+       * 无面板: clientTop=198.33（行盒）  spanTop=200（字形）  drawnTop=200.34
+       * 有面板: clientTop=321.19（行盒）  spanTop=326（字形）  drawnTop=326.20
        * ```
        * → 自绘块是**贴着字形**的（这是刻意的：让高亮块和文字对齐）
        * → 和行盒比 → **天然差 2~5px** → 那是**正常的**，不是定位错了。

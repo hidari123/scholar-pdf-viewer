@@ -50,11 +50,11 @@ export type RichTextCommand =
    *
    * ⚠️ **和 `hiliteColor` 的区别**：
    * -> `hiliteColor` = 荧光笔效果（背景色 + 可能带浅色）
-   * -> `textHighlight` = 纯背景色，**字色完全不变** ✅（用户需求：
+   * -> `textHighlight` = 纯背景色，**字色完全不变**  （用户需求：
    *    "这个颜色可以放在文字的高亮上"）
    *
    * ⚠️⚠️ **不在默认工具栏里**（用户反馈："功能和高亮重复了而且图标很丑"）❌
-   * -> 宿主可以自己在 `annotationToolbar` 里加回来 ✅
+   * -> 宿主可以自己在 `annotationToolbar` 里加回来
    */
   | 'textHighlight'
   /** 文字颜色 */
@@ -83,7 +83,7 @@ export interface RichTextPalette {
 /**
  * 工具栏按钮的**默认配置**。
  *
- * ⚠️ **宿主可以完全覆盖**（通过 `toolbar` prop）→ 只显示想展示的 ✅
+ * ⚠️ **宿主可以完全覆盖**（通过 `toolbar` prop）→ 只显示想展示的
  *
  * ⚠️ **label 支持 i18n 占位符**：传 `{key}` 形式 → 由 `RichTextEditor` 解析。
  *    不传 label → 用命令名（英文，可用但不是本地化的）
@@ -92,28 +92,28 @@ export interface RichTextPalette {
  *
  * | 按钮 | 命令 | 状态 |
  * |---|---|---|
- * | B 加粗 | `bold` | ✅ |
- * | I 斜体 | `italic` | ✅ |
- * | U 下划线 | `underline` | ✅ |
- * | S 删除线 | `strikeThrough` | ✅ |
- * | 高亮底色 | `hiliteColor` | ✅（有 palette 时） |
- * | A 文字颜色 | `foreColor` | ✅ |
+ * | B 加粗 | `bold` |  |
+ * | I 斜体 | `italic` |  |
+ * | U 下划线 | `underline` |  |
+ * | S 删除线 | `strikeThrough` |  |
+ * | 高亮底色 | `hiliteColor` |  （有 palette 时） |
+ * | A 文字颜色 | `foreColor` |  |
  *
  * ⚠️ **`textHighlight`（文字高亮）不在默认工具栏里**（用户反馈："功能重复 + 图标很丑"）❌
- * -> 但**命令和图标保留** -> 宿主可自己加回来 ✅
- * | 链接 | `createLink` | ✅ |
- * | 无序列表 | `insertUnorderedList` | ✅ |
- * | 有序列表 | `insertOrderedList` | ✅ |
- * | 引用 | `formatBlock` | ✅ |
- * | 清除格式 | `removeFormat` | ✅ |
- * | 撤销 | `undo` | ✅ |
- * | 重做 | `redo` | ✅ |
+ * -> 但**命令和图标保留** -> 宿主可自己加回来
+ * | 链接 | `createLink` |  |
+ * | 无序列表 | `insertUnorderedList` |  |
+ * | 有序列表 | `insertOrderedList` |  |
+ * | 引用 | `formatBlock` |  |
+ * | 清除格式 | `removeFormat` |  |
+ * | 撤销 | `undo` |  |
+ * | 重做 | `redo` |  |
  *
  * ## ⚠️⚠️ **文字颜色必须用【深色】色板**（用户反馈："如果是放在文字上 就太浅了"）
  *
- * -> `palette`（高亮底色）= **浅色**（\`#fff3a3\` 这种）✅
+ * -> `palette`（高亮底色）= **浅色**（\`#fff3a3\` 这种）
  * -> 拿来当**文字颜色** -> **浅得看不见** ❌
- * -> 所以 `foreColor` **必须**用 `textPalette`（深色）✅
+ * -> 所以 `foreColor` **必须**用 `textPalette`（深色）
  *
  * @param palette 高亮色板（用于 `hiliteColor` / `textHighlight`）
  * @param textPalette **文字颜色**色板（深色，用于 `foreColor`）
@@ -145,21 +145,21 @@ export function defaultRichTextToolbar(
    *
    * ### 为什么去掉
    *
-   * -> 实现上它就是 \`hiliteColor\` 的**别名** ✅
-   *    -> \`execCommand(command === 'textHighlight' ? 'hiliteColor' : command, ...)\` ✅
+   * -> 实现上它就是 \`hiliteColor\` 的**别名**
+   *    -> \`execCommand(command === 'textHighlight' ? 'hiliteColor' : command, ...)\`
    * -> 功能**完全重复** ❌
    * -> 图标（"A" + 背景块）**不好看** ❌
    *
    * ### 但是**命令和图标保留**
    *
-   * -> 宿主可以自己在 \`annotationToolbar\` 里加回来 ✅
-   * -> 命令（\`textHighlight\`）保留 -> 宿主的自定义工具栏能用 ✅
-   * -> 图标（\`textHighlight\`）保留 -> 宿主想用能用 ✅
-   * -> **不破坏**已有宿主的自定义工具栏 ✅
+   * -> 宿主可以自己在 \`annotationToolbar\` 里加回来
+   * -> 命令（\`textHighlight\`）保留 -> 宿主的自定义工具栏能用
+   * -> 图标（\`textHighlight\`）保留 -> 宿主想用能用
+   * -> **不破坏**已有宿主的自定义工具栏
    */
 
   items.push(
-    // ⚠️ **文字颜色用【深色】色板**（浅色当字色看不见）✅
+    // ⚠️ **文字颜色用【深色】色板**（浅色当字色看不见）
     {
       command: 'foreColor',
       label: '{richtext.textColor}',
@@ -190,7 +190,7 @@ export interface RichTextToolbarItem {
    * ⚠️ **之前是 `string`**（审计发现的 bug）：
    * -> 宿主拼错（\`icon: 'bolder'\`）**编译通过** ❌
    *   -> 渲染出来是**空白图标** ❌（用户看着像"按钮坏了"）
-   * -> 现在：**\`IconName\`** -> 拼错**直接编译报错** ✅
+   * -> 现在：**\`IconName\`** -> 拼错**直接编译报错**
    */
   icon?: IconName;
   /** 颜色面板（`hiliteColor` / `foreColor` 用） */
@@ -219,15 +219,15 @@ export interface RichTextToolbarItem {
  *   -> 清洗时**整个标签被替换成纯文本** ❌
  *   -> 实测：\`"<font color="#ff0000">World</font>"\` -> \`"World"\` ❌
  *      -> **颜色完全丢失** ❌
- *   -> 用户看到：**点了"文字颜色"一点反应都没有** ✅
+ *   -> 用户看到：**点了"文字颜色"一点反应都没有**
  *
  * ### 现在的做法
  *
- * -> \`styleWithCSS = true\` -> 浏览器生成 **\`<span style="color:#ff0000">\`** ✅
- *   -> \`<span>\` **在白名单里** ✅
- *   -> 而且 \`span\` 的 style **只保留 color / background-color** ✅
- *   -> **颜色保住了** ✅
- *   -> 顺带：**输出更干净**（不用为 \`<font>\` 破例）✅
+ * -> \`styleWithCSS = true\` -> 浏览器生成 **\`<span style="color:#ff0000">\`**
+ *   -> \`<span>\` **在白名单里**
+ *   -> 而且 \`span\` 的 style **只保留 color / background-color**
+ *   -> **颜色保住了**
+ *   -> 顺带：**输出更干净**（不用为 \`<font>\` 破例）
  *
  * @param command 命令
  * @param value 命令的值（颜色 / 链接地址 / 块类型）
@@ -235,9 +235,9 @@ export interface RichTextToolbarItem {
 /**
  * **"无背景色"色块的标记值**。
  *
- * ⚠️ **用一个不可能是合法颜色的字符串** ✅
- * -> 避免和真实颜色值冲突 ✅
- * -> 宿主也可以传这个值来清除颜色 ✅
+ * ⚠️ **用一个不可能是合法颜色的字符串**
+ * -> 避免和真实颜色值冲突
+ * -> 宿主也可以传这个值来清除颜色
  */
 export const NO_COLOR = '__none__';
 
@@ -262,12 +262,12 @@ export function execRichTextCommand(command: RichTextCommand, value?: string): v
    * -> 不开的话 \`foreColor\` 生成 **\`<font color="#ff0000">\`** ❌
    *   -> \`<font>\` **不在 \`sanitizeRichText\` 的白名单里** ❌
    *   -> 清洗时**整个标签被替换成纯文本** -> **颜色完全丢失** ❌
-   *   -> 用户看到：**点了"文字颜色"一点反应都没有** ✅
+   *   -> 用户看到：**点了"文字颜色"一点反应都没有**
    *
-   * -> 开了之后生成 **\`<span style="color: rgb(255,0,0)">\`** ✅
-   *   -> \`<span>\` **在白名单里** ✅
-   *   -> 而且 \`span\` 的 style **只保留 color / background-color** ✅
-   *   -> **颜色保住了** ✅
+   * -> 开了之后生成 **\`<span style="color: rgb(255,0,0)">\`**
+   *   -> \`<span>\` **在白名单里**
+   *   -> 而且 \`span\` 的 style **只保留 color / background-color**
+   *   -> **颜色保住了**
    *
    * ⚠️ **实测确认**（不是猜的）：
    * ```
@@ -286,17 +286,17 @@ export function execRichTextCommand(command: RichTextCommand, value?: string): v
      * ⚠️ **"文字高亮" -> 用 `hiliteColor` 实现**（用户需求：
      * "这个颜色可以放在文字的高亮上 增加一个添加文字高亮的按钮"）。
      *
-     * -> `hiliteColor` 在浏览器里就是**设置背景色** ✅
-     * -> **不会改字色** ✅ -> 正好是"文字高亮"要的效果 ✅
+     * -> `hiliteColor` 在浏览器里就是**设置背景色**
+     * -> **不会改字色**  -> 正好是"文字高亮"要的效果
      */
     /*
      * ⚠️⚠️ **"无背景色"**（用户需求："高亮这个按钮需要加上一个无背景颜色的选项，如飞书样式"）。
      *
      * -> 浏览器没有"清除背景色"的命令 ❌
      * -> **办法**：用 `removeFormat` 会把**所有**格式都清掉 ❌（太粗暴）
-     * -> **办法**：传 `transparent` -> 浏览器会设 `background-color: transparent` ✅
-     *    -> 视觉上**等于没有底色** ✅
-     * -> TipTap 用 `unsetHighlight()` / `unsetColor()` ✅（更干净）
+     * -> **办法**：传 `transparent` -> 浏览器会设 `background-color: transparent`
+     *    -> 视觉上**等于没有底色**
+     * -> TipTap 用 `unsetHighlight()` / `unsetColor()`  （更干净）
      */
     if (isNoColor(value)) {
       document.execCommand(
@@ -350,7 +350,7 @@ export function richTextToPlain(html: string): string {
  *
  * ⚠️ 审计发现的**真实漏洞**：
  * -> 之前的正则 \`([^;]+)\` 会把 \`url(javascript:...)\` 一起吞掉 ❌
- * -> 所以现在**只认纯颜色** ✅
+ * -> 所以现在**只认纯颜色**
  *
  * 允许：
  * - \`#rgb\` / \`#rgba\` / \`#rrggbb\` / \`#rrggbbaa\`
@@ -390,7 +390,7 @@ function isPlainColor(value: string): boolean {
 /**
  * **清洗 HTML**（只保留安全的标签）。
  *
- * ⚠️ 批注内容会存到宿主的后端 → **可能 XSS** → 必须清洗 ✅
+ * ⚠️ 批注内容会存到宿主的后端 → **可能 XSS** → 必须清洗
  *
  * 保留的标签：`b` `i` `u` `s` `mark` `a` `ul` `ol` `li` `blockquote` `br` `span` `code`
  *
@@ -472,16 +472,16 @@ export function sanitizeRichText(html: string): string {
        *
        * ### 现在的修法
        *
-       * -> 值里**不允许出现 \`url(\` / \`expression(\` / \`image-set(\`** -> 直接丢掉 ✅
-       * -> 也不允许 \`\\`（CSS 转义）-> 防止 \`\\75 rl(...)\` 这种绕过 ✅
-       * -> 只保留**纯颜色值**（\`#rgb\` / \`#rrggbb\` / \`rgb(...)\` / \`rgba(...)\` / 颜色名）✅
+       * -> 值里**不允许出现 \`url(\` / \`expression(\` / \`image-set(\`** -> 直接丢掉
+       * -> 也不允许 \`\\`（CSS 转义）-> 防止 \`\\75 rl(...)\` 这种绕过
+       * -> 只保留**纯颜色值**（\`#rgb\` / \`#rrggbb\` / \`rgb(...)\` / \`rgba(...)\` / 颜色名）
        */
       const style = el.getAttribute('style') ?? '';
       const match = /(^|;)\s*(background-color|color)\s*:\s*([^;]+)/i.exec(style);
       if (match) {
         const value = match[3] ?? '';
         /*
-         * ⚠️ **危险的值直接丢掉**（不"修补"，直接不要）✅
+         * ⚠️ **危险的值直接丢掉**（不"修补"，直接不要）
          */
         const dangerous = /url\s*\(|expression\s*\(|image-set\s*\(|@import|\\|\/\*/i.test(value);
         if (!dangerous && isPlainColor(value)) {

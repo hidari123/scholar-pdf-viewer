@@ -30,23 +30,23 @@
  *
  * ## 验证什么
  *
- * ⚠️ **判据改成：跟【Chrome 原生选区】比** ✅
+ * ⚠️ **判据改成：跟【Chrome 原生选区】比**
  *
- * -> 旧判据是"每个 span 的覆盖率 ≥ 90%" ✅
- * -> 那个判据假设我们**把整个 span 都涂上** ✅
- * -> 但现在按 Chrome 的**字符级**精度画 ✅ -> 只涂选中的那几个字 ✅
- *    -> 选区本来就不覆盖整个 span ✅ -> 覆盖率自然 < 90% ✅
- * -> 实测（真实 PDF ✅）：
+ * -> 旧判据是"每个 span 的覆盖率 ≥ 90%"
+ * -> 那个判据假设我们**把整个 span 都涂上**
+ * -> 但现在按 Chrome 的**字符级**精度画  -> 只涂选中的那几个字
+ *    -> 选区本来就不覆盖整个 span  -> 覆盖率自然 < 90%
+ * -> 实测（真实 PDF）：
  * ```
  * span "T cells and demonstrates" (w=695)
- *   Chrome Range 矩形: x=79  w=335   ← Chrome 也只涂 335px ✅
- *   我们画的:          x=79  w=335   ← 和 Chrome 一致 ✅
+ *   Chrome Range 矩形: x=79  w=335   ← Chrome 也只涂 335px
+ *   我们画的:          x=79  w=335   ← 和 Chrome 一致
  * ```
- * -> 所以【Chrome 自己的覆盖就是 48%】 ✅ -> 旧判据不成立 ✅
+ * -> 所以【Chrome 自己的覆盖就是 48%】  -> 旧判据不成立
  *
- * -> **新判据** ✅：我们画的选区 == Chrome 的 Range 选区 ✅
- *    -> 逐项比较【水平覆盖范围】✅（left / right ✅）
- *    -> 再检查【有没有漏掉 Chrome 选中的项】✅
+ * -> **新判据**：我们画的选区 == Chrome 的 Range 选区
+ *    -> 逐项比较【水平覆盖范围】 （left / right）
+ *    -> 再检查【有没有漏掉 Chrome 选中的项】
  */
 
 import { existsSync, readdirSync } from 'node:fs';
@@ -120,10 +120,10 @@ const selectAndMeasure = async (dragDy, dragDx) => {
     );
 
     /*
-     * ⚠️ **判据：跟 Chrome 原生选区比** ✅
+     * ⚠️ **判据：跟 Chrome 原生选区比**
      *
-     * -> Chrome 的 Range 矩形 ✅ = **唯一权威** ✅
-     * -> 我们画的 ✅ 应该和它**逐项一致** ✅
+     * -> Chrome 的 Range 矩形  = **唯一权威**
+     * -> 我们画的  应该和它**逐项一致**
      */
     const nativeRects = [];
     if (range) {
@@ -144,7 +144,7 @@ const selectAndMeasure = async (dragDy, dragDx) => {
       const l = r.left - pr.left;
       const t = r.top - pr.top;
 
-      // ⚠️ **Chrome 在这个项上覆盖的范围** ✅
+      // ⚠️ **Chrome 在这个项上覆盖的范围**
       let nl = Infinity;
       let nr = -Infinity;
       for (const n of nativeRects) {
@@ -154,7 +154,7 @@ const selectAndMeasure = async (dragDy, dragDx) => {
         }
       }
 
-      // ⚠️ **我们在这个项上覆盖的范围** ✅
+      // ⚠️ **我们在这个项上覆盖的范围**
       let ol = Infinity;
       let or = -Infinity;
       for (const d of drawn) {
@@ -167,11 +167,11 @@ const selectAndMeasure = async (dragDy, dragDx) => {
       const chromeCovers = nl < nr;
       const weCover = ol < or;
       /*
-       * ⚠️ **相对误差** ✅（比"占 span 全宽的比例"客观 ✅）
+       * ⚠️ **相对误差**  （比"占 span 全宽的比例"客观）
        *
-       * -> 比的是【左右边界】✅ -> 不是"占了多少" ✅
-       * -> 涂多了也不行 ✅（项级矩形会比 Chrome 宽 ✅）
-       * -> 容差 2px ✅（浮点 + 基线裁剪 ✅）
+       * -> 比的是【左右边界】 -> 不是"占了多少"
+       * -> 涂多了也不行  （项级矩形会比 Chrome 宽）
+       * -> 容差 2px  （浮点 + 基线裁剪）
        */
       const width = Math.max(1, nr - nl);
       const delta = chromeCovers && weCover ? Math.abs(ol - nl) + Math.abs(or - nr) : Infinity;
@@ -189,17 +189,17 @@ const selectAndMeasure = async (dragDy, dragDx) => {
       };
     });
 
-    // ⚠️ **漏选** = Chrome 选了 ✅ 但我们**没覆盖** ✅（不是"覆盖不够 %" ✅）
+    // ⚠️ **漏选** = Chrome 选了  但我们**没覆盖**  （不是"覆盖不够 %"）
     const missed = rows.filter((r) => r.chrome !== null && r.ours === null);
 
     return {
       total: rows.length,
       missed,
       /**
-       * 和 Chrome 的范围**不一致**的项 ✅
+       * 和 Chrome 的范围**不一致**的项
        *
-       * ⚠️ **左右边界都要比** ✅（容差 2px ✅）
-       * -> 涂多了也算不一致 ✅（项级矩形会比 Chrome 宽 ✅）
+       * ⚠️ **左右边界都要比**  （容差 2px）
+       * -> 涂多了也算不一致  （项级矩形会比 Chrome 宽）
        */
       mismatched: rows.filter((r) => r.chrome !== null && r.ours !== null && r.delta > 2),
       rows,
@@ -238,7 +238,7 @@ try {
       r1.missed.length === 0,
       `${r1.missed.length} 个漏选`,
     );
-    // ⚠️ **范围要和 Chrome 一致** ✅（不是"覆盖 span 全宽" ✅）
+    // ⚠️ **范围要和 Chrome 一致**  （不是"覆盖 span 全宽"）
     check(
       '选区范围和 Chrome 原生一致',
       r1.mismatched.length === 0,

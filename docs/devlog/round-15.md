@@ -38,21 +38,21 @@
 - `selectSearchItems(items, { viewport })` 新增 `viewport` 选项
 - 新增 `isRotatedItem(item, viewport)` —— 判据和渲染侧 `isRotatedAngle` **完全一致**（1°）
 - `PdfSearch.buildIndex` 新增 `viewport?: (pageNumber) => viewport` 选项
-- → 索引文本和渲染文本**完全一致**（实测 2553 = 2553 ✅）
+- → 索引文本和渲染文本**完全一致**（实测 2553 = 2553）
 
 ### ② 渲染侧按"字符位置"映射，不靠下标（`src/core/search/align.ts`）
 
 - 新增 `mapOffsetToRenderedByText(renderedTexts, start, length)`
 - → 把渲染的项按**字符数**累加 → 每个项覆盖一段字符区间
 - → 命中的字符偏移落在哪一段 → 就是哪个项
-- → **不依赖索引的项边界** → 两边切分不同也不影响 ✅
+- → **不依赖索引的项边界** → 两边切分不同也不影响
 - `highlight.ts` 的 `mapRangeToItemsByText` 改用它
 
 ### ③ 索引变化要通知（`src/core/search/search.ts`）
 
 - `PdfSearch` 新增 `subscribeIndexChange(listener)` + `getIndexVersion()`
 - → 索引是**异步**建的 → 组件第一次渲染时索引可能还是空的
-- → 组件订阅 → 索引一变就重渲染 ✅
+- → 组件订阅 → 索引一变就重渲染
 - `PdfViewer` 新增 `searchIndexVersion` state + 订阅 effect
 
 ### ④ `alignRenderedToIndex`（按内容对齐的兜底）
@@ -94,7 +94,7 @@
 - `pnpm verify`: **8/8 全绿**
 - `pnpm test`: **454 passed**（37 个文件）
 - E2E: **337/337 —— 0 个套件失败**（25 个套件）
-- 截图确认："An End-to-End **Agent** Auditing Engine" 的 "Agent" **精确高亮** ✅
+- 截图确认："An End-to-End **Agent** Auditing Engine" 的 "Agent" **精确高亮**
 - 提交：`a00f4dc`
 
 ## 为什么这么做

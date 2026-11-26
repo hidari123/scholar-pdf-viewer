@@ -44,13 +44,13 @@ export {
   /**
    * **包内置的高亮色板**（宿主不传也能用）。
    *
-   * -> 用户需求："高亮色…是包需要内置的 但是有接口宿主可以配置" ✅
+   * -> 用户需求："高亮色…是包需要内置的 但是有接口宿主可以配置"
    */
   BUILTIN_HIGHLIGHT_PALETTE,
   /**
    * **包内置的扩展语言表**（ja / fr）。
    *
-   * -> 宿主不用再写一整套文案表 ✅
+   * -> 宿主不用再写一整套文案表
    */
   BUILTIN_LOCALES,
   /**
@@ -125,7 +125,7 @@ export type {
  * → 45 个图标的几何数据约 5 kB（brotli 后）
  * → 静态导出 → 主入口 27 kB → 超了 25 kB 的预算 ❌
  * → 改成**独立入口**：import { getIconShape } from '@scholar-space/pdf-viewer/icons'
- * → 主入口只在**真正渲染内置图标时**动态加载 ✅
+ * → 主入口只在**真正渲染内置图标时**动态加载
  */
 export type { OutlineItemLike } from './core/outline/outline';
 export type { PaperSize, PrintMargin } from './core/print';
@@ -144,7 +144,7 @@ export type {
   TextPageLike,
 } from './core/search/search';
 export { PdfSearch } from './core/search/search';
-/* ---------- 选区动作（宿主可配置 ✅） ---------- */
+/* ---------- 选区动作（宿主可配置） ----------*/
 export type {
   SelectionAction,
   SelectionActionContext,

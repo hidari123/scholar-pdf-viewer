@@ -37,7 +37,7 @@
 
 -> 图标几何数据是**懒加载**的 -> **没加载完时整个 SVG 都不渲染** ❌
 -> DOM 里**一会儿有 `<title>`、一会儿没有** -> tooltip 的来源在两个值之间切 ❌
--> 用户反馈："第一次悬浮上去显示中文 鼠标移开再上去就英文了" ✅
+-> 用户反馈："第一次悬浮上去显示中文 鼠标移开再上去就英文了"
 
 **修法**：没传 `title` 就不渲染 `<title>`；Toolbar 的 10 个图标**都传上本地化 title**。
 
@@ -53,7 +53,7 @@
 ### 真 bug 3：高亮浮层的 5 个按钮**硬编码中文**
 
 -> `highlight-actions.ts` 写死了"添加批注/选择高亮颜色/复制/删除/更多" ❌
--> **高亮浮层永远中文，选区浮层永远英文** -> **两个浮层并排 = 混杂** ✅
+-> **高亮浮层永远中文，选区浮层永远英文** -> **两个浮层并排 = 混杂**
 
 **修法**：改成 **key -> MessageKey 的映射**，新增 5 个 i18n key（zh/en/ja/fr 四套齐全）。
 **没传 `t` -> 退化成 key（不是中文）**（宁可显示 key，也不显示错语言）。
@@ -69,15 +69,15 @@
 
 ### 顺带清理
 
-- 删掉死代码 `BUILTIN_ACTION_LABELS` / `useMessages` / `resolveIcon` ✅
-- demo 的宿主 UI（20 处硬编码中文）-> **接上 demo 自己的 i18n** ✅
+- 删掉死代码 `BUILTIN_ACTION_LABELS` / `useMessages` / `resolveIcon`
+- demo 的宿主 UI（20 处硬编码中文）-> **接上 demo 自己的 i18n**
 
 ## ⑥ 文字颜色 / 清空格式
 
 -> `execCommand('foreColor')` 生成 **`<font color>`** -> **不在白名单** -> **颜色被剥掉** ❌
--> **实测确认**：`execCommand('styleWithCSS', false, 'true')` **先调一次** -> 生成 **`<span style>`** ✅
+-> **实测确认**：`execCommand('styleWithCSS', false, 'true')` **先调一次** -> 生成 **`<span style>`**
 （⚠️ 第 4 个参数在 Chrome 里**不生效**，必须单独调一次）
--> `removeFormat` 之前"没反应"是因为**颜色本来就没生效** ✅
+-> `removeFormat` 之前"没反应"是因为**颜色本来就没生效**
 
 ## ② 高亮块被"选中" + ④a 光标不变小手
 
@@ -85,16 +85,16 @@
 
 -> `::selection` 的重置**只覆盖了 `.scpdf-text-layer`** ❌
 -> 高亮块在 **`.scpdf-annotations`**（**兄弟节点**）-> **不继承** ❌
--> **实测排除法**：`pointer-events: none` 的元素**不会**匹配 `:hover` -> 不是 hover 那条路 ✅
--> **修法**：**重置整个根节点** `.scpdf-root ::selection` + 编辑器**例外恢复** ✅
+-> **实测排除法**：`pointer-events: none` 的元素**不会**匹配 `:hover` -> 不是 hover 那条路
+-> **修法**：**重置整个根节点** `.scpdf-root ::selection` + 编辑器**例外恢复**
 
 ### ④a
 
 -> 文本层是 `inset: 0`（铺满整页）-> **子元素的显式 cursor 覆盖继承值** ❌
 -> JS 里 `cursor = ''`（**空字符串 = 清掉内联样式**）❌
--> **修法**：文本层 `cursor: inherit` + 容器 `cursor: text` + JS 离开链接时设 `'text'` ✅
+-> **修法**：文本层 `cursor: inherit` + 容器 `cursor: text` + JS 离开链接时设 `'text'`
 
-**实测**：链接上 `pointer` / 文字上 `text` ✅
+**实测**：链接上 `pointer` / 文字上 `text`
 
 ## ⑦ 跨页选区后浮层定位跑偏 + 往下滚会消失
 
@@ -103,8 +103,8 @@
 
 **修法**：
 
-- `readLiveAnchor()` 改成读 `getClientRects()` 的**【最后一个】**（用户最后选到的那一行）✅
-- 新增**吸附（sticky）模式**：选区滚出视野 -> 浮层吸到容器边缘（**不消失**）✅
+- `readLiveAnchor()` 改成读 `getClientRects()` 的**【最后一个】**（用户最后选到的那一行）
+- 新增**吸附（sticky）模式**：选区滚出视野 -> 浮层吸到容器边缘（**不消失**）
 
 **实测**（跨页拖选 + 三段滚动）：
 
@@ -126,7 +126,7 @@
 **⚠️ 实现陷阱**：必须用 **ref**，不能加进 `handleSelectionChange` 的依赖数组
 （会让 `useTextSelection` 反复解绑/重绑 document 监听器）。
 
-**实测**：选中 `shapes=1` -> 批注中 `shapes=1` -> 取消后 `shapes=0` ✅
+**实测**：选中 `shapes=1` -> 批注中 `shapes=1` -> 取消后 `shapes=0`
 
 ## ⑤ 批注框贴着屏幕右边
 
@@ -135,20 +135,20 @@
 
 **修法**：
 
-- 安全边距**跟视口宽度成比例**：`max(48, min(96, round(vw * 0.06)))` ✅
-- **锚点靠右时按右边缘对齐**（弹窗向左展开）✅
-- CSS 宽度 `min(480px, calc(100vw - 96px))` ✅
+- 安全边距**跟视口宽度成比例**：`max(48, min(96, round(vw * 0.06)))`
+- **锚点靠右时按右边缘对齐**（弹窗向左展开）
+- CSS 宽度 `min(480px, calc(100vw - 96px))`
 
 **⭐ 顺带把定位逻辑抽成纯函数**（`core/selection/dialog-position.ts`）——
-之前内嵌在组件里 -> jsdom 没布局 -> **没法单测** -> 现在 **12 条单测** ✅
+之前内嵌在组件里 -> jsdom 没布局 -> **没法单测** -> 现在 **12 条单测**
 
-**实测**：最靠右的行 **rightGap 24px -> 264px** ✅
+**实测**：最靠右的行 **rightGap 24px -> 264px**
 
 ## ④b/④c 目录/链接点了没反应 + 跳转两次
 
 ### 关键发现：内部链接**从来就没跳成功过**
 
--> PDF 里的链接**大量是"命名目标"**（实测 demo 样张：`"section.1"` / `"section.2"`）✅
+-> PDF 里的链接**大量是"命名目标"**（实测 demo 样张：`"section.1"` / `"section.2"`）
 -> 命名目标要 `getDestination()`（**异步**）才能展开 ❌
 -> 而之前**只用同步的** `pageRefToNumber` -> **永远解析不出来** ❌
 
@@ -159,7 +159,7 @@
 |        | scrollTop        | 页码                   |
 | ------ | ---------------- | ---------------------- |
 | 修复前 | 1900 -> 1900     | 1 -> 1（**没反应**）❌ |
-| 修复后 | 1900 -> **3850** | 1 -> **3** ✅          |
+| 修复后 | 1900 -> **3850** | 1 -> **3**             |
 
 ### 新的 `onInternalLink` 契约（用户明确要求）
 
@@ -175,23 +175,23 @@ onInternalLink?: (ctx: {
 }) => void;
 ```
 
--> **跳转只有一个执行者** -> 不会跳两次 ✅
--> **幂等锁**：同一目标页 200ms 内只跳一次 ✅
--> **目标页 == 当前页** -> 照样跳，而且滚到**那一行**（用 `targetY`）✅
--> 解析不出来 -> **toast 提示**（不静默）✅
+-> **跳转只有一个执行者** -> 不会跳两次
+-> **幂等锁**：同一目标页 200ms 内只跳一次
+-> **目标页 == 当前页** -> 照样跳，而且滚到**那一行**（用 `targetY`）
+-> 解析不出来 -> **toast 提示**（不静默）
 
-**实测**：`不取消 -> 跳了=true` / `取消后 -> 跳了=false` ✅
+**实测**：`不取消 -> 跳了=true` / `取消后 -> 跳了=false`
 
 ### 目录的静默失败
 
 -> 之前 `pageRefToNumber={... ?? (() => null)}` -> **内联箭头** -> 每次渲染新函数 + **永远返回 null** ❌
--> 现在用**稳定的** `resolveRefSync` + **完全解析不出来时显示提示** ✅
+-> 现在用**稳定的** `resolveRefSync` + **完全解析不出来时显示提示**
 
 ## 顺带修的 E2E（**测试自己有 bug**）
 
 -> 4 个 E2E 用 `select[aria-label="语言"]` 找语言下拉框 ❌
 -> **aria-label 现在也是本地化的** -> en 模式下是 "Language" -> **找不到** ❌
--> 改成 `select:has(option[value="en"])`（**语言无关**）✅
+-> 改成 `select:has(option[value="en"])`（**语言无关**）
 -> `e2e-popover-anchor.mjs` 用**并集 bbox** 测间距 -> 浮层改锚点后**误报** ❌ -> 改成**最后一个 client rect** ✅
 
 ## 体积
@@ -215,8 +215,8 @@ onInternalLink?: (ctx: {
 - `pnpm verify` -> **9/9 全绿**
 - `pnpm test` -> **737 passed**（58 files，+35）
 - E2E -> **559/559**（0 套件失败）
-- `node scripts/audit-i18n.mjs` -> **✅ 没有发现问题**（104 keys，四语言齐全）
-- **浏览器实测**：每个 bug 都有可复现的数字 ✅
+- `node scripts/audit-i18n.mjs` -> \*\* 没有发现问题**（104 keys，四语言齐全）
+- **浏览器实测**：每个 bug 都有可复现的数字
 
 ---
 
@@ -235,13 +235,13 @@ Error: There is no mark type named 'textStyle'.
 
 ### 根因
 
--> TipTap 的 `Color` 扩展是**基于 `textStyle` 实现的** ✅
--> `setColor` 内部会 `setMark('textStyle', { color })` ✅
+-> TipTap 的 `Color` 扩展是**基于 `textStyle` 实现的**
+-> `setColor` 内部会 `setMark('textStyle', { color })`
 -> 但 **StarterKit v3 不包含 `TextStyle`** ❌
--> 实测它的 dist 里只有 18 个扩展（bold/italic/...）**没有 textStyle** ✅
+-> 实测它的 dist 里只有 18 个扩展（bold/italic/...）**没有 textStyle**
 -> 只注册 `Color` 不注册 `TextStyle` -> **调用 setColor 直接抛错** ❌
 -> **文字颜色功能 100% 失效** ❌
--> 用户看到："点击会打开一个空的窄的框" ✅
+-> 用户看到："点击会打开一个空的窄的框"
 
 > ⚠️ **第 24 轮只修了【内置编辑器】**（`execCommand('styleWithCSS')`）❌
 > -> 但 **demo 用的是 TipTap**（`annotationEditor={TipTapEditor}`）❌
@@ -249,25 +249,25 @@ Error: There is no mark type named 'textStyle'.
 
 ### 修法
 
--> **显式注册 `TextStyle`** ✅
--> `@tiptap/extension-text-style` 加为 devDep + **optional peerDep** ✅
+-> **显式注册 `TextStyle`**
+-> `@tiptap/extension-text-style` 加为 devDep + **optional peerDep**
 
 ### ⭐ 顺带补上 TipTap 缺失的颜色面板
 
 -> 之前 TipTap 的工具栏**根本没有颜色面板** ❌
 -> 点"文字颜色"-> **直接应用第一个颜色** ❌
 -> 内置编辑器**有**面板 -> **两边行为不一致** ❌
--> 现在：**两边一致** ✅
+-> 现在：**两边一致**
 
 ### ⭐ 修 `hiliteColor` 没传颜色值
 
 -> 之前 `toggleHighlight`（**不带值**）-> 选哪个色都一样 ❌
--> 现在：`toggleHighlight({ color: value })` ✅
+-> 现在：`toggleHighlight({ color: value })`
 
 ### "清空格式"和"文字颜色"区分开
 
--> 只有 `hiliteColor` / `foreColor` 会弹面板 ✅
--> `removeFormat` -> `unsetAllMarks` -> **直接执行** ✅
+-> 只有 `hiliteColor` / `foreColor` 会弹面板
+-> `removeFormat` -> `unsetAllMarks` -> **直接执行**
 
 ## ② 批注期间点到底下的高亮 -> 蓝色选区框消失
 
@@ -279,14 +279,14 @@ Error: There is no mark type named 'textStyle'.
 
 ### 修法
 
--> **正在批注**（`isPendingNoteRef.current`）-> **不清选区** ✅
+-> **正在批注**（`isPendingNoteRef.current`）-> **不清选区**
 
 ### 实测
 
 |        | 蓝色框              | 批注弹窗 |
 | ------ | ------------------- | -------- |
 | 修复前 | `shapes: 1 -> 0` ❌ | 还在     |
-| 修复后 | `shapes: 1 -> 1` ✅ | 还在 ✅  |
+| 修复后 | `shapes: 1 -> 1`    | 还在     |
 
 ## 测试
 
@@ -297,18 +297,18 @@ Error: There is no mark type named 'textStyle'.
 | `scripts/e2e-richtext-color.mjs`             | 13   | 面板弹出 / 有色块 / 不是空的窄框 / 选色生效 / 没有 textStyle 报错 / 两个按钮不同 / 清除格式生效 |
 | `scripts/e2e-annotation-highlight-under.mjs` | 7    | 蓝色框保留 / 弹窗没被点掉 / `::selection` 透明                                                  |
 
-**顺带修的 E2E**：`e2e-ui-polish.mjs` 点"高亮"后要**先选色块**（行为变了）✅
+**顺带修的 E2E**：`e2e-ui-polish.mjs` 点"高亮"后要**先选色块**（行为变了）
 
 ## 文档
 
--> README / EXTENDING.md 加了 **TipTap peer 依赖清单** ✅
--> 明确写出 `@tiptap/extension-text-style` 少了会怎样 ✅
+-> README / EXTENDING.md 加了 **TipTap peer 依赖清单**
+-> 明确写出 `@tiptap/extension-text-style` 少了会怎样
 
 ## 验证
 
 - `pnpm test` -> **737 passed**
 - `pnpm verify` -> **9/9 全绿**
 - E2E -> **579/579**（0 套件失败，比上轮 +20）
-- 体积：主入口 **32.85 / 33 kB** ✅
+- 体积：主入口 **32.85 / 33 kB**
 
 ---
