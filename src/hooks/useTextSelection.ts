@@ -1157,7 +1157,7 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
        * ⚠️⚠️ **必须用【过滤后】的矩形**（实测踩到的坑）。
        *
        * -> 之前用的是**原始的 `rects`** ❌
-       * -> `filterByDragOrigin` 的结果**只喂给了自绘层** ❌
+       * -> 过滤结果**只喂给了自绘层** ❌
        *    -> 自绘的选区是对的 ✅
        *    -> 但**提取出来的高亮**用的是原始矩形 ❌
        *    -> 跨页时原始矩形包含**整页** -> 高亮全落在第 1 页 ❌
@@ -1440,7 +1440,7 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
     /*
      * ⚠️ **记住拖动的起点**（用于过滤"另一列"的矩形）。
      *
-     * 见 `core/selection/drag-origin.ts` 的说明。
+     * 见 `core/selection/dom-order.ts` 的说明。
      *
      * → 在**容器**上监听（不是 document）→ 点容器外的按钮不算拖动。
      * → 只在**文本层内**按下才算（否则点工具栏也会被记成起点）。

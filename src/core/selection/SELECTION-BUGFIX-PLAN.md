@@ -46,6 +46,7 @@
 - → 右栏里**比起点高**的行（右栏的上半部分）**全被丢掉** ❌
 
 > 实测（页 3 ✅ 跨栏拖 ✅）：
+>
 > ```
 > 浏览器给 10 个 rect（top = 350/350/370/370/390×6 ✅）
 > 垂直过滤后只剩 6 个 ✅ -> top=350 和 370 那两行没了 ✅
@@ -91,8 +92,8 @@ afterVertical: 37  （❌ 垂直过滤把范围又放宽了 ✅）
 
 ```ts
 export interface DomOrderItem {
-  pageNumber: number;   // data-page-number ✅
-  itemIndex: number;    // data-item-index ✅（新增 ✅）
+  pageNumber: number; // data-page-number ✅
+  itemIndex: number; // data-item-index ✅（新增 ✅）
   rect: ClientRectLike;
 }
 
@@ -110,11 +111,11 @@ export function clipByDomOrder(input: {
 3. 保留 `[min, max]` 区间内的项 ✅
 
 **关键兜底**（上次踩的坑 ✅）：
-| 情况 | 行为 |
-|---|---|
-| 起点/终点不在文本层 | **全保留**（点在空白处 ✅ / 保守 ✅）|
-| **找不到起点**（被过滤掉了 ✅） | **退化到第 0 项** ✅ ❌ 不是全保留 ✅ |
-| **找不到终点** | **退化到最后一项** ✅ ❌ 不是全保留 ✅ |
+| 情况                            | 行为                                   |
+| ------------------------------- | -------------------------------------- |
+| 起点/终点不在文本层             | **全保留**（点在空白处 ✅ / 保守 ✅）  |
+| **找不到起点**（被过滤掉了 ✅） | **退化到第 0 项** ✅ ❌ 不是全保留 ✅  |
+| **找不到终点**                  | **退化到最后一项** ✅ ❌ 不是全保留 ✅ |
 
 > 最后两条是这次新加的 —— 全保留会导致"多选几十项" ❌
 
@@ -167,11 +168,11 @@ return r.top + r.height > fromY && r.top < toY;
 
 替代 `drag-origin.ts` 里的行分段/空洞判断 ✅
 
-| 保留 | 丢弃 |
-|---|---|
-| 正文 | 整页矩形（`height > 页高/3` ✅）|
-| | 旋转文字（超高 ✅）|
-| | 竖排页边戳（水平离群 ✅）|
+| 保留 | 丢弃                             |
+| ---- | -------------------------------- |
+| 正文 | 整页矩形（`height > 页高/3` ✅） |
+|      | 旋转文字（超高 ✅）              |
+|      | 竖排页边戳（水平离群 ✅）        |
 
 **页边戳判据**：用 `columns.ts`（**已存在但是死代码 ✅**）算栏 ✅
 → 矩形中心不在任何栏内 → 剔除 ✅
@@ -191,15 +192,15 @@ return r.top + r.height > fromY && r.top < toY;
 ### 单元测试
 
 **`src/core/selection/dom-order.test.ts`**（新增 ✅）
-| 用例 | 断言 |
-|---|---|
-| 单栏区间 | 区间内全保留 ✅ 区间外全丢 ✅ |
-| 反向拖动 | 与正向对称 ✅ |
-| 跨页 | 区间连续 ✅ |
-| 起点不在文本层 | 全保留 ✅ |
-| **找不到起点** | **退化到第 0 项**（不是全保留 ✅）|
-| **找不到终点** | **退化到最后一项** ✅ |
-| **回归** | 7 行 / 52 rect → **一个都不丢** ✅ |
+| 用例           | 断言                               |
+| -------------- | ---------------------------------- |
+| 单栏区间       | 区间内全保留 ✅ 区间外全丢 ✅      |
+| 反向拖动       | 与正向对称 ✅                      |
+| 跨页           | 区间连续 ✅                        |
+| 起点不在文本层 | 全保留 ✅                          |
+| **找不到起点** | **退化到第 0 项**（不是全保留 ✅） |
+| **找不到终点** | **退化到最后一项** ✅              |
+| **回归**       | 7 行 / 52 rect → **一个都不丢** ✅ |
 
 **`src/core/selection/filter-outliers.test.ts`**（新增 ✅）
 - 整页矩形剔除 ✅ / 旋转文字剔除 ✅ / 页边戳剔除 ✅
@@ -216,14 +217,14 @@ return r.top + r.height > fromY && r.top < toY;
 → 按 top 分桶 ✅ → 两边分桶方式不同 ✅ → 必然对不上 ✅ ❌
 → 唯一客观的粒度是**文本项** ✅
 
-| # | 场景 | 断言 |
-|---|---|---|
-| 1 | **单栏多行拖选** | 项级：丢 0 ✅ 多 0 ✅ |
-| 2 | **跨栏拖（右→左）** | 右栏上半部分被选中 ✅ |
-| 3 | **反向拖（右→左）** | 选区行数 >= 3 ✅（不再是 2 行 ✅）|
-| 4 | **正向拖（左→右）** | 与 Chrome 一致 ✅ |
-| 5 | 页边戳页 | 选区不横跨整页 ✅ |
-| 6 | 跨页 | 两页内容都在 ✅ 页眉未被误选 ✅ |
+| #   | 场景                | 断言                               |
+| --- | ------------------- | ---------------------------------- |
+| 1   | **单栏多行拖选**    | 项级：丢 0 ✅ 多 0 ✅              |
+| 2   | **跨栏拖（右→左）** | 右栏上半部分被选中 ✅              |
+| 3   | **反向拖（右→左）** | 选区行数 >= 3 ✅（不再是 2 行 ✅） |
+| 4   | **正向拖（左→右）** | 与 Chrome 一致 ✅                  |
+| 5   | 页边戳页            | 选区不横跨整页 ✅                  |
+| 6   | 跨页                | 两页内容都在 ✅ 页眉未被误选 ✅    |
 
 ### 回归
 
@@ -235,19 +236,19 @@ return r.top + r.height > fromY && r.top < toY;
 
 ## 六、改动清单
 
-| 文件 | 类型 | 说明 |
-|---|---|---|
-| `src/components/TextLayer.tsx` | 改 | 加 `data-item-index` ✅ |
-| `src/core/selection/dom-order.ts` | **新增** | 文档顺序裁剪（纯计算 ✅）|
-| `src/core/selection/dom-order.test.ts` | **新增** | 单测 ✅ |
-| `src/core/selection/filter-outliers.ts` | **新增** | 离群项过滤 ✅ |
-| `src/core/selection/filter-outliers.test.ts` | **新增** | 单测 ✅ |
-| `src/core/selection/drag-origin.ts` | 删 | 逻辑迁到上面两个 ✅ |
-| `src/core/selection/drag-origin.test.ts` | 删 | 迁到新模块 ✅ |
-| `src/core/selection/columns.ts` | 改 | 从死代码接进链路 ✅ |
-| `src/hooks/useTextSelection.ts` | 改 | 换管线 + 垂直过滤双向 ✅ |
-| `src/hooks/useTextSelection.test.ts` | 改 | mock 要补 `data-item-index` ✅ |
-| `scripts/e2e-selection-dom-order.mjs` | **新增** | E2E（Chrome 为 oracle ✅）|
+| 文件                                         | 类型     | 说明                           |
+| -------------------------------------------- | -------- | ------------------------------ |
+| `src/components/TextLayer.tsx`               | 改       | 加 `data-item-index` ✅        |
+| `src/core/selection/dom-order.ts`            | **新增** | 文档顺序裁剪（纯计算 ✅）      |
+| `src/core/selection/dom-order.test.ts`       | **新增** | 单测 ✅                        |
+| `src/core/selection/filter-outliers.ts`      | **新增** | 离群项过滤 ✅                  |
+| `src/core/selection/filter-outliers.test.ts` | **新增** | 单测 ✅                        |
+| `src/core/selection/drag-origin.ts`          | 删       | 逻辑迁到上面两个 ✅            |
+| `src/core/selection/drag-origin.test.ts`     | 删       | 迁到新模块 ✅                  |
+| `src/core/selection/columns.ts`              | 改       | 从死代码接进链路 ✅            |
+| `src/hooks/useTextSelection.ts`              | 改       | 换管线 + 垂直过滤双向 ✅       |
+| `src/hooks/useTextSelection.test.ts`         | 改       | mock 要补 `data-item-index` ✅ |
+| `scripts/e2e-selection-dom-order.mjs`        | **新增** | E2E（Chrome 为 oracle ✅）     |
 
 ---
 
@@ -271,13 +272,13 @@ return r.top + r.height > fromY && r.top < toY;
 
 ## 八、风险
 
-| 风险 | 对策 |
-|---|---|
+| 风险                         | 对策                                                         |
+| ---------------------------- | ------------------------------------------------------------ |
 | `data-item-index` 缩放后变化 | 索引只需**同一时刻自洽** ✅ 缩放时 rect 和 items 一起重算 ✅ |
-| 宿主没传 `baselines` | 页边戳剔除退化为"用拖动 x 范围判断" ✅ 保守 ✅ |
-| `computeColumns` 误判单栏 | 已有"单栏快速判断" ✅ + 加"找不到栏就不剔除"兜底 ✅ |
-| 改动面大 | 分步提交 ✅ 每步跑 `verify` + 全部选区 E2E ✅ |
-| 上次的"多选 33 项" | 兜底改成"退化到边界" ✅ + E2E 断言"多选 0" ✅ |
+| 宿主没传 `baselines`         | 页边戳剔除退化为"用拖动 x 范围判断" ✅ 保守 ✅               |
+| `computeColumns` 误判单栏    | 已有"单栏快速判断" ✅ + 加"找不到栏就不剔除"兜底 ✅          |
+| 改动面大                     | 分步提交 ✅ 每步跑 `verify` + 全部选区 E2E ✅                |
+| 上次的"多选 33 项"           | 兜底改成"退化到边界" ✅ + E2E 断言"多选 0" ✅                |
 
 ---
 

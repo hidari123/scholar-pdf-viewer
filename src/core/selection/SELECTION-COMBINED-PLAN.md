@@ -7,10 +7,10 @@
 
 ## 一、两个需求
 
-| # | 需求 | 现状 |
-|---|---|---|
+| #     | 需求                                     | 现状           |
+| ----- | ---------------------------------------- | -------------- |
 | **A** | **字符级选框** —— 选一个字符不能涂一整块 | 已回退 ✅ 正常 |
-| **B** | **反向选择** —— 从后往前选要正常 | ❌ 边界项丢失 |
+| **B** | **反向选择** —— 从后往前选要正常         | ❌ 边界项丢失  |
 
 ---
 
@@ -108,8 +108,8 @@ return r.top + r.height > fromY;
 
 ```ts
 export interface DomOrderItem {
-  pageNumber: number;   // data-page-number ✅
-  itemIndex: number;    // data-item-index ✅（新增 ✅）
+  pageNumber: number; // data-page-number ✅
+  itemIndex: number; // data-item-index ✅（新增 ✅）
   rect: ClientRectLike;
 }
 
@@ -127,11 +127,11 @@ export function clipByDomOrder(input: {
 3. 保留 `[min, max]` 区间 ✅ -> **反向自动对称** ✅
 
 **兜底**（关键 ✅）：
-| 情况 | 行为 |
-|---|---|
-| 起点/终点不在文本层 | 全保留（点在空白处 ✅）|
-| **找不到起点** | **退化到第 0 项** ❌ 不是全保留 ✅ |
-| **找不到终点** | **退化到最后一项** ✅ |
+| 情况                | 行为                               |
+| ------------------- | ---------------------------------- |
+| 起点/终点不在文本层 | 全保留（点在空白处 ✅）            |
+| **找不到起点**      | **退化到第 0 项** ❌ 不是全保留 ✅ |
+| **找不到终点**      | **退化到最后一项** ✅              |
 
 > "找不到时全保留"会导致多选几十项 ✅ -> 必须收敛 ✅
 
@@ -200,11 +200,11 @@ return r.top + r.height > fromY && r.top < toY;
 
 **位置**：新增 `src/core/selection/filter-outliers.ts`
 
-| 保留 | 丢弃 |
-|---|---|
-| 正文 | 整页矩形（`height > 页高/3` ✅）|
-| | 旋转文字（超高 ✅）|
-| | 竖排页边戳（水平离群 ✅）|
+| 保留 | 丢弃                             |
+| ---- | -------------------------------- |
+| 正文 | 整页矩形（`height > 页高/3` ✅） |
+|      | 旋转文字（超高 ✅）              |
+|      | 竖排页边戳（水平离群 ✅）        |
 
 **不做分行** ✅ -> 不依赖几何启发式 ✅
 
@@ -221,18 +221,18 @@ return r.top + r.height > fromY && r.top < toY;
 
 ## 五、改动清单
 
-| 文件 | 类型 | 说明 |
-|---|---|---|
-| `src/components/TextLayer.tsx` | 改 | 加 `data-item-index` ✅ |
-| `src/core/selection/dom-order.ts` | **新增** | DOM 顺序裁剪 ✅ |
-| `src/core/selection/dom-order.test.ts` | **新增** | 单测 ✅ |
-| `src/core/selection/filter-outliers.ts` | **新增** | 离群项过滤 ✅ |
-| `src/core/selection/filter-outliers.test.ts` | **新增** | 单测 ✅ |
-| `src/hooks/useTextSelection.ts` | 改 | 换管线 + 字符级矩形 + 双向垂直 ✅ |
-| `src/hooks/useTextSelection.test.ts` | 改 | mock 补 `data-item-index` ✅ |
-| `src/core/selection/drag-origin.ts` | 删 | 逻辑迁到上面 ✅ |
-| `src/core/selection/drag-origin.test.ts` | 删 | 迁到新模块 ✅ |
-| `scripts/e2e-selection-dom-order.mjs` | **新增** | E2E ✅ |
+| 文件                                         | 类型     | 说明                              |
+| -------------------------------------------- | -------- | --------------------------------- |
+| `src/components/TextLayer.tsx`               | 改       | 加 `data-item-index` ✅           |
+| `src/core/selection/dom-order.ts`            | **新增** | DOM 顺序裁剪 ✅                   |
+| `src/core/selection/dom-order.test.ts`       | **新增** | 单测 ✅                           |
+| `src/core/selection/filter-outliers.ts`      | **新增** | 离群项过滤 ✅                     |
+| `src/core/selection/filter-outliers.test.ts` | **新增** | 单测 ✅                           |
+| `src/hooks/useTextSelection.ts`              | 改       | 换管线 + 字符级矩形 + 双向垂直 ✅ |
+| `src/hooks/useTextSelection.test.ts`         | 改       | mock 补 `data-item-index` ✅      |
+| `src/core/selection/drag-origin.ts`          | 删       | 逻辑迁到上面 ✅                   |
+| `src/core/selection/drag-origin.test.ts`     | 删       | 迁到新模块 ✅                     |
+| `scripts/e2e-selection-dom-order.mjs`        | **新增** | E2E ✅                            |
 
 ---
 
@@ -241,15 +241,15 @@ return r.top + r.height > fromY && r.top < toY;
 ### 单测
 
 **`dom-order.test.ts`**
-| 用例 | 断言 |
-|---|---|
-| 单栏区间 | 区间内保留 ✅ 区间外丢弃 ✅ |
-| **反向拖选** | **与正向完全对称** ✅ |
-| 跨栏 | 区间内全保留 ✅ |
-| 跨页 | 区间连续 ✅ |
-| 起点不在文本层 | 全保留 ✅ |
-| 找不到起点/终点 | 退化到边界 ✅ |
-| **52-rect 回归** | **一个都不丢** ✅ |
+| 用例             | 断言                        |
+| ---------------- | --------------------------- |
+| 单栏区间         | 区间内保留 ✅ 区间外丢弃 ✅ |
+| **反向拖选**     | **与正向完全对称** ✅       |
+| 跨栏             | 区间内全保留 ✅             |
+| 跨页             | 区间连续 ✅                 |
+| 起点不在文本层   | 全保留 ✅                   |
+| 找不到起点/终点  | 退化到边界 ✅               |
+| **52-rect 回归** | **一个都不丢** ✅           |
 
 **`filter-outliers.test.ts`**
 - 整页矩形 / 旋转文字 / 页边戳剔除 ✅
@@ -261,14 +261,14 @@ return r.top + r.height > fromY && r.top < toY;
 **比较粒度必须是【项】** ✅ 不是【行】✅
 （浏览器对同一视觉行会给多个 top 不同的 rect ✅）
 
-| # | 场景 | 断言 |
-|---|---|---|
-| 1 | **选 1 个字符** | 涂的宽度 ≈ Chrome ✅（不是整块 ✅）|
-| 2 | **反向拖** | 项集合 == Chrome ✅ |
-| 3 | 跨栏拖 | 项集合 == Chrome ✅ |
-| 4 | 正向拖 | 项集合 == Chrome ✅ |
-| 5 | 页边戳页 | 不横跨整页 ✅ |
-| 6 | 跨页 | 两页都在 ✅ |
+| #   | 场景            | 断言                                |
+| --- | --------------- | ----------------------------------- |
+| 1   | **选 1 个字符** | 涂的宽度 ≈ Chrome ✅（不是整块 ✅） |
+| 2   | **反向拖**      | 项集合 == Chrome ✅                 |
+| 3   | 跨栏拖          | 项集合 == Chrome ✅                 |
+| 4   | 正向拖          | 项集合 == Chrome ✅                 |
+| 5   | 页边戳页        | 不横跨整页 ✅                       |
+| 6   | 跨页            | 两页都在 ✅                         |
 
 ### 回归
 
@@ -297,13 +297,13 @@ return r.top + r.height > fromY && r.top < toY;
 
 ## 八、风险
 
-| 风险 | 对策 |
-|---|---|
-| DOM 顺序裁剪后**边界项**没矩形 | 步骤 4 专门处理 ✅ |
-| 字符级矩形**跨栏归属**错 | 按中心点归属 ✅ + 回退项级 ✅ |
-| 垂直过滤双向后**放宽太多** | 用内容坐标 ✅ + 20px 容差 ✅ |
-| 基线裁剪把字符级矩形**拉回整行** | 部分选中的项**跳过**基线裁剪 ✅ |
-| `drag-origin.ts` 删了**别处还在用** | 先 grep 确认 ✅（已确认 ✅）|
+| 风险                                | 对策                            |
+| ----------------------------------- | ------------------------------- |
+| DOM 顺序裁剪后**边界项**没矩形      | 步骤 4 专门处理 ✅              |
+| 字符级矩形**跨栏归属**错            | 按中心点归属 ✅ + 回退项级 ✅   |
+| 垂直过滤双向后**放宽太多**          | 用内容坐标 ✅ + 20px 容差 ✅    |
+| 基线裁剪把字符级矩形**拉回整行**    | 部分选中的项**跳过**基线裁剪 ✅ |
+| `drag-origin.ts` 删了**别处还在用** | 先 grep 确认 ✅（已确认 ✅）    |
 
 ---
 
