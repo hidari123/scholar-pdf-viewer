@@ -153,12 +153,6 @@ export default function App() {
         setPrintOrientation(orientation);
       },
       /**
-       * **打开工具栏的"高亮"按钮**（E2E 用）
-       */
-      enableToolbarHighlight() {
-        setShowToolbarHighlight(true);
-      },
-      /**
        * **开关功能**（第 29 轮新增）。
        */
       setDisabledFeatures(list: string[]) {
@@ -265,7 +259,6 @@ export default function App() {
    * -> demo 平时**不传**  -> 保持"默认隐藏"的样子
    * -> E2E 里**打开**它来测
    */
-  const [showToolbarHighlight, setShowToolbarHighlight] = useState(false);
   /**
    * **打印方向**（E2E 用）。
    *
@@ -1048,62 +1041,19 @@ export default function App() {
   const toolbarSlot = useMemo(
     () => (
       <>
-        <button
-          type="button"
-          className="scpdf-toolbar__btn"
-          onClick={() => {
-            if (!selection) {
-              setHint('请先在页面里选中一段文字');
-              return;
-            }
-            /*
-             * ⚠️ **走 `viewerRef.current.createHighlight()`**（包的统一入口）。
-             *
-             * → 包会：① 调 `onHighlightCreate`（宿主存）② **清掉选区**。
-             *
-             * 直接调 `handleHighlightCreate` 的话，包不知道"高亮做完了"
-             * → 选区的蓝色块一直浮在新高亮上（用户反馈"无法取消选中状态"）。
-             */
-            viewerRef.current?.createHighlight({
-              color: highlightColor,
-              selectedText: selection.text,
-              position: selection.norm,
-            });
-            setHint(t('demo.savedHighlight'));
-          }}
-          title={t('demo.addHighlight')}
-          aria-label={t('demo.addHighlight')}
-        >
-          <Icon name="highlight" />
-        </button>
-
-        <button
-          type="button"
-          className="scpdf-toolbar__btn"
-          onClick={handleExportHighlights}
-          title={t('demo.exportJson')}
-          aria-label={t('demo.exportJson')}
-        >
-          <Icon name="exportJson" />
-        </button>
-
         {/*
-        **导出带高亮的 PDF**（不是 JSON）。
-
-        ⚠️ `pdf-lib` 是**可选 peerDependency** → 宿主自己装（demo 里装了）。
-        → 包只给纯函数 + 坐标换算；取文件 / 触发下载是宿主的事。
-        */}
-        <button
-          type="button"
-          className="scpdf-toolbar__btn"
-          onClick={handleExportAnnotatedPdf}
-          title={t('demo.exportPdf')}
-          aria-label={t('demo.exportPdf')}
-        >
-          {/* ⚠️ **新图标**：之前用 `exportPdf` -> 和"下载 PDF"重复 ❌ */}
-          <Icon name="exportAnnotated" />
-        </button>
-
+         * ⚠️⚠️ **这三个按钮删掉了**（审计发现的重复 ✅）。
+         *
+         * -> demo 同时把 `onDownloadPdf` / `onExportAnnotatedPdf` / `onExportHighlights`
+         *    传给了包 ✅ -> **包的工具栏已经渲染这三个按钮** ✅
+         * -> 这里再手写一遍 ✅ -> **每个按钮出现两次** ✅ ❌
+         *
+         * 实测（浏览器 ✅）：工具栏 20 个按钮 ✅
+         *   下载 PDF x2 ✅ / 导出带高亮的 PDF x2 ✅ / 导出高亮 x2 ✅ ❌
+         *
+         * -> 现在只保留**包里没有的**"导入高亮" ✅
+         * -> 导出/下载走包的工具栏 ✅ -> 宿主不用重复实现 ✅
+         */}
         <button
           type="button"
           className="scpdf-toolbar__btn"
@@ -1111,30 +1061,11 @@ export default function App() {
           title={t('demo.importJson')}
           aria-label={t('demo.importJson')}
         >
-          {/* ⚠️ **新图标**：之前用 `upload` -> 看起来像"上传 PDF" ❌ */}
           <Icon name="importJson" />
-        </button>
-
-        <button
-          type="button"
-          className="scpdf-toolbar__btn"
-          onClick={handleDownloadPdf}
-          title={t('demo.downloadPdf')}
-          aria-label={t('demo.downloadPdf')}
-        >
-          <Icon name="download" />
         </button>
       </>
     ),
-    [
-      selection,
-      highlightColor,
-      handleExportHighlights,
-      handleImportHighlights,
-      handleDownloadPdf,
-      handleExportAnnotatedPdf,
-      t,
-    ],
+    [handleImportHighlights, t],
   );
 
   return (
@@ -1403,19 +1334,23 @@ export default function App() {
            * -> demo 平时**不传**  -> 保持默认的样子
            */
           printOrientation={printOrientation}
-          onToolbarHighlight={
-            showToolbarHighlight
-              ? (color: string) => {
-                  setHighlightColor(color);
-                  if (!selection) {
-                    setHint('（先选中一段文字）');
-                    return;
-                  }
-                  createHighlight(color, selection.text, selection.norm);
-                  setHint(t('demo.savedHighlight'));
-                }
-              : undefined
-          }
+          /*
+           * ⚠️ **包的工具栏高亮按钮**（分裂按钮 🖍 + ▾ ✅）。
+           *
+           * -> 之前藏在 `showToolbarHighlight` 后面 ✅（默认 false ✅）
+           *    -> 注释写的是"E2E 才打开" ✅
+           * -> 现在**默认打开** ✅ -> 宿主不用传 `showHighlight: true` ✅
+           * -> 包里已有内置色板和默认色 ✅ -> 宿主不传色板也能用 ✅
+           */
+          onToolbarHighlight={(color: string) => {
+            setHighlightColor(color);
+            if (!selection) {
+              setHint('（先选中一段文字）');
+              return;
+            }
+            createHighlight(color, selection.text, selection.norm);
+            setHint(t('demo.savedHighlight'));
+          }}
           onHighlightRemove={handleHighlightRemove}
           onHighlightComment={handleHighlightComment}
           stickyNotes={stickyNotes}

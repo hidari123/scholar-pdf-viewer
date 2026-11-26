@@ -56,6 +56,54 @@ describe('Toolbar', () => {
     expect(onExportHighlights).toHaveBeenCalled();
   });
 
+  /*
+   * ⚠️ **显式的显示开关**（`toolbar.showXxx` ✅）
+   *
+   * -> 之前只有"传了回调才显示" ✅
+   * -> 宿主传了回调又不想显示按钮 -> **做不到** ✅ ❌
+   * -> 现在：`false` -> 强制隐藏 ✅（哪怕回调在 ✅）
+   */
+  it('**showDownloadPdf: false -> 隐藏下载按钮**（哪怕回调在 ✅）', () => {
+    setup({ onDownloadPdf: vi.fn(), toolbar: { showDownloadPdf: false } });
+    expect(screen.queryByLabelText('下载 PDF')).toBeNull();
+  });
+
+  it('**showExportAnnotatedPdf: false -> 隐藏导出 PDF 按钮**', () => {
+    setup({ onExportAnnotatedPdf: vi.fn(), toolbar: { showExportAnnotatedPdf: false } });
+    expect(screen.queryByLabelText('导出带高亮的 PDF')).toBeNull();
+  });
+
+  it('**showExportHighlights: false -> 隐藏导出高亮按钮**', () => {
+    setup({ onExportHighlights: vi.fn(), toolbar: { showExportHighlights: false } });
+    expect(screen.queryByLabelText('导出高亮')).toBeNull();
+  });
+
+  it('**showPrint: false -> 隐藏打印按钮**（哪怕回调在 ✅）', () => {
+    setup({ onPrint: vi.fn(), toolbar: { showPrint: false } });
+    expect(screen.queryByLabelText('打印')).toBeNull();
+  });
+
+  it('**showHighlight: false -> 隐藏高亮按钮**', () => {
+    setup({ onToolbarHighlight: vi.fn(), toolbar: { showHighlight: false } });
+    expect(screen.queryByLabelText('高亮')).toBeNull();
+  });
+
+  it('**showTheme: false -> 隐藏主题按钮**', () => {
+    setup({ onThemeChange: vi.fn(), toolbar: { showTheme: false } });
+    expect(screen.queryByLabelText('主题')).toBeNull();
+  });
+
+  it('**showHighlight: true -> 强制显示**（哪怕没传回调 ✅）', () => {
+    setup({ toolbar: { showHighlight: true } });
+    expect(screen.queryByLabelText('高亮')).not.toBeNull();
+  });
+
+  it('**showXxx 不传 -> 保持原行为**（传了回调就显示 ✅）', () => {
+    setup({ onDownloadPdf: vi.fn(), onPrint: vi.fn() });
+    expect(screen.queryByLabelText('下载 PDF')).not.toBeNull();
+    expect(screen.queryByLabelText('打印')).not.toBeNull();
+  });
+
   it('显示当前页与总页数', () => {
     setup();
 

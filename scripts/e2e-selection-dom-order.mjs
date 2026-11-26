@@ -61,7 +61,7 @@ function check(name, ok, detail = '') {
 const readState = () =>
   page.evaluate(() => {
     const sel = window.getSelection();
-    const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+    const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
     const all = [...document.querySelectorAll('.scpdf-text-layer__item')];
     const nativeItems = range ? all.filter((el) => range.intersectsNode(el)) : [];
     const nativeSet = new Set(nativeItems);
