@@ -33,6 +33,17 @@ function makePage(text: string, pageNumber = 1): HTMLElement {
 
   const span = document.createElement('span');
   span.setAttribute('data-page-number', String(pageNumber));
+  /*
+   * ⚠️ **必须带 `data-item-index`** ✅
+   * -> 选区现在按【文档顺序】裁剪 ✅ -> 靠这个属性定位"选了哪一段" ✅
+   * -> 没有它 ✅ -> 项会被跳过 ✅ -> 选区算不出来 ✅
+   */
+  span.setAttribute('data-item-index', '0');
+  /*
+   * ⚠️ **必须有 `scpdf-text-layer__item` 这个 class** ✅
+   * -> `closest(TEXT_LAYER_ITEM_CLASS)` 靠它找到 span ✅
+   */
+  span.className = 'scpdf-text-layer__item';
   span.textContent = text;
   layer.appendChild(span);
   /*
@@ -88,6 +99,26 @@ function mockClientRects(rect: { top: number; left: number; width: number; heigh
     configurable: true,
     writable: true,
     value: () => list,
+  });
+
+  /*
+   * ⚠️⚠️ **还要 mock `Element.prototype.getClientRects`** ✅
+   *
+   * -> 选区现在按【文档顺序】裁剪 ✅
+   * -> -> `collectDomOrderItems` 读的是**每个 span 自己**的 rect ✅
+   *    -> `span.getClientRects()` ✅（不是 Range 的 ✅）
+   * -> jsdom 里 span 的 rect 也是 0 尺寸 ✅ -> 必须 mock ✅
+   */
+  Object.defineProperty(Element.prototype, 'getClientRects', {
+    configurable: true,
+    writable: true,
+    value: function (this: Element) {
+      // ⚠️ 只有文本项才有尺寸 ✅（哨兵 / 页容器没有 ✅）
+      if (!(this instanceof HTMLElement) || !this.classList.contains('scpdf-text-layer__item')) {
+        return [] as unknown as DOMRectList;
+      }
+      return list;
+    },
   });
 }
 

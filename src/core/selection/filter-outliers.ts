@@ -26,6 +26,9 @@
 
 import type { ClientRectLike } from './dom-order';
 
+/** 垂直容差（px）*/
+export const VERTICAL_TOLERANCE = 20;
+
 /**
  * **水平离群的距离阈值**（px）
  *

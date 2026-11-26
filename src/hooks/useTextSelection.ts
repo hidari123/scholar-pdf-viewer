@@ -20,9 +20,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { filterByDragOrigin, VERTICAL_TOLERANCE } from '../core/selection/drag-origin';
+import type { DomOrderItem } from '../core/selection/dom-order';
+import { assignRectsToItems, clipByDomOrder, describeDomOrder } from '../core/selection/dom-order';
 import type { PageFrame } from '../core/selection/extract';
 import { extractSelection } from '../core/selection/extract';
+import { filterOutliers, VERTICAL_TOLERANCE } from '../core/selection/filter-outliers';
 import type { BaselinesByPage } from '../core/selection/shape';
 import type { SelectionData } from '../core/types';
 
@@ -126,6 +128,108 @@ interface SelectionRect {
   left: number;
   width: number;
   height: number;
+}
+
+/** 文本层 span 上的页内项序号属性（文本流顺序）*/
+const ITEM_INDEX_ATTR = 'data-item-index';
+
+/**
+ * **收集页面上的文本项（按文档顺序）**
+ *
+ * ## 做什么
+ *
+ * -> 找出**所有**文本层 span -> 读它们的 `data-page-number` / `data-item-index`
+ * -> 读它们的**浏览器矩形**（`getClientRects()`）
+ * -> 找出 Range 的**起点 / 终点**分别落在哪个项上
+ *
+ * ## 为什么
+ *
+ * -> 浏览器原生选区 = **文档顺序的连续区间**
+ * -> 我们的文本层保持 **PDF 原始顺序**（= 文本流顺序）
+ * -> -> 用 `(pageNumber, itemIndex)` 就能精确定位"选了哪一段"
+ *
+ * ## ⚠️ **这里的矩形只用来定位"哪些项"**，不用来画
+ *
+ * -> `span.getClientRects()` 是**项级**矩形
+ * -> 画选区要用 **Range 的矩形**（**字符级**）
+ * -> -> 否则选一个字符也会把整个项涂上
+ *
+ * @param container 容器
+ * @param range 当前选区的 Range
+ * @returns 项列表 + 起点项 + 终点项
+ */
+function collectDomOrderItems(
+  container: HTMLElement,
+  range: Range,
+): {
+  items: DomOrderItem[];
+  start: DomOrderItem | null;
+  end: DomOrderItem | null;
+} {
+  const spans = container.querySelectorAll<HTMLElement>(`.${TEXT_LAYER_ITEM_CLASS}`);
+
+  const items: DomOrderItem[] = [];
+  /** span -> 项（用于找起点/终点）*/
+  const byEl = new Map<Element, DomOrderItem>();
+
+  for (const span of spans) {
+    const pageNumber = Number(span.getAttribute(PAGE_NUMBER_ATTR));
+    const itemIndex = Number(span.getAttribute(ITEM_INDEX_ATTR));
+
+    // ⚠️ **没有这两个属性 -> 跳过**（旧版本 / 第三方宿主）
+    if (!Number.isFinite(pageNumber) || !Number.isFinite(itemIndex)) {
+      continue;
+    }
+
+    const rects = span.getClientRects();
+    if (rects.length === 0) {
+      continue;
+    }
+
+    // ⚠️ **一个 span 可能给多个 rect**（行盒 + 字形盒）
+    // -> 每个 rect 都属于**这个项** -> 带同一个 (page, index)
+    for (const r of rects) {
+      if (r.width <= 0 || r.height <= 0) {
+        continue;
+      }
+      const item: DomOrderItem = {
+        pageNumber,
+        itemIndex,
+        rect: { top: r.top, left: r.left, width: r.width, height: r.height },
+      };
+      items.push(item);
+      if (!byEl.has(span)) {
+        byEl.set(span, item);
+      }
+    }
+  }
+
+  /*
+   * ⚠️ **找起点 / 终点所在的项**
+   *
+   * -> Range 的边界可能落在**文本节点**里 -> 要往上找 span
+   * -> 找不到 -> `null` -> 走"保守全保留"分支
+   */
+  const findItem = (node: Node | null): DomOrderItem | null => {
+    if (!node) {
+      return null;
+    }
+    const el = node instanceof Element ? node : node.parentElement;
+    if (!el) {
+      return null;
+    }
+    const span = el.closest(`.${TEXT_LAYER_ITEM_CLASS}`);
+    if (!span) {
+      return null;
+    }
+    return byEl.get(span) ?? null;
+  };
+
+  return {
+    items,
+    start: findItem(range.startContainer),
+    end: findItem(range.endContainer),
+  };
 }
 
 /**
@@ -824,9 +928,56 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
       const toContentY = (y: number, scrollTop: number): number => y - contentRect.top + scrollTop;
 
       /*
-       * ⚠️ **先按垂直范围过滤**（丢掉页首那些多出来的矩形）✅
+       * ⚠️⚠️⚠️ **【核心】按【文档顺序】裁剪** ✅
+       *
+       * ## 为什么是它
+       *
+       * -> 浏览器原生选区**本来就是**文档顺序的连续区间 ✅
+       *    （pdf.js 直接用 `::selection` ✅ -> 完全不过滤 ✅）
+       * -> 我们的文本层保持 **PDF 原始顺序** ✅（= 文本流顺序 ✅）
+       * -> -> 所以"用户选了哪一段"**用项序判断最准** ✅ ✅
+       *
+       * ## 它解决【反向选择】✅
+       *
+       * -> 浏览器的 Range 永远 `start < end` ✅（**按文档顺序** ✅）
+       * -> 反向拖（右栏 -> 左栏 ✅）时 ✅ 浏览器会**归一化方向** ✅
+       * -> -> 纯几何判断（只看 y ✅）会把**边界项**丢掉 ✅ ❌
+       *    -> 实测：丢的永远是**起点项**和**终点项** ✅
+       * -> -> 按文档顺序判断 ✅ -> 反向自动对称 ✅ ✅
+       *
+       * ## ⚠️ **它只决定"哪些项"，不决定矩形精度** ✅
+       *
+       * -> 矩形精度来自 **Range 的矩形** ✅（**字符级** ✅）
+       * -> ⚠️ 用项的矩形会**整块涂上** ✅ ❌（实测：选 1 个字 -> 涂 21 个字 ✅）
        */
-      const contentRects = rectsWithGaps.map((r) => ({
+      const domOrderItems = collectDomOrderItems(container, range);
+      const domOrder = clipByDomOrder({
+        items: domOrderItems.items,
+        start: domOrderItems.start,
+        end: domOrderItems.end,
+      });
+
+      /*
+       * ⚠️⚠️ **把 Range 的【字符级矩形】分配给保留的项** ✅
+       *
+       * -> `domOrder.kept` 里的矩形是**项级** ✅ -> 不能直接画 ✅
+       * -> -> 用 Range 的字符级矩形 ✅ 按中心点归属到各项 ✅
+       * -> -> 某项没分到 ✅ -> 回退到该项自己的矩形 ✅
+       */
+      const assigned = assignRectsToItems(domOrder.kept, rectsWithGaps);
+      const charLevelRects = domOrder.kept.flatMap((itemRect, i) => {
+        const sub = assigned.get(i);
+        // ⚠️ **没分到 -> 回退项级** ✅（保守 ✅）
+        return sub && sub.length > 0 ? sub : [itemRect];
+      });
+
+      /*
+       * ⚠️ **换算到【内容坐标】** ✅
+       *
+       * -> 后面所有步骤（垂直过滤 ✅ / 提取 ✅）都在**内容坐标**里做 ✅
+       * -> 这里换算一次 ✅（**只换一次** ✅）
+       */
+      const contentRects = charLevelRects.map((r) => ({
         top: toContentY(r.top, container.scrollTop),
         left: r.left,
         width: r.width,
@@ -855,26 +1006,17 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
           : contentRects;
 
       /*
-       * ⚠️ **过滤掉"旋转文字 / 整页"的矩形** ✅
+       * ⚠️ **剔除离群项** ✅（整页矩形 ✅ / 旋转文字 ✅ / 竖排页边戳 ✅）
        *
        * -> 跨页时浏览器会给一个**整页**的矩形 ❌
-       *    -> 它的水平范围覆盖整页 -> 水平过滤会**以它为准** ❌
-       *    -> -> 真正的正文被丢掉 ❌
+       *    -> 它的水平范围覆盖整页 -> 会把**真正的正文**一起带出来 ❌
        */
-      const verticalFiltered =
-        verticalKept.length > 0
-          ? verticalKept.filter((r) => r.height <= maxNormalHeight)
-          : verticalKept;
+      const outliers = filterOutliers({
+        rects: verticalKept,
+        pageHeight: tallestPage > 0 ? tallestPage : undefined,
+      });
 
-      const withDragOrigin = filterByDragOrigin(
-        verticalFiltered,
-        dragStart && dragEnd
-          ? {
-              startX: dragStart.x,
-              endX: dragEnd.x,
-            }
-          : null,
-      );
+      const withDragOrigin = outliers.kept;
 
       /*
        * ⚠️ **换回【视口坐标】**（自绘层和提取都用视口坐标）✅
@@ -963,8 +1105,28 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
       const filteredRects = withDragOrigin.length > 0 ? withDragOrigin : contentRects;
       if (typeof window !== 'undefined') {
         (window as unknown as { __dbgR?: unknown }).__dbgR = {
+          /*
+           * ⚠️⚠️ **每一级都要单独记** ✅
+           * -> 之前 `raw` / `filtered` 语义混在一起 ✅ -> 排查时极易误判 ✅
+           * -> 现在**每一级都单独记** ✅ -> 一眼看出是哪一级丢的 ✅
+           */
+          browserRects: rects.length,
+          afterDomOrder: domOrder.kept.length,
+          afterCharLevel: charLevelRects.length,
+          afterVertical: verticalKept.length,
+          afterOutlier: outliers.kept.length,
+          final: filteredRects.length,
           raw: rects.length,
           filtered: filteredRects.length,
+          /* 文档顺序裁剪的诊断信息 ✅ */
+          dom: describeDomOrder({
+            items: domOrderItems.items,
+            start: domOrderItems.start,
+            end: domOrderItems.end,
+          }),
+          /* 离群项统计 ✅ */
+          outlierTooTall: outliers.tooTall,
+          outlierHorizontal: outliers.tooFarHorizontally,
           rawMinTop: Math.min(...rects.map((r) => r.top)),
           rawMaxTop: Math.max(...rects.map((r) => r.top)),
           filtMinTop: Math.min(...filteredRects.map((r) => r.top)),
