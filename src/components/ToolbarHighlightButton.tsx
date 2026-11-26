@@ -29,11 +29,18 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { HighlightPalette } from '../core/highlight/palette';
-import { resolveHighlightColorName } from '../core/highlight/palette';
+import { BUILTIN_HIGHLIGHT_PALETTE, resolveHighlightColorName } from '../core/highlight/palette';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
 import { Icon } from './Icon';
+
+/**
+ * **兜底的默认色**（宿主没传 `defaultColor` 时用）。
+ *
+ * -> 内置色板的第一个 key ✅ -> 保证主按钮的色条**不是透明** ✅
+ */
+const FALLBACK_HIGHLIGHT_COLOR = Object.keys(BUILTIN_HIGHLIGHT_PALETTE)[0] ?? 'yellow';
 
 /** 参数 */
 export interface ToolbarHighlightButtonProps {
@@ -80,13 +87,15 @@ export function ToolbarHighlightButton(props: ToolbarHighlightButtonProps) {
   /**
    * ⚠️ **当前色**（上次选的；没选过 = 默认色）
    */
-  const [currentColor, setCurrentColor] = useState<string | null>(defaultColor ?? null);
+  const [currentColor, setCurrentColor] = useState<string | null>(
+    defaultColor ?? FALLBACK_HIGHLIGHT_COLOR,
+  );
 
   /*
    * ⚠️ **默认色变了就跟着变**（宿主改配置）
    */
   useEffect(() => {
-    setCurrentColor(defaultColor ?? null);
+    setCurrentColor(defaultColor ?? FALLBACK_HIGHLIGHT_COLOR);
   }, [defaultColor]);
 
   /*
@@ -116,7 +125,14 @@ export function ToolbarHighlightButton(props: ToolbarHighlightButtonProps) {
     };
   }, [open]);
 
-  const paletteEntries = Object.entries(palette ?? {});
+  /*
+   * ⚠️ **没有色板 -> 用内置的**（宿主不传也能有下拉 ✅）
+   *
+   * -> 用户需求："包工具栏的高亮也需要加个下拉箭头 可以选择颜色"
+   * -> 宿主不传 `highlightPalette` ✅ -> 不该**没有下拉** ✅
+   */
+  const effectivePalette = palette ?? BUILTIN_HIGHLIGHT_PALETTE;
+  const paletteEntries = Object.entries(effectivePalette);
 
   /*
    * ⚠️ **没有色板 -> 只画主按钮**（没有下拉）
@@ -129,6 +145,7 @@ export function ToolbarHighlightButton(props: ToolbarHighlightButtonProps) {
         title={t('selection.actionHighlight')}
         aria-label={t('selection.actionHighlight')}
         onClick={() => onHighlight?.(currentColor ?? defaultColor ?? '')}
+        disabled={!onHighlight}
       >
         <Icon name="highlight" title={t('selection.actionHighlight')} overrides={icons} />
       </button>
@@ -143,6 +160,14 @@ export function ToolbarHighlightButton(props: ToolbarHighlightButtonProps) {
         title={t('selection.actionHighlight')}
         aria-label={t('selection.actionHighlight')}
         onClick={() => onHighlight?.(currentColor ?? defaultColor ?? '')}
+        /*
+         * ⚠️ **没有回调 -> 置灰**
+         *
+         * -> `showHighlight: true` 但宿主还没接回调 ✅
+         * -> 点了没反应 ✅ -> 用户会以为按钮坏了 ❌
+         * -> -> 置灰 ✅ -> 一眼看出"还没接上" ✅
+         */
+        disabled={!onHighlight}
       >
         <Icon name="highlight" title={t('selection.actionHighlight')} overrides={icons} />
         {/*
@@ -152,7 +177,7 @@ export function ToolbarHighlightButton(props: ToolbarHighlightButtonProps) {
         <span
           className="scpdf-toolbar__current-color"
           style={{
-            background: palette?.[currentColor ?? defaultColor ?? ''] ?? 'transparent',
+            background: effectivePalette[currentColor ?? defaultColor ?? ''] ?? 'transparent',
           }}
           aria-hidden="true"
         />

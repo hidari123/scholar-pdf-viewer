@@ -55,6 +55,14 @@ export const DEFAULT_HIGHLIGHT_PALETTE: HighlightPalette = {
 };
 
 /**
+ * **内置的高亮色板**（宿主不传 `highlightPalette` 时用这个）。
+ *
+ * -> 和 `DEFAULT_HIGHLIGHT_PALETTE` **同一份** ✅
+ * -> 组件层直接 import 这个 ✅ -> 不用绕到 `core/config` ✅
+ */
+export const BUILTIN_HIGHLIGHT_PALETTE: HighlightPalette = DEFAULT_HIGHLIGHT_PALETTE;
+
+/**
  * **内置色板 key 的本地化名字**（key → 各语言的名字）。
  *
  * ⚠️ **为什么需要这个**（实测踩到的坑，用户反馈：

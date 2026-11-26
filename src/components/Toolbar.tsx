@@ -182,11 +182,30 @@ export function Toolbar(props: ToolbarProps) {
   const t = (key: keyof Messages, vars?: Record<string, string | number>) =>
     resolveMessage(locale, key, messages, vars, locales);
 
+  /*
+   * ⚠️ **显示开关的语义**（和选区浮层的动作开关一致 ✅）：
+   *
+   * | 值 | 行为 |
+   * |---|---|
+   * | `undefined` | 保持原行为（传了回调就显示） |
+   * | `true` | 强制显示 |
+   * | `false` | 强制隐藏（哪怕回调在） |
+   *
+   * -> 之前打印/下载/导出/高亮**只有"传回调才显示"** ❌
+   *    -> 宿主传了回调又不想显示按钮 -> **做不到** ❌
+   *    -> 有些场景回调要留着（业务逻辑）但按钮先藏着
+   */
   const showPageNav = toolbar.showPageNav !== false;
   const showZoom = toolbar.showZoom !== false;
   const showSearch = toolbar.showSearch !== false;
   const showThumbnails = toolbar.showThumbnails !== false;
   const showOutline = toolbar.showOutline !== false;
+  const showPrint = toolbar.showPrint !== false;
+  const showDownloadPdf = toolbar.showDownloadPdf !== false;
+  const showExportAnnotatedPdf = toolbar.showExportAnnotatedPdf !== false;
+  const showExportHighlights = toolbar.showExportHighlights !== false;
+  const showHighlight = toolbar.showHighlight !== false;
+  const showTheme = toolbar.showTheme !== false;
 
   /** 页码输入框的草稿值（用户正在输入的内容） */
   const [draftPage, setDraftPage] = useState(String(page));
@@ -374,7 +393,7 @@ export function Toolbar(props: ToolbarProps) {
           </>
         ) : null}
 
-        {onPrint ? (
+        {showPrint && onPrint ? (
           <button
             type="button"
             className="scpdf-toolbar__btn"
@@ -402,7 +421,7 @@ export function Toolbar(props: ToolbarProps) {
          * -> 所以：**包提供按钮和入口**  -> **宿主给实现**
          * -> 不传回调  -> **按钮不渲染**
          */}
-        {onDownloadPdf ? (
+        {showDownloadPdf && onDownloadPdf ? (
           <button
             type="button"
             className="scpdf-toolbar__btn"
@@ -414,7 +433,7 @@ export function Toolbar(props: ToolbarProps) {
           </button>
         ) : null}
 
-        {onExportAnnotatedPdf ? (
+        {showExportAnnotatedPdf && onExportAnnotatedPdf ? (
           <button
             type="button"
             className="scpdf-toolbar__btn"
@@ -426,7 +445,7 @@ export function Toolbar(props: ToolbarProps) {
           </button>
         ) : null}
 
-        {onExportHighlights ? (
+        {showExportHighlights && onExportHighlights ? (
           <button
             type="button"
             className="scpdf-toolbar__btn"
@@ -453,10 +472,20 @@ export function Toolbar(props: ToolbarProps) {
          *  如果没有选就是默认的高亮色"）。
          *
          * -> **分裂按钮**：主按钮 = 用当前色高亮，▾ = 选颜色
-         * -> **不传 `onToolbarHighlight` -> 不渲染**
-         *    -> 用户确认："默认隐藏吧"
+         *
+         * ⚠️ **显示条件**（和选区浮层的动作开关一致 ✅）：
+         *
+         * | `toolbar.showHighlight` | 行为 |
+         * |---|---|
+         * | `undefined` | **保持原行为** —— 传了 `onToolbarHighlight` 才显示 |
+         * | `true` | **强制显示**（哪怕没传回调 ✅）|
+         * | `false` | 强制隐藏 |
+         *
+         * -> `true` 但没传回调 ✅ -> 按钮**只显示 UI** ✅
+         *    -> 点了**不会高亮** ✅（没回调可调 ✅）
+         *    -> -> 宿主可以先开 UI ✅ -> 之后再接上回调 ✅
          */}
-        {onToolbarHighlight ? (
+        {showHighlight && (onToolbarHighlight || toolbar.showHighlight === true) ? (
           <ToolbarHighlightButton
             onHighlight={onToolbarHighlight}
             palette={highlightPalette}
@@ -468,7 +497,7 @@ export function Toolbar(props: ToolbarProps) {
           />
         ) : null}
 
-        {onThemeChange ? (
+        {showTheme && onThemeChange ? (
           <>
             <span className="scpdf-toolbar__divider" aria-hidden="true" />
             <ThemePicker

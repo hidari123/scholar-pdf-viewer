@@ -27,8 +27,6 @@
 import type { Locale, LocaleMessages, LocaleTable } from '../../i18n/messages';
 import { MESSAGES } from '../../i18n/messages';
 import type { RichTextPalette } from '../editor/rich-text';
-import type { HighlightPalette } from '../highlight/palette';
-import { DEFAULT_HIGHLIGHT_PALETTE } from '../highlight/palette';
 
 /**
  * **内置的语言表**。
@@ -283,7 +281,7 @@ export const BUILTIN_LOCALES: LocaleTable = {
  *
  * → 和 `DEFAULT_HIGHLIGHT_PALETTE` 一样（独立导出方便宿主引用）
  */
-export const BUILTIN_HIGHLIGHT_PALETTE: HighlightPalette = DEFAULT_HIGHLIGHT_PALETTE;
+export { BUILTIN_HIGHLIGHT_PALETTE } from '../highlight/palette';
 
 /**
  * **内置的批注色板**（富文本编辑器里的"高亮底色"）。

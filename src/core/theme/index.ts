@@ -172,6 +172,40 @@ export interface ToolbarConfig {
   showThumbnails?: boolean;
   /** 显示目录 */
   showOutline?: boolean;
+  /**
+   * 显示打印按钮。
+   *
+   * ⚠️ **语义和选区浮层的动作开关一致**（`core/config` 的 `Features` ✅）：
+   *
+   * | 值 | 行为 |
+   * |---|---|
+   * | `undefined` | 保持原行为（传了 `onPrint` 就显示） |
+   * | `true` | 强制显示 |
+   * | `false` | 强制隐藏（哪怕回调在） |
+   *
+   * -> 之前打印/下载/导出/高亮**只有"传回调才显示"** ❌
+   *    -> 宿主传了回调又不想显示按钮 -> **做不到** ❌
+   *    -> 有些场景回调要留着（业务逻辑）但按钮先藏着
+   */
+  showPrint?: boolean;
+  /** 显示"下载 PDF"按钮（语义同 `showPrint`） */
+  showDownloadPdf?: boolean;
+  /** 显示"导出带高亮的 PDF"按钮（语义同 `showPrint`） */
+  showExportAnnotatedPdf?: boolean;
+  /** 显示"导出高亮 JSON"按钮（语义同 `showPrint`） */
+  showExportHighlights?: boolean;
+  /**
+   * 显示工具栏的"高亮"按钮（分裂按钮 🖍 + ▾）。
+   *
+   * ⚠️ **语义同 `showPrint`**：
+   *
+   * -> `undefined` -> 保持原行为（传了 `onToolbarHighlight` 就显示）
+   * -> `true` -> **强制显示**（宿主不传回调也行 ✅ 用内置色板和默认色 ✅）
+   * -> `false` -> 强制隐藏（宿主自己已经有"加高亮"按钮 -> 不要重复）
+   */
+  showHighlight?: boolean;
+  /** 显示主题按钮（语义同 `showPrint`） */
+  showTheme?: boolean;
   /** 左侧插槽（宿主任意内容） */
   leftSlot?: ReactNode;
   /** 右侧插槽（宿主任意内容） */

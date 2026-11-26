@@ -85,9 +85,38 @@ describe('ToolbarHighlightButton', () => {
     }
   });
 
-  it('**没有色板 -> 只画主按钮**（没有下拉）', () => {
+  it('**没有色板 -> 用内置色板**（有下拉 ✅）', () => {
+    /*
+     * 用户需求："包工具栏的高亮也需要加个下拉箭头 可以选择颜色"
+     *
+     * -> 之前：宿主不传 `highlightPalette` -> **没有下拉** ❌
+     * -> 现在：用内置色板 -> **开箱即用** ✅
+     */
     render(<ToolbarHighlightButton onHighlight={vi.fn()} defaultColor="yellow" />);
-    expect(document.querySelectorAll('.scpdf-toolbar__btn--split-arrow').length).toBe(0);
+    expect(document.querySelectorAll('.scpdf-toolbar__btn--split-arrow').length).toBe(1);
     expect(screen.getByRole('button', { name: '高亮' })).not.toBeNull();
+  });
+
+  it('**没传默认色 -> 主按钮的色条不是透明的**', () => {
+    /*
+     * -> 之前 `defaultColor` 是 `undefined` -> 色条 `background: transparent` ❌
+     * -> 用户看不到"点这个会用哪个颜色" ❌
+     */
+    render(<ToolbarHighlightButton onHighlight={vi.fn()} palette={PALETTE} />);
+    const bar = document.querySelector('.scpdf-toolbar__current-color') as HTMLElement | null;
+    expect(bar).not.toBeNull();
+    expect(bar?.style.background).not.toBe('transparent');
+    expect(bar?.style.background).not.toBe('');
+  });
+
+  it('**没有回调 -> 主按钮禁用**（但下拉还能用）', () => {
+    /*
+     * -> `showHighlight: true` 但宿主还没接回调 ✅
+     * -> 点了不能报错 ✅ -> 按钮置灰 ✅
+     */
+    render(<ToolbarHighlightButton palette={PALETTE} defaultColor="yellow" />);
+    const main = screen.getByRole('button', { name: '高亮' }) as HTMLButtonElement;
+    expect(main.disabled).toBe(true);
+    expect(document.querySelectorAll('.scpdf-toolbar__btn--split-arrow').length).toBe(1);
   });
 });
