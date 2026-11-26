@@ -21,7 +21,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { DomOrderItem } from '../core/selection/dom-order';
-import { assignRectsToItems, clipByDomOrder, describeDomOrder } from '../core/selection/dom-order';
+import { clipByDomOrder, describeDomOrder, groupRectsByItem } from '../core/selection/dom-order';
 import type { PageFrame } from '../core/selection/extract';
 import { extractSelection } from '../core/selection/extract';
 import { filterOutliers, VERTICAL_TOLERANCE } from '../core/selection/filter-outliers';
@@ -963,12 +963,24 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
        * -> `domOrder.kept` 里的矩形是**项级** ✅ -> 不能直接画 ✅
        * -> -> 用 Range 的字符级矩形 ✅ 按中心点归属到各项 ✅
        * -> -> 某项没分到 ✅ -> 回退到该项自己的矩形 ✅
+       *
+       * ⚠️⚠️ **必须按【项】分组** ✅ 不能按数组下标 ✅
+       * -> 一个 span 给**多个 rect** ✅（行盒 + 字形盒 ✅）
+       * -> -> `kept` 和 `keptItems` **长度不同** ✅ ❌
+       * -> -> 按下标对应会**错位** ✅
+       *    -> 实测：项漏选 ✅（"T cells and demonstrates" 没底色 ✅ ❌）
        */
-      const assigned = assignRectsToItems(domOrder.kept, rectsWithGaps);
-      const charLevelRects = domOrder.kept.flatMap((itemRect, i) => {
-        const sub = assigned.get(i);
+      const assigned = groupRectsByItem(domOrder.kept, domOrder.keptItems, rectsWithGaps);
+
+      const charLevelRects = domOrder.keptItems.flatMap((item, i) => {
+        const key = `${item.pageNumber}:${item.itemIndex}`;
+        const sub = assigned.get(key);
+        if (sub && sub.length > 0) {
+          return sub;
+        }
         // ⚠️ **没分到 -> 回退项级** ✅（保守 ✅）
-        return sub && sub.length > 0 ? sub : [itemRect];
+        const itemRect = domOrder.kept[i];
+        return itemRect ? [itemRect] : [];
       });
 
       /*
@@ -984,24 +996,90 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
         height: r.height,
       }));
 
+      /*
+       * ⚠️⚠️⚠️ **垂直范围必须是【双向区间】** ✅（实测踩到的坑 ✅）
+       *
+       * ## 旧写法错在哪 ✅
+       *
+       * ```ts
+       * // ❌ 只保留下界 ✅
+       * const fromY = toContentY(dragStart.y, dragStart.scrollTop) - VERTICAL_TOLERANCE;
+       * return r.top + r.height > fromY;
+       * ```
+       *
+       * -> 那个结论**只在"往下拖"时成立** ✅
+       * -> **往上拖**时 ✅ -> 起点 y 成了下界 ✅
+       *    -> **比起点高的行全被丢掉** ✅ ❌
+       *    -> 实测（页 3 ✅ 跨栏 ✅）：
+       *       `afterDomOrder: 172` ✅（= Chrome ✅）
+       *       `afterVertical: 96` ✅ ❌ -> **砍掉 76 个** ✅
+       *    -> 用户反馈："**第二栏的上面部分都没被选中**" ✅ ❌
+       *
+       * ## Chrome 的语义 ✅
+       *
+       * -> 选区 = **DOM 顺序上起点→终点的连续区间** ✅
+       * -> 与上下方向**无关** ✅
+       * -> 往上拖 ✅ -> 保留**上面**的部分 ✅
+       *
+       * ## 修法 ✅
+       *
+       * -> 用**起点和终点的内容坐标**算出**上下界** ✅
+       * -> 起点：`按下时的 y + 按下时的 scrollTop` ✅（固定 ✅）
+       * -> 终点：`松手时的 y + 松手时的 scrollTop` ✅（`dragEndRef` 里记了 ✅）
+       * -> 全部在**内容坐标**里算 ✅ -> **自动滚动不影响** ✅
+       */
+      const verticalRange = (() => {
+        if (!dragStart || !dragEnd) {
+          return null;
+        }
+        const startY = toContentY(dragStart.y, dragStart.scrollTop);
+        const endY = toContentY(dragEnd.y, dragEnd.scrollTop);
+        return {
+          fromY: Math.min(startY, endY) - VERTICAL_TOLERANCE,
+          toY: Math.max(startY, endY) + VERTICAL_TOLERANCE,
+        };
+      })();
+
+      /*
+       * ⚠️⚠️⚠️ **垂直过滤【只在自动滚动时】才生效** ✅（实测踩到的坑 ✅）
+       *
+       * ## 为什么不能一直生效 ✅
+       *
+       * -> 浏览器的 Range 是**文档顺序的连续区间** ✅
+       * -> -> 跨栏拖选时 ✅ Range 会**跨过很多视觉行** ✅
+       *    -> 实测（页 3 ✅）：鼠标只经过 2 个视觉行 ✅
+       *    -> 但 Chrome 选中了 **44 个视觉行 / 172 个项** ✅ ✅
+       * -> -> 用鼠标的 y 做过滤 ✅ -> 会把绝大部分**正确内容**砍掉 ✅ ❌
+       *    -> 实测：`afterDomOrder: 172` ✅ -> `afterVertical: 66` ✅ ❌
+       *
+       * ## 垂直过滤的【唯一】用途 ✅
+       *
+       * -> 跨页拖选时浏览器**自动滚动** ✅
+       * -> -> Range 被**向前扩展到页首** ✅
+       *    -> 页 1 的**页眉**也被选中了 ✅ -> 高亮全落在第 1 页 ✅ ❌
+       * -> -> 这时候才需要过滤 ✅ ✅
+       *
+       * ## 怎么判断"发生了自动滚动" ✅
+       *
+       * -> **起点和终点的 `scrollTop` 不一样** ✅ -> 说明中途滚动了 ✅
+       * -> 没滚动 ✅ -> 区间就是鼠标划过的范围 ✅ -> 不用过滤 ✅ ✅
+       *
+       * -> ⚠️ 实测：跨栏拖选时 ✅ 起点终点 `scrollTop` **相同** ✅
+       *    -> -> 不用垂直过滤 ✅ -> 内容完整保留 ✅ ✅
+       */
+      const didAutoScroll =
+        dragStart && dragEnd ? dragStart.scrollTop !== dragEnd.scrollTop : false;
+
       const verticalKept =
-        dragStart && dragEnd
+        verticalRange && didAutoScroll
           ? contentRects.filter((r) => {
               /*
-               * ⚠️⚠️ **只保留下界**（实测踩到的坑）✅
-               *
-               * -> **上界不能用** ❌
-               *    -> 自动滚动之后指针的 y 变了 ❌
-               *    -> 算出来的上界**要么太大（全都留）** ❌
-               *    -> 要么太小（把真正的内容也丢了）❌
-               * -> **下界是可靠的** ✅
-               *    -> 起点在**内容坐标**里是固定的 ✅
-               *    -> 页 1 的页眉在起点**之上** ❌ -> 下界把它丢掉 ✅
-               * -> 浏览器自己的 Range 不会超出真实选区 ✅
-               *    -> 所以**不用上界** ✅
+               * -> 双向 ✅
+               * -> 跨页时浏览器**自动滚动** ✅ -> Range 被**向前扩展到页首** ✅
+               *    -> 页 1 的**页眉**也被选中了 ✅ -> 高亮全落在第 1 页 ✅ ❌
+               * -> -> 上下界把它挡在外面 ✅ ✅
                */
-              const fromY = toContentY(dragStart.y, dragStart.scrollTop) - VERTICAL_TOLERANCE;
-              return r.top + r.height > fromY;
+              return r.top + r.height > verticalRange.fromY && r.top < verticalRange.toY;
             })
           : contentRects;
 
@@ -1124,6 +1202,10 @@ export function useTextSelection(options: UseTextSelectionOptions): UseTextSelec
             start: domOrderItems.start,
             end: domOrderItems.end,
           }),
+          /* 垂直范围（双向区间）-> 排查"往上拖丢内容"时必须能看到 */
+          verticalRange,
+          /* 是否发生了自动滚动（决定垂直过滤是否生效 ✅）*/
+          didAutoScroll,
           /* 离群项统计 ✅ */
           outlierTooTall: outliers.tooTall,
           outlierHorizontal: outliers.tooFarHorizontally,

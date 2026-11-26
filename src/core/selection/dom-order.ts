@@ -65,7 +65,13 @@ export interface DomOrderResult {
   kept: ClientRectLike[];
   /** 丢弃的矩形 */
   dropped: ClientRectLike[];
-  /** ⚠️ **保留的项**（用来做字符级矩形分配 ✅）*/
+  /**
+   * ⚠️ **保留的项**（用来做字符级矩形分配 ✅）
+   *
+   * ⚠️ **一个项可能对应多个矩形** ✅（行盒 + 字形盒 ✅）
+   *    -> `kept` 和 `keptItems` **不是一一对应** ✅ ❌
+   *    -> -> 分配时**必须按项分组** ✅ ❌ 不能按数组下标 ✅
+   */
   keptItems: DomOrderItem[];
 }
 
@@ -216,6 +222,12 @@ export function clipByDomOrder(input: DomOrderInput): DomOrderResult {
 
   const kept: ClientRectLike[] = [];
   const dropped: ClientRectLike[] = [];
+  /**
+   * ⚠️ **和 `kept` 平行** ✅（下标一一对应 ✅）
+   *
+   * -> `sorted` 里是**每个矩形一条** ✅（一个项可能有多个矩形 ✅）
+   * -> -> 所以 `kept[i]` 对应的项就是 `keptItems[i]` ✅ ✅
+   */
   const keptItems: DomOrderItem[] = [];
 
   for (let i = 0; i < sorted.length; i += 1) {
@@ -324,6 +336,94 @@ export function assignRectsToItems(
       list.push(rect);
     } else {
       result.set(owner, [rect]);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * **按【项】把字符级矩形分好组** ✅
+ *
+ * ## ⚠️ **为什么不能按数组下标对应** ✅
+ *
+ * -> 一个 span 会给**多个 rect** ✅（行盒 + 字形盒 ✅）
+ * -> 所以 `kept`（矩形数组）和 `keptItems`（项数组）**长度不同** ✅ ❌
+ * -> -> 按下标对应会**错位** ✅
+ *    -> 实测：项漏选 ✅（"T cells and demonstrates" ✅ 没底色 ✅ ❌）
+ *
+ * ## 做法 ✅
+ *
+ * -> 按 `(pageNumber, itemIndex)` 把矩形**分组** ✅
+ * -> -> 每项一组 ✅ -> 组内是该项的所有矩形 ✅
+ *
+ * @param itemRects 各项的矩形（**同一个项的矩形会挨在一起** ✅）
+ * @param items 对应的项（顺序与 `itemRects` **一致** ✅）
+ * @param rangeRects Range 的矩形（字符级 ✅）
+ * @returns 每项该用哪些矩形（key = 项的序号 ✅）
+ */
+export function groupRectsByItem(
+  itemRects: readonly ClientRectLike[],
+  items: readonly DomOrderItem[],
+  rangeRects: readonly ClientRectLike[],
+): Map<string, ClientRectLike[]> {
+  const result = new Map<string, ClientRectLike[]>();
+  if (itemRects.length === 0 || items.length === 0) {
+    return result;
+  }
+
+  /*
+   * ⚠️ **先建立【项 -> 矩形下标】的映射** ✅
+   *
+   * -> `itemRects` 和 `items` 是**平行数组** ✅（一一对应 ✅）
+   * -> -> 但一个项会有**多个矩形** ✅ -> 所以要按 key 分组 ✅
+   */
+  const rectsByKey = new Map<string, ClientRectLike[]>();
+  for (let i = 0; i < itemRects.length; i += 1) {
+    const rect = itemRects[i];
+    const item = items[i];
+    if (!rect || !item) {
+      continue;
+    }
+    const key = `${item.pageNumber}:${item.itemIndex}`;
+    const list = rectsByKey.get(key);
+    if (list) {
+      list.push(rect);
+    } else {
+      rectsByKey.set(key, [rect]);
+    }
+  }
+
+  // ⚠️ **按【项的矩形范围】判断归属** ✅
+  for (const rect of rangeRects) {
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    let ownerKey: string | null = null;
+    for (const [key, rects] of rectsByKey) {
+      for (const r of rects) {
+        const right = r.left + r.width;
+        const bottom = r.top + r.height;
+        if (centerX >= r.left && centerX <= right && centerY >= r.top && centerY <= bottom) {
+          ownerKey = key;
+          break;
+        }
+      }
+      if (ownerKey) {
+        break;
+      }
+    }
+
+    // 找不到归属 -> 丢掉（保守 ✅）
+    if (!ownerKey) {
+      continue;
+    }
+
+    const list = result.get(ownerKey);
+    if (list) {
+      list.push(rect);
+    } else {
+      result.set(ownerKey, [rect]);
     }
   }
 
