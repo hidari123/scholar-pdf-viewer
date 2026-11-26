@@ -78,7 +78,7 @@
 
 ```
 主入口                          28.48 kB（不变量级）✅
-@scholar-club/pdf-viewer/editor  5.81 kB  ← 宿主想用富文本批注才装 TipTap
+@scholar-space/pdf-viewer/editor  5.81 kB  ← 宿主想用富文本批注才装 TipTap
 ```
 
 **踩了 5 个坑**（都在 commit message 里）：

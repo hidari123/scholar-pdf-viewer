@@ -835,10 +835,10 @@ onPrint={
 ```ts
 resolve: {
   alias: {
-    '@scholar-club/pdf-viewer/styles.css': `${packageRoot}dist/styles.css`,
+    '@scholar-space/pdf-viewer/styles.css': `${packageRoot}dist/styles.css`,
   },
 },
 ```
 
-否则 `import "@scholar-club/pdf-viewer/styles.css"` 会 500（demo 白屏）。
+否则 `import "@scholar-space/pdf-viewer/styles.css"` 会 500（demo 白屏）。
 **这个和用户的 5 个问题无关，但属于"起不来"的阻塞问题**，已在上一轮修掉，方案里一并列出。

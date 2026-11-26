@@ -13,8 +13,8 @@
  * ⚠️ **每次改动都保存**（用户要求）→ 用**防抖**合并连续操作。
  */
 
-import type { HighlightRecord } from '@scholar-club/pdf-viewer';
-import { exportHighlights, importHighlights } from '@scholar-club/pdf-viewer';
+import type { HighlightRecord } from '@scholar-space/pdf-viewer';
+import { exportHighlights, importHighlights } from '@scholar-space/pdf-viewer';
 
 /** localStorage 的 key 前缀 */
 const KEY_PREFIX = 'scholar-pdf-viewer:highlights:';

@@ -27,7 +27,7 @@
 
 - `src/styles/themes.css` —— 7 套主题 + appearance 的 class
 - `src/core/theme/index.ts` —— `themeClasses()` / `THEMES` / `THEME_LABELS`（纯函数，零 DOM）
-- 单独导出：`@scholar-club/pdf-viewer/themes.css`
+- 单独导出：`@scholar-space/pdf-viewer/themes.css`
 
 ### ④ 顺带修的 bug（都是实测发现的）
 

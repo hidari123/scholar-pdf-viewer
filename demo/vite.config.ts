@@ -15,7 +15,7 @@ import { defineConfig } from 'vite';
  * ⚠️ **不能用 `import.meta.url` 直接算**：Vite 把配置文件打成 bundle 再执行
  * → `import.meta.url` 指向的是**临时 bundle 文件**，不是原文件
  * → 算出来的路径是错的 → alias 指向不存在的文件
- * → 报 "Failed to resolve import @scholar-club/pdf-viewer/styles.css"。
+ * → 报 "Failed to resolve import @scholar-space/pdf-viewer/styles.css"。
  *
  * ⚠️ **也不能用相对路径当 alias 的值**：Vite 的 alias 必须是**绝对路径**
  * → `'../dist/styles.css'` 解析不到。
@@ -59,11 +59,11 @@ export default defineConfig({
      * ## 现象
      *
      * demo 消费的是**包的 `dist/`**（workspace 软链）。
-     * `import "@scholar-club/pdf-viewer/styles.css"` 走的是 package.json 的
+     * `import "@scholar-space/pdf-viewer/styles.css"` 走的是 package.json 的
      * **exports 子路径** → Vite 解析不到 → 500：
      *
      * ```
-     * Failed to resolve import "@scholar-club/pdf-viewer/styles.css" from "src/App.tsx"
+     * Failed to resolve import "@scholar-space/pdf-viewer/styles.css" from "src/App.tsx"
      * ```
      *
      * ## 为什么 `optimizeDeps.exclude` 不管用
@@ -80,7 +80,7 @@ export default defineConfig({
      */
     alias: {
       // ⚠️ **必须是绝对路径**（相对路径解析不到）
-      '@scholar-club/pdf-viewer/styles.css': `${packageRoot}/dist/styles.css`,
+      '@scholar-space/pdf-viewer/styles.css': `${packageRoot}/dist/styles.css`,
     },
   },
   /*
@@ -88,6 +88,6 @@ export default defineConfig({
    * （dist 被删了重建会让预打包缓存失效）。
    */
   optimizeDeps: {
-    exclude: ['@scholar-club/pdf-viewer'],
+    exclude: ['@scholar-space/pdf-viewer'],
   },
 });

@@ -33,7 +33,7 @@
 **1. 装依赖**
 
 ```bash
-pnpm add @scholar-club/pdf-viewer
+pnpm add @scholar-space/pdf-viewer
 # 可选：导出带高亮的 PDF
 pnpm add pdf-lib
 ```
@@ -41,14 +41,14 @@ pnpm add pdf-lib
 **2. 引样式**（**必做**，否则布局全乱）
 
 ```tsx
-import '@scholar-club/pdf-viewer/styles.css';
-import '@scholar-club/pdf-viewer/themes.css'; // 可选
+import '@scholar-space/pdf-viewer/styles.css';
+import '@scholar-space/pdf-viewer/themes.css'; // 可选
 ```
 
 **3. 用起来**
 
 ```tsx
-import { PdfViewer } from '@scholar-club/pdf-viewer';
+import { PdfViewer } from '@scholar-space/pdf-viewer';
 
 export function Reader({ url }: { url: string }) {
   return (
@@ -75,9 +75,9 @@ import {
   type HighlightRecord,
   type NewHighlight,
   type AnnotationRecord,
-} from '@scholar-club/pdf-viewer';
-import '@scholar-club/pdf-viewer/styles.css';
-import '@scholar-club/pdf-viewer/themes.css';
+} from '@scholar-space/pdf-viewer';
+import '@scholar-space/pdf-viewer/styles.css';
+import '@scholar-space/pdf-viewer/themes.css';
 
 export function PaperReader({ paperId, fileUrl }: Props) {
   const viewerRef = useRef<PdfViewerHandle>(null);
@@ -349,8 +349,8 @@ onAnnotationSave={(id, html, plain) => {
 ### 换掉编辑器（用 TipTap）
 
 ```tsx
-import { AnnotationDialog } from '@scholar-club/pdf-viewer/dialog';
-import { TipTapEditor } from '@scholar-club/pdf-viewer/editor';
+import { AnnotationDialog } from '@scholar-space/pdf-viewer/dialog';
+import { TipTapEditor } from '@scholar-space/pdf-viewer/editor';
 
 <PdfViewer
   annotationEditor={TipTapEditor}
@@ -641,7 +641,7 @@ viewerRef.current?.fitPage(); // 适应整页
 Acrobat / Preview / Chrome / Edge 打开都能看到，**也能点开看原文**。
 
 ```tsx
-import { exportHighlightedPdf } from '@scholar-club/pdf-viewer';
+import { exportHighlightedPdf } from '@scholar-space/pdf-viewer';
 
 const bytes = await exportHighlightedPdf({
   pdfBytes, // 原始 PDF 字节（宿主自己取）
@@ -737,7 +737,7 @@ URL.revokeObjectURL(url);
 ### 用 IndexedDB 缓存（`idb`）
 
 ```ts
-import { DocumentCache } from '@scholar-club/pdf-viewer/core';
+import { DocumentCache } from '@scholar-space/pdf-viewer/core';
 
 const cache = new DocumentCache({
   dbName: 'my-pdf-cache',   // IndexedDB 的库名
@@ -768,7 +768,7 @@ await cache.init();  // ⚠️ 要先 init（失败会自动降级为内存）
 <summary><b>页面空白 / 什么都看不见</b></summary>
 
 1. 容器**没有高度** → 包填满父容器，父容器 0 高就是 0 高
-2. **忘了引样式** → `import '@scholar-club/pdf-viewer/styles.css'`
+2. **忘了引样式** → `import '@scholar-space/pdf-viewer/styles.css'`
 </details>
 
 <details>

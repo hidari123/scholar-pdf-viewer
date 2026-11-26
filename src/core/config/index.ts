@@ -445,7 +445,7 @@ export function mergeConfig(
  * ⚠️⚠️ **必须重新导出内置默认值**（实测踩过的坑）。
  *
  * → `src/core/config/index.ts` 是 `core` 子路径的出口
- * → 不重新导出 -> 宿主 `import { BUILTIN_LOCALES } from '@scholar-club/pdf-viewer/core'`
+ * → 不重新导出 -> 宿主 `import { BUILTIN_LOCALES } from '@scholar-space/pdf-viewer/core'`
  *   -> **undefined** ❌（实测：core 子路径里查不到）
  * -> 重新导出 -> 宿主从哪个子路径都能拿到 ✅
  */

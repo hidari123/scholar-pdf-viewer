@@ -107,7 +107,7 @@ function MyToolbar() {
 浮层里加一个"查文献"按钮：
 
 ```tsx
-import type { SelectionAction } from '@scholar-club/pdf-viewer';
+import type { SelectionAction } from '@scholar-space/pdf-viewer';
 
 const actions: SelectionAction[] = [
   {
@@ -225,7 +225,7 @@ import { Download, Upload, Search } from 'lucide-react';
 ### 用包自带的图标集（不引第三方库）
 
 ```tsx
-import { Icon } from '@scholar-club/pdf-viewer/icons';
+import { Icon } from '@scholar-space/pdf-viewer/icons';
 
 <Icon name="download" size={16} />;
 ```
@@ -291,7 +291,7 @@ import { Icon } from '@scholar-club/pdf-viewer/icons';
 ### 用 TipTap（包自带集成）
 
 ```tsx
-import { TipTapEditor } from '@scholar-club/pdf-viewer/editor';
+import { TipTapEditor } from '@scholar-space/pdf-viewer/editor';
 
 <PdfViewer annotationEditor={TipTapEditor} />;
 ```
@@ -451,7 +451,7 @@ onToast={(toast) => {
 
 ```tsx
 import * as pdfjs from 'pdfjs-dist';
-import type { PdfViewerProps } from '@scholar-club/pdf-viewer';
+import type { PdfViewerProps } from '@scholar-space/pdf-viewer';
 
 const workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
 pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
@@ -487,11 +487,11 @@ let doc: pdfjs.PDFDocumentProxy | null = null;
 
 ## 13. 用 core 层的纯逻辑
 
-`@scholar-club/pdf-viewer/core` 是**零 React、零 DOM** 的纯逻辑。
+`@scholar-space/pdf-viewer/core` 是**零 React、零 DOM** 的纯逻辑。
 可以在**服务端**跑（比如批量算高亮坐标）：
 
 ```ts
-import { sanitizeRichText, richTextToPlain } from '@scholar-club/pdf-viewer/core';
+import { sanitizeRichText, richTextToPlain } from '@scholar-space/pdf-viewer/core';
 
 const safe = sanitizeRichText(userInput);
 const plain = richTextToPlain(safe);

@@ -1,5 +1,5 @@
 {
-  "name": "@scholar-club/pdf-viewer-demo",
+  "name": "@scholar-space/pdf-viewer-demo",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@scholar-club/pdf-viewer": "workspace:*",
+    "@scholar-space/pdf-viewer": "workspace:*",
     "@tiptap/core": "^3.34.0",
     "@tiptap/extension-color": "^3.34.0",
     "@tiptap/extension-highlight": "^3.34.0",

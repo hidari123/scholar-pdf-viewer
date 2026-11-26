@@ -6,14 +6,14 @@
  * Copyright (c) 2026 by hidari, All Rights Reserved.
  */
 /**
- * @scholar-club/pdf-viewer —— 主入口
+ * @scholar-space/pdf-viewer —— 主入口
  *
  * 导出的东西分两类：
  * - 组件与 hooks（React 层）
  * - 公共类型（core 层，零 React）
  *
  * 零 React 的用法（Node / Worker / SSR）：
- *   import type { SelectionData } from '@scholar-club/pdf-viewer/core';
+ *   import type { SelectionData } from '@scholar-space/pdf-viewer/core';
  */
 
 export * from './components';
@@ -124,7 +124,7 @@ export type {
  *
  * → 45 个图标的几何数据约 5 kB（brotli 后）
  * → 静态导出 → 主入口 27 kB → 超了 25 kB 的预算 ❌
- * → 改成**独立入口**：import { getIconShape } from '@scholar-club/pdf-viewer/icons'
+ * → 改成**独立入口**：import { getIconShape } from '@scholar-space/pdf-viewer/icons'
  * → 主入口只在**真正渲染内置图标时**动态加载 ✅
  */
 export type { OutlineItemLike } from './core/outline/outline';

@@ -54,7 +54,7 @@ try {
 
   // ① core 子路径能拿到内置的
   const core = await page.evaluate(async () => {
-    const mod = await import('/node_modules/@scholar-club/pdf-viewer/dist/core.js');
+    const mod = await import('/node_modules/@scholar-space/pdf-viewer/dist/core.js');
     return {
       hasPalette: !!mod.BUILTIN_HIGHLIGHT_PALETTE,
       paletteKeys: Object.keys(mod.BUILTIN_HIGHLIGHT_PALETTE ?? {}),
@@ -124,7 +124,7 @@ try {
 
   // ④ 宿主可以覆盖内置的语言
   const overridden = await page.evaluate(async () => {
-    const mod = await import('/node_modules/@scholar-club/pdf-viewer/dist/core.js');
+    const mod = await import('/node_modules/@scholar-space/pdf-viewer/dist/core.js');
     const merged = mod.mergeLocales({ en: { 'search.placeholder': 'My Search' } });
     return {
       en: merged.en?.['search.placeholder'],
@@ -136,7 +136,7 @@ try {
 
   // ⑤ 宿主可以覆盖内置的高亮色板
   const overriddenPalette = await page.evaluate(async () => {
-    const mod = await import('/node_modules/@scholar-club/pdf-viewer/dist/core.js');
+    const mod = await import('/node_modules/@scholar-space/pdf-viewer/dist/core.js');
     const merged = mod.mergeConfig({}, { highlightPalette: { mine: '#123456' } });
     return Object.keys(merged.highlightPalette ?? {});
   });

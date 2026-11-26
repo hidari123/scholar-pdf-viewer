@@ -14,7 +14,7 @@
 ### ① `core` 子路径拿不到内置的默认值 ❌
 
 `src/core/config/index.ts` 是 `core` 子路径的出口，但它**没重新导出** `builtin-defaults`
--> 宿主 `import { BUILTIN_LOCALES } from '@scholar-club/pdf-viewer/core'` -> **undefined** ❌
+-> 宿主 `import { BUILTIN_LOCALES } from '@scholar-space/pdf-viewer/core'` -> **undefined** ❌
 
 实测：在页面里 `import('/node_modules/.../dist/core.js')` -> `hasBuiltinLocales: false`
 

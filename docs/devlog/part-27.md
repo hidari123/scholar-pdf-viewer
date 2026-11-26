@@ -1220,7 +1220,7 @@ pnpm e2e:all         → 目标 http://127.0.0.1:5180
 启动 demo 时发现**白屏 + 500**：
 
 ```
-Failed to resolve import "@scholar-club/pdf-viewer/styles.css" from "src/App.tsx"
+Failed to resolve import "@scholar-space/pdf-viewer/styles.css" from "src/App.tsx"
 ```
 
 **根因**：demo 消费的是**包的 `dist/`**（workspace 软链）。
@@ -1232,7 +1232,7 @@ Failed to resolve import "@scholar-club/pdf-viewer/styles.css" from "src/App.tsx
 
 **修法（两处）**：
 
-1. `demo/vite.config.ts` 加 `optimizeDeps.exclude: ['@scholar-club/pdf-viewer']`
+1. `demo/vite.config.ts` 加 `optimizeDeps.exclude: ['@scholar-space/pdf-viewer']`
    → Vite **按源码直接服务** workspace 包 → dist 重建后不需要重启
 2. `scripts/demo.mjs` **先构建包再起服务**
    → 每次 `pnpm demo` 都保证 `dist/` 是最新的

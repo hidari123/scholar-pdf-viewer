@@ -6,7 +6,7 @@
  * Copyright (c) 2026 by hidari, All Rights Reserved.
 -->
 
-# @scholar-club/pdf-viewer
+# @scholar-space/pdf-viewer
 
 <div align="center">
 
@@ -61,7 +61,7 @@
 ## 安装
 
 ```sh
-pnpm add @scholar-club/pdf-viewer
+pnpm add @scholar-space/pdf-viewer
 ```
 
 Peer：`react >=18 <20`（由宿主提供）。
@@ -85,8 +85,8 @@ Peer：`react >=18 <20`（由宿主提供）。
 ## 最小接入
 
 ```tsx
-import { PdfViewer } from '@scholar-club/pdf-viewer';
-import '@scholar-club/pdf-viewer/styles.css';
+import { PdfViewer } from '@scholar-space/pdf-viewer';
+import '@scholar-space/pdf-viewer/styles.css';
 
 <PdfViewer file="/docs/paper.pdf" />;
 ```
@@ -187,19 +187,19 @@ import '@scholar-club/pdf-viewer/styles.css';
 <PdfViewer
   printMode="original"
   documentUrl="/samples/paper.pdf" // ← 必要→ 用隐藏 iframe 打印 PDF 文件
-/>
+/>;
 ```
 
 -> **为什么这样就完整了** ✅
-   -> **Chrome 原生 PDF 阅读器** ✅ **不打印 DOM** ✅ -> **直接把 PDF 文件交给浏览器** ✅
-   -> **我们也这样** ✅ -> **每页都完整** ✅ ✅
-   -> 实测：**iframe 打印 -> 14 页** ✅ -> **和 PDF 原页数一致** ✅ ✅
+-> **Chrome 原生 PDF 阅读器** ✅ **不打印 DOM** ✅ -> **直接把 PDF 文件交给浏览器** ✅
+-> **我们也这样** ✅ -> **每页都完整** ✅ ✅
+-> 实测：**iframe 打印 -> 14 页** ✅ -> **和 PDF 原页数一致** ✅ ✅
 
 -> **但要打印高亮呢** ✅ -> 高亮不在 PDF 里** ✅ -> 只能走 DOM** ✅
-   -> 此时建议用**工具栏的“打印”按钮** ✅ -> **会等所有页画完** ✅ ✅
+-> 此时建议用**工具栏的“打印”按钮** ✅ -> **会等所有页画完** ✅ ✅
 
 > 💡 **默认推荐 `original`** ✅ -> **与 Chrome 原生行为一致** ✅ ✅
-**排查顺序** ✅：
+> **排查顺序** ✅：
 
 1. **宿主的全局 CSS 盖掉了包的打印样式** ✅
    -> 最常见 ✅ -> 宿主写了 `@media print { .my-layout { height: 100vh } }` ✅
@@ -318,8 +318,8 @@ onHighlight={({ text, color, position }) => {
 
 ```tsx
 import { useCallback, useRef, useState } from 'react';
-import { PdfViewer, type PdfViewerHandle } from '@scholar-club/pdf-viewer';
-import '@scholar-club/pdf-viewer/styles.css';
+import { PdfViewer, type PdfViewerHandle } from '@scholar-space/pdf-viewer';
+import '@scholar-space/pdf-viewer/styles.css';
 
 export function Reader({ url, paperId }: { url: string; paperId: string }) {
   const viewerRef = useRef<PdfViewerHandle>(null);
@@ -530,7 +530,7 @@ Main entry 29.69 kB (tree-shaken) · core subpath 1.15 kB · CSS 12 kB
 ## Install
 
 ```sh
-pnpm add @scholar-club/pdf-viewer
+pnpm add @scholar-space/pdf-viewer
 ```
 
 Peer: `react >=18 <20` (provided by the host).
@@ -557,8 +557,8 @@ Optional peers: `pdf-lib` (export annotated PDF), `@tiptap/*` (rich-text editor)
 ## Minimal integration
 
 ```tsx
-import { PdfViewer } from '@scholar-club/pdf-viewer';
-import '@scholar-club/pdf-viewer/styles.css';
+import { PdfViewer } from '@scholar-space/pdf-viewer';
+import '@scholar-space/pdf-viewer/styles.css';
 
 <PdfViewer file="/docs/paper.pdf" />;
 ```
@@ -625,8 +625,8 @@ otherwise the matching button is **not rendered**:
 
 ```tsx
 import { useCallback, useRef, useState } from 'react';
-import { PdfViewer, type PdfViewerHandle } from '@scholar-club/pdf-viewer';
-import '@scholar-club/pdf-viewer/styles.css';
+import { PdfViewer, type PdfViewerHandle } from '@scholar-space/pdf-viewer';
+import '@scholar-space/pdf-viewer/styles.css';
 
 export function Reader({ url, paperId }: { url: string; paperId: string }) {
   const viewerRef = useRef<PdfViewerHandle>(null);

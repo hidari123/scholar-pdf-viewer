@@ -40,7 +40,7 @@ console.log('');
  * ⚠️ **先构建包**（demo 消费的是 `dist/`）。
  *
  * 不构建的话，如果 `dist/` 不存在或过期，demo 会白屏 / 报
- * "Failed to resolve import @scholar-club/pdf-viewer/styles.css"。
+ * "Failed to resolve import @scholar-space/pdf-viewer/styles.css"。
  *
  * → 每次起 demo 都保证 `dist/` 是最新的。
  */
@@ -57,7 +57,7 @@ if (build.status !== 0) {
 console.log('[demo] 构建完成');
 console.log('');
 
-const child = spawn('pnpm', ['--filter', '@scholar-club/pdf-viewer-demo', 'dev'], {
+const child = spawn('pnpm', ['--filter', '@scholar-space/pdf-viewer-demo', 'dev'], {
   cwd: root,
   stdio: 'inherit',
   shell: process.platform === 'win32',

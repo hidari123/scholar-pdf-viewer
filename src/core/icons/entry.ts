@@ -1,5 +1,5 @@
 /**
- * icons —— 图标集**独立入口**（`@scholar-club/pdf-viewer/icons`）。
+ * icons —— 图标集**独立入口**（`@scholar-space/pdf-viewer/icons`）。
  *
  * ## 为什么单独一个入口（实测踩过的坑：体积超预算）
  *
@@ -17,7 +17,7 @@
  * <PdfViewer icons={{ upload: <Upload /> }} />
  *
  * // ③ 想自己画图标 → 从这个入口拿几何数据
- * import { getIconShape } from '@scholar-club/pdf-viewer/icons';
+ * import { getIconShape } from '@scholar-space/pdf-viewer/icons';
  * ```
  *
  * ⚠️ **默认用法（①）不会打包几何数据** → 主入口保持轻量 ✅

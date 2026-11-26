@@ -1,5 +1,5 @@
 {
-  "name": "@scholar-club/pdf-viewer",
+  "name": "@scholar-space/pdf-viewer",
   "version": "0.1.0",
   "description": "零 LLM 依赖、可复用的 PDF 查看器组件（pdfjs-dist 6 直连）",
   "type": "module",
@@ -70,7 +70,10 @@
     "**/*.css"
   ],
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -81,7 +84,7 @@
     "test:watch": "vitest",
     "verify": "node scripts/verify.mjs",
     "demo": "node scripts/demo.mjs",
-    "demo:build": "pnpm build && pnpm --filter @scholar-club/pdf-viewer-demo build",
+    "demo:build": "pnpm build && pnpm --filter @scholar-space/pdf-viewer-demo build",
     "e2e": "node scripts/e2e-smoke.mjs",
     "e2e:text": "node scripts/e2e-text-layer.mjs",
     "e2e:panels": "node scripts/e2e-panels.mjs",
@@ -95,7 +98,7 @@
     "e2e:search": "node scripts/e2e-search-highlight.mjs",
     "e2e:thumbnail": "node scripts/e2e-thumbnail.mjs",
     "e2e:all": "node scripts/e2e-all.mjs",
-    "e2e:serve": "pnpm --filter @scholar-club/pdf-viewer-demo dev",
+    "e2e:serve": "pnpm --filter @scholar-space/pdf-viewer-demo dev",
     "size": "size-limit",
     "publint": "publint",
     "attw": "attw --pack",
@@ -186,5 +189,32 @@
     "react-dom": {
       "optional": true
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hidari123/scholar-pdf-viewer.git"
+  },
+  "homepage": "https://github.com/hidari123/scholar-pdf-viewer#readme",
+  "bugs": {
+    "url": "https://github.com/hidari123/scholar-pdf-viewer/issues"
+  },
+  "author": {
+    "name": "hidari",
+    "url": "https://github.com/hidari123"
+  },
+  "keywords": [
+    "pdf",
+    "pdf-viewer",
+    "react",
+    "pdfjs",
+    "viewer",
+    "annotation",
+    "highlight",
+    "scholar",
+    "paper"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   }
 }

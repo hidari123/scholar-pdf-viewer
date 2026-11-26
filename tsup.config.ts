@@ -18,7 +18,7 @@ export default defineConfig({
      * → 45 个图标的几何数据约 **5 kB**（brotli 后）
      * → 全塞进主入口 → 主入口 **27 kB** → 超了 25 kB 的预算 ❌
      * → 拆成独立入口 → 宿主**不覆盖图标**时完全不用加载 ✅
-     * → 覆盖图标时再 `import { getIconShape } from '@scholar-club/pdf-viewer/icons'`
+     * → 覆盖图标时再 `import { getIconShape } from '@scholar-space/pdf-viewer/icons'`
      */
     icons: 'src/core/icons/entry.ts',
     /**

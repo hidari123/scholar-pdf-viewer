@@ -1,4 +1,4 @@
-# @scholar-club/pdf-viewer —— 前端 PDF 阅读器组件包 · 方案
+# @scholar-space/pdf-viewer —— 前端 PDF 阅读器组件包 · 方案
 
 > 版本：v2（2026-11-13）
 > 状态：已定稿，进入实施

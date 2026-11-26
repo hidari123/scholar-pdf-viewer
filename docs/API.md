@@ -27,21 +27,21 @@
 
 ## 1. 包入口 / Package entry points
 
-| 子路径 / Subpath                      | 内容 / Contents                        | 说明                               |
-| ------------------------------------- | -------------------------------------- | ---------------------------------- |
-| `@scholar-club/pdf-viewer`            | `PdfViewer` + 全部公共类型 + 工具函数  | 主入口                             |
-| `@scholar-club/pdf-viewer/core`       | **零 React、零 DOM** 的纯逻辑          | 宿主可以单独用（比如服务端算坐标） |
-| `@scholar-club/pdf-viewer/editor`     | `TipTapEditor`                         | 可选 peer：`@tiptap/*`             |
-| `@scholar-club/pdf-viewer/dialog`     | `AnnotationDialog` / `AnnotationPanel` | 批注弹窗                           |
-| `@scholar-club/pdf-viewer/icons`      | 全部图标组件                           | 单独引入图标                       |
-| `@scholar-club/pdf-viewer/styles.css` | 基础样式（**必引**）                   |                                    |
-| `@scholar-club/pdf-viewer/themes.css` | 7 套主题变量                           | 可选                               |
+| 子路径 / Subpath                       | 内容 / Contents                        | 说明                               |
+| -------------------------------------- | -------------------------------------- | ---------------------------------- |
+| `@scholar-space/pdf-viewer`            | `PdfViewer` + 全部公共类型 + 工具函数  | 主入口                             |
+| `@scholar-space/pdf-viewer/core`       | **零 React、零 DOM** 的纯逻辑          | 宿主可以单独用（比如服务端算坐标） |
+| `@scholar-space/pdf-viewer/editor`     | `TipTapEditor`                         | 可选 peer：`@tiptap/*`             |
+| `@scholar-space/pdf-viewer/dialog`     | `AnnotationDialog` / `AnnotationPanel` | 批注弹窗                           |
+| `@scholar-space/pdf-viewer/icons`      | 全部图标组件                           | 单独引入图标                       |
+| `@scholar-space/pdf-viewer/styles.css` | 基础样式（**必引**）                   |                                    |
+| `@scholar-space/pdf-viewer/themes.css` | 7 套主题变量                           | 可选                               |
 
 **必引样式**（否则布局全乱）：
 
 ```tsx
-import '@scholar-club/pdf-viewer/styles.css';
-import '@scholar-club/pdf-viewer/themes.css'; // 可选
+import '@scholar-space/pdf-viewer/styles.css';
+import '@scholar-space/pdf-viewer/themes.css'; // 可选
 ```
 
 > ⚠️ **可选 peer 依赖**：`pdf-lib`（导出带高亮的 PDF）、`@tiptap/*`（富文本编辑器）、`react-dom`。

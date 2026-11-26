@@ -333,7 +333,7 @@ pnpm demo      # 启动
 
 指定端口：
 ```sh
-pnpm --filter @scholar-club/pdf-viewer-demo dev --port 5199
+pnpm --filter @scholar-space/pdf-viewer-demo dev --port 5199
 ```
 
 > ⚠️ 改了 `src/` 必须 `pnpm build` **并重启 demo** —— Vite 对 workspace 依赖有缓存。

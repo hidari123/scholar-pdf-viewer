@@ -303,7 +303,7 @@ export interface PdfViewerProps {
    * → 不传 → 用**包内置的轻量编辑器**（contenteditable，零依赖）✅
    * → 传了 → 用**宿主的编辑器**（比如 TipTapEditor）✅
    *
-   * 用法：`import { TipTapEditor } from '@scholar-club/pdf-viewer/editor'`
+   * 用法：`import { TipTapEditor } from '@scholar-space/pdf-viewer/editor'`
    * 然后 `<PdfViewer annotationEditor={TipTapEditor} />`
    *
    * ⚠️ **TipTap 是可选 peerDependency** → 主入口体积不变（25 kB）✅

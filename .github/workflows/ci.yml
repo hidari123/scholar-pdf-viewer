@@ -44,11 +44,11 @@ jobs:
       - run: pnpm build
       # demo（宿主侧）换装目标 react 版本
       - run: >-
-          pnpm --filter @scholar-club/pdf-viewer-demo add
+          pnpm --filter @scholar-space/pdf-viewer-demo add
           react@^${{ matrix.react }} react-dom@^${{ matrix.react }}
           @types/react@^${{ matrix.react }} @types/react-dom@^${{ matrix.react }}
-      - run: pnpm --filter @scholar-club/pdf-viewer-demo run typecheck
-      - run: pnpm --filter @scholar-club/pdf-viewer-demo run build
+      - run: pnpm --filter @scholar-space/pdf-viewer-demo run typecheck
+      - run: pnpm --filter @scholar-space/pdf-viewer-demo run build
 
   # 发布门禁：包体积 / package.json 规范 / 类型解析
   #
@@ -89,7 +89,7 @@ jobs:
       # 装 Chromium（Playwright）
       - run: pnpm exec playwright install --with-deps chromium
       # 起 demo（后台）
-      - run: pnpm --filter @scholar-club/pdf-viewer-demo dev --port 5180 &
+      - run: pnpm --filter @scholar-space/pdf-viewer-demo dev --port 5180 &
       - name: 等待 demo 就绪
         run: >-
           node -e "const t=Date.now();(async()=>{while(Date.now()-t<60000){try{const r=await fetch('http://localhost:5180');if(r.ok){console.log('ready');process.exit(0)}}catch{}await new Promise(r=>setTimeout(r,500))}console.error('timeout');process.exit(1)})()"

@@ -96,4 +96,4 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "发布版本: $VERSION"
-          npm view "@scholar-club/pdf-viewer@$VERSION" version
+          npm view "@scholar-space/pdf-viewer@$VERSION" version

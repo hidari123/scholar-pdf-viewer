@@ -6,7 +6,7 @@ import { E2E_BASE_URL } from './e2e-base.mjs';
  * "PDF 真的画出来了吗 / 缩放后还在原位吗 / 选区能取到吗" 这些**只能靠真浏览器**。
  *
  * 跑法（需先起 demo）：
- *   pnpm --filter @scholar-club/pdf-viewer-demo dev --port 5180
+ *   pnpm --filter @scholar-space/pdf-viewer-demo dev --port 5180
  *   node scripts/e2e-smoke.mjs
  */
 

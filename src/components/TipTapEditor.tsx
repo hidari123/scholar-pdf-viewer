@@ -17,7 +17,7 @@
  *
  * ```
  * 主入口            25 kB（不变）✅
- * @scholar-club/pdf-viewer/editor   ← 宿主想用富文本批注才装 TipTap
+ * @scholar-space/pdf-viewer/editor   ← 宿主想用富文本批注才装 TipTap
  * ```
  *
  * ## 宿主怎么用
@@ -27,8 +27,8 @@
  * ```
  *
  * ```tsx
- * import { PdfViewer } from '@scholar-club/pdf-viewer';
- * import { TipTapEditor } from '@scholar-club/pdf-viewer/editor';
+ * import { PdfViewer } from '@scholar-space/pdf-viewer';
+ * import { TipTapEditor } from '@scholar-space/pdf-viewer/editor';
  *
  * <PdfViewer
  *   annotationEditor={TipTapEditor}   // ← 传了就用 TipTap

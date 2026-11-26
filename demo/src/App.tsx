@@ -14,7 +14,7 @@ import type {
   PdfViewerHandle,
   PdfViewerTheme,
   SelectionData,
-} from '@scholar-club/pdf-viewer';
+} from '@scholar-space/pdf-viewer';
 import {
   downloadFile,
   exportHighlightedPdf,
@@ -26,9 +26,9 @@ import {
   stringifyHighlightDoc,
   THEMES,
   themeLabel,
-} from '@scholar-club/pdf-viewer';
-import { AnnotationDialog } from '@scholar-club/pdf-viewer/dialog';
-import { TipTapEditor } from '@scholar-club/pdf-viewer/editor';
+} from '@scholar-space/pdf-viewer';
+import { AnnotationDialog } from '@scholar-space/pdf-viewer/dialog';
+import { TipTapEditor } from '@scholar-space/pdf-viewer/editor';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import * as pdfjs from 'pdfjs-dist';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -36,7 +36,7 @@ import { HighlightPicker, PRESET_COLORS } from './HighlightPicker';
 import { createDebouncedSaver, loadHighlights } from './highlight-store';
 import './demo.css';
 import { demoText } from './demo-i18n';
-import '@scholar-club/pdf-viewer/styles.css';
+import '@scholar-space/pdf-viewer/styles.css';
 
 /**
  * 真实接入 demo —— 这是包与宿主的**标准接线示例**。
@@ -440,7 +440,7 @@ export default function App() {
    * —— **双栏论文** ✅ 用来暴露双栏选区的问题 ✅），
    * 没有时用内置的手写样张（3 页，可测选中）。
    */
-  const [sampleUrl, setSampleUrl] = useState<string | null>(null);
+  const [sampleUrl, setSampleUrl] = useState<string | undefined>(undefined);
   const [sampleLabel, setSampleLabel] = useState('');
 
   /** 加载本地真实文档（若存在） */
@@ -1168,7 +1168,7 @@ export default function App() {
           flexShrink: 0,
         }}
       >
-        <strong>@scholar-club/pdf-viewer</strong>
+        <strong>@scholar-space/pdf-viewer</strong>
         <button type="button" className="scpdf-btn" onClick={createSample}>
           {t('demo.loadSample')}
         </button>
@@ -1321,7 +1321,7 @@ export default function App() {
           ref={viewerRef}
           locale={locale}
           locales={HOST_LOCALES}
-          file={sampleUrl}
+          file={sampleUrl ?? null}
           documentId={documentId}
           theme={theme}
           /*
