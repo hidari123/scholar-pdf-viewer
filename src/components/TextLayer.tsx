@@ -61,7 +61,7 @@ export function TextLayer({
 
   return (
     <div className="scpdf-text-layer" aria-hidden="true">
-      {items.map((item) => (
+      {items.map((item, index) => (
         <span
           /*
            * key 用"位置 + 文本"而不是数组下标：
@@ -72,6 +72,29 @@ export function TextLayer({
           className="scpdf-text-layer__item"
           // 选区归页用（useTextSelection 靠它判断选中的是哪一页）
           data-page-number={pageNumber}
+          /*
+           * ⚠️⚠️ **页内项序号**（选区"按文档顺序裁剪"的依据）
+           *
+           * ## 为什么必须有
+           *
+           * -> 浏览器的 `Range` 是**文档顺序的连续区间**
+           * -> 我们的文本层保持 **PDF 原始顺序**（= 文本流顺序）
+           * -> -> 用 `(pageNumber, itemIndex)` 就能精确定位"选了哪一段"
+           *
+           * ## ⚠️ **不能用 `key` 代替**
+           *
+           * -> `key` 里带位置和文本 -> **缩放后会变**
+           * -> 而 `data-item-index` 必须**稳定**
+           * -> 只需保证"**同一时刻自洽**"（rect 和 items 一起重算）
+           *
+           * ## ⚠️ **index 就是文本流序号**
+           *
+           * -> `items` 的顺序 = `layoutTextItems` 的产出顺序 = **PDF 文本流顺序**
+           * -> 这个顺序**不是**按 y 排的
+           *    -> 双栏论文里 = **左栏全部，然后右栏全部**
+           * -> -> 这正是跨栏选区需要的
+           */
+          data-item-index={index}
           style={{
             left: `${item.left}px`,
             top: `${item.top}px`,
