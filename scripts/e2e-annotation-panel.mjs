@@ -68,9 +68,16 @@ async function makeHighlight() {
   });
   await page.waitForTimeout(1000);
 
+  /*
+   * ⚠️ **点包的"高亮"按钮**（不是 demo 自己的"添加高亮"按钮 ✅）。
+   *
+   * -> demo 之前在 toolbarSlot 里自己写了一个"添加高亮"按钮 ❌
+   *    -> 和包的高亮按钮**重复** ❌ -> 已经删掉了 ✅
+   * -> 现在用**包的高亮按钮** ✅（aria-label 是"高亮" ✅）
+   */
   for (const b of await page.locator('.scpdf-toolbar__btn').all()) {
     const label = await b.getAttribute('aria-label');
-    if (label?.includes('添加高亮')) {
+    if (label === '高亮') {
       await b.click();
       break;
     }

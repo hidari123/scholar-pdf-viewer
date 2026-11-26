@@ -153,6 +153,15 @@ export default function App() {
         setPrintOrientation(orientation);
       },
       /**
+       * **打开工具栏的"高亮"按钮**（E2E 用）
+       *
+       * -> 现在高亮按钮**默认就显示** ✅ -> 这个开关不再需要 ✅
+       * -> 保留是为了不破坏已有的 E2E 脚本 ✅
+       */
+      enableToolbarHighlight() {
+        /* 现在默认显示 ✅ -> 什么都不用做 ✅ */
+      },
+      /**
        * **开关功能**（第 29 轮新增）。
        */
       setDisabledFeatures(list: string[]) {
