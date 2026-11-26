@@ -99,7 +99,7 @@ describe('importHighlights', () => {
   /*
    * ⚠️ **逐条过滤**（而不是整份文档都废掉）。
    */
-  it('不合法的高亮被过滤掉，合法���保留', () => {
+  it('不合法的高亮被过滤掉，合法的保留', () => {
     const doc = importHighlights({
       documentId: 'x',
       highlights: [

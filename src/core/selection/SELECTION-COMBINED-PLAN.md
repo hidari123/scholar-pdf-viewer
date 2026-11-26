@@ -313,4 +313,4 @@ return r.top + r.height > fromY && r.top < toY;
 2. **基线裁剪跳过"部分选中"的项** ✅ —— 同意吗？
    - 代价：部分选中时高亮块会比整行选中时"高一点" ✅
 3. **删掉 `drag-origin.ts`** ✅ —— 同意吗？
-4. **要��修 `CHANGELOG.md` 版本号**吗？（`0.2.0` vs `package.json` 的 `0.1.0` ✅）
+4. **要不要修 `CHANGELOG.md` 版本号**吗？（`0.2.0` vs `package.json` 的 `0.1.0` ✅）

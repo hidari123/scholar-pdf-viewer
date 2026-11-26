@@ -7,7 +7,7 @@
  *
  * 缩放后立即重算是修白屏的关键：
  * 缩放改变了所有页的高度与位置，靠 IO 的异步回调会滞后一帧以上，
- * 用户会看到"页面变白 → 又出现"���闪。
+ * 用户会看到"页面变白 → 又出现"的闪。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';

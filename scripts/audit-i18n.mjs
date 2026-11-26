@@ -85,7 +85,7 @@ function isDeveloperFacing(context) {
  * ⚠️ `core/errors.ts` 的 `DEFAULT_MESSAGES`：
  * -> 它是 `PdfViewerError.message` 的默认值 ❌
  * -> **UI 层已经按 `error.code` 取 i18n 文案了** ✅（`PdfViewer.tsx:3982`）
- * -> 所以这里的��文**只给宿主排障看** -> 不用翻译 ✅
+ * -> 所以这里的英文**只给宿主排障看** -> 不用翻译 ✅
  */
 const DEVELOPER_FACING_OBJECTS = ['DEFAULT_MESSAGES', 'THEME_LABELS'];
 

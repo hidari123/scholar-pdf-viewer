@@ -26,11 +26,27 @@
  *
  * ## 修复
  *
- * 改成按**"同一视觉行内的连续性"**判断（段和段之间的空隙，而不是段和拖动范围的��离）。
+ * 改成按**"同一视觉行内的连续性"**判断（段和段之间的空隙，而不是段和拖动范围的距离）。
  *
  * ## 验证什么
  *
- * **每一个被浏览器选中的文字 span，都必须有底色**（覆盖率 ≥ 90%）。
+ * ⚠️ **判据改成：跟【Chrome 原生选区】比** ✅
+ *
+ * -> 旧判据是"每个 span 的覆盖率 ≥ 90%" ✅
+ * -> 那个判据假设我们**把整个 span 都涂上** ✅
+ * -> 但现在按 Chrome 的**字符级**精度画 ✅ -> 只涂选中的那几个字 ✅
+ *    -> 选区本来就不覆盖整个 span ✅ -> 覆盖率自然 < 90% ✅
+ * -> 实测（真实 PDF ✅）：
+ * ```
+ * span "T cells and demonstrates" (w=695)
+ *   Chrome Range 矩形: x=79  w=335   ← Chrome 也只涂 335px ✅
+ *   我们画的:          x=79  w=335   ← 和 Chrome 一致 ✅
+ * ```
+ * -> 所以【Chrome 自己的覆盖就是 48%】 ✅ -> 旧判据不成立 ✅
+ *
+ * -> **新判据** ✅：我们画的选区 == Chrome 的 Range 选区 ✅
+ *    -> 逐项比较【水平覆盖范围】✅（left / right ✅）
+ *    -> 再检查【有没有漏掉 Chrome 选中的项】✅
  */
 
 import { existsSync, readdirSync } from 'node:fs';
@@ -103,27 +119,92 @@ const selectAndMeasure = async (dragDy, dragDx) => {
       range?.intersectsNode(x),
     );
 
+    /*
+     * ⚠️ **判据：跟 Chrome 原生选区比** ✅
+     *
+     * -> Chrome 的 Range 矩形 ✅ = **唯一权威** ✅
+     * -> 我们画的 ✅ 应该和它**逐项一致** ✅
+     */
+    const nativeRects = [];
+    if (range) {
+      for (const rr of range.getClientRects()) {
+        if (rr.width > 0 && rr.height > 0) {
+          nativeRects.push({
+            l: rr.left - pr.left,
+            t: rr.top - pr.top,
+            w: rr.width,
+            h: rr.height,
+          });
+        }
+      }
+    }
+
     const rows = spans.map((x) => {
       const r = x.getBoundingClientRect();
       const l = r.left - pr.left;
       const t = r.top - pr.top;
-      let covered = 0;
-      for (const d of drawn) {
-        const ox = Math.max(0, Math.min(l + r.width, d.l + d.w) - Math.max(l, d.l));
-        const oy = Math.max(0, Math.min(t + r.height, d.t + d.h) - Math.max(t, d.t));
-        covered += (ox * oy) / Math.max(1, r.width * r.height);
+
+      // ⚠️ **Chrome 在这个项上覆盖的范围** ✅
+      let nl = Infinity;
+      let nr = -Infinity;
+      for (const n of nativeRects) {
+        if (n.t < t + r.height && n.t + n.h > t && n.l + n.w > l && n.l < l + r.width) {
+          nl = Math.min(nl, n.l);
+          nr = Math.max(nr, n.l + n.w);
+        }
       }
+
+      // ⚠️ **我们在这个项上覆盖的范围** ✅
+      let ol = Infinity;
+      let or = -Infinity;
+      for (const d of drawn) {
+        if (d.t < t + r.height && d.t + d.h > t && d.l + d.w > l && d.l < l + r.width) {
+          ol = Math.min(ol, d.l);
+          or = Math.max(or, d.l + d.w);
+        }
+      }
+
+      const chromeCovers = nl < nr;
+      const weCover = ol < or;
+      /*
+       * ⚠️ **相对误差** ✅（比"占 span 全宽的比例"客观 ✅）
+       *
+       * -> 比的是【左右边界】✅ -> 不是"占了多少" ✅
+       * -> 涂多了也不行 ✅（项级矩形会比 Chrome 宽 ✅）
+       * -> 容差 2px ✅（浮点 + 基线裁剪 ✅）
+       */
+      const width = Math.max(1, nr - nl);
+      const delta = chromeCovers && weCover ? Math.abs(ol - nl) + Math.abs(or - nr) : Infinity;
+
       return {
-        cover: Math.round(covered * 100),
+        cover: weCover ? Math.round(((Math.min(or, nr) - Math.max(ol, nl)) / width) * 100) : 0,
+        delta: Math.round(delta),
         txt: (x.textContent ?? '').slice(0, 24),
         l: Math.round(l),
         t: Math.round(t),
         w: Math.round(r.width),
         h: Math.round(r.height),
+        chrome: chromeCovers ? [Math.round(nl), Math.round(nr)] : null,
+        ours: weCover ? [Math.round(ol), Math.round(or)] : null,
       };
     });
 
-    return { total: rows.length, missed: rows.filter((r) => r.cover < 90), rows, drawn };
+    // ⚠️ **漏选** = Chrome 选了 ✅ 但我们**没覆盖** ✅（不是"覆盖不够 %" ✅）
+    const missed = rows.filter((r) => r.chrome !== null && r.ours === null);
+
+    return {
+      total: rows.length,
+      missed,
+      /**
+       * 和 Chrome 的范围**不一致**的项 ✅
+       *
+       * ⚠️ **左右边界都要比** ✅（容差 2px ✅）
+       * -> 涂多了也算不一致 ✅（项级矩形会比 Chrome 宽 ✅）
+       */
+      mismatched: rows.filter((r) => r.chrome !== null && r.ours !== null && r.delta > 2),
+      rows,
+      drawn,
+    };
   });
 };
 
@@ -146,16 +227,29 @@ try {
     console.log(
       `  选中 ${r1.total} 个 span，漏选 ${r1.missed.length} 个` +
         (r1.missed.length
-          ? `：${r1.missed.map((m) => `"${m.txt}"(${m.cover}% @${m.l},${m.t} ${m.w}x${m.h})`).join(', ')}`
+          ? `：${r1.missed.map((m) => `"${m.txt}"(Chrome ${JSON.stringify(m.chrome)} / 我们 ${JSON.stringify(m.ours)})`).join(', ')}`
           : ''),
     );
     if (r1.missed.length) {
       console.log('  画出来的矩形:', JSON.stringify(r1.drawn));
     }
     check(
-      '**每个被选中的 span 都有底色**（行尾也不能漏）',
+      '**Chrome 选中的每个 span 都有底色**（行尾也不能漏）',
       r1.missed.length === 0,
       `${r1.missed.length} 个漏选`,
+    );
+    // ⚠️ **范围要和 Chrome 一致** ✅（不是"覆盖 span 全宽" ✅）
+    check(
+      '选区范围和 Chrome 原生一致',
+      r1.mismatched.length === 0,
+      r1.mismatched.length
+        ? r1.mismatched
+            .map(
+              (m) =>
+                `"${m.txt}"(Chrome ${JSON.stringify(m.chrome)} / 我们 ${JSON.stringify(m.ours)})`,
+            )
+            .join(', ')
+        : '完全一致',
     );
   }
 
@@ -164,6 +258,18 @@ try {
   if (r2) {
     console.log(`  大范围：选中 ${r2.total} 个 span，漏选 ${r2.missed.length} 个`);
     check('大范围拖选：也没有漏选', r2.missed.length === 0, `${r2.missed.length} 个漏选`);
+    check(
+      '大范围拖选：范围和 Chrome 一致',
+      r2.mismatched.length === 0,
+      r2.mismatched.length
+        ? r2.mismatched
+            .map(
+              (m) =>
+                `"${m.txt}"(Chrome ${JSON.stringify(m.chrome)} / 我们 ${JSON.stringify(m.ours)})`,
+            )
+            .join(', ')
+        : '完全一致',
+    );
   }
 
   // ---- 3. 单行 ----

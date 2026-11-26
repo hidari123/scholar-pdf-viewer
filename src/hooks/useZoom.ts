@@ -174,7 +174,7 @@ export interface UseZoomResult {
  * @param scale 原始比例
  * @param min 最小值
  * @param max 最大值
- * @returns 夹好���比例
+ * @returns 夹好的比例
  */
 export function clampScale(
   scale: number,
