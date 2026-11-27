@@ -311,6 +311,82 @@ console.log('\n[3] 便签内容框在页边角不被裁');
   }
 }
 
+/*
+ * ⚠️ **没有选区时点【高亮】按钮 → toast 提示**（用户需求 ✅）。
+ *
+ * -> 选区是包内部的状态 ✅ -> 只有包知道有没有选中 ✅
+ * -> 没有选区时 ✅ -> 弹 toast ✅ + **不调** `onToolbarHighlight` ✅
+ */
+console.log('\n[4] 无选区点高亮按钮的提示');
+/*
+ * ⚠️ **必须先清掉选区** ✅
+ *
+ * -> 上一段测便签的时候**选过文字** ✅ -> 选区还在 ✅
+ * -> 有选区就不会弹这个提示 ✅ -> 测的就不是"无选区"了 ❌
+ */
+await page.evaluate(() => {
+  window.getSelection()?.removeAllRanges();
+});
+await page.mouse.move(10, 10);
+await page.waitForTimeout(600);
+await page.click('.scpdf-toolbar__btn[aria-label="高亮"]');
+await page.waitForTimeout(700);
+const noSelectionToast = await page.evaluate(() => {
+  const items = [...document.querySelectorAll('.scpdf-toast__item')];
+  return {
+    count: items.length,
+    text: (items[0]?.textContent ?? '').trim(),
+    isInfo: items[0]?.className.includes('--info') ?? false,
+  };
+});
+check(
+  '无选区时弹了提示',
+  noSelectionToast.count === 1 && noSelectionToast.text.length > 0,
+  noSelectionToast.text || '没弹',
+);
+check('提示是 info 类型', noSelectionToast.isInfo, noSelectionToast.isInfo ? 'info' : '不是');
+
+// ⚠️ **清掉 toast ✅**
+await page.evaluate(() => {
+  document.querySelectorAll('.scpdf-toast__close').forEach((b) => {
+    b.click();
+  });
+});
+await page.waitForTimeout(400);
+
+/*
+ * ⚠️ **有选区时点【高亮】按钮 → 不该弹这个提示** ✅
+ */
+const hasSelection = await page.evaluate(() => {
+  const c = document.querySelector('.scpdf-container');
+  const cb = c.getBoundingClientRect();
+  const el = [...document.querySelectorAll('.scpdf-text-layer__item')].find(
+    (e) =>
+      (e.textContent ?? '').length > 25 &&
+      e.getBoundingClientRect().top >= cb.top + 60 &&
+      e.getBoundingClientRect().top <= cb.bottom - 200,
+  );
+  if (!el) return null;
+  const b = el.getBoundingClientRect();
+  return { x: b.left + 10, y: b.top + b.height / 2 };
+});
+if (hasSelection) {
+  await page.mouse.move(hasSelection.x, hasSelection.y);
+  await page.mouse.down();
+  await page.mouse.move(hasSelection.x + 100, hasSelection.y, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(1000);
+
+  await page.click('.scpdf-toolbar__btn[aria-label="高亮"]');
+  await page.waitForTimeout(700);
+  const withSelectionToast = await page.evaluate(
+    () => document.querySelectorAll('.scpdf-toast__item').length,
+  );
+  check('有选区时不弹"先选择文字"的提示', withSelectionToast === 0, `${withSelectionToast} 条`);
+} else {
+  check('有选区时不弹"先选择文字"的提示', false, '没找到可选的文字');
+}
+
 check('没有页面错误', errors.length === 0, errors.join(' | ').slice(0, 140));
 
 const failed = results.filter((r) => !r.ok);

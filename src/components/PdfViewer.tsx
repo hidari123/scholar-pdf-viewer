@@ -4014,6 +4014,92 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     setCurrentSelection(null);
   }, [textSelection]);
 
+  /**
+   * ⚠️ **工具栏的"高亮"按钮**（用户需求：
+   * "点击包工具栏的高亮按钮时 如果没有选择文字 则toast提示用户先选择文字"）。
+   *
+   * ## 为什么放在包里
+   *
+   * -> 选区是**包内部**的状态 ✅ -> 包才知道"有没有选中" ✅
+   * -> 放宿主那边 ❌ -> 每个宿主都要自己判断一遍 ❌
+   * -> 提示也用**包自己的 toast** ✅ -> 宿主传了 `onToast` 就会用宿主的 ✅
+   *
+   * ## 行为
+   *
+   * -> **没有选区** -> `toast.info` ✅ + **不调** `onToolbarHighlight` ✅
+   *    -> 免得宿主收到一个没有内容的回调 ❌ -> 宿主自己弹错提示 ❌
+   * -> **有选区** -> 照常调 `onToolbarHighlight(color)` ✅
+   */
+  const handleToolbarHighlight = useCallback(
+    (color: string) => {
+      /*
+       * ⚠️⚠️ **两边都要看** ✅
+       *
+       * -> `currentSelection` 是 React state ✅ -> 选区**可能已经过期** ✅
+       *    -> 用户选完又点空白 ✅ -> 浏览器选区没了 ✅
+       *    -> 但包的 `selectionchange` 处理器在"选区塌缩"时**直接 return** ✅
+       *       （`useTextSelection.ts` 的 `rangeCount === 0` 分支 ✅）
+       *    -> -> `currentSelection` 还留着**旧内容** ✅❌
+       *    -> 只看 state ❌ -> 以为还有选区 ✅ -> 不提示 ❌
+       *
+       * -> 浏览器的 `window.getSelection()` 是**实时真值** ✅
+       *    -> 但它可能选到**包外面**的东西 ❌ -> 所以还要看是不是在包里 ✅
+       *
+       * -> 结论：**浏览器的实时选区说了算** ✅
+       *    -> 它为空 ✅ -> 说明用户已经取消选择了 ✅ -> 提示 ✅
+       *    -> state 只是**兜底** ✅（浏览器选区可能被宿主拿走 ✅）
+       */
+      const domSelection = typeof window === 'undefined' ? null : window.getSelection();
+      const hasDomSelection = Boolean(
+        domSelection && domSelection.rangeCount > 0 && !domSelection.isCollapsed,
+      );
+      /*
+       * ⚠️ **实时选区优先于 state** ✅
+       *
+       * -> state 可能是**过期的** ✅（用户取消选择后 ✅ state's `selectionchange` 处理器
+       *    在"选区塌缩"时**直接 return** ✅ -> 不通知 null ✅ -> state 留着旧内容 ✅）
+       * -> 浏览器选区是**实时真值** ✅ -> 空了就说明真的没选了 ✅
+       * -> 但要**确认这个选区在包里** ✅（宿主可能选中了别处的文字 ✅）
+       */
+      const container = containerRef.current;
+      const domRange = domSelection?.rangeCount ? domSelection.getRangeAt(0) : null;
+      const inContainer = Boolean(
+        domRange && container?.contains(domRange.commonAncestorContainer),
+      );
+
+      /*
+       * ⚠️ **浏览器里没有选区 -> 就是没选** ✅
+       *
+       * -> state 可能是**过期的** ✅（用户取消选择后 ✅
+       *    `selectionchange` 处理器在"选区塌缩"时**直接 return** ✅
+       *    -> 不通知 null ✅ -> state 留着旧内容 ✅）
+       * -> 所以**以浏览器选区为准** ✅
+       *
+       * ⚠️ **例外** ✅：**宿主刚拿走选区** ✅
+       * -> 比如刚点完"高亮" ✅ -> 包的 `clearSelectionAfterHighlight` ✅
+       *    -> 已经把 state 清成 null 了 ✅ -> 下面 `stateHasText` 为 false ✅
+       * -> -> 这种情况下也会提示 ✅（合理 ✅ -> 用户确实该重新选 ✅）
+       */
+      if (!hasDomSelection) {
+        toast.info(t('selection.selectFirst'));
+        return;
+      }
+
+      /*
+       * ⚠️ **浏览器里有选区 -> 但要确认在包里** ✅
+       *
+       * -> 宿主可能选中了**包外面**的文字 ✅ -> 那不能拿来高亮 ✅
+       */
+      if (!inContainer) {
+        toast.info(t('selection.selectFirst'));
+        return;
+      }
+
+      onToolbarHighlight?.(color);
+    },
+    [onToolbarHighlight, toast, t],
+  );
+
   /** 选颜色 → 立刻用该颜色高亮 */
   const handlePickHighlightColor = useCallback(
     (key: string) => {
@@ -5132,7 +5218,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           theme={merged.theme}
           onThemeChange={merged.features?.themePicker === false ? undefined : onThemeChange}
           themeOptions={themeOptions}
-          onToolbarHighlight={onToolbarHighlight}
+          onToolbarHighlight={handleToolbarHighlight}
           highlightPalette={merged.highlightPalette}
           defaultHighlightColor={merged.defaultHighlightColor}
         />

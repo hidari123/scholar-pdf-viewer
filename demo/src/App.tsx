@@ -1336,8 +1336,15 @@ export default function App() {
            */
           onToolbarHighlight={(color: string) => {
             setHighlightColor(color);
+            /*
+             * ⚠️ **没有选区的提示由包弹** ✅
+             *
+             * -> 包知道有没有选区 ✅（选区是包内部的状态 ✅）
+             * -> 包会弹 toast ✅（宿主传了 `onToast` 就用宿主的 ✅）
+             * -> 而且**没有选区时根本不会调这个回调** ✅
+             * -> 所以这里不用再判断 ✅
+             */
             if (!selection) {
-              setHint('（先选中一段文字）');
               return;
             }
             createHighlight(color, selection.text, selection.norm);

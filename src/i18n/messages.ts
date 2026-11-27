@@ -164,6 +164,8 @@ export interface Messages {
   'toast.exportFailed': string;
   'selection.addNote': string;
   'selection.actionHighlight': string;
+  /** 没有选区时的提示（点工具栏的高亮按钮） */
+  'selection.selectFirst': string;
   'selection.actionCopy': string;
   'selection.actionTranslate': string;
   'selection.actionAsk': string;
@@ -349,6 +351,7 @@ export const ZH_MESSAGES: Messages = {
   'toast.exportFailed': '导出失败',
   'selection.addNote': '加批注',
   'selection.actionHighlight': '高亮',
+  'selection.selectFirst': '请先选中文字',
   'selection.actionCopy': '复制',
   'selection.actionTranslate': '翻译',
   'selection.actionAsk': '提问',
@@ -468,6 +471,7 @@ export const EN_MESSAGES: Messages = {
   'toast.exportFailed': 'Export failed',
   'selection.addNote': 'Add note',
   'selection.actionHighlight': 'Highlight',
+  'selection.selectFirst': 'Select text first',
   'selection.actionCopy': 'Copy',
   'selection.actionTranslate': 'Translate',
   'selection.actionAsk': 'Ask',
