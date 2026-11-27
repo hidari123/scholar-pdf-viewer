@@ -110,6 +110,48 @@ console.log('\n[2] 高亮按钮（分裂按钮）');
     () => document.querySelectorAll('.scpdf-toolbar__color-swatch').length,
   );
   check('点箭头展开色板', swatches > 0, `${swatches} 个色块`);
+
+  /*
+   * ⚠️ **色板必须完整可见**（用户反馈："下拉之后会出现滚动条 需要移出来"）
+   *
+   * -> 之前是 `position: absolute` ✅
+   * -> 祖先 `.scpdf-toolbar__right` 的 `overflow-x: auto` ✅
+   *    -> 浏览器强制 `overflow-y: auto` ✅ -> 色板被裁 ✅
+   * -> 现在 `position: fixed` ✅ -> 不受祖先 overflow 影响 ✅
+   */
+  const menuState = await page.evaluate(() => {
+    const menu = document.querySelector('.scpdf-toolbar__color-menu');
+    const right = document.querySelector('.scpdf-toolbar__right');
+    const mr = menu.getBoundingClientRect();
+    return {
+      position: getComputedStyle(menu).position,
+      // ⚠️ **容器有没有多出纵向滚动条** ✅
+      hasVScroll: right.scrollHeight > right.clientHeight,
+      /*
+       * ⚠️ **色板有没有超出视口** ✅
+       *
+       * -> fixed 定位 ✅ -> 只受视口约束 ✅
+       * -> 之前是 absolute ✅ -> 被工具栏容器裁掉 ✅
+       *    -> 现在要比的是**视口** ✅ 而不是工具栏容器 ✅
+       */
+      outViewportBottom: mr.bottom - window.innerHeight,
+      outViewportTop: -mr.top,
+      menuH: mr.height,
+      menuTop: mr.top,
+    };
+  });
+  check('色板是 fixed 定位', menuState.position === 'fixed', menuState.position);
+  check(
+    '工具栏右侧没有多出滚动条',
+    !menuState.hasVScroll,
+    menuState.hasVScroll ? '有滚动条' : '无',
+  );
+  check(
+    '色板完整可见（在视口内）',
+    menuState.outViewportBottom <= 0 && menuState.outViewportTop <= 0,
+    `下溢出 ${Math.round(menuState.outViewportBottom)}px / 上溢出 ${Math.round(menuState.outViewportTop)}px`,
+  );
+
   await page.keyboard.press('Escape');
   await page.waitForTimeout(400);
 }
@@ -165,14 +207,21 @@ console.log('\n[3] 便签内容框在页边角不被裁');
 
     if (noteCount > 0) {
       for (const pos of ['right', 'bottom-right']) {
-        // ⚠️ **把便签挪到页的边角** ✅
+        /*
+         * ⚠️ **把便签挪到页的边角** ✅
+         *
+         * -> "bottom-right" 会把图标挪到**视口外** ✅（页很高 ✅）
+         * -> -> 先**滚到能看见的位置** ✅ 不然量不到任何东西 ✅
+         */
         await page.evaluate((pos) => {
           const note = document.querySelector('.scpdf-sticky-note');
           const pb = note.closest('.scpdf-page').getBoundingClientRect();
           const nb = note.getBoundingClientRect();
           note.style.left = `${Math.round(pb.right - nb.left - 20)}px`;
           if (pos === 'bottom-right') {
-            note.style.top = `${Math.round(pb.bottom - nb.top - 20)}px`;
+            // ⚠️ **放在【视口内**的右下角** ✅ 不然 hover 不到 ✅
+            const cb = document.querySelector('.scpdf-container').getBoundingClientRect();
+            note.style.top = `${Math.round(cb.bottom - nb.top - 40)}px`;
           }
         }, pos);
         await page.waitForTimeout(300);
@@ -190,6 +239,8 @@ console.log('\n[3] 便签内容框在页边角不被裁');
           if (!c) return { found: false };
           const b = c.getBoundingClientRect();
           const pb = c.closest('.scpdf-page')?.getBoundingClientRect();
+          const icon = document.querySelector('.scpdf-sticky-note__icon');
+          const ir = icon?.getBoundingClientRect();
           return {
             found: true,
             position: getComputedStyle(c).position,
@@ -198,6 +249,10 @@ console.log('\n[3] 便签内容框在页边角不被裁');
             outViewportRight: b.right - window.innerWidth,
             outViewportBottom: b.bottom - window.innerHeight,
             visible: c.dataset.visible === 'true',
+            boxLeft: b.left,
+            boxWidth: b.width,
+            iconLeft: ir ? ir.left : 0,
+            iconWidth: ir ? ir.width : 0,
           };
         });
 
@@ -205,6 +260,28 @@ console.log('\n[3] 便签内容框在页边角不被裁');
           check(`[${pos}] 内容框存在`, false);
         } else {
           check(`[${pos}] 内容框是 fixed`, out.position === 'fixed', out.position);
+          /*
+           * ⚠️ **离图标要近**（用户反馈："距离批注按钮太远"）
+           *
+           * -> 之前翻到左边时 ✅ -> 框的**右边缘**贴着图标的左边缘 ✅
+           *    -> 框整个往左延伸 ✅ -> 框的主体离图标 142px ✅
+           * -> 现在改成**中心对齐** ✅ -> 框的中心 ≈ 图标的中心 ✅
+           */
+          /*
+           * ⚠️ **量【边缘间距】** ✅ 不是中心间距 ✅
+           *
+           * -> 内容框和图标**相邻**时 ✅ -> 中心差必然很大 ✅（框本身 142px 宽 ✅）
+           *    -> 那不是"太远" ✅ -> 那是正常的 ✅
+           * -> 用户说的"太远" ✅ -> 是翻到左边时 ✅
+           *    -> 框整个往左延伸 ✅ -> **两个框挨着的那个边**才有意义 ✅
+           *
+           * -> 所以量：**框的近边到图标的远边** ✅
+           */
+          const iconRight = out.iconLeft + out.iconWidth;
+          const gapRight = out.boxLeft - iconRight;
+          const gapLeft = out.iconLeft - (out.boxLeft + out.boxWidth);
+          const nearest = gapRight >= 0 ? gapRight : gapLeft >= 0 ? gapLeft : 0;
+          check(`[${pos}] 内容框紧挨着图标`, nearest <= 60, `最近边间距 ${Math.round(nearest)}px`);
           check(
             `[${pos}] 内容框没超出页右边`,
             out.overflowRight <= 0,

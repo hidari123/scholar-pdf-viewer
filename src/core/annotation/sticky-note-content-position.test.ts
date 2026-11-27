@@ -20,15 +20,49 @@ describe('computeStickyNoteContentPosition', () => {
     expect(pos.top).toBe(300);
   });
 
-  it('图标在右边 -> 翻到左边', () => {
+  it('图标在右边 -> 翻到左边（中心对齐 ✅）', () => {
     const pos = computeStickyNoteContentPosition({
       icon: { left: 900, top: 300, width: 22, height: 22 },
       size: SIZE,
       viewport: VIEWPORT,
     });
-    // 右边放不下（900 + 22 + 26 + 200 > 1000 - 8）
-    // -> 翻到左边：900 - 26 - 200 = 674
-    expect(pos.left).toBe(674);
+    /*
+     * 右边放不下（900 + 22 + 26 + 200 > 1000 - 8）-> 翻到左边
+     *
+     * ⚠️ **翻到左边时改成"中心对齐"**（用户反馈："距离批注按钮太远"）
+     * -> 框的中心线 = 图标中心 + gap/2
+     * -> 算出来 left = 900 + 11 + 13 - 100 = 824
+     * -> 但 clamp 到"视口右边界减安全边距" -> 1000 - 200 - 8 = 792
+     *
+     * 之前是"右边缘贴着图标左边缘" -> left = 900 - 26 - 200 = 674
+     * -> 框整个往左延伸 -> 视觉上离图标 200px -> 太远
+     */
+    expect(pos.left).toBe(792);
+  });
+
+  it('⚠️ **翻到左边时 ✅ 框和图标的距离更近**（用户反馈 ✅）', () => {
+    const icon = { left: 1399, top: 300, width: 24, height: 24 };
+    const size = { width: 142, height: 60 };
+    const pos = computeStickyNoteContentPosition({
+      icon,
+      size,
+      viewport: { width: 1600, height: 800 },
+    });
+
+    // 图标右边 1423 -> 右边放不下（1423 + 26 + 142 = 1591，1600 - 8 = 1592）
+    // ⚠️ 刚好放得下 -> 走"右边"分支 ✅
+    // -> 强制让它放不下 ✅
+    const flipped = computeStickyNoteContentPosition({
+      icon: { left: 1420, top: 300, width: 24, height: 24 },
+      size,
+      viewport: { width: 1600, height: 800 },
+    });
+
+    // 中心对齐 -> 框的中心 ≈ 图标的中心 + 13px
+    const iconCenter = 1420 + 12;
+    const boxCenter = flipped.left + size.width / 2;
+    expect(Math.abs(boxCenter - iconCenter)).toBeLessThanOrEqual(14);
+    expect(pos.left).toBeGreaterThan(0);
   });
 
   it('图标在下边界 -> 翻到上方', () => {
@@ -87,10 +121,12 @@ describe('computeStickyNoteContentPosition', () => {
     /*
      * 内容框 900px 宽，视口 1000px。
      *
-     * -> 居中：(1000 - 900) / 2 = 50
-     * -> 再 clamp：max(8, min(50, 1000 - 900 - 8 = 92)) = 50
+     * -> 右边放不下 ✅
+     * -> 左边：中心对齐 480+11+13-450 = 54 ✅ -> 放得下（>= 8 ✅）
+     *    -> 走"翻到左边"分支 -> 54
+     * -> clamp 上限 1000-900-8 = 92 -> 54 < 92 -> 不变
      */
-    expect(pos.left).toBe(50);
+    expect(pos.left).toBe(54);
     expect(pos.left + 900).toBeLessThanOrEqual(VIEWPORT.width);
   });
 
@@ -100,10 +136,13 @@ describe('computeStickyNoteContentPosition', () => {
       size: { width: 600, height: 150 },
       viewport: VIEWPORT,
     });
-    // 右边放不下（480+22+26+600 > 1000-8）
-    // 左边也放不下（480-26-600 < 8）
-    // -> 居中：(1000-600)/2 = 200
-    expect(pos.left).toBe(200);
+    /*
+     * 右边放不下（480+22+26+600 > 1000-8）
+     * 左边也放不下（中心对齐后 480+11+13-300 = 204 -> 但 clamp 上限是
+     *    1000-600-8 = 392 -> 204 < 392 -> 放得下 ✅）
+     * -> 走"翻到左边"分支 ✅ -> 204
+     */
+    expect(pos.left).toBe(204);
     expect(pos.left + 600).toBeLessThanOrEqual(VIEWPORT.width);
   });
 

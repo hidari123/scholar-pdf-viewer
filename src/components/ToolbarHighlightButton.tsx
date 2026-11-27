@@ -81,6 +81,23 @@ export function ToolbarHighlightButton(props: ToolbarHighlightButtonProps) {
   /** 下拉是否展开 */
   const [open, setOpen] = useState(false);
 
+  /*
+   * ⚠️ **色板的位置**（视口坐标 ✅）
+   *
+   * -> 色板是 `position: fixed` ✅ -> 坐标由 JS 算 ✅
+   * -> 和主题菜单**同一套做法** ✅（`ThemePicker.tsx` ✅）
+   *
+   * ### 为什么不能用绝对定位 ✅
+   *
+   * -> 之前是 `position: absolute` + CSS 写死 `right: 0` ❌
+   * -> 祖先 `.scpdf-toolbar__right` 有 `overflow-x: auto` ✅
+   *    -> 浏览器会把它**强制变成** `overflow-y: auto` ✅（一个轴非 visible ✅）
+   *    -> 色板在工具栏**下面** ✅ -> **被裁掉** ✅ ❌
+   *    -> 实测：菜单在容器下方 76px ✅ -> 可见高度 -6px ✅（完全看不见 ✅）
+   *    -> 而且容器**多出一条纵向滚动条** ✅ ❌（用户反馈 ✅）
+   */
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+
   /** 容器 ref（点外面关闭） */
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -97,6 +114,38 @@ export function ToolbarHighlightButton(props: ToolbarHighlightButtonProps) {
   useEffect(() => {
     setCurrentColor(defaultColor ?? FALLBACK_HIGHLIGHT_COLOR);
   }, [defaultColor]);
+
+  /*
+   * ⚠️ **展开时算色板的位置**（照抄主题菜单的做法 ✅）
+   *
+   * -> 量箭头的位置 ✅ -> 色板**右边缘**对齐箭头右边缘 ✅
+   * -> 下方放不下 -> **翻到上方** ✅
+   */
+  useEffect(() => {
+    if (!open) {
+      setMenuPos(null);
+      return;
+    }
+    const button = rootRef.current?.querySelector('button[aria-haspopup="menu"]');
+    if (!button) {
+      return;
+    }
+    const rect = button.getBoundingClientRect();
+    // 色板宽 156px ✅（CSS 里写死的 ✅）
+    const menuWidth = 156;
+    const menuHeight = 8 + 24 * 3 + 4 * 2 + 8;
+    const spaceBelow = window.innerHeight - rect.bottom;
+
+    const top =
+      spaceBelow < menuHeight && rect.top > menuHeight
+        ? rect.top - menuHeight - 4
+        : rect.bottom + 4;
+
+    setMenuPos({
+      top,
+      left: Math.max(8, rect.right - menuWidth),
+    });
+  }, [open]);
 
   /*
    * ⚠️ **点外面关闭**（和高亮色板的行为保持一致）
@@ -211,7 +260,11 @@ export function ToolbarHighlightButton(props: ToolbarHighlightButtonProps) {
       </button>
 
       {open ? (
-        <div className="scpdf-toolbar__color-menu" role="menu">
+        <div
+          className="scpdf-toolbar__color-menu"
+          role="menu"
+          style={menuPos ? { top: menuPos.top, left: menuPos.left } : { visibility: 'hidden' }}
+        >
           {paletteEntries.map(([key, color]) => {
             const colorName = resolveHighlightColorName(key, locale);
             return (

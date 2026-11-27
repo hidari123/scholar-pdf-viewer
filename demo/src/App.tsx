@@ -16,6 +16,7 @@ import type {
   SelectionData,
 } from '@scholar-space/pdf-viewer';
 import {
+  BUILTIN_HIGHLIGHT_PALETTE,
   downloadFile,
   exportHighlightedPdf,
   exportHighlights,
@@ -32,7 +33,6 @@ import { TipTapEditor } from '@scholar-space/pdf-viewer/editor';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import * as pdfjs from 'pdfjs-dist';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { HighlightPicker, PRESET_COLORS } from './HighlightPicker';
 import { createDebouncedSaver, loadHighlights } from './highlight-store';
 import './demo.css';
 import { demoText } from './demo-i18n';
@@ -350,22 +350,19 @@ export default function App() {
     [],
   );
 
-  /** 用户自定义的颜色（key → 颜色）；持久化也是宿主的事 */
-  const [customColors, setCustomColors] = useState<Record<string, string>>({});
-
   /**
    * 传给包的高亮色板（语义 key → CSS 颜色）。
    *
-   * ⚠️ **宿主负责组装**：预设色 + 用户自定义色 → 传给包的 `highlightPalette`。
-   * 包只认 key，不关心 key 的含义。
+   * ⚠️ **不传也能用** ✅
+   * -> 包内置了一份色板 ✅（`BUILTIN_HIGHLIGHT_PALETTE` ✅）
+   * -> 之前 demo 自己组装一份 ✅ + 在 header 放了个取色器 ✅
+   *    -> 和包工具栏的**颜色下拉重复** ✅ ❌
+   *    -> 还把 header 撑高 ✅ -> 色板被裁 ✅ ❌
+   * -> 现在直接用包内置的 ✅
+   *
+   * -> 宿主要**自定义色** ✅ -> 传自己的 `highlightPalette` ✅（会完全覆盖 ✅）
    */
-  const highlightPalette = useMemo(() => {
-    const palette: Record<string, string> = {};
-    for (const item of PRESET_COLORS) {
-      palette[item.key] = item.color;
-    }
-    return { ...palette, ...customColors };
-  }, [customColors]);
+  const highlightPalette = BUILTIN_HIGHLIGHT_PALETTE;
 
   /** 选区（宿主拿到的几何） */
   const [selection, setSelection] = useState<SelectionData | null>(null);
@@ -1240,20 +1237,18 @@ export default function App() {
         </span>
 
         {/*
-          高亮颜色选择器 —— **宿主侧的 UI**。
-          包只提供 `highlightPalette`（key → 颜色）这条通道，
-          取色器/预设/持久化全在宿主。
-        */}
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ opacity: 0.7, whiteSpace: 'nowrap' }}>{t('demo.highlightColor')}</span>
-          <HighlightPicker
-            value={highlightColor}
-            customColors={customColors}
-            onChange={(key) => setHighlightColor(key)}
-            onSaveCustom={(key, color) => setCustomColors((prev) => ({ ...prev, [key]: color }))}
-            locale={locale}
-          />
-        </span>
+          ⚠️ **这里原来有个高亮颜色选择器** ✅ -> **删掉了** ✅
+          *
+          * -> 包的工具栏**自带**颜色下拉 ✅（🖍 + ▾ ✅）
+          *    -> 里面有内置色板 ✅ -> 宿主不传也能选色 ✅
+          * -> demo 再放一个 ✅ -> **功能重复** ✅ ❌
+          * -> 而且那个取色器把 header 撑高了 ✅
+          *    -> header 是 `height: 46` + `overflowY: hidden` ✅
+          *    -> 色板被**拦腰裁掉** ✅ ❌（用户反馈"最上面出现乱码" ✅）
+          *    -> 截图确认：右上角的色块只显示下半截 ✅ ✅
+          *
+          * -> 宿主要自定义色 ✅ -> 传 `highlightPalette` ✅（包会覆盖内置的 ✅）
+          */}
       </div>
 
       <div style={{ flex: 1, minHeight: 0 }}>

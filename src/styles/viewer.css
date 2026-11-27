@@ -536,10 +536,26 @@
 
 /* 颜色下拉菜单 */
 .scpdf-toolbar__color-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 30;
+  /*
+   * ⚠️⚠️ **必须用 `position: fixed`**（用户反馈：
+   * "包工具栏高亮分类旁边下拉框 下拉之后会出现滚动条 需要移出来
+   *  具体展示效果与主题一样"）
+   *
+   * -> 之前是 `position: absolute` ❌
+   * -> 祖先 `.scpdf-toolbar__right` 有 `overflow-x: auto` ❌
+   *    -> 浏览器会把它**强制变成** `overflow-y: auto` ❌（一个轴非 visible ❌）
+   *    -> 色板在工具栏**下面** ❌ -> **被裁掉** ❌
+   *    -> 实测：菜单在容器下方 76px ❌ -> 可见高度 -6px ❌（完全看不见 ❌）
+   *    -> 而且容器**多出一条纵向滚动条** ❌
+   *
+   * -> 改成 `position: fixed` + **JS 算视口坐标** ✅
+   *    -> 不受任何祖先的 overflow 影响 ✅
+   *    -> 和**主题菜单**同一套做法 ✅（`.scpdf-theme-picker__menu` ✅）
+   */
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1100;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;

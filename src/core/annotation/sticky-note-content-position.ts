@@ -50,8 +50,13 @@ const DEFAULT_MARGIN = 8;
  *
  * ## 水平规则
  *
- * 1. 默认贴在图标**右边**
+ * 1. 默认贴在图标**右边**（左边缘贴着图标右边缘）
  * 2. 右边放不下（超出视口减安全边距）-> 翻到**左边**
+ *    - ⚠️ **翻到左边时改成"中心对齐"**（用户反馈："批注在右边的时候
+ *      看批注距离批注按钮太远"）
+ *    - 之前是"右边缘贴着图标左边缘" -> 内容框整个往左延伸
+ *      -> 框有 142px 宽 -> 框的主体离图标 142px -> 视觉上太远
+ *    - 现在改成"框的中心线略微偏过图标" -> 两边距离都小 -> 视觉上贴住
  * 3. 左右都放不下 -> 贴着视口中间
  *
  * ## 垂直规则
@@ -77,13 +82,25 @@ export function computeStickyNoteContentPosition(
    * 水平：先试右边，再试左边
    */
   const rightLeft = icon.left + icon.width + gap;
-  const leftLeft = icon.left - gap - size.width;
+
+  /*
+   * ⚠️ **翻到左边时用"中心对齐"**（用户反馈："距离批注按钮太远"）
+   *
+   * -> 不用"右边缘贴着图标左边缘" ❌
+   *    -> 内容框整个往左延伸 ❌
+   *    -> 框宽 142px ❌ -> 框的主体离图标 142px ❌ -> 视觉上太远 ❌
+   * -> 改成：框的**中心线**略微偏过图标 ✅
+   *    -> 图标右边 26px 处 = 框的中心 ✅
+   *    -> 框的左边缘 = 图标左边 - 框宽/2 + 26px ✅
+   *    -> 两边距离都小 ✅ -> 视觉上"贴住"图标 ✅
+   */
+  const flippedLeft = icon.left + icon.width / 2 + gap / 2 - size.width / 2;
 
   let left: number;
   if (rightLeft + size.width <= vw - margin) {
     left = rightLeft;
-  } else if (leftLeft >= margin) {
-    left = leftLeft;
+  } else if (flippedLeft >= margin) {
+    left = flippedLeft;
   } else {
     // 两边都放不下 -> 贴着视口中间
     left = Math.max(margin, (vw - size.width) / 2);
