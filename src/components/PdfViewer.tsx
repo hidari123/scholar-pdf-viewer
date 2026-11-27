@@ -25,7 +25,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { findStickyNoteIcon } from '../core/annotation/anchor';
 import type { LinkAnnotationLike } from '../core/annotation/links';
 import type { AnnotationRecord } from '../core/annotation/sticky-note';
 import type { DocumentCache } from '../core/cache/store';
@@ -71,6 +70,8 @@ import type {
   SelectionData,
 } from '../core/types';
 import { EMPTY_NORM_POSITION } from '../core/types';
+import { useAnnotationPanel } from '../hooks/useAnnotationPanel';
+import { useContainerRect } from '../hooks/useContainerRect';
 import { useCurrentPage } from '../hooks/useCurrentPage';
 import { usePdfDocument } from '../hooks/usePdfDocument';
 import { usePrint } from '../hooks/usePrint';
@@ -4153,68 +4154,13 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     [currentSelection, onHighlight, handlePopoverClose, clearSelectionAfterHighlight],
   );
 
-  /**
-   * 浮层的容器矩形（视口坐标）—— PDF 的可视区。
+  /*
+   * ⚠️ **容器矩形**（浮层 clamp 用）
    *
-   * 用 state 而不是 ref：容器位置会随滚动/缩放变化，
-   * 浮层要跟着 clamp → 需要重渲染。
+   * -> 原来这段有 62 行 ✅ -> 抽到 `useContainerRect` ✅
+   * -> 逻辑**一个字都没改** ✅ -> 只是搬家 ✅
    */
-  const [popoverContainerRect, setPopoverContainerRect] = useState<{
-    left: number;
-    top: number;
-    right: number;
-    bottom: number;
-  } | null>(null);
-
-  // 滚动 / 缩放 / 尺寸变化时更新容器矩形；并**隐藏浮层**（位置已失效）
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) {
-      return;
-    }
-
-    // 依赖 scale：缩放会改变容器可视区 → 重新量
-    void scale;
-
-    const update = () => {
-      const rect = container.getBoundingClientRect();
-      setPopoverContainerRect({
-        left: rect.left,
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-      });
-    };
-
-    update();
-
-    /*
-     * ⚠️ **滚动时浮层跟随**（用户明确要求：方案 A）。
-     *
-     * 旧实现：滚动时 `setPopoverOpen(false)` → 浮层**直接消失**。
-     * 实测：滚动 120px 后浮层 `top=null`（是被卸载，不是隐藏）。
-     *
-     * 现在：浮层自己在 `useLayoutEffect` 里**实时**读 DOM 选区算位置
-     *      → 滚动时它会自然地跟着选区走 → 这里**不需要做任何事**。
-     *
-     * ⚠️ `update` 只更新**容器矩形**（可视区）—— 用于 clamp。
-     *    容器矩形在滚动时**不变**（滚动的是内容，不是容器），
-     *    所以监听 scroll 是为了应对"容器自身位置变化"的情况。
-     */
-    container.addEventListener('scroll', update, { passive: true });
-
-    if (typeof ResizeObserver === 'undefined') {
-      return () => container.removeEventListener('scroll', update);
-    }
-
-    const observer = new ResizeObserver(update);
-    observer.observe(container);
-
-    return () => {
-      container.removeEventListener('scroll', update);
-      observer.disconnect();
-    };
-  }, [scale]);
+  const popoverContainerRect = useContainerRect(containerRef, scale);
 
   /** 浮层动作被点击 */
   const handlePopoverAction = useCallback(
@@ -4864,258 +4810,32 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     };
   }, []);
 
-  /**
-   * **当前打开的批注**（便利贴面板）。
-   *
-   * ⚠️ **包不自己存批注** → 这里只存"哪个批注正在编辑"这个 UI 状态。
-   */
-  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
-
-  /** 当前打开的批注记录 */
-  const activeAnnotation = useMemo(() => {
-    if (!activeAnnotationId) {
-      return null;
-    }
-    return stickyNotes?.find((a) => a.id === activeAnnotationId) ?? null;
-  }, [activeAnnotationId, stickyNotes]);
-
-  /**
-   * **当前打开的便签的视口矩形**（给便利贴详情面板当锚点）。
-   *
-   * ⚠️ **之前面板固定在"页面中间偏右"** ❌
-   *    -> 便签在 \`x=571\`、面板在 \`x=918\` -> **离得很远** ❌
-   *    -> 用户反馈："打开详细按钮目前是失效的 需要点击能打开一个稍微大一点的便利贴的样式"
-   *
-   * -> 现在：**量便签图标的位置** -> 面板**贴在它旁边**
-   */
   /*
-   * ⚠️⚠️ **便签的位置要在 DOM 画出来之后才能量**（实测踩到的坑）。
+   * ⚠️ **批注面板**（便利贴详情面板 + 锚点弹窗）
    *
-   * ### 问题
-   *
-   * -> 之前是 `useMemo([activeAnnotationId])` ❌
-   * -> 它在**渲染期间**算 -> 那时便签图标**可能还没渲染出来** ❌
-   *    -> `querySelector` 返回 null -> `anchorRect = null` ❌
-   *    -> 详情面板**退回"中间偏右"** -> "出现在 PDF 的最上方" ❌
-   *
-   * ### 现在的做法
-   *
-   * -> 用 `state` + `useEffect` -> **DOM 画完之后**再量
-   * -> 量不到就**再试一次**（下一帧）
+   * -> 原来这段有 252 行 ✅ -> 抽到 `useAnnotationPanel` ✅
+   * -> 逻辑**一个字都没改** ✅ -> 只是搬家 ✅
+   * -> `PdfViewer.tsx` 少了 252 行 ✅
    */
-  const [activeAnnotationAnchor, setActiveAnnotationAnchor] = useState<{
-    left: number;
-    top: number;
-    right: number;
-    bottom: number;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!activeAnnotationId) {
-      setActiveAnnotationAnchor(null);
-      return;
-    }
-
-    /*
-     * ⚠️⚠️⚠️ **锚点查找要支持"合并组"**（实测踩到的坑，用户反馈：
-     * "如果同一位置两个批注 那么第一个批注点击之后展示位置正常
-     *  第二个批注详情点击之后还是会出现在pdf的首页位置"）。
-     *
-     * -> 同一位置的多个批注**合并成一个图标**
-     * -> 那个图标上只有 `data-note-id={first.id}`（第一条）❌
-     * -> 选**第二条** -> 精确匹配**找不到** ❌
-     * -> -> 锚点**保持旧值** ❌ -> 面板停在**首页** ❌
-     *
-     * -> 现在用 `findStickyNoteIcon` -> 找"**包含这个 id**"的图标
-     * -> 合并组用 `data-note-ids` 匹配
-     */
-    const measure = () => {
-      const el = findStickyNoteIcon(containerRef.current, activeAnnotationId);
-      if (!el) {
-        return;
-      }
-      const r = el.getBoundingClientRect();
-      setActiveAnnotationAnchor({
-        left: r.left,
-        top: r.top,
-        right: r.right,
-        bottom: r.bottom,
-      });
-    };
-
-    /*
-     * ⚠️⚠️ **一个 rAF 循环干两件事**（实测踩到的坑）。
-     *
-     * -> 之前是**两套逻辑** ❌
-     *    1. rAF 重试（最多 10 帧）-> 为了等便签画出来
-     *    2. `scroll` 事件监听 -> 为了滚动时重新量
-     * -> 两套**各自独立** ❌ -> 会**打架** ❌
-     *    -> 用户反馈："滚动的时候 定位也跑来跑去的"
-     *
-     * -> 现在：**一个循环**负责"量到为止 + 一直跟随"
-     *    -> 便签还没画出来 -> **继续等**
-     *    -> 便签画出来了 -> **每一帧都跟着**
-     *    -> 用户滚动 -> 面板**贴着便签走**  （不抖）
-     */
-    let raf = 0;
-    let tries = 0;
-
-    const tick = () => {
-      tries += 1;
-      const el = findStickyNoteIcon(containerRef.current, activeAnnotationId);
-      if (el) {
-        const r = el.getBoundingClientRect();
-        setActiveAnnotationAnchor({
-          left: r.left,
-          top: r.top,
-          right: r.right,
-          bottom: r.bottom,
-        });
-      } else if (tries >= 10) {
-        // ⚠️ **量不到 -> 放弃**（不让 rAF 一直跑）
-        return;
-      }
-
-      /*
-       * ⚠️ **量到了就继续跑**（跟随模式）
-       * -> 滚动时便签在视口里的位置变了  -> 面板要跟着
-       * -> 组件卸载时 cleanup 会 cancel
-       */
-      raf = requestAnimationFrame(tick);
-    };
-
-    /*
-     * ⚠️ **先量一次**（便签可能已经在）
-     */
-    measure();
-
-    raf = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(raf);
-    };
-  }, [activeAnnotationId]);
-
-  /** 批注的删除（宿主实现） */
-  const handleAnnotationDelete = useCallback(
-    (id: string) => {
-      setActiveAnnotationId(null);
-      onAnnotationDelete?.(id);
-    },
-    [onAnnotationDelete],
-  );
-
-  /** 关掉面板 */
-  const handleAnnotationClose = useCallback(() => {
-    setActiveAnnotationId(null);
-  }, []);
-
-  /*
-   * ⚠️⚠️ **"编辑批注"的弹窗**（用户需求：
-   * "富文本编辑完之后没有保存按钮啊 保存都保存不了
-   *  而且 富文本点了编辑 怎么富文本编辑框还在文档最上面啊
-   *  要出现在视野里啊 就点的旁边"）。
-   *
-   * ### 之前
-   *
-   * → 点"编辑" -> 打开**右侧的便利贴面板**（`AnnotationPanel`）❌
-   * → 面板**离批注很远**（甚至在视口外）-> "还在文档最上面" ❌
-   * → 面板里**没有「保存」按钮** -> 只能靠 `Ctrl+Enter` ❌
-   *   （而 TipTap 编辑器**根本没接 `onSubmit`** -> **根本保存不了** ❌）
-   *
-   * ### 现在
-   *
-   * -> 点"编辑" -> 打开**锚点弹窗**（`AnnotationDialog`）
-   * -> 弹窗**贴在批注图标下面**（飞书评论气泡的感觉）
-   * -> 弹窗里**有「保存」「取消」按钮**
-   * -> 和"新建批注"**同一套组件**（行为一致）
-   */
-  const [editAnnotation, setEditAnnotation] = useState<{
-    id: string;
-    content: string;
-    anchor: { left: number; top: number; right: number; bottom: number } | null;
-  } | null>(null);
-
-  /** 编辑批注的锚点版本（滚动/缩放时重算位置） */
-  const [editAnchorTick, setEditAnchorTick] = useState(0);
-
-  /** 页面滚动 / 缩放 -> 锚点位置变了 -> 重算 */
-  useEffect(() => {
-    if (!editAnnotation) {
-      return;
-    }
-    const update = () => {
-      setEditAnchorTick((n) => n + 1);
-    };
-    window.addEventListener('scroll', update, true);
-    window.addEventListener('resize', update);
-    return () => {
-      window.removeEventListener('scroll', update, true);
-      window.removeEventListener('resize', update);
-    };
-  }, [editAnnotation]);
-
-  /**
-   * **打开"编辑批注"弹窗**（锚点 = 批注图标的位置）。
-   *
-   * @param annotation 要编辑的批注
-   * @param element 批注图标元素（用来算锚点）
-   */
-  const handleAnnotationEdit = useCallback(
-    (annotation: AnnotationRecord, element?: HTMLElement | null) => {
-      const rect = element?.getBoundingClientRect();
-      setEditAnnotation({
-        id: annotation.id,
-        content: annotation.content ?? '',
-        anchor: rect
-          ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
-          : null,
-      });
-      setActiveAnnotationId(null);
-    },
-    [],
-  );
-
-  /*
-   * ⚠️⚠️ **给 `<Page>` 的 3 个回调**（`Page.tsx` 的注释明确警告过 ✅）
-   *
-   * > "所有 props 都得是稳定引用！`PdfViewer` 里不能给 `<Page>` 传
-   * >  inline 箭头函数（每次都是新函数 → memo 失效）"
-   *
-   * -> 之前**确实是内联函数** ✅ ❌ -> 是个雷 ✅
-   * -> 现在实测没出问题 ✅（改主题/搜索 → 0 次页面重渲染 ✅）
-   *    -> 因为闭包捕获的都是稳定引用 ✅
-   * -> 但以后有人往闭包里加一个 `useState` 依赖 ✅
-   *    -> `<Page>` 的 memo **立刻失效** ✅ -> 所有页每次都重渲染 ✅ ❌
-   * -> 抽成 `useCallback` ✅ -> 引用稳定 ✅ -> 隐患消除 ✅
-   */
-
-  /** 点便签 → 打开便利贴面板 */
-  const handlePageAnnotationClick = useCallback(
-    (annotation: AnnotationRecord) => {
-      setActiveAnnotationId(annotation.id);
-      onAnnotationClick?.(annotation);
-    },
-    [onAnnotationClick],
-  );
-
-  /** 点"编辑" → 打开锚点弹窗（贴在批注旁边） */
-  const handlePageAnnotationEdit = useCallback(
-    (annotation: AnnotationRecord, element?: HTMLElement | null) => {
-      handleAnnotationEdit(annotation, element);
-      onAnnotationEdit?.(annotation);
-    },
-    [handleAnnotationEdit, onAnnotationEdit],
-  );
-
-  /** 点"展开" → 打开便利贴面板（看完整内容） */
-  const handlePageAnnotationExpand = useCallback(
-    (annotation: AnnotationRecord) => {
-      setActiveAnnotationId(annotation.id);
-      onAnnotationExpand?.(annotation);
-    },
-    [onAnnotationExpand],
-  );
+  const {
+    activeAnnotation,
+    activeAnnotationAnchor,
+    handleAnnotationDelete,
+    handleAnnotationClose,
+    handlePageAnnotationClick,
+    handlePageAnnotationEdit,
+    handlePageAnnotationExpand,
+    editAnnotation,
+    setEditAnnotation,
+    editAnchorTick,
+  } = useAnnotationPanel({
+    stickyNotes,
+    containerRef,
+    onAnnotationClick,
+    onAnnotationEdit,
+    onAnnotationExpand,
+    onAnnotationDelete,
+  });
 
   /*
    * ⚠️ **文字方向**（审计发现的：之前**完全没有 RTL 支持**）。
