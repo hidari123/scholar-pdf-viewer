@@ -486,7 +486,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 />;
 ```
 
-### ⚠️ 接了自己�� pdf.js 就要自己配资源路径
+### ⚠️ 接了自己的 pdf.js 就要自己配资源路径
 
 见下一节 —— **不配的话会乱码** ⚠️
 

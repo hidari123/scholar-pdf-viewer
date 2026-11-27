@@ -568,15 +568,21 @@ type PdfViewerTheme = (typeof THEMES)[number];
 
 ### CSS 变量（第三层：像素微调）
 
+⚠️ **变量定义在 `.scpdf-root` 上** ✅ —— **不是** `:root` ✅
+→ 宿主的 `<html>` 上**一个包的变量都没有** ✅ → **零全局污染** ✅
+
 ```css
 .scpdf-root {
-  --scpdf-color-accent: #2f54eb;
+  --scpdf-color-primary: #2f54eb;
   --scpdf-color-border: #e5e7eb;
-  --scpdf-color-bg: #ffffff;
+  --scpdf-color-surface: #ffffff;
   --scpdf-color-text: #1f2329;
-  --scpdf-density: cozy;
+  --scpdf-gap: 12px;
 }
 ```
+
+> ⚠️ **变量名以 `--scpdf-` 开头** ✅（具体叫什么看 `viewer.css` ✅）
+> ⚠️ 宿主想覆盖 ✅ → **在 `.scpdf-root` 上重定义** ✅ → 照样生效 ✅
 
 ---
 

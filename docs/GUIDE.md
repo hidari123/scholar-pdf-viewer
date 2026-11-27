@@ -498,10 +498,14 @@ appearance={{
 
 ```css
 .scpdf-root {
-  --scpdf-color-accent: #2f54eb;
+  --scpdf-color-primary: #2f54eb;
   --scpdf-color-border: #e5e7eb;
 }
 ```
+
+> ⚠️ **变量挂在 `.scpdf-root` 上** ✅ —— **不是** `:root` ✅
+> → 宿主的 `<html>` 上**一个包的变量都没有** ✅ → **零全局污染** ✅
+> → 想覆盖 ✅ → **在 `.scpdf-root` 上重定义** ✅
 
 ---
 

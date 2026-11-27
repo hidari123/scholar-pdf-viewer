@@ -3,10 +3,41 @@
  * 约定：
  * - 所有类名 `scpdf-` 前缀（命名空间隔离，防撞宿主）
  * - 所有颜色/尺寸走 CSS 变量（宿主覆盖变量即换肤）
+ * - **零全局污染**（宿主要求："包的 css 不能影响到宿主" ✅）
+ *   - CSS 变量定义在 `.scpdf-root` 上 ✅ → **不是** `:root` ✅
+ *   - `@page` 只在包里用 ✅ → **不能**用全局的 ✅
  * - 零构建依赖：任何 bundler 都能用，也能 CDN 直引
  */
 
-:root {
+/*
+ * ⚠️ **主题在 `themes.css` 里**（7 套：light / dark / auto / paper / sepia /
+ *    contrast / minimal + appearance 结构开关）。
+ * → 单独一个文件 → 宿主不想用主题时可以只引 `viewer.css`。
+ *
+ * ⚠️ **主题块的选择器也是 `.scpdf-root--*`** ✅
+ * → 和下面 `.scpdf-root` 上的默认值**同层级** ✅
+ * → `themes.css` 在 `viewer.css` **之后**加载 ✅ → 主题赢 ✅
+ *    （宿主自己改 `.scpdf-root` 上的变量 ✅ → 也能覆盖主题 ✅）
+ */
+
+/*
+ * ⚠️⚠️ **变量定义在 `.scpdf-root` 上，不是 `:root`**（实测踩到的坑）。
+ *
+ * ### 之前的问题
+ *
+ * -> 变量定义在 `:root` ✅ -> 那是 `<html>` ✅ -> **整页生效** ✅
+ * -> 宿主的 `<html>` 上会多出 20 个 `--scpdf-*` ✅ -> **污染宿主的全局命名空间** ✅
+ * -> 宿主如果也用 `--scpdf-color-primary`（抄了包的名字 ✅）-> **互相打架** ✅
+ *
+ * ### 现在的做法
+ *
+ * -> 变量挂在 `.scpdf-root` ✅ -> **只有包内部能继承到** ✅
+ * -> 宿主的 `<html>` 上**一个都没有** ✅
+ * -> 包自己的规则照旧能用 ✅（`.scpdf-root` 是祖先 ✅ -> 变量往下继承 ✅）
+ * -> 宿主**覆盖**包样式的能力**不受影响** ✅
+ *    （在 `.scpdf-root` 上重定义同一个变量 ✅ -> 照样生效 ✅）
+ */
+.scpdf-root {
   --scpdf-color-surface: #ffffff;
   --scpdf-color-surface-alt: #f5f6f8;
   --scpdf-color-text: #1f2329;
@@ -47,15 +78,7 @@
   --scpdf-toolbar-height: 40px;
   --scpdf-panel-width: 220px;
   --scpdf-gap: 12px;
-}
 
-/*
- * ⚠️ **主题在 `themes.css` 里**（7 套：light / dark / auto / paper / sepia /
- *    contrast / minimal + appearance 结构开关）。
- * → 单独一个文件 → 宿主不想用主题时可以只引 `viewer.css`。
- */
-
-.scpdf-root {
   font-family: var(--scpdf-font-reading);
   color: var(--scpdf-color-text);
   background: var(--scpdf-color-surface-alt);
@@ -3248,13 +3271,14 @@
     print-color-adjust: exact;
   }
 
-  /* ---------- 页面设置 ---------- */
-
-  @page {
-    /* `size: auto` → 用打印机默认纸张；`margin` 留出打印边距 */
-    size: auto;
-    margin: 12mm;
-  }
+  /*
+   * 这里的 `@page` 规则已删掉 ✅
+   *
+   * `@page` 是**全局的** ✅ -> 改的是**整张打印纸** ✅ -> 宿主的打印被改 ✅
+   * -> CSS 没有"只作用于某个组件的 @page" ✅
+   * -> 纸张和边距由**宿主**决定 ✅
+   *    （或用 `printPaper` / `printOrientation` / `printMargin` ✅ -> 包会算成缩放和边距 ✅）
+   */
 }
 
 /*
