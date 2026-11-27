@@ -1,6 +1,6 @@
 {
   "name": "@scholar-space/pdf-viewer",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "零 LLM 依赖、可复用的 PDF 查看器组件（pdfjs-dist 6 直连）",
   "type": "module",
   "license": "MIT",

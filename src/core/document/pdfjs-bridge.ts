@@ -41,6 +41,7 @@
  * -> -> **用到时才加载**
  */
 
+import { pdfViewerError } from '../errors';
 /** 宿主的"取页"回调（和 \`PdfViewer\` 的 prop 同型） */
 import { type PdfJsResourcePaths, resolvePdfJsResourcePaths } from './pdfjs-resources';
 
@@ -128,6 +129,82 @@ export async function createDefaultPdfJsBridge(
         getMetadata?: () => Promise<unknown>;
       } | null = null;
 
+      /** 页的最小形状（取尺寸用） */
+      type PageLike = {
+        getViewport: (o: { scale: number }) => { width: number; height: number };
+      };
+
+      /**
+       * ⚠️⚠️ **当前这次 `open()` 的 promise**（竞态修复）。
+       *
+       * ### 问题（实测踩到的坑）
+       *
+       * -> `usePdfDocument` 先 `setData(bytes)` ✅ 再 `await docInfo(bytes)` ✅
+       *    -> 而 `docInfo` 里面才调 `bridge.open()` ✅
+       * -> `setData` 会**立刻**触发"取可见页"的 effect ✅
+       *    -> 那时 `open()` **还没跑完** ✅ -> `currentDoc` 还是 `null` ✅
+       *    -> `getPage()` 返回 `undefined` ✅ -> **文本层整个没了** ❌
+       *
+       * ### 表现
+       *
+       * -> canvas **能画出来** ✅（走的是另一条路 ✅）
+       * -> 但**没有文本层** ❌ -> 选不了字 ❌ -> 高亮不了 ❌
+       * -> 而且**不报错** ❌ -> 排查了很久 ❌
+       *
+       * ### 修法（两层）
+       *
+       * -> 1. `usePdfDocument` 里**先打开文档再给数据** ✅（根治 ✅）
+       * -> 2. 这里 `getPage()` / `getPageSizes()` **先 await `open()`** ✅（兜底 ✅）
+       *    -> 就算调用顺序反了 ✅ 也能拿到**已打开**的文档 ✅
+       */
+      let opening: Promise<void> | null = null;
+
+      /**
+       * ⚠️ **`open()` 还没被调用时的等待者**（竞态修复）。
+       *
+       * -> `open()` 可能**还没被调用** ✅（页面的 effect 先触发了 ✅）
+       * -> 这时 `opening` 还是 `null` ✅ -> 直接返回就又踩坑了 ✅
+       * -> 所以让 `getPage()` 等到 `open()` **开始**为止 ✅
+       *
+       * ⚠️ **不能无限等** ✅
+       * -> 宿主**完全不用**默认接线（比如自己传了 `getPage`）✅
+       *    -> `open()` 永远不会被调 ✅ -> `getPage()` 挂死 ❌
+       * -> 所以：**等一小会儿** ✅ -> 还没开就返回 `undefined` ✅
+       */
+      const OPEN_WAIT_TIMEOUT_MS = 2000;
+      let openStarted: Promise<void>;
+      let markOpenStarted: () => void = () => undefined;
+      openStarted = new Promise<void>((resolve) => {
+        markOpenStarted = resolve;
+      });
+
+      /**
+       * ⚠️ **等文档打开完成**（`open()` 还没被调用时最多等一小会儿 ✅）。
+       *
+       * @returns 无返回值（等不到就当没打开 ✅）
+       */
+      const waitForOpen = async (): Promise<void> => {
+        if (opening) {
+          // ⚠️ **已经在打开了** ✅ -> 等它跑完 ✅
+          await opening;
+          return;
+        }
+        /*
+         * ⚠️ **`open()` 还没被调用** ✅
+         * -> 等它开始 ✅（最多等 `OPEN_WAIT_TIMEOUT_MS` ✅）
+         * -> 超时说明**根本没人打算打开** ✅ -> 返回 ✅
+         */
+        await Promise.race([
+          openStarted,
+          new Promise<void>((resolve) => {
+            setTimeout(resolve, OPEN_WAIT_TIMEOUT_MS);
+          }),
+        ]);
+        if (opening) {
+          await opening;
+        }
+      };
+
       return {
         async open(data: Uint8Array, password?: string) {
           /*
@@ -152,16 +229,37 @@ export async function createDefaultPdfJsBridge(
            */
           const resources = resolvePdfJsResourcePaths(resourcePaths);
 
-          const doc = await pdfjs.getDocument({
-            data: data.slice(),
-            ...(password ? { password } : {}),
-            ...(resources.standardFontDataUrl
-              ? { standardFontDataUrl: resources.standardFontDataUrl }
-              : {}),
-            ...(resources.cMapUrl ? { cMapUrl: resources.cMapUrl } : {}),
-            ...(resources.wasmUrl ? { wasmUrl: resources.wasmUrl } : {}),
-          }).promise;
-          currentDoc = doc as never;
+          /*
+           * ⚠️ **把 promise 存下来**（竞态修复 ✅）
+           * -> `getPage()` 会 await 它 ✅
+           * -> -> 就算 `getPage` 比 `open` 先到 ✅ 也能拿到文档 ✅
+           */
+          opening = (async () => {
+            const opened = await pdfjs.getDocument({
+              data: data.slice(),
+              ...(password ? { password } : {}),
+              ...(resources.standardFontDataUrl
+                ? { standardFontDataUrl: resources.standardFontDataUrl }
+                : {}),
+              ...(resources.cMapUrl ? { cMapUrl: resources.cMapUrl } : {}),
+              ...(resources.wasmUrl ? { wasmUrl: resources.wasmUrl } : {}),
+            }).promise;
+            currentDoc = opened as never;
+          })();
+
+          /*
+           * ⚠️ **告诉等待者"open 开始了"** ✅
+           * -> `getPage()` 可能在 `open()` 之前就先到了 ✅
+           * -> 它在等 `openStarted` ✅ -> 这里 resolve 它 ✅
+           */
+          markOpenStarted();
+
+          await opening;
+
+          const doc = currentDoc;
+          if (!doc) {
+            throw pdfViewerError('E_PDF_INVALID', { message: 'PDF 打开失败' });
+          }
 
           const numPages = doc.numPages;
 
@@ -172,7 +270,7 @@ export async function createDefaultPdfJsBridge(
            */
           const pageSizes: { width: number; height: number }[] = [];
           for (let i = 1; i <= numPages; i += 1) {
-            const page = await doc.getPage(i);
+            const page = (await doc.getPage(i)) as PageLike | undefined;
             if (!page) {
               continue;
             }
@@ -186,6 +284,14 @@ export async function createDefaultPdfJsBridge(
         },
 
         async getPage(pageNumber: number) {
+          /*
+           * ⚠️ **先等 `open()` 跑完**（竞态修复 ✅）
+           *
+           * -> 页面加载的 effect 可能**比 `open()` 先触发** ✅
+           * -> 那时 `currentDoc` 还是 `null` ✅ -> 直接返回 `undefined` ❌
+           *    -> **文本层整个没了** ❌（canvas 还在 ✅ -> 不报错 ✅ -> 极难查 ❌）
+           */
+          await waitForOpen();
           if (!currentDoc) {
             return undefined;
           }
@@ -193,15 +299,14 @@ export async function createDefaultPdfJsBridge(
         },
 
         async getPageSizes(numPages: number) {
+          await waitForOpen();
           const sizes: { width: number; height: number }[] = [];
           for (let i = 1; i <= numPages; i += 1) {
-            const page = await currentDoc?.getPage(i);
+            const page = (await currentDoc?.getPage(i)) as PageLike | undefined;
             if (!page) {
               continue;
             }
-            const viewport = (
-              page as { getViewport: (o: { scale: number }) => { width: number; height: number } }
-            ).getViewport({ scale: 1 });
+            const viewport = page.getViewport({ scale: 1 });
             sizes.push({ width: viewport.width, height: viewport.height });
           }
           return sizes;

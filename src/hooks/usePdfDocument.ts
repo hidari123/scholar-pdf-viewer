@@ -223,7 +223,6 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
           return;
         }
 
-        setData(loaded.data);
         setLoading(false);
         setProgress(1);
 
@@ -232,7 +231,17 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
           void cacheOption.set(key, loaded.data);
         }
 
-        // 4) 取文档信息（页数/元数据）—— 由调用方注入 pdf.js 解析
+        /*
+         * 4) 取文档信息（页数/元数据）—— 由调用方注入 pdf.js 解析
+         *
+         * ⚠️⚠️ **必须在 `setData` 之前**（实测踩到的坑）。
+         *
+         * -> `setData` 会触发"取可见页"的 effect ✅
+         * -> 那时如果文档**还没打开** ✅ -> `getPage()` 返回 `undefined` ❌
+         *    -> **文本层整个没了** ❌（canvas 还在 ✅ -> 不报错 ✅ -> 极难查 ❌）
+         * -> `docInfo` 里面才会真正打开文档（默认接线走 `bridge.open()`）✅
+         * -> 所以：**先打开 ✅ 再给数据 ✅**
+         */
         if (docInfo) {
           try {
             const info = await docInfo(loaded.data);
@@ -244,6 +253,12 @@ export function usePdfDocument(options: UsePdfDocumentOptions): UsePdfDocumentRe
             reportError?.(toPdfViewerError(infoError));
           }
         }
+
+        if (!isCurrent()) {
+          return;
+        }
+
+        setData(loaded.data);
       } catch (caught) {
         if (!isCurrent()) {
           return;

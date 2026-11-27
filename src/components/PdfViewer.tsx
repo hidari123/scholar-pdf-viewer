@@ -1713,7 +1713,14 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
   /** 取各页尺寸（宿主注入；失败则用 A4 兜底） */
   useEffect(() => {
-    if (!getPageSizes || numPages <= 0) {
+    /*
+     * ⚠️ **判断的是 `effectiveGetPageSizes`，不是 `getPageSizes`**（同上面的坑 ✅）。
+     *
+     * -> 宿主没传 `getPageSizes` 时 ✅ -> 用**包内置的默认接线** ✅
+     * -> 但这里判断的是 `getPageSizes` ✅ -> **没传就早退** ❌
+     *    -> 页尺寸一直是 **A4 兜底** ❌ -> 滚动条长度不准 ❌ -> 打印缩放偏 ❌
+     */
+    if (!effectiveGetPageSizes || numPages <= 0) {
       return;
     }
 
@@ -1732,7 +1739,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     return () => {
       cancelled = true;
     };
-  }, [effectiveGetPageSizes, numPages, getPageSizes]);
+  }, [effectiveGetPageSizes, numPages]);
 
   /**
    * 取页（可见页才取，懒加载）。
@@ -1753,7 +1760,20 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     const targetPages =
       printing && numPages > 0 ? Array.from({ length: numPages }, (_, i) => i + 1) : visiblePages;
 
-    if (!getPage || targetPages.length === 0 || !data) {
+    /*
+     * ⚠️⚠️ **判断的是 `effectiveGetPage`，不是 `getPage`**（实测踩到的坑）。
+     *
+     * -> `getPage` 是**宿主的 prop** ✅
+     * -> 宿主**没传** `getPage` 时 ✅ -> 用**包内置的默认接线** ✅
+     *    -> 默认接线是**能用的** ✅（动态 import pdf.js ✅ + 自动设 worker ✅）
+     * -> 但这里判断的是 `getPage` ✅ -> **没传就早退** ❌
+     *    -> 一页都**不取** ❌ -> `pageProxies` 永远是空的 ❌
+     *    -> -> **文本层整个没了** ❌（canvas 还在 ✅ -> 不报错 ✅ -> 极难查 ❌）
+     * -> -> **默认接线等于白给** ❌
+     *
+     * -> `effectiveGetPage` ✅ -> 宿主的和默认的**都算** ✅
+     */
+    if (!effectiveGetPage || targetPages.length === 0 || !data) {
       return;
     }
 
@@ -1786,7 +1806,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     return () => {
       cancelled = true;
     };
-  }, [effectiveGetPage, visiblePages, pageProxies, data, printing, numPages, getPage]);
+  }, [effectiveGetPage, visiblePages, pageProxies, data, printing, numPages]);
 
   /**
    * 取链接注解（可见页才取）。
