@@ -6,6 +6,27 @@
 
 ---
 
+## 0.1.3
+
+### Patch Changes
+
+- 清除全部高亮时先弹确认框
+  - 清除全部高亮是**不可撤销**的 ✅ -> 先问一句 ✅
+  - **不用** `window.confirm` ✅ -> 用包**自研**的 `ConfirmDialog` ✅
+    - `window.confirm` 按钮文字跟随浏览器语言 ❌ -> 没法走 i18n ❌
+    - 样式跟随系统 ❌ -> 深色模式下可能看不清 ❌
+    - **没法截图** ❌ -> E2E 测不了 ❌
+    - 阻塞整个页面 ❌ -> 渲染线程**卡住** ❌
+  - 文案走 i18n ✅ -> 内置 zh / en / ja / fr ✅
+  - 确定按钮**红色** ✅（危险操作 ✅）
+  - **Esc** 关闭 ✅ -> 点遮罩关闭 ✅ -> 打开时自动聚焦"确定" ✅
+  - 宿主可以复用这个组件 ✅ -> `@scholar-space/pdf-viewer/dialog` ✅
+
+- 内部
+  - `dialog` 子路径改成导出 `AnnotationDialog` + `ConfirmDialog` ✅
+  - 主题补上 `--scpdf-color-danger` / `--scpdf-color-text-secondary` ✅
+  - 新增 E2E：确认框的完整流程（取消 / Esc / 确认）✅
+
 ## 0.1.2
 
 ### Patch Changes

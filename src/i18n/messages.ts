@@ -72,6 +72,13 @@ export interface Messages {
   'password.submit': string;
   'password.cancel': string;
   'password.wrong': string;
+  /** 通用确认框 */
+  'common.confirm': string;
+  'common.cancel': string;
+  /** 清除全部高亮的确认框 */
+  'clearHighlights.title': string;
+  'clearHighlights.message': string;
+  'clearHighlights.confirm': string;
   'page.of': string;
   'zoom.in': string;
   'zoom.out': string;
@@ -289,6 +296,11 @@ export const ZH_MESSAGES: Messages = {
   'password.submit': '确定',
   'password.cancel': '取消',
   'password.wrong': '密码错误，请重试',
+  'common.confirm': '确定',
+  'common.cancel': '取消',
+  'clearHighlights.title': '清除全部高亮',
+  'clearHighlights.message': '确定要清除所有高亮吗？此操作无法撤销。',
+  'clearHighlights.confirm': '清除',
   'page.of': '第 {page} / {total} 页',
   'zoom.in': '放大',
   'zoom.out': '缩小',
@@ -409,6 +421,11 @@ export const EN_MESSAGES: Messages = {
   'password.submit': 'OK',
   'password.cancel': 'Cancel',
   'password.wrong': 'Wrong password, try again',
+  'common.confirm': 'OK',
+  'common.cancel': 'Cancel',
+  'clearHighlights.title': 'Clear all highlights',
+  'clearHighlights.message': 'Clear all highlights? This cannot be undone.',
+  'clearHighlights.confirm': 'Clear',
   'page.of': 'Page {page} of {total}',
   'zoom.in': 'Zoom in',
   'zoom.out': 'Zoom out',

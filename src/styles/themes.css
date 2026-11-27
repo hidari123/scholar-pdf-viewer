@@ -42,6 +42,8 @@
   --scpdf-color-text: #2b2620;
   --scpdf-color-border: #ddd5c5;
   --scpdf-color-primary: #b45309;
+  --scpdf-color-danger: #d83931;
+  --scpdf-color-text-secondary: #6b6255;
   --scpdf-highlight-my: #ffe9a8;
   --scpdf-highlight-others: #dbe7f5;
   --scpdf-highlight-active: #b45309;
@@ -59,6 +61,8 @@
     --scpdf-color-text: #ece5d8;
     --scpdf-color-border: #453d33;
     --scpdf-color-primary: #f59e0b;
+    --scpdf-color-danger: #f56b6b;
+    --scpdf-color-text-secondary: #b8ad99;
     --scpdf-highlight-my: #6b5518;
     --scpdf-highlight-others: #2b4460;
     --scpdf-highlight-active: #f59e0b;
@@ -84,6 +88,8 @@
   --scpdf-color-text: #4a4238;
   --scpdf-color-border: #d6cbb6;
   --scpdf-color-primary: #a08a72;
+  --scpdf-color-danger: #c9544c;
+  --scpdf-color-text-secondary: #7a6f5e;
   --scpdf-highlight-my: #e8dcc0;
   --scpdf-highlight-others: #d4ddd2;
   --scpdf-highlight-active: #a08a72;
@@ -111,6 +117,8 @@
   --scpdf-color-text: #f4f5f6;
   --scpdf-color-border: #c9cdd2;
   --scpdf-color-primary: #d9d16f;
+  --scpdf-color-danger: #ff6b6b;
+  --scpdf-color-text-secondary: #9aa0a6;
   --scpdf-highlight-my: #d9d16f;
   --scpdf-highlight-others: #7fb4b0;
   --scpdf-highlight-active: #d9d16f;
@@ -131,6 +139,8 @@
   --scpdf-color-text: #000000;
   --scpdf-color-border: #d0d0d0;
   --scpdf-color-primary: #333333;
+  --scpdf-color-danger: #d83931;
+  --scpdf-color-text-secondary: #616161;
   --scpdf-highlight-my: #f0f0f0;
   --scpdf-highlight-others: #e8e8e8;
   --scpdf-highlight-active: #333333;
@@ -163,6 +173,8 @@
   --scpdf-color-text: #e2e3e5;
   --scpdf-color-border: #3d4046;
   --scpdf-color-primary: #7e9cc0;
+  --scpdf-color-danger: #d83931;
+  --scpdf-color-text-secondary: #616161;
   --scpdf-highlight-my: #6b6244;
   --scpdf-highlight-others: #3d5570;
   --scpdf-highlight-active: #7e9cc0;

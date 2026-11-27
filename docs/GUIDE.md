@@ -289,6 +289,15 @@ import { resolvePdfJsResourcePaths } from '@scholar-space/pdf-viewer';
 
 ---
 
+### 6.1 清除全部高亮会先问一句
+
+点工具栏的「清除全部高亮」→ **弹确认框** ✅ → 点「清除」才真的清 ✅。
+
+- 不用浏览器的 `window.confirm` ✅（那个**没法定制** ✅）
+- 文案走 i18n ✅ · 确定按钮**红色** ✅ · **Esc** 也能关 ✅
+
+---
+
 ## 7. 工具栏的六个开关
 
 `toolbar` 对象可以逐个关掉内置按钮：

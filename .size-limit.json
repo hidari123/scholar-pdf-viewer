@@ -2,7 +2,7 @@
   {
     "name": "主入口（组件 + hooks）",
     "path": "dist/index.js",
-    "limit": "39 kB",
+    "limit": "40 kB",
     "import": "{ PdfViewer }",
     "entry": "index"
   },
@@ -37,9 +37,9 @@
     "import": "{ TipTapEditor }"
   },
   {
-    "name": "dialog 子路径（写批注的富文本弹窗）",
+    "name": "dialog 子路径（写批注的富文本弹窗 + 通用确认框）",
     "path": "dist/dialog.js",
-    "limit": "9 kB",
-    "import": "{ AnnotationDialog }"
+    "limit": "10 kB",
+    "import": "{ AnnotationDialog, ConfirmDialog }"
   }
 ]

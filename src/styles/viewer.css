@@ -2659,12 +2659,35 @@
   z-index: 10;
 }
 
+/*
+ * ⚠️ **遮罩层的可点击区域**（`ConfirmDialog` 用 ✅）。
+ *
+ * -> 是个**真正的 `<button>`** ✅ -> 键盘可达 ✅ -> 语义对 ✅
+ * -> 但**不能挡着对话框** ✅ -> 所以用 `position: absolute` + `z-index` ✅
+ *    -> 对话框在它**上面** ✅ -> 点对话框不会触发 ✅
+ */
+.scpdf-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+
 .scpdf-dialog {
   min-width: 280px;
   padding: 20px;
-  background: var(--scpdf-color-surface);
+  background: var(--scpdf-color-surface, #ffffff);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  /*
+   * ⚠️ **在遮罩按钮上面** ✅
+   * -> 遮罩是个 `<button>` ✅（为了键盘可达 ✅）
+   * -> 不加这两行的话 ✅ -> 点对话框会**穿透**到遮罩 ✅ -> 误触发取消 ❌
+   */
+  position: relative;
+  z-index: 1;
 }
 
 .scpdf-dialog__title {
@@ -2695,6 +2718,43 @@
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+}
+
+/*
+ * ⚠️ **确认框**（`ConfirmDialog`）。
+ *
+ * -> 和密码框共用 `.scpdf-dialog` 的外观 ✅
+ * -> 只是多了正文和"危险"按钮 ✅
+ */
+.scpdf-dialog--confirm {
+  max-width: 360px;
+}
+
+.scpdf-dialog__message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--scpdf-color-text-secondary, #6b7280);
+}
+
+/*
+ * ⚠️ **"危险"按钮**（不可撤销的操作 ✅）。
+ *
+ * -> 红色 ✅ -> 用户看一眼就知道"这个要小心" ✅
+ *
+ * ⚠️ **带兜底值** ✅
+ * -> 宿主可能**没引** `themes.css` ✅ -> 变量没定义 ✅
+ * -> 不带兜底的话 ✅ -> 背景变**透明** ✅ -> 白字白底 ✅ -> **看不见** ❌
+ */
+.scpdf-btn--danger {
+  background: var(--scpdf-color-danger, #d83931);
+  border-color: var(--scpdf-color-danger, #d83931);
+  color: #ffffff;
+}
+
+.scpdf-btn--danger:hover {
+  color: #ffffff;
+  opacity: 0.9;
 }
 
 .scpdf-btn--primary {

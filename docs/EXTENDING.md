@@ -17,12 +17,13 @@
 - [7. 换主题 / 做品牌色](#7-换主题--做品牌色)
 - [8. 换富文本编辑器](#8-换富文本编辑器)
 - [9. 自定义批注渲染](#9-自定义批注渲染)
-- [10. 接管 Toast](#10-接管-toast)
-- [11. 接管密码输入](#11-接管密码输入)
-- [12. 注入自己的 pdf.js](#12-注入自己的-pdfjs)
-- [13. 覆盖 pdf.js 的静态资源](#13-覆盖-pdfjs-的静态资源)
-- [14. 用 core 层的纯逻辑](#14-用-core-层的纯逻辑)
-- [15. 包的边界（什么不要往里塞）](#15-包的边界什么不要往里塞)
+- [10. 给"不可撤销"的操作加确认](#10-给不可撤销的操作加确认)
+- [11. 接管 Toast](#11-接管-toast)
+- [12. 接管密码输入](#12-接管密码输入)
+- [13. 注入自己的 pdf.js](#13-注入自己的-pdfjs)
+- [14. 覆盖 pdf.js 的静态资源](#14-覆盖-pdfjs-的静态资源)
+- [15. 用 core 层的纯逻辑](#15-用-core-层的纯逻辑)
+- [16. 包的边界（什么不要往里塞）](#16-包的边界什么不要往里塞)
 
 ---
 
@@ -43,6 +44,7 @@
 | 换**高亮色板**           | `highlightPalette`                       | ⭐     |
 | 换**富文本编辑器**       | `annotationEditor`                       | ⭐⭐⭐ |
 | 自定义**批注样式**       | CSS 变量 + `slots`                       | ⭐⭐   |
+| 给"不可撤销"操作加确认   | `ConfirmDialog`                          | ⭐     |
 | 接管 **Toast**           | `onToast`                                | ⭐     |
 | 接管**密码输入**         | `onRequestPassword`                      | ⭐     |
 | 自带 **pdf.js**          | `getPage` / `getDocInfo` …               | ⭐⭐   |
@@ -379,7 +381,45 @@ execRichTextCommand('removeFormat');
 
 ---
 
-## 10. 接管 Toast
+## 10. 给"不可撤销"的操作加确认
+
+包**自研**了确认框 ✅（不用 `window.confirm` ✅ —— 那个**没法定制** ✅）。
+
+```tsx
+import { ConfirmDialog } from '@scholar-space/pdf-viewer/dialog';
+
+function MyDeleteButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => setOpen(true)}>删除</button>
+      <ConfirmDialog
+        open={open}
+        title="删除这份笔记？"
+        message="删除后无法恢复。"
+        confirmText="删除"
+        danger
+        onConfirm={() => {
+          setOpen(false);
+          void doDelete();
+        }}
+        onCancel={() => setOpen(false)}
+      />
+    </>
+  );
+}
+```
+
+| 想要的行为                      | 怎么配                       |
+| ------------------------------- | ---------------------------- |
+| 确定按钮**红色**（不可撤销 ✅） | `danger`                     |
+| 自定义按钮文字                  | `confirmText` / `cancelText` |
+| **Esc** 关闭                    | 默认就有 ✅                  |
+| 点遮罩关闭                      | 默认就有 ✅                  |
+
+---
+
+## 11. 接管 Toast
 
 ```tsx
 <PdfViewer
@@ -398,7 +438,7 @@ execRichTextCommand('removeFormat');
 
 ---
 
-## 11. 接管密码输入
+## 12. 接管密码输入
 
 ```tsx
 <PdfViewer
@@ -415,7 +455,7 @@ execRichTextCommand('removeFormat');
 
 ---
 
-## 12. 注入自己的 pdf.js
+## 13. 注入自己的 pdf.js
 
 ### 最小接线
 
@@ -452,7 +492,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 
 ---
 
-## 13. 覆盖 pdf.js 的静态资源
+## 14. 覆盖 pdf.js 的静态资源
 
 ### 为什么需要
 
@@ -495,7 +535,7 @@ const resources = resolvePdfJsResourcePaths({
 
 ---
 
-## 14. 用 core 层的纯逻辑
+## 15. 用 core 层的纯逻辑
 
 `@scholar-space/pdf-viewer/core` 是**零 React** 的 ✅ —— 可以单独拿去用。
 
@@ -535,7 +575,7 @@ import {
 
 ---
 
-## 15. 包的边界（什么不要往里塞）
+## 16. 包的边界（什么不要往里塞）
 
 包是**通用组件**。下面这些**不该**进包：
 

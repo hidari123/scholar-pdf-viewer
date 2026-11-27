@@ -82,6 +82,7 @@ import { useVisiblePages } from '../hooks/useVisiblePages';
 import { useZoom } from '../hooks/useZoom';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
+import { ConfirmDialog } from './ConfirmDialog';
 import type { IconName } from './Icon';
 import { Page } from './Page';
 import type { PageProxyLike } from './PageCanvas';
@@ -1312,6 +1313,19 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
   /** 密码框是否打开 */
   const [passwordOpen, setPasswordOpen] = useState(false);
+
+  /**
+   * **"清除全部高亮"的确认框是否打开**。
+   *
+   * ⚠️ **清除全部高亮是不可撤销的** ✅ -> 必须先问一句 ✅
+   * -> 不用 `window.confirm` ✅ -> 那个**没法定制** ✅
+   *    -> 按钮文字跟随浏览器语言 ❌ -> 没法走 i18n ❌
+   *    -> 样式跟随系统 ❌ -> 深色模式下可能看不清 ❌
+   *    -> **没法截图** ❌ -> E2E 测不了 ❌
+   *    -> 阻塞整个页面 ❌ -> 渲染线程**卡住** ❌
+   * -> 用包**自研**的 `ConfirmDialog` ✅
+   */
+  const [clearHighlightsOpen, setClearHighlightsOpen] = useState(false);
 
   /** 上次密码是否错误（用于提示） */
   const [passwordWrong, setPasswordWrong] = useState(false);
@@ -4146,6 +4160,23 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     [onToolbarHighlight, toast, t],
   );
 
+  /**
+   * **点"清除全部高亮"** -> 先弹确认框 ✅。
+   *
+   * ⚠️ **清除全部高亮是不可撤销的** ✅ -> 必须先问一句 ✅
+   * -> 这里**只开框** ✅ -> 宿主的高亮**不动** ✅
+   * -> 用户点"确定"才调 `onClearHighlights` ✅
+   */
+  const handleRequestClearHighlights = useCallback(() => {
+    setClearHighlightsOpen(true);
+  }, []);
+
+  /** 用户在确认框里点了"确定" -> 才真的清除 */
+  const handleConfirmClearHighlights = useCallback(() => {
+    setClearHighlightsOpen(false);
+    onClearHighlights?.();
+  }, [onClearHighlights]);
+
   /** 选颜色 → 立刻用该颜色高亮 */
   const handlePickHighlightColor = useCallback(
     (key: string) => {
@@ -5002,7 +5033,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           onDownloadPdf={onDownloadPdf}
           onExportAnnotatedPdf={onExportAnnotatedPdf}
           onExportHighlights={onExportHighlights}
-          onClearHighlights={onClearHighlights}
+          onClearHighlights={handleRequestClearHighlights}
           onImportHighlights={onImportHighlights}
           /*
            * ⚠️ **缩放比例可填写 + 上下限可配**（用户需求）。
@@ -5628,6 +5659,29 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           }}
           onCancel={() => {
             setPasswordOpen(false);
+          }}
+          locale={merged.locale ?? 'zh'}
+          locales={merged.locales}
+          messages={merged.messages}
+        />
+      ) : null}
+
+      {/*
+       * **"清除全部高亮"的确认框**。
+       *
+       * ⚠️ **只有宿主传了 `onClearHighlights` 才弹** ✅
+       * -> 没传的话工具栏**不渲染**那个按钮 ✅ -> 也就无从点起 ✅
+       */}
+      {onClearHighlights ? (
+        <ConfirmDialog
+          open={clearHighlightsOpen}
+          title={t('clearHighlights.title')}
+          message={t('clearHighlights.message')}
+          confirmText={t('clearHighlights.confirm')}
+          danger
+          onConfirm={handleConfirmClearHighlights}
+          onCancel={() => {
+            setClearHighlightsOpen(false);
           }}
           locale={merged.locale ?? 'zh'}
           locales={merged.locales}

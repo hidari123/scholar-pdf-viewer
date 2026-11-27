@@ -27,15 +27,15 @@
 
 ## 1. 包入口 / Package entry points
 
-| 子路径 / Subpath                       | 内容 / Contents                   | 说明 / Notes               |
-| -------------------------------------- | --------------------------------- | -------------------------- |
-| `@scholar-space/pdf-viewer`            | `PdfViewer` + 全部工具函数 + 类型 | 主入口 / Main entry        |
-| `@scholar-space/pdf-viewer/core`       | 框架无关的纯函数                  | 零 React ✅                |
-| `@scholar-space/pdf-viewer/icons`      | `getIconShape`                    | 内置图标集，按需加载       |
-| `@scholar-space/pdf-viewer/dialog`     | `AnnotationDialog`                | 写批注的富文本弹窗         |
-| `@scholar-space/pdf-viewer/editor`     | `TipTapEditor`                    | TipTap 富文本（可选 peer） |
-| `@scholar-space/pdf-viewer/styles.css` | 组件样式                          | **必引** / Required        |
-| `@scholar-space/pdf-viewer/themes.css` | 主题                              | 可选 / Optional            |
+| 子路径 / Subpath                       | 内容 / Contents                      | 说明 / Notes                    |
+| -------------------------------------- | ------------------------------------ | ------------------------------- |
+| `@scholar-space/pdf-viewer`            | `PdfViewer` + 全部工具函数 + 类型    | 主入口 / Main entry             |
+| `@scholar-space/pdf-viewer/core`       | 框架无关的纯函数                     | 零 React ✅                     |
+| `@scholar-space/pdf-viewer/icons`      | `getIconShape`                       | 内置图标集，按需加载            |
+| `@scholar-space/pdf-viewer/dialog`     | `AnnotationDialog` + `ConfirmDialog` | 写批注的富文本弹窗 + 通用确认框 |
+| `@scholar-space/pdf-viewer/editor`     | `TipTapEditor`                       | TipTap 富文本（可选 peer）      |
+| `@scholar-space/pdf-viewer/styles.css` | 组件样式                             | **必引** / Required             |
+| `@scholar-space/pdf-viewer/themes.css` | 主题                                 | 可选 / Optional                 |
 
 **peerDependencies**：`react`（仅此一个）。
 包**不依赖** `react-dom` → 不用 `createPortal`。
@@ -207,6 +207,49 @@ interface PdfJsResourcePaths {
 >
 > 对应的开关：`toolbar.showDownloadPdf` / `showExportAnnotatedPdf` /
 > `showExportHighlights` / `showImportHighlights` / `showClearHighlights`
+
+---
+
+### 2.11 清除全部高亮的确认框
+
+点工具栏的「清除全部高亮」→ **先弹确认框** ✅ → 用户点「清除」才真的清除 ✅。
+
+- **不用 `window.confirm`** ✅ —— 那个**没法定制** ✅
+  - 按钮文字跟随浏览器语言 ❌ → 没法走 i18n ❌
+  - 样式跟随系统 ❌ → 深色模式下可能看不清 ❌
+  - **没法截图** ❌ → E2E 测不了 ❌
+  - 阻塞整个页面 ❌ → 渲染线程**卡住** ❌
+- 用包**自研**的 `ConfirmDialog` ✅ —— 样式可控 ✅ 文案走 i18n ✅ E2E 可测 ✅
+- **Esc** 关闭 ✅ · 点**遮罩**关闭 ✅ · 确定按钮**红色**（危险操作 ✅）
+- 只有宿主传了 `onClearHighlights` 才弹 ✅
+
+### 2.12 `ConfirmDialog`（宿主可复用）
+
+```tsx
+import { ConfirmDialog } from '@scholar-space/pdf-viewer/dialog';
+
+<ConfirmDialog
+  open={open}
+  title="删除这份笔记？"
+  message="删除后无法恢复。"
+  confirmText="删除"
+  danger
+  onConfirm={() => void doDelete()}
+  onCancel={() => setOpen(false)}
+/>;
+```
+
+| prop                              | 类型         | 说明                                  |
+| --------------------------------- | ------------ | ------------------------------------- |
+| `open`                            | `boolean`    | 是否打开                              |
+| `title`                           | `string`     | 标题                                  |
+| `message`                         | `string?`    | 正文                                  |
+| `confirmText`                     | `string?`    | 确定按钮文字（默认走 i18n）           |
+| `cancelText`                      | `string?`    | 取消按钮文字（默认走 i18n）           |
+| `danger`                          | `boolean?`   | 确定按钮**红色**（不可撤销的操作 ✅） |
+| `onConfirm`                       | `() => void` | 点确定                                |
+| `onCancel`                        | `() => void` | 点取消 / Esc / 点遮罩                 |
+| `locale` / `messages` / `locales` | —            | 走 i18n ✅                            |
 
 ---
 

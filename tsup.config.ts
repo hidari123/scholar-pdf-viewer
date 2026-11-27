@@ -29,7 +29,7 @@ export default defineConfig({
      * → 静态 export → 每个宿主都要背 ❌
      * → 独立入口 → **要用才装** ✅
      */
-    dialog: 'src/components/AnnotationDialog.tsx',
+    dialog: 'src/components/dialog.ts',
     /**
      * **TipTap 富文本编辑器**（独立入口）。
      *
