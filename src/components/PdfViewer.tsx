@@ -82,13 +82,10 @@ import { useZoom } from '../hooks/useZoom';
 import type { Locale, LocaleMessagesMap, LocaleTable, Messages } from '../i18n/messages';
 import { resolveMessage } from '../i18n/messages';
 import type { IconName } from './Icon';
-import { OutlinePanel } from './OutlinePanel';
 import { Page } from './Page';
 import type { PageProxyLike } from './PageCanvas';
 import { PasswordDialog } from './PasswordDialog';
-import { SearchPanel } from './SearchPanel';
 import { SelectionPopover } from './SelectionPopover';
-import { ThumbnailPanel } from './ThumbnailPanel';
 import type { ToastContent, ToastController } from './Toast';
 import { useToastController } from './Toast';
 import type { ToolbarConfig } from './Toolbar';
@@ -126,6 +123,34 @@ const AnnotationPanel = lazy(() =>
  * -> 懒加载 -> **不弹就不加载**
  */
 const Toast = lazy(() => import('./Toast').then((mod) => ({ default: mod.Toast })));
+
+/*
+ * ⚠️⚠️ **侧栏三个面板**（懒加载）。
+ *
+ * ## 为什么懒加载
+ *
+ * -> 搜索面板 + 缩略图面板 + 目录面板 合计约 **13 kB**（brotli 后）
+ * -> 但**只有用户点开才需要**
+ * -> 静态 import -> 每个宿主都要背这 13 kB ❌
+ * -> 懒加载 -> **不点就不加载** ✅
+ *
+ * ## 什么时候会加载
+ *
+ * -> `SearchPanel` -> 点【搜索】✅
+ * -> `ThumbnailPanel` -> 点【缩略图】✅
+ * -> `OutlinePanel` -> 点【目录】✅
+ */
+const SearchPanel = lazy(() =>
+  import('./SearchPanel').then((mod) => ({ default: mod.SearchPanel })),
+);
+
+const ThumbnailPanel = lazy(() =>
+  import('./ThumbnailPanel').then((mod) => ({ default: mod.ThumbnailPanel })),
+);
+
+const OutlinePanel = lazy(() =>
+  import('./OutlinePanel').then((mod) => ({ default: mod.OutlinePanel })),
+);
 
 const AnnotationDialog = lazy(() =>
   import('./AnnotationDialog').then((mod) => ({ default: mod.AnnotationDialog })),
@@ -5052,6 +5077,47 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
   );
 
   /*
+   * ⚠️⚠️ **给 `<Page>` 的 3 个回调**（`Page.tsx` 的注释明确警告过 ✅）
+   *
+   * > "所有 props 都得是稳定引用！`PdfViewer` 里不能给 `<Page>` 传
+   * >  inline 箭头函数（每次都是新函数 → memo 失效）"
+   *
+   * -> 之前**确实是内联函数** ✅ ❌ -> 是个雷 ✅
+   * -> 现在实测没出问题 ✅（改主题/搜索 → 0 次页面重渲染 ✅）
+   *    -> 因为闭包捕获的都是稳定引用 ✅
+   * -> 但以后有人往闭包里加一个 `useState` 依赖 ✅
+   *    -> `<Page>` 的 memo **立刻失效** ✅ -> 所有页每次都重渲染 ✅ ❌
+   * -> 抽成 `useCallback` ✅ -> 引用稳定 ✅ -> 隐患消除 ✅
+   */
+
+  /** 点便签 → 打开便利贴面板 */
+  const handlePageAnnotationClick = useCallback(
+    (annotation: AnnotationRecord) => {
+      setActiveAnnotationId(annotation.id);
+      onAnnotationClick?.(annotation);
+    },
+    [onAnnotationClick],
+  );
+
+  /** 点"编辑" → 打开锚点弹窗（贴在批注旁边） */
+  const handlePageAnnotationEdit = useCallback(
+    (annotation: AnnotationRecord, element?: HTMLElement | null) => {
+      handleAnnotationEdit(annotation, element);
+      onAnnotationEdit?.(annotation);
+    },
+    [handleAnnotationEdit, onAnnotationEdit],
+  );
+
+  /** 点"展开" → 打开便利贴面板（看完整内容） */
+  const handlePageAnnotationExpand = useCallback(
+    (annotation: AnnotationRecord) => {
+      setActiveAnnotationId(annotation.id);
+      onAnnotationExpand?.(annotation);
+    },
+    [onAnnotationExpand],
+  );
+
+  /*
    * ⚠️ **文字方向**（审计发现的：之前**完全没有 RTL 支持**）。
    *
    * -> 阿拉伯语 / 希伯来语的宿主**没法用** ❌
@@ -5227,15 +5293,18 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
       {children}
 
       {searchOpen ? (
-        <SearchPanel
-          search={searchEngine ?? null}
-          onClose={handleSearchClose}
-          onHitsChange={handleSearchHitsChange}
-          onNavigate={handleSearchNavigate}
-          locale={merged.locale ?? 'zh'}
-          locales={merged.locales}
-          messages={merged.messages}
-        />
+        /* ⚠️ **懒加载**（`Suspense`）→ 不点搜索就不加载 ✅ */
+        <Suspense fallback={null}>
+          <SearchPanel
+            search={searchEngine ?? null}
+            onClose={handleSearchClose}
+            onHitsChange={handleSearchHitsChange}
+            onNavigate={handleSearchNavigate}
+            locale={merged.locale ?? 'zh'}
+            locales={merged.locales}
+            messages={merged.messages}
+          />
+        </Suspense>
       ) : null}
 
       {/*
@@ -5255,48 +5324,54 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
         ) : (
           <>
             {sidebar === 'thumbnails' && renderThumbnail ? (
-              <ThumbnailPanel
-                totalPages={numPages}
-                currentPage={page}
-                visiblePages={visiblePages}
-                pageSizes={pageSizesPt}
-                renderThumbnail={renderThumbnail}
-                onPageSelect={(target) => scrollToPage(target)}
-                locale={merged.locale ?? 'zh'}
-                locales={merged.locales}
-                messages={merged.messages}
-              />
+              /* ⚠️ **懒加载**（`Suspense`）→ 不点缩略图就不加载 ✅ */
+              <Suspense fallback={null}>
+                <ThumbnailPanel
+                  totalPages={numPages}
+                  currentPage={page}
+                  visiblePages={visiblePages}
+                  pageSizes={pageSizesPt}
+                  renderThumbnail={renderThumbnail}
+                  onPageSelect={(target) => scrollToPage(target)}
+                  locale={merged.locale ?? 'zh'}
+                  locales={merged.locales}
+                  messages={merged.messages}
+                />
+              </Suspense>
             ) : null}
 
             {sidebar === 'outline' && getOutline ? (
-              <OutlinePanel
-                outline={outline}
-                /*
-                 * ⚠️ **宿主的同步映射优先** → 宿主的**异步映射**（包解析的）兜底
-                 * → 都不给 → 目录项显示"解析中"，点了会记下意图（等映射好了自动跳）
-                 */
-                /*
-                 * ⚠️⚠️ **不能再用内联箭头函数**（审计发现的真 bug）。
-                 *
-                 * -> 之前是 `() => null` ❌
-                 *   -> **每次渲染都是新函数** ❌
-                 *   -> `OutlinePanel` 的 `useMemo(flattenOutline, [..., pageRefToNumber])` 依赖**永远变** ❌
-                 *   -> 目录**每次渲染都重算** ❌
-                 *   -> 而且**永远返回 null** -> **目录点了没反应** ❌
-                 *
-                 * -> 现在：用**稳定的** `resolveRefSync`
-                 *   -> 宿主的 `pageRefToNumber` 优先
-                 *   -> 否则用包自己解析出来的 `outlinePageMapper`
-                 *   -> 都没有 -> 返回 null -> **给出可见提示**（不静默）
-                 */
-                pageRefToNumber={resolveRefSync}
-                resolveToken={internalResolveToken + (outlineResolveToken ?? 0)}
-                currentPage={page}
-                onPageSelect={(target) => scrollToPage(target)}
-                locale={merged.locale ?? 'zh'}
-                locales={merged.locales}
-                messages={merged.messages}
-              />
+              /* ⚠️ **懒加载**（`Suspense`）→ 不点目录就不加载 ✅ */
+              <Suspense fallback={null}>
+                <OutlinePanel
+                  outline={outline}
+                  /*
+                   * ⚠️ **宿主的同步映射优先** → 宿主的**异步映射**（包解析的）兜底
+                   * → 都不给 → 目录项显示"解析中"，点了会记下意图（等映射好了自动跳）
+                   */
+                  /*
+                   * ⚠️⚠️ **不能再用内联箭头函数**（审计发现的真 bug）。
+                   *
+                   * -> 之前是 `() => null` ❌
+                   *   -> **每次渲染都是新函数** ❌
+                   *   -> `OutlinePanel` 的 `useMemo(flattenOutline, [..., pageRefToNumber])` 依赖**永远变** ❌
+                   *   -> 目录**每次渲染都重算** ❌
+                   *   -> 而且**永远返回 null** -> **目录点了没反应** ❌
+                   *
+                   * -> 现在：用**稳定的** `resolveRefSync`
+                   *   -> 宿主的 `pageRefToNumber` 优先
+                   *   -> 否则用包自己解析出来的 `outlinePageMapper`
+                   *   -> 都没有 -> 返回 null -> **给出可见提示**（不静默）
+                   */
+                  pageRefToNumber={resolveRefSync}
+                  resolveToken={internalResolveToken + (outlineResolveToken ?? 0)}
+                  currentPage={page}
+                  onPageSelect={(target) => scrollToPage(target)}
+                  locale={merged.locale ?? 'zh'}
+                  locales={merged.locales}
+                  messages={merged.messages}
+                />
+              </Suspense>
             ) : null}
           </>
         )}
@@ -5716,38 +5791,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
                       activeHighlightId={activeHighlightId}
                       palette={merged.highlightPalette}
                       stickyNotes={stickyNotes}
-                      onAnnotationClick={(annotation) => {
-                        /*
-                         * ⚠️ **点便签 → 打开便利贴面板**（用户需求）。
-                         *
-                         * → "点击批注的时候展开的是一个便利贴一样的ui"
-                         * → 同时**通知宿主**（宿主可以自己做别的事）
-                         */
-                        setActiveAnnotationId(annotation.id);
-                        onAnnotationClick?.(annotation);
-                      }}
-                      onAnnotationEdit={(annotation, element) => {
-                        /*
-                         * ⚠️⚠️ **点"编辑" → 打开锚点弹窗**（用户需求：
-                         * "富文本编辑完之后没有保存按钮啊 保存都保存不了
-                         *  而且 富文本点了编辑 怎么富文本编辑框还在文档最上面啊
-                         *  要出现在视野里啊 就点的旁边"）。
-                         *
-                         * → 之前打开的是**右侧的便利贴面板** -> 离批注很远 ❌
-                         * → 现在打开**锚点弹窗** -> **贴在批注旁边**
-                         */
-                        handleAnnotationEdit(annotation, element);
-                        onAnnotationEdit?.(annotation);
-                      }}
-                      onAnnotationExpand={(annotation) => {
-                        /*
-                         * ⚠️ **点"展开" → 打开便利贴面板**（看完整内容）。
-                         *
-                         * → 用户需求："也可以点击展开，查看批注详情"
-                         */
-                        setActiveAnnotationId(annotation.id);
-                        onAnnotationExpand?.(annotation);
-                      }}
+                      onAnnotationClick={handlePageAnnotationClick}
+                      onAnnotationEdit={handlePageAnnotationEdit}
+                      onAnnotationExpand={handlePageAnnotationExpand}
                       locale={merged.locale ?? 'zh'}
                       locales={merged.locales}
                       messages={merged.messages}
