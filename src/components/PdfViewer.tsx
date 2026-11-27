@@ -32,7 +32,11 @@ import type { DocumentCache } from '../core/cache/store';
 import type { Features, PdfViewerConfig } from '../core/config';
 import { mergeConfig } from '../core/config';
 import type { DocumentSource, LoadOptions } from '../core/document/loader';
-import { createDefaultPdfJsBridge, type PdfJsBridge } from '../core/document/pdfjs-bridge';
+import {
+  createDefaultPdfJsBridge,
+  type PdfJsBridge,
+  type PdfJsResourcePaths,
+} from '../core/document/pdfjs-bridge';
 import type { RichTextPalette, RichTextToolbarItem } from '../core/editor/rich-text';
 import type { PdfViewerError } from '../core/errors';
 import { pdfViewerError } from '../core/errors';
@@ -457,6 +461,28 @@ export interface PdfViewerProps {
    */
   onExportHighlights?: () => void;
   /**
+   * **清除全部高亮**（用户需求："包也内置一个清除高亮按钮吧"）。
+   *
+   * -> 高亮数据在**宿主手里** ✅ -> 包只给按钮 ✅
+   * -> 不传 -> 工具栏**不渲染**这个按钮 ✅
+   */
+  onClearHighlights?: () => void;
+  /**
+   * **导入高亮**（用户反馈："导入高亮的icon重新设计一个能看得出是导入高亮的"）。
+   *
+   * -> 高亮数据在**宿主手里** ✅ -> 包只给按钮 ✅
+   * -> 不传 -> 工具栏**不渲染**这个按钮 ✅
+   */
+  onImportHighlights?: () => void;
+  /**
+   * **pdf.js 静态资源的路径**（标准字体 / CMap / WASM）。
+   *
+   * -> 标准字体**包已经内置** ✅ -> 一般不用传 ✅
+   * -> 宿主有自己的字体子集 / CMap 目录 -> 传这里**覆盖** ✅（浅覆盖 ✅）
+   * -> 只在用**默认接线**（没传 `getDocInfo`）时生效 ✅
+   */
+  pdfJsResourcePaths?: PdfJsResourcePaths;
+  /**
    * **插槽**（方案 D：完全自定义）。
    *
    * 每个槽给了就**替换**内置的那块；不给就用内置的。
@@ -827,6 +853,9 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     onDownloadPdf,
     onExportAnnotatedPdf,
     onExportHighlights,
+    onClearHighlights,
+    onImportHighlights,
+    pdfJsResourcePaths,
     slots,
     getPage,
     getPageSizes,
@@ -1311,7 +1340,15 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
 
   /**
    * ⚠️ **只在宿主没传自己的接线时**才加载默认的
+   *
+   * ⚠️ **资源路径用 ref 拿** ✅
+   * -> 桥接是**模块级缓存**的 ✅（pdf.js 只能初始化一次 ✅）
+   * -> 路径变了**不能重建** ✅ -> 会重复初始化 pdf.js ❌
+   * -> -> 放进 ref ✅ -> effect 不依赖它 ✅ -> 不会反复重建 ✅
    */
+  const pdfJsResourcePathsRef = useRef(pdfJsResourcePaths);
+  pdfJsResourcePathsRef.current = pdfJsResourcePaths;
+
   useEffect(() => {
     if (getDocInfo) {
       // 宿主有自己的 -> 不用默认的
@@ -1319,7 +1356,7 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
     }
     let cancelled = false;
     if (!defaultBridgePromise.current) {
-      defaultBridgePromise.current = createDefaultPdfJsBridge();
+      defaultBridgePromise.current = createDefaultPdfJsBridge(pdfJsResourcePathsRef.current);
     }
     void defaultBridgePromise.current
       .then((bridge) => {
@@ -5073,6 +5110,8 @@ export function PdfViewer(props: PdfViewerProps & { ref?: React.Ref<PdfViewerHan
           onDownloadPdf={onDownloadPdf}
           onExportAnnotatedPdf={onExportAnnotatedPdf}
           onExportHighlights={onExportHighlights}
+          onClearHighlights={onClearHighlights}
+          onImportHighlights={onImportHighlights}
           /*
            * ⚠️ **缩放比例可填写 + 上下限可配**（用户需求）。
            *

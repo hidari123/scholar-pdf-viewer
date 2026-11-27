@@ -20,10 +20,10 @@ import {
   downloadFile,
   exportHighlightedPdf,
   exportHighlights,
-  Icon,
   PdfSearch,
   PdfViewer,
   parseHighlightDoc,
+  resolvePdfJsResourcePaths,
   stringifyHighlightDoc,
   THEMES,
   themeLabel,
@@ -802,7 +802,25 @@ export default function App() {
 
   /** 文档信息（宿主注入给包） */
   const getDocInfo = useCallback(async (data: Uint8Array) => {
-    const doc = await pdfjs.getDocument({ data: data.slice() }).promise;
+    /*
+     * ⚠️⚠️ **必须配静态资源路径**（用户反馈："页面刚打开顶部出现乱码"）
+     *
+     * -> 不配 `standardFontDataUrl` ❌
+     *    -> pdf.js 请求不到标准字体 ❌
+     *    -> 文档里**没内嵌字体**的页会画歪 ❌（首次打开乱码、刷新就没 ❌）
+     * -> `resolvePdfJsResourcePaths` 是包提供的 ✅
+     *    -> 标准字体用包内置的 ✅
+     *    -> 宿主要覆盖就传第二个参数 ✅
+     */
+    const resources = resolvePdfJsResourcePaths();
+    const doc = await pdfjs.getDocument({
+      data: data.slice(),
+      ...(resources.standardFontDataUrl
+        ? { standardFontDataUrl: resources.standardFontDataUrl }
+        : {}),
+      ...(resources.cMapUrl ? { cMapUrl: resources.cMapUrl } : {}),
+      ...(resources.wasmUrl ? { wasmUrl: resources.wasmUrl } : {}),
+    }).promise;
     docRef.current = doc;
 
     const info = (await doc.getMetadata().catch(() => null)) as {
@@ -1043,37 +1061,6 @@ export default function App() {
       });
   }, [sampleUrl, documentId, highlights, t, includeAnnotationText]);
 
-  /** 工具栏插槽（宿主塞自己的按钮 —— 证明包不需要业务入口） */
-  const toolbarSlot = useMemo(
-    () => (
-      <>
-        {/*
-         * ⚠️⚠️ **这三个按钮删掉了**（审计发现的重复 ✅）。
-         *
-         * -> demo 同时把 `onDownloadPdf` / `onExportAnnotatedPdf` / `onExportHighlights`
-         *    传给了包 ✅ -> **包的工具栏已经渲染这三个按钮** ✅
-         * -> 这里再手写一遍 ✅ -> **每个按钮出现两次** ✅ ❌
-         *
-         * 实测（浏览器 ✅）：工具栏 20 个按钮 ✅
-         *   下载 PDF x2 ✅ / 导出带高亮的 PDF x2 ✅ / 导出高亮 x2 ✅ ❌
-         *
-         * -> 现在只保留**包里没有的**"导入高亮" ✅
-         * -> 导出/下载走包的工具栏 ✅ -> 宿主不用重复实现 ✅
-         */}
-        <button
-          type="button"
-          className="scpdf-toolbar__btn"
-          onClick={handleImportHighlights}
-          title={t('demo.importJson')}
-          aria-label={t('demo.importJson')}
-        >
-          <Icon name="importJson" />
-        </button>
-      </>
-    ),
-    [handleImportHighlights, t],
-  );
-
   return (
     <div
       className="demo-root"
@@ -1284,6 +1271,8 @@ export default function App() {
           onDownloadPdf={handleDownloadPdf}
           onExportAnnotatedPdf={handleExportAnnotatedPdf}
           onExportHighlights={handleExportHighlights}
+          onImportHighlights={handleImportHighlights}
+          onClearHighlights={clearCurrentHighlights}
           dir={dir}
           appearance={{ density }}
           /*
@@ -1303,7 +1292,6 @@ export default function App() {
           slots={useSlots ? demoSlots : undefined}
           highlights={highlights}
           highlightPalette={highlightPalette}
-          toolbar={{ rightSlot: toolbarSlot }}
           getPage={getPage}
           getPageSizes={getPageSizes}
           getDocInfo={getDocInfo}

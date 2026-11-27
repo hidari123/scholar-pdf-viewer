@@ -112,6 +112,20 @@ export interface ToolbarProps {
    */
   onThemeChange?: (theme: PdfViewerTheme) => void;
   /**
+   * **清除全部高亮**（用户需求："包也内置一个清除高亮按钮吧"）。
+   *
+   * -> 高亮数据在**宿主手里** ✅ -> 包只给按钮 ✅
+   * -> 不传 -> **不渲染** ✅（和 `onHighlightRemove` 一个思路 ✅）
+   */
+  onClearHighlights?: () => void;
+  /**
+   * **导入高亮**（用户反馈："导入高亮的icon重新设计一个能看得出是导入高亮的"）。
+   *
+   * -> 高亮数据在**宿主手里** ✅ -> 包只给按钮 ✅
+   * -> 不传 -> **不渲染** ✅
+   */
+  onImportHighlights?: () => void;
+  /**
    * **点工具栏的"高亮"按钮**（用户需求：
    * "包工具栏的高亮也需要加个下拉箭头 可以选择颜色
    *  如果没有选就是默认的高亮色"）。
@@ -169,6 +183,8 @@ export function Toolbar(props: ToolbarProps) {
     onDownloadPdf,
     onExportAnnotatedPdf,
     onExportHighlights,
+    onClearHighlights,
+    onImportHighlights,
     theme,
     onThemeChange,
     themeOptions,
@@ -205,6 +221,8 @@ export function Toolbar(props: ToolbarProps) {
   const showExportAnnotatedPdf = toolbar.showExportAnnotatedPdf !== false;
   const showExportHighlights = toolbar.showExportHighlights !== false;
   const showHighlight = toolbar.showHighlight !== false;
+  const showClearHighlights = toolbar.showClearHighlights !== false;
+  const showImportHighlights = toolbar.showImportHighlights !== false;
   const showTheme = toolbar.showTheme !== false;
 
   /** 页码输入框的草稿值（用户正在输入的内容） */
@@ -421,6 +439,12 @@ export function Toolbar(props: ToolbarProps) {
          * -> 所以：**包提供按钮和入口**  -> **宿主给实现**
          * -> 不传回调  -> **按钮不渲染**
          */}
+        {/*
+         * ⚠️ **下载 PDF 用 `importJson` 的图形**（文件 + 向下箭头）
+         *
+         * -> 用户反馈："导入高亮的那个icon 把它作为下载pdf的icon"
+         * -> 旧的 `download`（云 + 箭头）看着像"下载云端文件" -> 不直观
+         */}
         {showDownloadPdf && onDownloadPdf ? (
           <button
             type="button"
@@ -429,7 +453,7 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={t('export.downloadPdf')}
             title={t('export.downloadPdf')}
           >
-            <Icon name={'download'} title={t('export.downloadPdf')} overrides={icons} />
+            <Icon name={'importJson'} title={t('export.downloadPdf')} overrides={icons} />
           </button>
         ) : null}
 
@@ -454,6 +478,43 @@ export function Toolbar(props: ToolbarProps) {
             title={t('export.highlightsJson')}
           >
             <Icon name={'exportJson'} title={t('export.highlightsJson')} overrides={icons} />
+          </button>
+        ) : null}
+
+        {/*
+         * ⚠️ **导入高亮**（用户反馈："导入高亮的icon重新设计一个
+         * 能看得出是导入高亮的"）。
+         *
+         * -> icon 是**文件 + 高亮块 + 向上箭头** ✅
+         *    -> 一眼看出"导入的是**高亮**" ✅（不是普通 JSON ✅）
+         */}
+        {showImportHighlights && onImportHighlights ? (
+          <button
+            type="button"
+            className="scpdf-toolbar__btn"
+            onClick={onImportHighlights}
+            aria-label={t('export.importHighlights')}
+            title={t('export.importHighlights')}
+          >
+            <Icon name={'importHighlight'} title={t('export.importHighlights')} overrides={icons} />
+          </button>
+        ) : null}
+
+        {/*
+         * ⚠️ **清除全部高亮**（用户需求："包也内置一个清除高亮按钮吧"）。
+         *
+         * -> 高亮数据在宿主手里 ✅ -> 包只给按钮 ✅
+         * -> 不传 `onClearHighlights` -> 不渲染 ✅
+         */}
+        {showClearHighlights && onClearHighlights ? (
+          <button
+            type="button"
+            className="scpdf-toolbar__btn"
+            onClick={onClearHighlights}
+            aria-label={t('export.clearHighlights')}
+            title={t('export.clearHighlights')}
+          >
+            <Icon name={'eraser'} title={t('export.clearHighlights')} overrides={icons} />
           </button>
         ) : null}
 

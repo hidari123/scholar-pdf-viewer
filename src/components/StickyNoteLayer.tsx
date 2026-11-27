@@ -128,6 +128,17 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
   const iconRefs = useRef(new Map<string, HTMLButtonElement>());
 
   /*
+   * ⚠️ **内容框的 ref**（用来量它的真实尺寸 ✅）
+   *
+   * -> 之前 `updateContentPos(icon, null)` ✅ -> 拿不到内容框 ✅
+   *    -> 只能用 CSS 的上限兜底（260×220 ✅）❌
+   *    -> 翻到左边时 ❌ -> 按 260 算 ❌ -> **位置偏了 148px** ✅ ❌
+   *    -> 用户反馈："距离批注按钮太远" ✅ ❌
+   * -> 现在量**真实**渲染出来的盒子 ✅
+   */
+  const contentRef = useRef<HTMLSpanElement | null>(null);
+
+  /*
    * ⚠️⚠️ **关闭的延迟定时器**（用户反馈：
    * "鼠标一移开批注按钮 批注内容区域就消失了 鼠标一移开就消失了"）。
    *
@@ -160,7 +171,14 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
    */
   const updateContentPos = useCallback((icon: HTMLElement, content: HTMLElement | null) => {
     const iconRect = icon.getBoundingClientRect();
-    const contentRect = content?.getBoundingClientRect();
+    /*
+     * ⚠️ **量内容框的真实尺寸** ✅
+     *
+     * -> 优先用传进来的 ✅ -> 没有就用 ref 里的 ✅
+     * -> 量不到（还没渲染）-> 用 CSS 的上限兜底 ✅
+     */
+    const target = content ?? contentRef.current;
+    const contentRect = target?.getBoundingClientRect();
     const width = contentRect?.width || 260;
     const height = contentRect?.height || 220;
 
@@ -502,6 +520,7 @@ export function StickyNoteLayer(props: StickyNoteLayerProps) {
             */}
             {!isGroup ? (
               <span
+                ref={contentRef}
                 className="scpdf-sticky-note__content"
                 data-visible={hoveredId === first.id ? 'true' : 'false'}
                 role="note"

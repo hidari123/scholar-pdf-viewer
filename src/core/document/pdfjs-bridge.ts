@@ -42,6 +42,10 @@
  */
 
 /** 宿主的"取页"回调（和 \`PdfViewer\` 的 prop 同型） */
+import { type PdfJsResourcePaths, resolvePdfJsResourcePaths } from './pdfjs-resources';
+
+export type { PdfJsResourcePaths };
+
 export type DefaultGetPage = (pageNumber: number) => Promise<
   | {
       getViewport: (options: { scale: number }) => { width: number; height: number };
@@ -93,7 +97,9 @@ let bridgePromise: Promise<PdfJsBridge> | null = null;
  *
  * @returns 接好的桥接
  */
-export async function createDefaultPdfJsBridge(): Promise<PdfJsBridge> {
+export async function createDefaultPdfJsBridge(
+  resourcePaths?: PdfJsResourcePaths,
+): Promise<PdfJsBridge> {
   if (!bridgePromise) {
     bridgePromise = (async () => {
       const pdfjs = await import('pdfjs-dist');
@@ -136,9 +142,24 @@ export async function createDefaultPdfJsBridge(): Promise<PdfJsBridge> {
            * -> -> 加密 PDF 在**默认接线**下打不开 ❌
            * -> -> 这里把密码传进去
            */
+          /*
+           * ⚠️⚠️ **静态资源路径**（用户反馈："页面刚打开顶部出现乱码"）
+           *
+           * -> 不配 `standardFontDataUrl` ❌
+           *    -> pdf.js 请求不到标准字体 ❌
+           *    -> 文档里**没内嵌字体**的页会画歪 ❌
+           * -> 宿主可以覆盖 ✅（浅覆盖 ✅）
+           */
+          const resources = resolvePdfJsResourcePaths(resourcePaths);
+
           const doc = await pdfjs.getDocument({
             data: data.slice(),
             ...(password ? { password } : {}),
+            ...(resources.standardFontDataUrl
+              ? { standardFontDataUrl: resources.standardFontDataUrl }
+              : {}),
+            ...(resources.cMapUrl ? { cMapUrl: resources.cMapUrl } : {}),
+            ...(resources.wasmUrl ? { wasmUrl: resources.wasmUrl } : {}),
           }).promise;
           currentDoc = doc as never;
 

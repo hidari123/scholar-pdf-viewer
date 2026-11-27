@@ -64,6 +64,8 @@ export {
 } from './core/config/builtin-defaults';
 /* ---------- 下载（纯 DOM，无网络依赖） ---------- */
 export { downloadFile } from './core/document/download';
+export type { PdfJsResourcePaths } from './core/document/pdfjs-resources';
+export { resolvePdfJsResourcePaths } from './core/document/pdfjs-resources';
 /* ---------- 富文本（零依赖，工具栏宿主可配） ---------- */
 export type {
   RichTextCommand,

@@ -206,6 +206,10 @@ export interface ToolbarConfig {
   showHighlight?: boolean;
   /** 显示主题按钮（语义同 `showPrint`） */
   showTheme?: boolean;
+  /** 显示"清除全部高亮"按钮（语义同 `showPrint`） */
+  showClearHighlights?: boolean;
+  /** 显示"导入高亮"按钮（语义同 `showPrint`） */
+  showImportHighlights?: boolean;
   /** 左侧插槽（宿主任意内容） */
   leftSlot?: ReactNode;
   /** 右侧插槽（宿主任意内容） */

@@ -95,6 +95,10 @@ export interface Messages {
   'export.annotatedPdf': string;
   /** 导出高亮 JSON*/
   'export.highlightsJson': string;
+  /** 清除全部高亮 */
+  'export.clearHighlights': string;
+  /** 导入高亮 */
+  'export.importHighlights': string;
   /* —— 主题 —— */
   /** 主题选择按钮 */
   'theme.picker': string;
@@ -302,6 +306,8 @@ export const ZH_MESSAGES: Messages = {
   'export.downloadPdf': '下载 PDF',
   'export.annotatedPdf': '导出带高亮的 PDF',
   'export.highlightsJson': '导出高亮',
+  'export.clearHighlights': '清除全部高亮',
+  'export.importHighlights': '导入高亮',
   'theme.picker': '主题',
   'theme.current': '当前主题',
   'a11y.canvas': 'PDF 页面',
@@ -419,6 +425,8 @@ export const EN_MESSAGES: Messages = {
   'export.downloadPdf': 'Download PDF',
   'export.annotatedPdf': 'Export annotated PDF',
   'export.highlightsJson': 'Export highlights',
+  'export.clearHighlights': 'Clear all highlights',
+  'export.importHighlights': 'Import highlights',
   'theme.picker': 'Theme',
   'theme.current': 'Current theme',
   'a11y.canvas': 'PDF page',

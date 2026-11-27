@@ -268,20 +268,26 @@ console.log('\n[3] 便签内容框在页边角不被裁');
            * -> 现在改成**中心对齐** ✅ -> 框的中心 ≈ 图标的中心 ✅
            */
           /*
-           * ⚠️ **量【边缘间距】** ✅ 不是中心间距 ✅
+           * ⚠️ **量【边缘间距】和【重叠】** ✅
            *
-           * -> 内容框和图标**相邻**时 ✅ -> 中心差必然很大 ✅（框本身 142px 宽 ✅）
-           *    -> 那不是"太远" ✅ -> 那是正常的 ✅
-           * -> 用户说的"太远" ✅ -> 是翻到左边时 ✅
-           *    -> 框整个往左延伸 ✅ -> **两个框挨着的那个边**才有意义 ✅
-           *
-           * -> 所以量：**框的近边到图标的远边** ✅
+           * -> 用户反馈了两轮 ✅：
+           *    -> "距离批注按钮太远" ❌ -> 间距太大 ❌
+           *    -> "离得又太近了 已经重叠上去了" ❌ -> 间距变成负数 ❌
+           * -> 目标：**间距 15~20px** ✅ 且**不重叠** ✅
            */
           const iconRight = out.iconLeft + out.iconWidth;
           const gapRight = out.boxLeft - iconRight;
           const gapLeft = out.iconLeft - (out.boxLeft + out.boxWidth);
-          const nearest = gapRight >= 0 ? gapRight : gapLeft >= 0 ? gapLeft : 0;
-          check(`[${pos}] 内容框紧挨着图标`, nearest <= 60, `最近边间距 ${Math.round(nearest)}px`);
+          const nearest = Math.max(0, gapRight, gapLeft);
+          const overlap =
+            Math.min(iconRight, out.boxLeft + out.boxWidth) - Math.max(out.iconLeft, out.boxLeft);
+
+          check(
+            `[${pos}] 内容框紧挨着图标（间距 15~20px）`,
+            nearest >= 12 && nearest <= 24,
+            `间距 ${Math.round(nearest)}px`,
+          );
+          check(`[${pos}] 内容框没有压住图标`, overlap <= 0, `重叠 ${Math.round(overlap)}px`);
           check(
             `[${pos}] 内容框没超出页右边`,
             out.overflowRight <= 0,
