@@ -44,7 +44,7 @@
 | 文档                                | 内容                                          |
 | ----------------------------------- | --------------------------------------------- |
 | **[使用指南](./docs/GUIDE.md)**     | 怎么接进来、完整接线示例、常见问题            |
-| **[API 参考](./docs/API.md)**       | 全部 71 个 props、11 个 handle 方法、类型定义 |
+| **[API 参考](./docs/API.md)**       | 全部 85 个 props、11 个 handle 方法、类型定义 |
 | **[扩展开发](./docs/EXTENDING.md)** | 加按钮、加语言、换主题、换编辑器              |
 
 ## 设计原则（硬约束）
@@ -280,7 +280,7 @@ import '@scholar-space/pdf-viewer/styles.css';
 ```tsx
 <PdfViewer
   highlightPalette={{ yellow: '#ffd54a', green: '#c8e6c9' }}
-  defaultHighlightColor="green" // ← 不选颜色时用这个
+  defaultHighlightColor: "green" // ← 不选颜色时用这个（**在 config 里**）
 />;
 ```
 
@@ -513,7 +513,7 @@ Main entry 29.69 kB (tree-shaken) · core subpath 1.15 kB · CSS 12 kB
 | Doc                                    | Contents                                              |
 | -------------------------------------- | ----------------------------------------------------- |
 | **[Getting Started](./docs/GUIDE.md)** | How to integrate, full wiring example, FAQ            |
-| **[API Reference](./docs/API.md)**     | All 67 props, 11 handle methods, type definitions     |
+| **[API Reference](./docs/API.md)**     | All 85 props, 11 handle methods, type definitions     |
 | **[Extending](./docs/EXTENDING.md)**   | Add buttons, add languages, re-theme, swap the editor |
 
 ## Design principles (hard constraints)

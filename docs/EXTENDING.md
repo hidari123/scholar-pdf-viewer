@@ -14,34 +14,39 @@
 - [4. 覆盖内置动作](#4-覆盖内置动作)
 - [5. 加一种语言](#5-加一种语言)
 - [6. 换图标](#6-换图标)
-- [7. 换主题 / 做品牌色](#7-换主题-做品牌色)
+- [7. 换主题 / 做品牌色](#7-换主题--做品牌色)
 - [8. 换富文本编辑器](#8-换富文本编辑器)
 - [9. 自定义批注渲染](#9-自定义批注渲染)
 - [10. 接管 Toast](#10-接管-toast)
 - [11. 接管密码输入](#11-接管密码输入)
 - [12. 注入自己的 pdf.js](#12-注入自己的-pdfjs)
-- [13. 用 core 层的纯逻辑](#13-用-core-层的纯逻辑)
-- [14. 包的边界（什么不要往里塞）](#14-包的边界什么不要往里塞)
+- [13. 覆盖 pdf.js 的静态资源](#13-覆盖-pdfjs-的静态资源)
+- [14. 用 core 层的纯逻辑](#14-用-core-层的纯逻辑)
+- [15. 包的边界（什么不要往里塞）](#15-包的边界什么不要往里塞)
 
 ---
 
 ## 1. 扩展地图
 
-| 想做什么                 | 用什么                           | 难度   |
-| ------------------------ | -------------------------------- | ------ |
-| 工具栏**加**按钮         | `toolbar.leftSlot` / `rightSlot` | ⭐     |
-| 工具栏**整个换**         | `slots.toolbar` + `viewerRef`    | ⭐⭐   |
-| 选区浮层**加**动作       | `selectionActions`               | ⭐     |
-| 选区浮层**覆盖**内置动作 | `selectionActions`（同 key）     | ⭐     |
-| 加**一种语言**           | `locales`                        | ⭐     |
-| 覆盖**一两句**文案       | `messages`                       | ⭐     |
-| 换**图标**               | `icons`                          | ⭐     |
-| 做**品牌主题**           | `theme` + CSS 变量               | ⭐⭐   |
-| 换**富文本编辑器**       | `annotationEditor`               | ⭐⭐⭐ |
-| 自定义**批注样式**       | CSS 变量 + `slots`               | ⭐⭐   |
-| 接管 **Toast**           | `onToast`                        | ⭐     |
-| 接管**密码输入**         | `onRequestPassword`              | ⭐     |
-| 自带 **pdf.js**          | `getPage` / `getDocInfo` …       | ⭐⭐   |
+| 想做什么                 | 用什么                                   | 难度   |
+| ------------------------ | ---------------------------------------- | ------ |
+| 工具栏**加**按钮         | `toolbar.leftSlot` / `toolbar.rightSlot` | ⭐     |
+| 工具栏**整个换**         | `slots.toolbar` + `viewerRef`            | ⭐⭐   |
+| 选区浮层**加**动作       | `selectionActions`                       | ⭐     |
+| 选区浮层**覆盖**内置动作 | `selectionActions`（同 key）             | ⭐     |
+| 侧栏**整个换**           | `slots.panel`                            | ⭐     |
+| 页面上**加**东西         | `slots.pageOverlay`                      | ⭐     |
+| 加**一种语言**           | `locales`                                | ⭐     |
+| 覆盖**一两句**文案       | `messages`                               | ⭐     |
+| 换**图标**               | `icons`                                  | ⭐     |
+| 做**品牌主题**           | `theme` + CSS 变量                       | ⭐⭐   |
+| 换**高亮色板**           | `highlightPalette`                       | ⭐     |
+| 换**富文本编辑器**       | `annotationEditor`                       | ⭐⭐⭐ |
+| 自定义**批注样式**       | CSS 变量 + `slots`                       | ⭐⭐   |
+| 接管 **Toast**           | `onToast`                                | ⭐     |
+| 接管**密码输入**         | `onRequestPassword`                      | ⭐     |
+| 自带 **pdf.js**          | `getPage` / `getDocInfo` …               | ⭐⭐   |
+| 换 **pdf.js 资源**       | `pdfJsResourcePaths`                     | ⭐     |
 
 ---
 
@@ -59,69 +64,57 @@ function MyToolbarExtras() {
   );
 }
 
-<PdfViewer toolbar={{ rightSlot: <MyToolbarExtras /> }} />;
+<PdfViewer
+  file={url}
+  toolbar={{
+    leftSlot: <MyToolbarExtras />,
+    rightSlot: <button onClick={openSettings}>⚙</button>,
+  }}
+/>;
 ```
 
-> 💡 插槽在工具栏的**两端**，中间的内置按钮都还在。
+> ⚠️ `leftSlot` / `rightSlot` 在 **`toolbar` 对象里** ✅
+> （`slots` 对象里是 `toolbar` / `panel` / `pageOverlay` ✅）
 
 ### 方式 B：整个替换（要完全控制布局时）
 
 ```tsx
-const viewerRef = useRef<PdfViewerHandle>(null);
-
-function MyToolbar() {
-  const [page, setPage] = useState(1);
-  return (
-    <div className="my-toolbar">
-      <button onClick={() => viewerRef.current?.goToPage(page - 1)}>‹</button>
-      <input
-        value={page}
-        onChange={(e) => setPage(Number(e.target.value))}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') viewerRef.current?.goToPage(page);
-        }}
-      />
-      <button onClick={() => viewerRef.current?.goToPage(page + 1)}>›</button>
-
-      <button onClick={() => viewerRef.current?.zoomOut()}>−</button>
-      <button onClick={() => viewerRef.current?.zoomIn()}>+</button>
-      <button onClick={() => viewerRef.current?.fitWidth()}>适应宽度</button>
-      <button onClick={() => viewerRef.current?.print()}>打印</button>
-    </div>
-  );
-}
-
-<PdfViewer ref={viewerRef} slots={{ toolbar: <MyToolbar /> }} />;
+<PdfViewer file={url} slots={{ toolbar: <MyToolbar /> }} />;
 ```
 
-> ⚠️ 替换之后：**页码状态要自己同步**。
-> 用 `onPageChange` 拿当前页：
-> ```tsx
-> <PdfViewer onPageChange={(p) => setPage(p)} />
-> ```
+**替换后这些都要自己接**（用 `viewerRef`）：
+
+```tsx
+const viewerRef = useRef<PdfViewerHandle>(null);
+
+<MyToolbar
+  onPrev={() => viewerRef.current?.goToPage(page - 1)}
+  onNext={() => viewerRef.current?.goToPage(page + 1)}
+  onZoomIn={() => viewerRef.current?.zoomIn()}
+  onZoomOut={() => viewerRef.current?.zoomOut()}
+  onFitWidth={() => viewerRef.current?.fitWidth()}
+  onSearch={() => setSearchOpen(true)}
+/>;
+```
 
 ---
 
 ## 3. 加一个选区动作
 
-浮层里加一个"查文献"按钮：
-
 ```tsx
-import type { SelectionAction } from '@scholar-space/pdf-viewer';
-
-const actions: SelectionAction[] = [
-  {
-    key: 'lookup',
-    icon: 'search',
-    label: '查文献',
-    order: 10,
-    onSelect: (ctx) => {
-      searchLiterature(ctx.text);
+<PdfViewer
+  file={url}
+  selectionActions={[
+    {
+      key: 'summarize',
+      icon: 'copy',
+      label: '总结',
+      group: 'primary',
+      order: 30,
+      onSelect: ({ text }) => void summarize(text),
     },
-  },
-];
-
-<PdfViewer selectionActions={actions} />;
+  ]}
+/>;
 ```
 
 ### 带条件显示（只在选中英文时出现）
@@ -131,78 +124,92 @@ const actions: SelectionAction[] = [
   key: 'translate',
   icon: 'translate',
   label: '翻译',
-  when: (ctx) => /[a-zA-Z]/.test(ctx.text),
-  onSelect: (ctx) => translate(ctx.text),
+  group: 'secondary',
+  order: 40,
+  // ⚠️ 不传 `when` -> 一直显示 ✅
+  when: ({ text }) => /[a-zA-Z]/.test(text),
+  onSelect: ({ text }) => void translate(text),
 }
 ```
 
 ### ⚠️ `label` 建议走 i18n
 
-```tsx
-{
-  key: 'lookup',
-  icon: 'search',
-  label: '{my.lookup}',    // ← 占位符
-  onSelect: ...,
-}
+`label` 是**字符串**，不是 key。要走 i18n 就自己翻译：
 
-// 配套
-<PdfViewer messages={{ 'my.lookup': '查文献' }} />
+```tsx
+const { locale } = useViewerLocale();   // 宿主自己的 i18n
+label: locale === 'zh' ? '总结' : 'Summarize',
 ```
 
 ---
 
 ## 4. 覆盖内置动作
 
-**用同样的 `key`**：
+**同一个 `key`** 就能覆盖内置的动作：
 
 ```tsx
-const actions: SelectionAction[] = [
-  {
-    key: 'copy', // ← 覆盖内置的"复制"
-    icon: 'copy',
-    label: '复制到笔记',
-    onSelect: (ctx) => {
-      myApp.copyToNotes(ctx.text);
-      // 想让包清选区 -> 调 ctx.done?.()
-      ctx.done?.();
-    },
-  },
-];
+import { mergeSelectionActions } from '@scholar-space/pdf-viewer';
 
-<PdfViewer selectionActions={actions} />;
+<PdfViewer
+  file={url}
+  selectionActions={mergeSelectionActions(
+    // ⚠️ **内置的** ✅
+    undefined,
+    // ⚠️ **同 key 覆盖** ✅
+    [
+      {
+        key: 'copy',
+        icon: 'copy',
+        label: '复制原文',
+        group: 'primary',
+        order: 20,
+        onSelect: ({ text }) => void copyRaw(text),
+      },
+    ],
+  )}
+/>;
 ```
 
-**内置 key**：`highlight` `copy` `translate` `note` `ask` `explain` `delete`
-
-> 💡 不传 `onCopy` 也可以 —— 传了 `selectionActions` 里的 `copy` 会**优先**。
+内置的 key 见 `BUILTIN_ACTION_KEYS`。
 
 ---
 
 ## 5. 加一种语言
 
-```tsx
-const locales = {
-  de: {
-    'load.loading': 'Wird geladen…',
-    'load.retry': 'Erneut versuchen',
-    'empty.title': 'Kein Dokument',
-    'page.of': '{page} von {total}',
-    // ⚠️ 不用写全 -> 缺的自动回退到内置英文
-  },
-};
-
-<PdfViewer locale="de" locales={locales} />;
-```
-
 ### ⚠️ `locales` vs `messages`
 
-|            | 用途                       | 例子                      |
-| ---------- | -------------------------- | ------------------------- |
-| `locales`  | **加一整个语言**           | `{ de: { ...95 条 } }`    |
-| `messages` | **覆盖当前语言的个别句子** | `{ 'load.loading': '…' }` |
+| prop       | 干什么                   | 用在哪     |
+| ---------- | ------------------------ | ---------- |
+| `messages` | **覆盖**内置语言的一两句 | 改文案     |
+| `locales`  | **新增**一种语言         | 加西班牙语 |
 
-> ⚠️ **两个都传**时，`messages` 优先级更高（回退链：`messages` → `locales[locale]` → 内置 → 英文）。
+```tsx
+import { buildLocaleTable } from '@scholar-space/pdf-viewer';
+
+<PdfViewer
+  file={url}
+  locale="es"
+  locales={buildLocaleTable({
+    es: {
+      'selection.actionHighlight': 'Resaltar',
+      'selection.actionCopy': 'Copiar',
+      'toast.copied': 'Copiado al portapapeles',
+    },
+  })}
+/>;
+```
+
+### 覆盖一两句
+
+```tsx
+<PdfViewer
+  file={url}
+  messages={{
+    zh: { 'selection.actionHighlight': '标记' },
+    en: { 'selection.actionHighlight': 'Mark' },
+  }}
+/>;
+```
 
 ---
 
@@ -211,13 +218,11 @@ const locales = {
 ### 逐个覆盖
 
 ```tsx
-import { Download, Upload, Search } from 'lucide-react';
-
 <PdfViewer
+  file={url}
   icons={{
-    download: <Download size={16} />,
-    upload: <Upload size={16} />,
-    search: <Search size={16} />,
+    highlight: <MyHighlightIcon />,
+    download: <MyDownloadIcon />,
   }}
 />;
 ```
@@ -225,14 +230,23 @@ import { Download, Upload, Search } from 'lucide-react';
 ### 用包自带的图标集（不引第三方库）
 
 ```tsx
-import { Icon } from '@scholar-space/pdf-viewer/icons';
+import { getIconShape, type IconName } from '@scholar-space/pdf-viewer/icons';
 
-<Icon name="download" size={16} />;
+const shape = getIconShape('highlight');
+// { paths, fills, circles, rects, lines, polylines }
 ```
 
-**全部 54 个图标名**见 [API §9](./API.md#9-图标)。
+### 自己加一个新图标
 
-> 💡 换图标不影响包体积 —— 宿主引的库不进包的 bundle。
+图标的几何数据是**纯数据**（坐标系统一 24×24，描边 `currentColor`）：
+
+```tsx
+const myIcon = {
+  paths: ['M12 3v18', 'M5 10l7-7 7 7'],
+};
+
+<PdfViewer file={url} icons={{ sparkle: <MySvg paths={myIcon.paths} /> }} />;
+```
 
 ---
 
@@ -241,48 +255,38 @@ import { Icon } from '@scholar-space/pdf-viewer/icons';
 ### 用内置主题
 
 ```tsx
-<PdfViewer theme="sepia" />; // light dark auto paper sepia contrast minimal
+<PdfViewer file={url} theme="dark" />;
 ```
 
 ### 做自己的品牌主题（CSS 变量）
 
 ```css
-:root {
-  /* 主色 */
-  --scpdf-color-primary: #fa541c;
-  --scpdf-color-primary-hover: #e64310;
-
-  /* 文字 */
-  --scpdf-text-primary: #1f2329;
-  --scpdf-text-secondary: #646a73;
-
-  /* 背景 */
-  --scpdf-bg-page: #ffffff;
-  --scpdf-bg-toolbar: #f7f8fa;
-
-  /* 尺寸 */
-  --scpdf-toolbar-height: 48px;
-  --scpdf-page-gap: 12px;
+.scpdf-root {
+  --scpdf-color-accent: #7c3aed;
+  --scpdf-color-accent-soft: #ede9fe;
+  --scpdf-color-border: #e5e7eb;
+  --scpdf-color-bg: #ffffff;
+  --scpdf-color-bg-subtle: #f9fafb;
+  --scpdf-color-text: #1f2329;
+  --scpdf-color-text-subtle: #6b7280;
 }
 ```
-
-> 💡 变量的完整清单在 [`src/styles/viewer.css`](../src/styles/viewer.css) 的 `:root` 段。
-> **每个变量都有默认值** —— 你只覆盖要改的。
 
 ### 高亮色板（品牌色）
 
 ```tsx
 <PdfViewer
+  file={url}
   highlightPalette={{
-    'my-yellow': '#fff3bf',
-    'my-green': '#d9f7be',
-    'my-blue': '#bae0ff',
+    yellow: '#fef08a',
+    green: '#bbf7d0',
+    brand: '#7c3aed', // ⚠️ 自定义 key ✅
   }}
 />;
 ```
 
-> ⚠️ 色板是**语义 key → CSS 颜色**。存高亮时存 **key**（不是颜色值）→
-> 宿主换主题时**高亮自动跟着变**
+> ⚠️ **key 是语义名**，包只认 key 不认含义 ✅
+> 不传就用内置的 8 色（`BUILTIN_HIGHLIGHT_PALETTE`）✅
 
 ---
 
@@ -293,72 +297,59 @@ import { Icon } from '@scholar-space/pdf-viewer/icons';
 ```tsx
 import { TipTapEditor } from '@scholar-space/pdf-viewer/editor';
 
-<PdfViewer annotationEditor={TipTapEditor} />;
+<TipTapEditor value={html} onChange={setHtml} palette={myPalette} />;
 ```
-
-> ⚠️ 需要装 `@tiptap/react` `@tiptap/starter-kit` 等（可选 peer）。
->
-> ⚠️⚠️ **`@tiptap/extension-text-style` 一定要装**（审计发现的**真 bug**）：
->
-> -> TipTap 的 `Color` 扩展是**基于 `textStyle` 实现的**
-> -> 但 **StarterKit v3 不包含 `TextStyle`** ❌
-> -> 少了它 -> `setColor` 直接抛错 ❌
->   -> 报错：`There is no mark type named 'textStyle'` ❌
->   -> -> **文字颜色功能 100% 失效** ❌
->
-> ```sh
-> pnpm add @tiptap/core @tiptap/starter-kit @tiptap/react \
->   @tiptap/extension-text-style @tiptap/extension-color \
->   @tiptap/extension-highlight @tiptap/extension-underline \
->   @tiptap/extension-link @tiptap/extension-placeholder
-> ```
->
-> -> **没装 TipTap** -> 自动**回退到包内置的轻量编辑器**  （功能少一点，但能用）
 
 ### 用自己的编辑器
 
+⚠️ `annotationEditor` 收的是**组件**，不是配置对象 ✅
+
 ```tsx
-import type { ComponentType } from 'react';
+function MyEditor(props: {
+  value?: string;
+  onChange?: (html: string, plain: string) => void;
+  onCancel?: () => void;
+  onSave?: (html: string) => void;
+}) {
+  return (
+    <textarea
+      value={props.value}
+      onChange={(e) => props.onChange?.(e.target.value, e.target.value)}
+    />
+  );
+}
 
-const MyEditor: ComponentType<{
-  value: string;
-  onChange: (html: string) => void;
-  toolbar?: RichTextToolbarItem[];
-}> = (props) => <MyRichText {...props} />;
-
-<PdfViewer annotationEditor={MyEditor} />;
+<PdfViewer file={url} annotationEditor={MyEditor} />;
 ```
+
+> ⚠️ `onChange` 的第二个参数是**纯文本** ✅ -> 存的时候可以用它做搜索/复制 ✅
 
 ### ⚠️ 自定义编辑器要支持这三个颜色命令
 
-包会把 `toolbar` 传给编辑器，**编辑器负责执行命令**。三个颜色命令的语义**必须一致**：
+包会调这三个命令名：
 
-| 命令            | 必须做到                         | 用哪个色板              |
-| --------------- | -------------------------------- | ----------------------- |
-| `hiliteColor`   | 设**背景色**（`value` 是颜色值） | `annotationPalette`     |
-| `textHighlight` | 设**背景色**，**字色不变** ⭐    | `annotationPalette`     |
-| `foreColor`     | 设**字色**（`value` 是颜色值）   | `annotationTextPalette` |
+| 命令            | 作用             |
+| --------------- | ---------------- |
+| `textColor`     | 改文字颜色       |
+| `textHighlight` | 给文字加背景高亮 |
+| `clearFormat`   | 清除格式         |
 
--> `value` **可能为空** -> 表示"清除这个格式"
--> 颜色值是 **CSS 颜色字符串**（`#rrggbb` / `rgb(...)`）
+```tsx
+import { execRichTextCommand } from '@scholar-space/pdf-viewer';
 
-**参考实现**：包内置的 `RichTextEditor`（`execRichTextCommand`）和
-`TipTapEditor`（`run`）都遵守这个约定
+execRichTextCommand('textColor', { color: '#ff0000' });
+execRichTextCommand('textHighlight', { color: '#ffff00' });
+execRichTextCommand('removeFormat');
+```
 
 ### ⚠️ 图标要能区分开
 
-三个颜色命令的图标**必须长得不一样**（用户反馈："图标还是跟文字颜色相同 需要区分开"）：
+- `textColor` = A + **色条**
+- `textHighlight` = **粗色带**
+- `clearFormat` = A + **斜杠**
+- `eraser` = **橡皮擦**（清除全部高亮 ✅）
 
-| 命令            | 内置图标         | 画法               |
-| --------------- | ---------------- | ------------------ |
-| `hiliteColor`   | `highlightColor` | 笔 + **底部**色条  |
-| `textHighlight` | `textHighlight`  | "A" + **背景方块** |
-| `foreColor`     | `textColor`      | "A" + **下方色条** |
-| `removeFormat`  | `clearFormat`    | "A" + **斜杠**划掉 |
-
--> ⚠️ **默认工具栏只有前三个里的"高亮"和"文字颜色"**（"文字高亮"被去掉了）❌
-
--> 宿主覆盖图标时**也要保持这个区分**
+四个都**不能画成一样** ✅
 
 ---
 
@@ -367,10 +358,9 @@ const MyEditor: ComponentType<{
 ### CSS 定制小便签
 
 ```css
-.scpdf-annotation {
+.scpdf-sticky-note__icon {
+  --scpdf-note-color: #7c3aed;
   border-radius: 6px;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
-  font-family: "Inter", sans-serif;
 }
 ```
 
@@ -378,13 +368,14 @@ const MyEditor: ComponentType<{
 
 ```tsx
 <PdfViewer
+  file={url}
   slots={{
-    pageOverlay: (pageNumber) => <MyPageBadge page={pageNumber} />,
+    pageOverlay: (pageNumber: number) => <div className="my-page-badge">第 {pageNumber} 页</div>,
   }}
 />;
 ```
 
-> 💡 每页都会渲染这个函数返回的东西 —— 适合做"章节标记"这类东西。
+> ⚠️ `pageOverlay` **可以传函数** ✅ -> 按页号调用 ✅
 
 ---
 
@@ -392,39 +383,18 @@ const MyEditor: ComponentType<{
 
 ```tsx
 <PdfViewer
+  file={url}
   onToast={(toast) => {
-    // 用宿主自己的 UI 体系（antd / shadcn / 自研）
-    myApp.toast({ type: 'success', message: '已保存' });
+    toast.success('已保存');
+    void toast.loadingPromise('正在导出…', async () => {
+      const bytes = await exportPdf();
+      downloadFile(bytes, 'a.pdf');
+    });
   }}
 />;
 ```
 
-**`ToastController` 的方法**：
-
-| 方法             | 签名                                | 说明                          |
-| ---------------- | ----------------------------------- | ----------------------------- |
-| `show`           | `(options: ToastOptions) => string` | 弹一条（返回 toast id）       |
-| `success`        | `(msg, options?) => string`         | 成功                          |
-| `error`          | `(msg, options?) => string`         | 失败                          |
-| `warning`        | `(msg, options?) => string`         | 警告（**不是 `warn`**）       |
-| `info`           | `(msg, options?) => string`         | 提示                          |
-| `loading`        | `(msg, options?) => string`         | 加载中                        |
-| `loadingPromise` | `(msg, task) => Promise<string>`    | **Promise 形态**（照着 antd） |
-| `close`          | `(id?: string) => void`             | 关闭（不给 id = 关最后一条）  |
-
-**`loadingPromise` 的妙用**（自动 loading → success / error）：
-
-```tsx
-onToast={(toast) => {
-  toast.loadingPromise('正在复制…', async () => {
-    await copyToClipboard(text);
-    return '复制成功';   // ← 这句会变成 success toast
-  });
-}}
-```
-
-> 💡 **不传 `onToast` 就用包内置的**（antd 风格）。
-> 宿主接管后，**包自己不发 toast**（宿主想怎么弹就怎么弹）。
+传了 `onToast` → **完全接管** ✅ -> 包不渲染自己的 toast 容器 ✅
 
 ---
 
@@ -432,91 +402,160 @@ onToast={(toast) => {
 
 ```tsx
 <PdfViewer
+  file={url}
+  showPasswordDialog={false}
   onRequestPassword={({ retry, cancel }) => {
-    openMyPasswordDialog({
-      onSubmit: (pw: string) => retry(pw),
-      onCancel: () => cancel(),
+    showMyDialog((pwd) => {
+      if (pwd) retry(pwd);
+      else cancel();
     });
   }}
 />;
 ```
 
-> ⚠️ `retry(pw)` 密码错了会**再次调** `onRequestPassword` → 宿主记得显示"密码错误"。
-
 ---
 
 ## 12. 注入自己的 pdf.js
 
-包**不内置 pdf.js**（体积 + 许可证）。宿主注入：
+### 最小接线
 
 ```tsx
 import * as pdfjs from 'pdfjs-dist';
-import type { PdfViewerProps } from '@scholar-space/pdf-viewer';
 
-const workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
-pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
-
-let doc: pdfjs.PDFDocumentProxy | null = null;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString();
 
 <PdfViewer
   file={url}
-  getPage={async (n) => {
-    doc ??= await pdfjs.getDocument(url).promise;
-    return doc.getPage(n);
-  }}
   getDocInfo={async (data) => {
-    doc ??= await pdfjs.getDocument({ data }).promise;
-    return { numPages: doc.numPages, title: '', author: '', subject: '', keywords: '' };
+    const doc = await pdfjs.getDocument({ data: data.slice() }).promise;
+    return { numPages: doc.numPages, metadata: await doc.getMetadata() };
   }}
-  getPageSizes={async (numPages) => {
-    doc ??= await pdfjs.getDocument(url).promise;
-    return Promise.all(
-      Array.from({ length: numPages }, async (_, i) => {
-        const page = await doc!.getPage(i + 1);
-        const vp = page.getViewport({ scale: 1 });
-        return { width: vp.width, height: vp.height };
-      }),
-    );
+  getPage={async (pageNumber) => {
+    const doc = myDocRef.current!;
+    const page = await doc.getPage(pageNumber);
+    return {
+      pageNumber: page.pageNumber,
+      getViewport: ({ scale }) => page.getViewport({ scale }),
+      getTextContent: () => page.getTextContent(),
+      render: (params) => page.render(params),
+    };
   }}
 />;
 ```
 
-> 💡 **`getPageSizes` 一定要传** —— 不传则用 A4 兜底 → 跳页会偏。
+### ⚠️ 接了自己�� pdf.js 就要自己配资源路径
+
+见下一节 —— **不配的话会乱码** ⚠️
 
 ---
 
-## 13. 用 core 层的纯逻辑
+## 13. 覆盖 pdf.js 的静态资源
 
-`@scholar-space/pdf-viewer/core` 是**零 React、零 DOM** 的纯逻辑。
-可以在**服务端**跑（比如批量算高亮坐标）：
+### 为什么需要
 
-```ts
-import { sanitizeRichText, richTextToPlain } from '@scholar-space/pdf-viewer/core';
+pdf.js 给文档里的每种字体建 `@font-face`。
+PDF 里**内嵌了**的字体它能直接拿到字节；
+**没内嵌的**要去 `standardFontDataUrl` 指的目录下载 `.pfb`。
 
-const safe = sanitizeRichText(userInput);
-const plain = richTextToPlain(safe);
+不配 → 请求不到 → 那些字体 fallback 到系统字体 → **字宽度不对** →
+canvas 上按字宽度排的文字**位置全错** → **页面上的字挤成一团**（像乱码）。
+
+### 包已经内置了 ✅
+
+`dist/standard_fonts/` 已经在包里 → **用默认接线的话不用管** ✅
+
+### 自己接 pdf.js 的话
+
+```tsx
+import { resolvePdfJsResourcePaths } from '@scholar-space/pdf-viewer';
+
+const resources = resolvePdfJsResourcePaths();
+const doc = await pdfjs.getDocument({
+  data: data.slice(),
+  standardFontDataUrl: resources.standardFontDataUrl,
+}).promise;
 ```
 
-> ⚠️ `sanitizeRichText` 在 **SSR**（没有 `document`）下**不做任何清洗** ——
-> 服务端要清洗的话，**别指望它**。
+### 覆盖成自己的
+
+```tsx
+const resources = resolvePdfJsResourcePaths({
+  standardFontDataUrl: '/my-fonts/', // 覆盖内置的 ✅
+  cMapUrl: '/pdfjs/cmaps/', // 中日韩竖排 PDF 才需要
+  wasmUrl: '/pdfjs/wasm/', // JBIG2 / JPEG2000 图片才需要
+});
+```
+
+> ⚠️ **必须是浅覆盖** ✅ -> 只写要改的那几个 ✅ -> 其他的还用内置的 ✅
+> ⚠️ **URL 必须带尾部斜杠** ✅ -> pdf.js 是**直接拼文件名**的 ✅
+> （`new URL('./x/', base)` 会**吃掉**尾斜杠 ✅ -> 要自己补回去 ✅）
 
 ---
 
-## 14. 包的边界（什么不要往里塞）
+## 14. 用 core 层的纯逻辑
 
-包**只做 PDF**。这些**不属于包**：
+`@scholar-space/pdf-viewer/core` 是**零 React** 的 ✅ —— 可以单独拿去用。
 
-| 东西                         | 归谁     |
-| ---------------------------- | -------- |
-| 翻译 / 提问 / 解释的业务逻辑 | **宿主** |
-| 批注内容存哪、怎么同步       | **宿主** |
-| 认证 / 权限                  | **宿主** |
-| 拖放上传文件                 | **宿主** |
-| 文件列表 / 目录树            | **宿主** |
+```tsx
+import {
+  exportHighlightedPdf,
+  parseHighlightDoc,
+  groupAnnotations,
+  computePrintScale,
+} from '@scholar-space/pdf-viewer/core';
+```
 
-**判断标准**：如果一个功能**换个后端就不用改** → 属于包；
-**换个后端就要改** → 属于宿主。
+### core 层有哪些
+
+| 目录              | 内容                  |
+| ----------------- | --------------------- |
+| `annotation/`     | 批注分组、便签定位    |
+| `cache/`          | 字节缓存接口          |
+| `config/`         | 配置合并、类型        |
+| `document/`       | 文档加载、pdf.js 接线 |
+| `editor/`         | 富文本命令、HTML 消毒 |
+| `errors/`         | 错误码                |
+| `export/`         | 导出带高亮的 PDF      |
+| `geometry/`       | 坐标换算              |
+| `highlight/`      | 高亮 → PDF 注解       |
+| `icons/`          | 图标几何数据          |
+| `outline/`        | 目录                  |
+| `print/`          | 打印尺寸计算          |
+| `render/`         | **渲染队列**          |
+| `search/`         | 搜索引擎              |
+| `selection/`      | 选区几何、动作        |
+| `store/`          | 文档缓存              |
+| `text-layer/`     | 文本层排版            |
+| `theme/`          | 主题、外观            |
+| `thumbnail/`      | 缩略图规划            |
+| `virtualization/` | 可视页计算            |
 
 ---
 
-**← 返回 [README](../README.md) · [API 参考](./API.md) · [使用指南](./GUIDE.md)**
+## 15. 包的边界（什么不要往里塞）
+
+包是**通用组件**。下面这些**不该**进包：
+
+| 东西                         | 为什么                      | 该放哪 |
+| ---------------------------- | --------------------------- | ------ |
+| 后端调用 / 持久化            | 包不该知道你的业务          | 宿主   |
+| 认证 / 权限                  | 同上                        | 宿主   |
+| 用户的笔记 / 标签            | 高亮数据在宿主手里          | 宿主   |
+| 特定领域的按钮（"生成摘要"） | 用 `selectionActions` ✅    | 宿主   |
+| 自己的 UI 组件库             | 包只认 `ReactNode` ✅       | 宿主   |
+| 特定字体                     | 用 `pdfJsResourcePaths` ✅  | 宿主   |
+| 特定打印模板                 | 用 `printMode` + `slots` ✅ | 宿主   |
+
+### 判断标准
+
+> **"这个功能换个宿主还有用吗？"**
+>
+> 有 → 可以考虑进包
+> 没有 → 宿主自己做
+
+---
+
+[← 返回 README](../README.md) · [API 参考](./API.md) · [使用指南](./GUIDE.md)
